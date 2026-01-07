@@ -24,23 +24,12 @@ export default class BaseTranslationEngine {
     }
 
     /**
-     * Batch translate messages and speakers
-     * @param {Array} entries - Array of {text, cacheKey, speaker} objects
-     * @param {Array} speakers - Array of speaker names to translate
-     * @returns {Promise<void>}
+     * Batch translate items (texts, speakers, choices)
+     * @param {Array} items - Array of {type, id, value, cacheKey} objects
+     * @returns {Promise<{successes: Array, failures: Array}>}
      */
-    async batchTranslateMessagesAndSpeakers(entries, speakers) {
-        throw new Error('batchTranslateMessagesAndSpeakers() must be implemented');
-    }
-
-    /**
-     * Batch translate choices
-     * @param {Array} choices - Array of choice texts
-     * @param {string} choiceKey - Cache key for the choice set
-     * @returns {Promise<{choices: Array, complete: boolean}>}
-     */
-    async batchTranslateChoices(choices, choiceKey) {
-        throw new Error('batchTranslateChoices() must be implemented');
+    async batchTranslate(items) {
+        throw new Error('batchTranslate() must be implemented');
     }
 
     /**
@@ -88,14 +77,6 @@ export default class BaseTranslationEngine {
 
     setCacheValue(key, value) {
         return this.panel.setCacheValue(key, value);
-    }
-
-    showSpinner() {
-        return this.panel.showSpinner();
-    }
-
-    hideSpinner() {
-        return this.panel.hideSpinner();
     }
 
     wrapText(text, maxWidth) {

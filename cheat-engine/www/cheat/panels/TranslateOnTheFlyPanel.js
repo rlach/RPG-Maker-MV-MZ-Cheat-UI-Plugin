@@ -172,6 +172,15 @@ export default {
                 @change="onChangeAiModel"
                 class="mb-2"
             ></v-select>
+            
+            <v-checkbox
+                v-model="aiAllowNewlineMismatch"
+                label="Allow newline mismatch"
+                :disabled="!enabled"
+                @change="onChangeAiAllowNewlineMismatch"
+                class="mt-2"
+                hide-details
+            ></v-checkbox>
         </div>
     </v-card-text>
 
@@ -474,35 +483,41 @@ export default {
             return candidates.find((it) => it && typeof it.isRunning === 'function' && it.isRunning() && it._waitMode === 'message');
         },
 
-        collectAheadMessages(currentText, interpreter, options = {}) {
+        collectAheadItems(currentText, currentSpeaker, interpreter, options = {}) {
             const charLimit = options.charLimit || 5000;
             const maxLookahead = options.maxLookahead || 50;
-            const maxDepth = options.maxDepth !== undefined ? options.maxDepth : 999; // 0 = only current, 999 = scan ahead
+            const maxDepth = options.maxDepth !== undefined ? options.maxDepth : 999;
             const NL = '\n';
-            const collected = [];
+            const items = []; // Unified list: { type: 'text'|'speaker'|'choice', id: string, value: string }
+            let totalChars = 0;
+            let itemIdCounter = 0;
 
-            const pushEntry = (text) => {
-                if (!text || typeof text !== 'string') {
-                    return false;
+            const pushItem = (type, value) => {
+                if (!value || typeof value !== 'string') return false;
+                if (totalChars + value.length > charLimit) return false;
+                
+                // Check cache first
+                const cacheKey = this.getCacheKey(value, type);
+                if (this.translationCache.has(cacheKey)) {
+                    return true; // Skip cached items
                 }
-                const nextLength = collected.reduce((acc, e) => acc + e.text.length, 0) + text.length;
-                if (nextLength > charLimit) {
-                    return false;
-                }
-                collected.push({ text, cacheKey: this.getCacheKey(text, 'text') });
+
+                const id = `${type}_${itemIdCounter++}`;
+                items.push({ type, id, value, cacheKey });
+                totalChars += value.length;
                 return true;
             };
 
-            // Always include the current text first
-            pushEntry(currentText);
+            // Always include current text and speaker first
+            if (currentText) pushItem('text', currentText);
+            if (currentSpeaker) pushItem('speaker', currentSpeaker);
 
-            // If maxDepth is 0, only return current message (no lookahead)
+            // If maxDepth is 0, only return current message
             if (maxDepth === 0 || !interpreter || !Array.isArray(interpreter._list)) {
-                return collected;
+                return items;
             }
 
             const list = interpreter._list;
-            // _index in RPG Maker points to the next command to execute; start scanning from there
             const startIndex = Math.max(0, interpreter._index || 0);
             const baseIndent = interpreter.currentCommand && typeof interpreter.currentCommand === 'function'
                 ? (interpreter.currentCommand() && interpreter.currentCommand().indent) || 0
@@ -513,147 +528,180 @@ export default {
             while (i < list.length && scanned < maxLookahead) {
                 scanned++;
                 const cmd = list[i];
-                if (!cmd || typeof cmd.code !== 'number') {
-                    break;
-                }
-
-                if (cmd.indent !== undefined && cmd.indent < baseIndent) {
-                    break; // exited current branch
-                }
-
-                if (cmd.code === 0) {
-                    break; // end of list
-                }
-
-                // Skip lines from other deeper-indent branches (e.g., inside if/else blocks)
-                // but continue scanning for messages on the same base indent level
+                if (!cmd || typeof cmd.code !== 'number') break;
+                if (cmd.indent !== undefined && cmd.indent < baseIndent) break;
+                if (cmd.code === 0) break;
                 if (cmd.indent !== undefined && cmd.indent > baseIndent) {
-                    i++;
-                    continue; // Skip this command, but keep scanning for more messages
-                }
-
-                if (cmd.code === 401) { // continuation of previous message, skip as standalone
                     i++;
                     continue;
                 }
 
-                if (cmd.code === 101) { // new message block - collect it and all its continuation lines
+                if (cmd.code === 401) {
+                    i++;
+                    continue;
+                }
+
+                if (cmd.code === 101) { // Message block
                     const speaker = (cmd.parameters && cmd.parameters[4]) || '';
                     const lines = [];
                     let j = i + 1;
                     
-                    // Collect all 401 lines (message continuation) that follow this 101
                     while (j < list.length && list[j] && list[j].code === 401 && list[j].indent === cmd.indent) {
                         lines.push(list[j].parameters && list[j].parameters[0]);
                         j++;
                     }
                     
                     const joined = lines.join(NL);
-                    if (!pushEntry(joined)) {
-                        break; // Char limit reached, stop collecting
-                    }
+                    if (!pushItem('text', joined)) break;
+                    if (speaker && !pushItem('speaker', speaker)) break;
                     
-                    // Attach speaker info to the last pushed entry
-                    const last = collected[collected.length - 1];
-                    if (last) {
-                        last.speaker = speaker;
-                    }
-                    
-                    i = j; // Move to position after all 401 lines
+                    i = j;
                     continue;
                 }
 
-                // For all other commands (show icon, play sound, etc.) at the same indent,
-                // skip them but continue scanning for more messages ahead
+                if (cmd.code === 102) { // Show Choices
+                    const choices = cmd.parameters && cmd.parameters[0];
+                    if (Array.isArray(choices)) {
+                        for (const choice of choices) {
+                            if (!pushItem('choice', choice)) break;
+                        }
+                    }
+                    i++;
+                    continue;
+                }
+
                 i++;
                 continue;
             }
 
-            return collected;
+            return items;
         },
 
         async startAheadTranslation({ currentText, currentSpeakerName, cacheKey, maxDepth }) {
-            let batch = [];
             try {
                 const interpreter = this.findMessageInterpreter();
-                batch = this.collectAheadMessages(currentText, interpreter, { charLimit: 5000, maxDepth });
+                const items = this.collectAheadItems(currentText, currentSpeakerName, interpreter, { charLimit: 5000, maxDepth });
 
-                if (!batch.length) {
-                    return;
-                }
-
-                const currentEntry = batch[0];
-
-                // If current message already cached, apply and skip API
-                if (this.translationCache.has(currentEntry.cacheKey)) {
-                    this.replaceMessageText(this.translationCache.get(currentEntry.cacheKey));
-                    this._translationApplied = true;
-                    return;
-                }
-
-                // Only translate entries that are missing in cache
-                const missing = batch.filter(entry => !this.translationCache.has(entry.cacheKey));
-                if (!missing.length) {
-                    this.replaceMessageText(this.translationCache.get(currentEntry.cacheKey));
-                    this._translationApplied = true;
-                    return;
-                }
-
-                // Mark missing entries as pending
-                for (const entry of missing) {
-                    this.pendingTranslations.set(entry.cacheKey, true);
-                }
-
-                // Batch translate missing messages in one call using safe delimiters
-                console.log('[TranslateOnTheFly] Ahead translation batch (missing only):', missing.map(m => m.text));
-                // Batch translate messages + speakers in one call (skip batch for LibreTranslate due to unstable tag handling)
-                const speakerSet = new Set();
-                if (currentSpeakerName) {
-                    speakerSet.add(currentSpeakerName);
-                }
-                batch.forEach(e => {
-                    if (e && e.speaker) {
-                        speakerSet.add(e.speaker);
+                // Add current choices from $gameMessage if present
+                if ($gameMessage && $gameMessage.isChoice && $gameMessage.isChoice()) {
+                    const currentChoices = $gameMessage._translateOriginalChoices || $gameMessage.choices();
+                    if (Array.isArray(currentChoices)) {
+                        for (let i = 0; i < currentChoices.length; i++) {
+                            const choice = currentChoices[i];
+                            const choiceCacheKey = this.getCacheKey(choice, 'choice');
+                            if (!this.translationCache.has(choiceCacheKey)) {
+                                items.push({
+                                    type: 'choice',
+                                    id: `current_choice_${i}`,
+                                    value: choice,
+                                    cacheKey: choiceCacheKey
+                                });
+                            }
+                        }
                     }
-                });
-                // Filter out speakers that are already cached - don't re-translate them!
-                const speakerList = Array.from(speakerSet).filter(speaker => {
-                    if (!speaker) return false;
-                    const speakerKey = this.getCacheKey(speaker, 'speaker');
-                    return !this.translationCache.has(speakerKey);
-                });
+                }
 
-                // Delegate to engine for batch translation
-                await this.engine.batchTranslateMessagesAndSpeakers(missing, speakerList);
+                if (!items.length) {
+                    return;
+                }
 
-                // Apply the current message (now cached)
-                const applied = this.translationCache.get(currentEntry.cacheKey) || currentText;
-                this.replaceMessageText(applied);
-                this._translationApplied = true;
+                // Filter out items already in cache
+                const uncached = items.filter(item => !this.translationCache.has(item.cacheKey));
+                
+                if (uncached.length === 0) {
+                    // All items cached, apply current text immediately
+                    const firstTextItem = items.find(item => item.type === 'text');
+                    if (firstTextItem) {
+                        const cached = this.translationCache.get(firstTextItem.cacheKey);
+                        if (cached) {
+                            this.replaceMessageText(cached);
+                            this._translationApplied = true;
+                        }
+                    }
+                    return;
+                }
 
-                // Do NOT cache original speaker names here; only translations are cached elsewhere
+                // Deduplicate by cacheKey - only send unique items to translator
+                const uniqueMap = new Map();
+                for (const item of uncached) {
+                    if (!uniqueMap.has(item.cacheKey)) {
+                        uniqueMap.set(item.cacheKey, item);
+                    }
+                }
+                const uniqueItems = Array.from(uniqueMap.values());
 
-                this.translationCount += missing.length;
-                this.lastTranslation = {
-                    original: currentText.substring(0, 100),
-                    translated: applied.substring(0, 100)
-                };
-                this.saveSettings();
+                // Mark as pending (all uncached, including duplicates)
+                for (const item of uncached) {
+                    this.pendingTranslations.set(item.cacheKey, true);
+                }
 
-                // Log how many actually got cached
-                const cachedCount = missing.filter(e => this.translationCache.has(e.cacheKey)).length;
-                console.log('[TranslateOnTheFly] Ahead translation batch cached', cachedCount, 'of', missing.length);
+                console.log(`[TranslateOnTheFly] Batch translating ${uniqueItems.length} items (${uniqueItems.filter(i => i.type === 'text').length} texts, ${uniqueItems.filter(i => i.type === 'speaker').length} speakers, ${uniqueItems.filter(i => i.type === 'choice').length} choices)`);
+
+                // Batch translate via engine (only unique items)
+                this.showSpinner();
+                const result = await this.engine.batchTranslate(uniqueItems);
+                this.hideSpinner();
+
+                // Apply successes to cache
+                for (const success of result.successes) {
+                    this.setCacheValue(success.cacheKey, success.translated);
+                }
+
+                // Log failures
+                for (const failure of result.failures) {
+                    console.warn(`[TranslateOnTheFly] Failed to translate ${failure.type}:`, failure.value, '→', failure.rejectReason);
+                    this.failedTranslations.set(failure.cacheKey, Date.now());
+                }
+
+                // Apply the current text (now hopefully cached)
+                const firstTextItem = items.find(item => item.type === 'text');
+                if (firstTextItem) {
+                    const translated = this.translationCache.get(firstTextItem.cacheKey);
+                    if (translated) {
+                        this.replaceMessageText(translated);
+                        this._translationApplied = true;
+
+                        this.translationCount += result.successes.filter(s => s.type === 'text').length;
+                        this.lastTranslation = {
+                            original: currentText.substring(0, 100),
+                            translated: translated.substring(0, 100)
+                        };
+                        this.saveSettings();
+                    } else {
+                        // Translation failed, show original
+                        this.replaceMessageText(currentText);
+                        this._translationApplied = true;
+                    }
+                }
+
+                // Apply translated choices if present
+                if ($gameMessage && $gameMessage.isChoice && $gameMessage.isChoice()) {
+                    const originalChoices = $gameMessage._translateOriginalChoices || $gameMessage.choices();
+                    const choiceSetKey = this.getCacheKey(JSON.stringify(originalChoices), 'choices');
+                    
+                    // Build translated choices array from cache
+                    const translatedChoices = originalChoices.map(choice => {
+                        const choiceCacheKey = this.getCacheKey(choice, 'choice');
+                        return this.translationCache.get(choiceCacheKey) || choice;
+                    });
+                    
+                    // Cache the complete set
+                    this.setCacheValue(choiceSetKey, translatedChoices);
+                    this.replaceChoiceText(translatedChoices);
+                }
+
+                console.log(`[TranslateOnTheFly] Batch complete: ${result.successes.length} successes, ${result.failures.length} failures`);
+
             } catch (error) {
                 console.error('[TranslateOnTheFly] Ahead translation error:', error);
-                // Never cache original on failure; mark failed and allow cooldown
                 this.failedTranslations.set(cacheKey, Date.now());
-                // Apply original for display this time, without caching
                 this.replaceMessageText(currentText);
                 this._translationApplied = true;
             } finally {
-                // Clear pending flags for batch entries
-                for (const entry of batch) {
-                    this.pendingTranslations.delete(entry.cacheKey);
+                this.hideSpinner();
+                // Clear pending flags
+                for (const key of this.pendingTranslations.keys()) {
+                    this.pendingTranslations.delete(key);
                 }
             }
         },
@@ -913,27 +961,13 @@ export default {
                         }
                     }
 
-                    // Start translation for choices if needed
-                    if (allowTranslation && hasChoices && !choicesReady) {
-                        console.log('[TranslateOnTheFly] Starting choice translation for:', choices.join(' | ').substring(0, 50));
-                        self.pendingTranslations.set(choiceKey, true);
-
-                        self.translateChoices(originalChoices)
-                            .then(result => {
-                                const safeChoices = (result && result.choices) || originalChoices;
-                                if (result && result.complete) {
-                                    self.setCacheValue(choiceKey, safeChoices);
-                                }
-                                self.replaceChoiceText(safeChoices);
-                            })
-                            .catch(error => {
-                                console.error('[TranslateOnTheFly] Choice translation error:', error);
-                                // Do not cache original choices on error
-                                self.failedTranslations.set(choiceKey, Date.now());
-                            })
-                            .finally(() => {
-                                self.pendingTranslations.delete(choiceKey);
-                            });
+                    // Choices are now translated together with text in startAheadTranslation batch
+                    // Just apply them if cached
+                    if (choicesReady) {
+                        const cachedChoices = self.translationCache.get(choiceKey);
+                        if (cachedChoices) {
+                            self.replaceChoiceText(cachedChoices);
+                        }
                     }
 
                     // Speaker: respect cooldown on failures to avoid loops
@@ -1046,28 +1080,7 @@ export default {
                     return;
                 }
 
-                // If already pending, do nothing
-                if (self.pendingTranslations.has(choiceKey)) {
-                    return;
-                }
-
-                // Kick off translation asynchronously (non-blocking)
-                self.pendingTranslations.set(choiceKey, true);
-                self.translateChoices(choices)
-                    .then(result => {
-                        const safeChoices = (result && result.choices) || choices;
-                        if (result && result.complete) {
-                            self.setCacheValue(choiceKey, safeChoices);
-                        }
-                        self.replaceChoiceText(safeChoices);
-                    })
-                    .catch(error => {
-                        console.error('[TranslateOnTheFly] Choice translation error (setChoices hook):', error);
-                        self.setCacheValue(choiceKey, choices);
-                    })
-                    .finally(() => {
-                        self.pendingTranslations.delete(choiceKey);
-                    });
+                // Don't translate here - choices will be translated together with text in startAheadTranslation
             };
 
             // Block entering choice input until choices are translated
@@ -1117,27 +1130,11 @@ export default {
                         self.failedTranslations.delete(choiceKey);
                     }
 
-                    // If not cached, start translation and wait (only when not skipping)
-                    if (allowTranslation && !self.translationCache.has(choiceKey)) {
-                        self.pendingTranslations.set(choiceKey, true);
-                        self.translateChoices(originalChoices)
-                            .then(result => {
-                                const safeChoices = (result && result.choices) || originalChoices;
-                                if (result && result.complete) {
-                                    self.setCacheValue(choiceKey, safeChoices);
-                                }
-                                self.replaceChoiceText(safeChoices);
-                            })
-                            .catch(error => {
-                                console.error('[TranslateOnTheFly] Choice translation error (startInput hook):', error);
-                                // Do not cache original choices; mark failure for cooldown
-                                self.failedTranslations.set(choiceKey, Date.now());
-                            })
-                            .finally(() => {
-                                self.pendingTranslations.delete(choiceKey);
-                            });
-
-                        return false; // wait until translation done
+                    // Choices should already be translated from main batch
+                    // If not cached by now, something went wrong - use originals
+                    if (!self.translationCache.has(choiceKey) && allowTranslation) {
+                        console.warn('[TranslateOnTheFly] Choices not in cache (should have been translated with text)');
+                        self.replaceChoiceText(originalChoices);
                     }
 
                     // Cached -> ensure applied then proceed
@@ -1188,14 +1185,14 @@ export default {
 
         getCacheKey(text, type = 'text') {
             const keyText = type === 'speaker' ? this.ensureSpeakerKeyPrefix(text) : text;
-            return `${type}:${this.translationEngine}-${this.sourceLang}-${this.targetLang}-${keyText}`;
+            return `${type}:${this.sourceLang}-${this.targetLang}-${keyText}`;
         },
 
         getLegacySpeakerCacheKey(speakerName) {
             if (!speakerName) {
                 return null;
             }
-            return `speaker:${this.translationEngine}-${this.sourceLang}-${this.targetLang}-${speakerName}`;
+            return `speaker:${this.sourceLang}-${this.targetLang}-${speakerName}`;
         },
 
         ensureSpeakerKeyPrefix(text) {
@@ -1459,10 +1456,64 @@ export default {
             }
         },
 
-        translateChoices(choices) {
-            const choiceKey = this.getCacheKey(JSON.stringify(choices || []), 'choices');
-            // Delegate to engine
-            return this.engine.batchTranslateChoices(choices || [], choiceKey);
+        async translateChoices(choices) {
+            if (!Array.isArray(choices) || !choices.length) {
+                return { choices: choices || [], complete: true };
+            }
+
+            // Check cache for entire choice set
+            const choiceKey = this.getCacheKey(JSON.stringify(choices), 'choices');
+            if (this.translationCache.has(choiceKey)) {
+                return { choices: this.translationCache.get(choiceKey), complete: true };
+            }
+
+            // Build items for uncached choices
+            const items = choices.map((choice, i) => {
+                const cacheKey = this.getCacheKey(choice, 'choice');
+                return {
+                    type: 'choice',
+                    id: `choice_${i}`,
+                    value: choice,
+                    cacheKey
+                };
+            }).filter(item => !this.translationCache.has(item.cacheKey));
+
+            if (items.length === 0) {
+                // All individual choices cached, build result
+                const translatedChoices = choices.map(choice => {
+                    const cacheKey = this.getCacheKey(choice, 'choice');
+                    return this.translationCache.get(cacheKey) || choice;
+                });
+                this.setCacheValue(choiceKey, translatedChoices);
+                return { choices: translatedChoices, complete: true };
+            }
+
+            // Translate uncached choices
+            this.showSpinner();
+            const result = await this.engine.batchTranslate(items);
+            this.hideSpinner();
+
+            // Apply successes to cache
+            for (const success of result.successes) {
+                this.setCacheValue(success.cacheKey, success.translated);
+            }
+
+            // Build final choice array
+            const translatedChoices = choices.map(choice => {
+                const cacheKey = this.getCacheKey(choice, 'choice');
+                return this.translationCache.get(cacheKey) || choice;
+            });
+
+            const complete = result.failures.length === 0;
+            if (complete) {
+                this.setCacheValue(choiceKey, translatedChoices);
+            } else {
+                for (const failure of result.failures) {
+                    this.failedTranslations.set(failure.cacheKey, Date.now());
+                }
+            }
+
+            return { choices: translatedChoices, complete };
         },
 
         async translateSpeakerName(speakerName) {

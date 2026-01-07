@@ -91,23 +91,35 @@ export default class LibreTranslateEngine extends BaseTranslationEngine {
         return tmp.textContent || '';
     }
 
-    async batchTranslateMessagesAndSpeakers(entries, speakers) {
-        const msgs = Array.isArray(entries) ? entries : [];
-        const spks = Array.isArray(speakers) ? speakers : [];
-        if (!msgs.length && !spks.length) {
-            return;
+    async batchTranslate(items) {
+        // items: [{ type, id, value, cacheKey }]
+        if (!Array.isArray(items) || !items.length) {
+            return { successes: [], failures: [] };
         }
 
-        const msgParts = msgs.map((e, i) => `<span data-t="m" data-i="${i}">${this.htmlizeText(e.text || '')}</span>`);
-        const spkParts = spks.map((s, i) => `<span data-t="s" data-i="${i}">${this.htmlizeText(s || '')}</span>`);
-        const htmlPayload = `<div id="tof-batch">${msgParts.join('')}${spkParts.join('')}</div>`;
+        const typeToHtmlType = { text: 'm', speaker: 's', choice: 'c' };
+        const htmlParts = items.map((item, idx) => {
+            const htmlType = typeToHtmlType[item.type] || item.type;
+            return `<span data-t="${htmlType}" data-i="${idx}">${this.htmlizeText(item.value || '')}</span>`;
+        });
+        const htmlPayload = `<div id="tof-batch">${htmlParts.join('')}</div>`;
 
         const translatedHtml = await this.translate(htmlPayload, this.panel.sourceLang, this.panel.targetLang, { format: 'html' });
         const html = translatedHtml && translatedHtml.trim().length ? translatedHtml : null;
+
+        const successes = [];
+        const failures = [];
+
         if (!html) {
             console.warn('[LibreTranslate] HTML batch returned empty/original, NOT caching');
-            msgs.forEach(e => this.panel.failedTranslations.set(e.cacheKey, Date.now()));
-            return;
+            items.forEach(item => failures.push({
+                type: item.type,
+                id: item.id,
+                value: item.value,
+                cacheKey: item.cacheKey,
+                rejectReason: 'Empty response'
+            }));
+            return { successes, failures };
         }
 
         let doc = null;
@@ -115,155 +127,67 @@ export default class LibreTranslateEngine extends BaseTranslationEngine {
             try { doc = new DOMParser().parseFromString(html, 'text/html'); } catch (_) { doc = null; }
         }
 
-        const extractNodes = (type, count) => {
-            const arr = new Array(count).fill(null);
+        // Process each item individually
+        for (let idx = 0; idx < items.length; idx++) {
+            const item = items[idx];
+            const htmlType = typeToHtmlType[item.type] || item.type;
+            let rawHtml = null;
+
             if (doc) {
-                const nodes = doc.querySelectorAll(`span[data-t="${type}"]`);
-                nodes.forEach(node => {
-                    const idx = parseInt(node.getAttribute('data-i'), 10);
-                    if (!isNaN(idx) && idx >= 0 && idx < count) {
-                        arr[idx] = node.innerHTML;
-                    }
+                const node = doc.querySelector(`span[data-t="${htmlType}"][data-i="${idx}"]`);
+                if (node) {
+                    rawHtml = node.innerHTML;
+                }
+            } else {
+                const regex = new RegExp(`<span[^>]*data-t=\\"${htmlType}\\"[^>]*data-i=\\"${idx}\\"[^>]*>([\\\\s\\\\S]*?)<\\\\/span>`, 'i');
+                const m = regex.exec(html);
+                if (m) {
+                    rawHtml = m[1];
+                }
+            }
+
+            if (rawHtml === null || rawHtml === undefined) {
+                failures.push({
+                    type: item.type,
+                    id: item.id,
+                    value: item.value,
+                    cacheKey: item.cacheKey,
+                    rejectReason: 'Missing slice in response'
                 });
-            } else {
-                const regex = new RegExp(`<span[^>]*data-t=\\"${type}\\"[^>]*data-i=\\"(\\\\d+)\\"[^>]*>([\\\\s\\\\S]*?)<\\\\/span>`, 'gi');
-                let m;
-                while ((m = regex.exec(html)) !== null) {
-                    const idx = parseInt(m[1], 10);
-                    if (!isNaN(idx) && idx >= 0 && idx < count) {
-                        arr[idx] = m[2];
-                    }
-                }
+                continue;
             }
-            return arr;
-        };
 
-        const msgSlices = extractNodes('m', msgs.length);
-        const spkSlices = extractNodes('s', spks.length);
-
-        for (let i = 0; i < msgs.length; i++) {
-            const entry = msgs[i];
-            const rawHtml = msgSlices[i];
-            if (rawHtml !== null && rawHtml !== undefined) {
-                const raw = this.decodeHtml(rawHtml);
-                const isSame = raw.trim() === (entry.text || '').trim();
-                if (!(this.panel.sourceLang !== this.panel.targetLang && isSame)) {
-                    const cleaned = this.wrapText(this.cleanTranslatedText(raw), this.panel.maxLineWidth);
-                    this.setCacheValue(entry.cacheKey, cleaned);
-                    continue;
-                }
+            const translated = this.decodeHtml(rawHtml);
+            const isSame = translated.trim() === (item.value || '').trim();
+            if (this.panel.sourceLang !== this.panel.targetLang && isSame) {
+                failures.push({
+                    type: item.type,
+                    id: item.id,
+                    value: item.value,
+                    cacheKey: item.cacheKey,
+                    rejectReason: 'Translation unchanged'
+                });
+                continue;
             }
-            console.warn('[LibreTranslate] HTML batch message missing/unchanged slice, NOT caching');
-            this.panel.failedTranslations.set(entry.cacheKey, Date.now());
-        }
 
-        for (let i = 0; i < spks.length; i++) {
-            const orig = spks[i];
-            const rawHtml = spkSlices[i];
-            if (rawHtml !== null && rawHtml !== undefined) {
-                const raw = this.decodeHtml(rawHtml);
-                const key = this.getCacheKey(orig, 'speaker');
-                const normalized = this.normalizeSpeakerNameCase(raw);
-                this.setCacheValue(key, normalized);
-            } else {
-                console.warn('[LibreTranslate] HTML batch speaker missing slice, not caching');
+            // Clean and wrap text/choice types
+            let finalTranslated = translated;
+            if (item.type === 'text' || item.type === 'choice') {
+                finalTranslated = this.wrapText(this.cleanTranslatedText(translated), this.panel.maxLineWidth);
+            } else if (item.type === 'speaker') {
+                finalTranslated = this.normalizeSpeakerNameCase(translated);
             }
-        }
-    }
 
-    async batchTranslateChoices(choices, choiceKey) {
-        const list = Array.isArray(choices) ? choices : [];
-        if (!list.length) {
-            return { choices, complete: true };
-        }
-
-        // Check which individual choices are already cached
-        const cachedResults = new Array(list.length).fill(null);
-        const needsTranslation = [];
-        const needsTranslationIndices = [];
-        
-        for (let i = 0; i < list.length; i++) {
-            const choiceText = list[i];
-            const individualKey = this.getCacheKey(choiceText, 'choice');
-            const cached = this.panel.translationCache.get(individualKey);
-            if (cached) {
-                cachedResults[i] = cached;
-            } else {
-                needsTranslation.push(choiceText);
-                needsTranslationIndices.push(i);
-            }
-        }
-
-        if (needsTranslation.length === 0) {
-            console.log('[LibreTranslate] All choices found in cache');
-            return { choices: cachedResults, complete: true };
-        }
-
-        const parts = needsTranslation.map((c, i) => `<span data-t="c" data-i="${i}">${this.htmlizeText(c || '')}</span>`);
-        const htmlPayload = `<div id="tof-choices">${parts.join('')}</div>`;
-        const translatedHtml = await this.translate(htmlPayload, this.panel.sourceLang, this.panel.targetLang, { format: 'html' });
-        const html = translatedHtml && translatedHtml.trim().length ? translatedHtml : null;
-        if (!html) {
-            console.warn('[LibreTranslate] HTML choice batch returned empty/original, not caching');
-            this.panel.failedTranslations.set(choiceKey, Date.now());
-            return { choices: list, complete: false };
-        }
-
-        let doc = null;
-        if (typeof DOMParser !== 'undefined') {
-            try { doc = new DOMParser().parseFromString(html, 'text/html'); } catch(_) { doc = null; }
-        }
-
-        const translatedResults = new Array(needsTranslation.length).fill(null);
-        if (doc) {
-            doc.querySelectorAll('span[data-t="c"]').forEach(node => {
-                const idx = parseInt(node.getAttribute('data-i'), 10);
-                if (!isNaN(idx) && idx >= 0 && idx < translatedResults.length) {
-                    translatedResults[idx] = node.innerHTML;
-                }
+            successes.push({
+                type: item.type,
+                id: item.id,
+                value: item.value,
+                translated: finalTranslated,
+                cacheKey: item.cacheKey
             });
-        } else {
-            const regex = /<span[^>]*data-t=\"c\"[^>]*data-i=\"(\d+)\"[^>]*>([\s\S]*?)<\/span>/gi;
-            let m;
-            while ((m = regex.exec(html)) !== null) {
-                const idx = parseInt(m[1], 10);
-                if (!isNaN(idx) && idx >= 0 && idx < translatedResults.length) {
-                    translatedResults[idx] = m[2];
-                }
-            }
         }
 
-        // Merge cached and newly translated results
-        const results = [...cachedResults];
-        for (let i = 0; i < needsTranslationIndices.length; i++) {
-            const originalIndex = needsTranslationIndices[i];
-            results[originalIndex] = translatedResults[i];
-        }
-
-        const finalChoices = list.map((orig, idx) => {
-            const rawHtml = results[idx];
-            if (rawHtml !== null && rawHtml !== undefined) {
-                const raw = this.decodeHtml(rawHtml);
-                const isSame = raw.trim() === (orig || '').trim();
-                if (!(this.panel.sourceLang !== this.panel.targetLang && isSame)) {
-                    const cleaned = this.wrapText(this.cleanTranslatedText(raw), this.panel.maxLineWidth);
-                    // Cache individual choice for reuse
-                    const individualKey = this.getCacheKey(orig, 'choice');
-                    this.setCacheValue(individualKey, cleaned);
-                    return cleaned;
-                }
-            }
-            return orig;
-        });
-
-        const complete = results.every(r => r !== null && r !== undefined);
-        if (complete) {
-            this.setCacheValue(choiceKey, finalChoices);
-        } else {
-            console.warn('[LibreTranslate] HTML choice batch incomplete, not caching');
-            this.panel.failedTranslations.set(choiceKey, Date.now());
-        }
-
-        return { choices: finalChoices, complete };
+        console.log(`[LibreTranslate] Batch complete: ${successes.length} successes, ${failures.length} failures`);
+        return { successes, failures };
     }
 }

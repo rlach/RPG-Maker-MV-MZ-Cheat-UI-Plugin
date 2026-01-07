@@ -11,6 +11,7 @@ export default class AIEngine extends BaseTranslationEngine {
         this.models = [];
         this.loadingModels = false;
         this.modelsError = '';
+        this.allowNewlineMismatch = false;
 
         // Map panel-saved keys to internal fields for seamless restore via Object.assign
         Object.defineProperties(this, {
@@ -41,6 +42,10 @@ export default class AIEngine extends BaseTranslationEngine {
             aiModelsError: {
                 get: () => this.modelsError,
                 set: (v) => { this.modelsError = v || ''; }
+            },
+            aiAllowNewlineMismatch: {
+                get: () => this.allowNewlineMismatch,
+                set: (v) => { this.allowNewlineMismatch = !!v; }
             }
         });
     }
@@ -118,6 +123,15 @@ export default class AIEngine extends BaseTranslationEngine {
                 @change="onChangeAiModel"
                 class="mb-2"
             ></v-select>
+
+            <v-checkbox
+                v-model="aiAllowNewlineMismatch"
+                label="Allow newline mismatch"
+                :disabled="!enabled"
+                @change="onChangeAiAllowNewlineMismatch"
+                class="mt-2"
+                hide-details
+            ></v-checkbox>
         `;
     }
 
@@ -133,7 +147,8 @@ export default class AIEngine extends BaseTranslationEngine {
             aiSelectedModel: this.selectedModel,
             aiModels: this.models,
             aiLoadingModels: this.loadingModels,
-            aiModelsError: this.modelsError
+            aiModelsError: this.modelsError,
+            aiAllowNewlineMismatch: this.allowNewlineMismatch
         };
     }
 
@@ -211,6 +226,10 @@ export default class AIEngine extends BaseTranslationEngine {
                 self.selectedModel = panel.aiSelectedModel;
                 panel.translationCache.clear();
                 panel.saveSettings();
+            },
+            onChangeAiAllowNewlineMismatch() {
+                self.allowNewlineMismatch = panel.aiAllowNewlineMismatch;
+                panel.saveSettings();
             }
         };
     }
@@ -240,7 +259,7 @@ export default class AIEngine extends BaseTranslationEngine {
         }
 
         const hints = [];
-        const prefix = `speaker:${this.panel.translationEngine}-${this.panel.sourceLang}-${this.panel.targetLang}-`;
+        const prefix = `speaker:${this.panel.sourceLang}-${this.panel.targetLang}-`;
 
         for (const [key, value] of this.panel.translationCache.entries()) {
             if (!key || typeof key !== 'string' || !key.startsWith(prefix)) {
@@ -260,6 +279,14 @@ export default class AIEngine extends BaseTranslationEngine {
         }
 
         return hints.length ? `Translate ${hints.join(', ')}.` : '';
+    }
+
+    isNewlineOnlyMismatch(expected, actual) {
+        // Check if the only difference between expected and actual tag counts is in simpleN (newlines)
+        if (expected.nBracket !== actual.nBracket) return false;
+        if (expected.cBracket !== actual.cBracket) return false;
+        // Allow difference only in simpleN (newlines)
+        return true;
     }
 
     preprocessTags(text) {
@@ -300,7 +327,7 @@ export default class AIEngine extends BaseTranslationEngine {
 
     postprocessTags(text, tagCounts, caseMap) {
         if (!text || typeof text !== 'string') {
-            return { text: text || '', valid: false };
+            return { text: text || '', valid: false, expectedCounts: tagCounts, actualCounts: {} };
         }
 
         let result = text;
@@ -360,7 +387,7 @@ export default class AIEngine extends BaseTranslationEngine {
             });
         }
 
-        return { text: result, valid };
+        return { text: result, valid, expectedCounts: tagCounts, actualCounts };
     }
 
     // Helpers for endpoints and headers
@@ -381,256 +408,173 @@ export default class AIEngine extends BaseTranslationEngine {
         return {};
     }
 
-    async batchTranslateMessagesAndSpeakers(entries, speakers) {
-        const msgs = Array.isArray(entries) ? entries : [];
-        const spks = Array.isArray(speakers) ? speakers : [];
-        if (!msgs.length && !spks.length) {
-            return;
+    async batchTranslate(items) {
+        // items: [{ type, id, value, cacheKey }]
+        if (!Array.isArray(items) || !items.length) {
+            return { successes: [], failures: [] };
         }
 
-        // Preprocess each message/speaker individually to track tags per item
-        const msgData = msgs.map((e, i) => {
-            const { text: preprocessed, tagCounts, caseMap } = this.preprocessTags(e.text || '');
-            return { index: i, entry: e, preprocessed, tagCounts, caseMap };
+        if (!this.selectedModel) {
+            console.warn('[AIEngine] No model selected');
+            return {
+                successes: [],
+                failures: items.map(item => ({
+                    ...item,
+                    rejectReason: 'No model selected'
+                }))
+            };
+        }
+
+        // Preprocess each item individually to track tags
+        const itemData = items.map((item, i) => {
+            const { text: preprocessed, tagCounts, caseMap } = this.preprocessTags(item.value || '');
+            return { ...item, index: i, preprocessed, tagCounts, caseMap };
         });
 
-        const spkData = spks.map((s, i) => {
-            const { text: preprocessed, tagCounts, caseMap } = this.preprocessTags(s || '');
-            return { index: i, original: s, preprocessed, tagCounts, caseMap };
-        });
-
+        // Map type to short tag
+        const typeToTag = { text: 't', speaker: 's', choice: 'ch' };
+        
         // Build tagged batch text
-        const msgTags = msgData.map(m => `[m${m.index}]${m.preprocessed}[em${m.index}]`).join('');
-        const spkTags = spkData.map(s => `[s${s.index}]${s.preprocessed}[es${s.index}]`).join('');
-        const taggedText = msgTags + spkTags;
-
-        const nameHints = this.buildNameHints(taggedText);
+        const taggedItems = itemData.map(item => {
+            const shortTag = typeToTag[item.type] || item.type;
+            return `[${shortTag}${item.index}]${item.preprocessed}[e${shortTag}${item.index}]`;
+        }).join('');
+        
+        const nameHints = this.buildNameHints(taggedItems);
 
         const sourceName = this.getLanguageName(this.panel.sourceLang);
         const targetName = this.getLanguageName(this.panel.targetLang);
         const systemPrompt = `Translate from ${sourceName} to ${targetName}. You are translating scripts that contain []. Altering contents or order of any such tags, removing or adding tags will break the script. DO NOT REMOVE OR ADD ANY TAGS. Only translate the text, do not comment or add anything else:`;
-        console.log('[AIEngine] Batch preprocessed tagged text:', taggedText);
-        const content =  systemPrompt + '[start]' + (nameHints ? nameHints + '\n' : '') + taggedText + '[end]';
-        console.log('[AIEngine] Content to translate:', content);
+        const content = systemPrompt + '[start]' + (nameHints ? nameHints + '\n' : '') + taggedItems + '[end]';
+        
+        console.log('[AIEngine] Batch translate items:', items.length, 'content length:', content.length);
+        console.log('[AIEngine] Request content:', content);
 
         const payload = {
             model: this.selectedModel,
-            messages: [
-                { role: 'user', content: content }
-            ],
+            messages: [{ role: 'user', content }],
             max_tokens: 10000,
             temperature: 0.01
         };
 
         const url = this.getChatUrl();
-        console.log('[AIEngine] Batch via', this.provider, 'messages=', msgs.length, 'speakers=', spks.length);
 
-        this.showSpinner();
         try {
             const response = await axios.post(url, payload, { headers: this.getAuthHeaders() });
             const data = response && response.data;
+            
             if (!data || !data.choices || !data.choices[0]) {
                 console.warn('[AIEngine] Batch returned empty response');
-                msgs.forEach(e => this.panel.failedTranslations.set(e.cacheKey, Date.now()));
-                return;
+                return {
+                    successes: [],
+                    failures: items.map(item => ({ ...item, rejectReason: 'Empty response' }))
+                };
             }
 
             const message = data.choices[0].message;
-            console.log('[AIEngine] Batch response received', message?.content);
             if (!message || !message.content) {
                 console.warn('[AIEngine] Batch returned no content');
-                msgs.forEach(e => this.panel.failedTranslations.set(e.cacheKey, Date.now()));
-                return;
+                return {
+                    successes: [],
+                    failures: items.map(item => ({ ...item, rejectReason: 'No content' }))
+                };
             }
 
             const rawTranslated = message.content;
+            console.log('[AIEngine] Response content:', rawTranslated);
+            const successes = [];
+            const failures = [];
 
-            // Process each message individually
-            for (const m of msgData) {
-                const startTag = `[m${m.index}]`;
-                const endTag = `[em${m.index}]`;
+            // Map type to short tag
+            const typeToTag = { text: 't', speaker: 's', choice: 'ch' };
+
+            // Process each item individually
+            for (const itemD of itemData) {
+                const shortTag = typeToTag[itemD.type] || itemD.type;
+                const startTag = `[${shortTag}${itemD.index}]`;
+                const endTag = `[e${shortTag}${itemD.index}]`;
                 const startPos = rawTranslated.indexOf(startTag);
                 const endPos = rawTranslated.indexOf(endTag);
                 
                 if (startPos === -1 || endPos === -1 || endPos <= startPos) {
-                    console.warn('[AIEngine] Batch message missing slice', m.index);
-                    this.panel.failedTranslations.set(m.entry.cacheKey, Date.now());
-                    continue;
-                }
-
-                const rawSlice = rawTranslated.substring(startPos + startTag.length, endPos);
-                
-                // Postprocess this specific message with its own tag tracking
-                const { text: translated, valid } = this.postprocessTags(rawSlice, m.tagCounts, m.caseMap);
-                
-                if (!valid) {
-                    console.warn('[AIEngine] Batch message tag mismatch', m.index, {
-                        expected: m.tagCounts,
-                        text: rawSlice.substring(0, 50)
+                    failures.push({
+                        type: itemD.type,
+                        id: itemD.id,
+                        value: itemD.value,
+                        cacheKey: itemD.cacheKey,
+                        rejectReason: 'Missing slice in response'
                     });
-                    this.panel.failedTranslations.set(m.entry.cacheKey, Date.now());
-                    continue;
-                }
-
-                const isSame = translated.trim() === (m.entry.text || '').trim();
-                if (this.panel.sourceLang !== this.panel.targetLang && isSame) {
-                    console.warn('[AIEngine] Batch message unchanged', m.index);
-                    this.panel.failedTranslations.set(m.entry.cacheKey, Date.now());
-                    continue;
-                }
-
-                const cleaned = this.wrapText(this.cleanTranslatedText(translated), this.panel.maxLineWidth);
-                this.setCacheValue(m.entry.cacheKey, cleaned);
-            }
-
-            // Process each speaker individually
-            for (const s of spkData) {
-                const startTag = `[s${s.index}]`;
-                const endTag = `[es${s.index}]`;
-                const startPos = rawTranslated.indexOf(startTag);
-                const endPos = rawTranslated.indexOf(endTag);
-                
-                if (startPos === -1 || endPos === -1 || endPos <= startPos) {
-                    console.warn('[AIEngine] Batch speaker missing slice', s.index);
                     continue;
                 }
 
                 const rawSlice = rawTranslated.substring(startPos + startTag.length, endPos);
                 
-                // Postprocess this specific speaker with its own tag tracking
-                const { text: translated, valid } = this.postprocessTags(rawSlice, s.tagCounts, s.caseMap);
+                // Postprocess with tag tracking
+                const { text: translated, valid, expectedCounts, actualCounts } = this.postprocessTags(rawSlice, itemD.tagCounts, itemD.caseMap);
                 
+                // Check if invalid due to tag mismatch
                 if (!valid) {
-                    console.warn('[AIEngine] Batch speaker tag mismatch', s.index);
-                    continue;
-                }
-
-                const key = this.getCacheKey(s.original, 'speaker');
-                const normalized = this.normalizeSpeakerNameCase(translated);
-                this.setCacheValue(key, normalized);
-            }
-        } catch (error) {
-            console.error('[AIEngine] Batch error:', error.message);
-            msgs.forEach(e => this.panel.failedTranslations.set(e.cacheKey, Date.now()));
-        } finally {
-            this.hideSpinner();
-        }
-    }
-
-    async batchTranslateChoices(choices, choiceKey) {
-        const list = Array.isArray(choices) ? choices : [];
-        if (!list.length) {
-            return { choices, complete: true };
-        }
-
-        const cachedResults = new Array(list.length).fill(null);
-        const needsTranslation = [];
-        const needsTranslationIndices = [];
-        for (let i = 0; i < list.length; i++) {
-            const choiceText = list[i];
-            const individualKey = this.getCacheKey(choiceText, 'choice');
-            const cached = this.panel.translationCache.get(individualKey);
-            if (cached) {
-                cachedResults[i] = cached;
-            } else {
-                needsTranslation.push(choiceText);
-                needsTranslationIndices.push(i);
-            }
-        }
-
-        if (needsTranslation.length === 0) {
-            return { choices: cachedResults, complete: true };
-        }
-
-        const taggedChoices = needsTranslation.map((c, i) => `[ch${i}]${c || ''}[ech${i}]`).join('');
-        const { text: preprocessedTaggedChoices, tagCounts, caseMap } = this.preprocessTags(taggedChoices);
-
-        const sourceName = this.getLanguageName(this.panel.sourceLang);
-        const targetName = this.getLanguageName(this.panel.targetLang);
-        const systemPrompt = `Translate from ${sourceName} to ${targetName}. Do not remove, add or alter any [] sequences. Only translate, do not comment:`;
-
-        const payload = {
-            model: this.selectedModel,
-            messages: [
-                { role: 'user', content: systemPrompt + '\n\n' + preprocessedTaggedChoices }
-            ],
-            max_tokens: 10000,
-            temperature: 0.01
-        };
-
-        const url = this.getChatUrl();
-        this.showSpinner();
-        try {
-            const response = await axios.post(url, payload, { headers: this.getAuthHeaders() });
-            const data = response && response.data;
-            if (!data || !data.choices || !data.choices[0]) {
-                this.panel.failedTranslations.set(choiceKey, Date.now());
-                return { choices: list, complete: false };
-            }
-
-            const message = data.choices[0].message;
-            if (!message || !message.content) {
-                this.panel.failedTranslations.set(choiceKey, Date.now());
-                return { choices: list, complete: false };
-            }
-
-            const rawTranslated = message.content;
-            const { text: translated, valid } = this.postprocessTags(rawTranslated, tagCounts, caseMap);
-            if (!valid) {
-                this.panel.failedTranslations.set(choiceKey, Date.now());
-                return { choices: list, complete: false };
-            }
-
-            if (translated === taggedChoices) {
-                this.panel.failedTranslations.set(choiceKey, Date.now());
-                return { choices: list, complete: false };
-            }
-
-            const translatedResults = new Array(needsTranslation.length).fill(null);
-            for (let i = 0; i < needsTranslation.length; i++) {
-                const startTag = `[ch${i}]`;
-                const endTag = `[ech${i}]`;
-                const startPos = translated.indexOf(startTag);
-                const endPos = translated.indexOf(endTag);
-                if (startPos !== -1 && endPos !== -1 && endPos > startPos) {
-                    translatedResults[i] = translated.substring(startPos + startTag.length, endPos);
-                }
-            }
-
-            const results = [...cachedResults];
-            for (let i = 0; i < needsTranslationIndices.length; i++) {
-                const originalIndex = needsTranslationIndices[i];
-                results[originalIndex] = translatedResults[i];
-            }
-
-            const finalChoices = list.map((orig, idx) => {
-                const raw = results[idx];
-                if (raw !== null && raw !== undefined) {
-                    const isSame = raw.trim() === (orig || '').trim();
-                    if (!(this.panel.sourceLang !== this.panel.targetLang && isSame)) {
-                        const cleaned = this.wrapText(this.cleanTranslatedText(raw), this.panel.maxLineWidth);
-                        const individualKey = this.getCacheKey(orig, 'choice');
-                        this.setCacheValue(individualKey, cleaned);
-                        return cleaned;
+                    // If allowNewlineMismatch is enabled and only newlines differ, accept it
+                    if (this.allowNewlineMismatch && this.isNewlineOnlyMismatch(expectedCounts, actualCounts)) {
+                        // Accept with newline mismatch - continue to check other validations
+                        console.log('[AIEngine] Accepting translation with newline count mismatch:', {
+                            expected: expectedCounts,
+                            actual: actualCounts
+                        });
+                    } else {
+                        failures.push({
+                            type: itemD.type,
+                            id: itemD.id,
+                            value: itemD.value,
+                            cacheKey: itemD.cacheKey,
+                            rejectReason: `Tag count mismatch (expected: ${JSON.stringify(itemD.tagCounts)})`
+                        });
+                        continue;
                     }
                 }
-                return orig;
-            });
 
-            const complete = results.every(r => r !== null && r !== undefined);
-            if (complete) {
-                this.setCacheValue(choiceKey, finalChoices);
-            } else {
-                this.panel.failedTranslations.set(choiceKey, Date.now());
+                const isSame = translated.trim() === (itemD.value || '').trim();
+                if (this.panel.sourceLang !== this.panel.targetLang && isSame) {
+                    failures.push({
+                        type: itemD.type,
+                        id: itemD.id,
+                        value: itemD.value,
+                        cacheKey: itemD.cacheKey,
+                        rejectReason: 'Translation unchanged'
+                    });
+                    continue;
+                }
+
+                // Clean and wrap text/choice types
+                let finalTranslated = translated;
+                if (itemD.type === 'text' || itemD.type === 'choice') {
+                    finalTranslated = this.wrapText(this.cleanTranslatedText(translated), this.panel.maxLineWidth);
+                } else if (itemD.type === 'speaker') {
+                    finalTranslated = this.normalizeSpeakerNameCase(translated);
+                }
+
+                successes.push({
+                    type: itemD.type,
+                    id: itemD.id,
+                    value: itemD.value,
+                    translated: finalTranslated,
+                    cacheKey: itemD.cacheKey
+                });
             }
 
-            return { choices: finalChoices, complete };
+            console.log(`[AIEngine] Batch complete: ${successes.length} successes, ${failures.length} failures`);
+            return { successes, failures };
+
         } catch (error) {
-            console.error('[AIEngine] Choice batch error:', error.message);
-            this.panel.failedTranslations.set(choiceKey, Date.now());
-            return { choices: list, complete: false };
-        } finally {
-            this.hideSpinner();
+            console.error('[AIEngine] Batch error:', error.message);
+            return {
+                successes: [],
+                failures: items.map(item => ({
+                    ...item,
+                    rejectReason: `Exception: ${error.message}`
+                }))
+            };
         }
     }
+
 }
