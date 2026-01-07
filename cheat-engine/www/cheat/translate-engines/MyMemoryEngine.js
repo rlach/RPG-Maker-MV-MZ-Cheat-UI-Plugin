@@ -9,19 +9,6 @@ export default class MyMemoryEngine extends BaseTranslationEngine {
         return 'MyMemory';
     }
 
-    async translate(text, sourceLang, targetLang, options = {}) {
-        console.log(`[MyMemory] Translating: [${sourceLang} -> ${targetLang}]`, text.substring(0, 50));
-        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`;
-        
-        const response = await axios.get(url);
-
-        if (response.data && response.data.responseData && response.data.responseData.translatedText) {
-            return response.data.responseData.translatedText;
-        }
-
-        return text;
-    }
-
     async batchTranslateMessagesAndSpeakers(entries, speakers) {
         const msgs = Array.isArray(entries) ? entries : [];
         const spks = Array.isArray(speakers) ? speakers : [];

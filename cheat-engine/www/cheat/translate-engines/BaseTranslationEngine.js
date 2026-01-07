@@ -24,18 +24,6 @@ export default class BaseTranslationEngine {
     }
 
     /**
-     * Translate text
-     * @param {string} text - Text to translate
-     * @param {string} sourceLang - Source language code
-     * @param {string} targetLang - Target language code
-     * @param {object} options - Additional options (format, skipWrap, etc.)
-     * @returns {Promise<string>} Translated text
-     */
-    async translate(text, sourceLang, targetLang, options = {}) {
-        throw new Error('translate() must be implemented');
-    }
-
-    /**
      * Batch translate messages and speakers
      * @param {Array} entries - Array of {text, cacheKey, speaker} objects
      * @param {Array} speakers - Array of speaker names to translate

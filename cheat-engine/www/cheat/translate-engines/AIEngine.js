@@ -381,53 +381,6 @@ export default class AIEngine extends BaseTranslationEngine {
         return {};
     }
 
-    async translate(text, sourceLang, targetLang, options = {}) {
-        if (!this.selectedModel) {
-            console.warn('[AIEngine] No model selected');
-            return text;
-        }
-
-        const { text: preprocessedText, tagCounts, caseMap } = this.preprocessTags(text);
-
-        const url = this.getChatUrl();
-        const sourceName = this.getLanguageName(sourceLang);
-        const targetName = this.getLanguageName(targetLang);
-        const systemPrompt = `Translate from ${sourceName} to ${targetName}. Do not remove, add or alter any [] sequences. Only translate, do not comment:`;
-
-        const payload = {
-            model: this.selectedModel,
-            messages: [
-                { role: 'user', content: systemPrompt + '\n\n' + preprocessedText }
-            ],
-            max_tokens: 10000,
-            temperature: 0.01
-        };
-
-        console.log(`[AIEngine] Translating via ${this.provider}:`, preprocessedText.substring(0, 50));
-
-        try {
-            const response = await axios.post(url, payload, { headers: this.getAuthHeaders() });
-            const data = response && response.data;
-            if (data && data.choices && data.choices.length > 0) {
-                const message = data.choices[0].message;
-                if (message && message.content) {
-                    const rawResult = message.content.trim();
-                    const { text: finalResult, valid } = this.postprocessTags(rawResult, tagCounts, caseMap);
-                    if (!valid) {
-                        console.warn('[AIEngine] Translation rejected: tag count mismatch');
-                        return text;
-                    }
-                    return finalResult;
-                }
-            }
-            console.warn('[AIEngine] No content in response');
-            return text;
-        } catch (error) {
-            console.error('[AIEngine] error:', error.message);
-            return text;
-        }
-    }
-
     async batchTranslateMessagesAndSpeakers(entries, speakers) {
         const msgs = Array.isArray(entries) ? entries : [];
         const spks = Array.isArray(speakers) ? speakers : [];
@@ -435,18 +388,29 @@ export default class AIEngine extends BaseTranslationEngine {
             return;
         }
 
-        const msgTags = msgs.map((e, i) => `[m${i}]${e.text || ''}[em${i}]`).join('');
-        const spkTags = spks.map((s, i) => `[s${i}]${s || ''}[es${i}]`).join('');
+        // Preprocess each message/speaker individually to track tags per item
+        const msgData = msgs.map((e, i) => {
+            const { text: preprocessed, tagCounts, caseMap } = this.preprocessTags(e.text || '');
+            return { index: i, entry: e, preprocessed, tagCounts, caseMap };
+        });
+
+        const spkData = spks.map((s, i) => {
+            const { text: preprocessed, tagCounts, caseMap } = this.preprocessTags(s || '');
+            return { index: i, original: s, preprocessed, tagCounts, caseMap };
+        });
+
+        // Build tagged batch text
+        const msgTags = msgData.map(m => `[m${m.index}]${m.preprocessed}[em${m.index}]`).join('');
+        const spkTags = spkData.map(s => `[s${s.index}]${s.preprocessed}[es${s.index}]`).join('');
         const taggedText = msgTags + spkTags;
 
-        const { text: preprocessedTaggedText, tagCounts, caseMap } = this.preprocessTags(taggedText);
-        const nameHints = this.buildNameHints(preprocessedTaggedText);
+        const nameHints = this.buildNameHints(taggedText);
 
         const sourceName = this.getLanguageName(this.panel.sourceLang);
         const targetName = this.getLanguageName(this.panel.targetLang);
-        const systemPrompt = `Translate from ${sourceName} to ${targetName}. Do not remove, add or alter any [] sequences. Response has to start and end with tags, EXACTLY AS THE TAGS YOU GOT. Only translate, do not comment:`;
-        console.log('[AIEngine] Batch preprocessed tagged text:', preprocessedTaggedText);
-        const content =  systemPrompt + '\n\n' + (nameHints ? nameHints + '\n' : '') + preprocessedTaggedText
+        const systemPrompt = `Translate from ${sourceName} to ${targetName}. You are translating scripts that contain []. Altering contents or order of any such tags, removing or adding tags will break the script. DO NOT REMOVE OR ADD ANY TAGS. Only translate the text, do not comment or add anything else:`;
+        console.log('[AIEngine] Batch preprocessed tagged text:', taggedText);
+        const content =  systemPrompt + '[start]' + (nameHints ? nameHints + '\n' : '') + taggedText + '[end]';
         console.log('[AIEngine] Content to translate:', content);
 
         const payload = {
@@ -480,52 +444,70 @@ export default class AIEngine extends BaseTranslationEngine {
             }
 
             const rawTranslated = message.content;
-            const { text: translated, valid } = this.postprocessTags(rawTranslated, tagCounts, caseMap);
-            if (!valid) {
-                console.warn('[AIEngine] Batch rejected: tag count mismatch');
-                msgs.forEach(e => this.panel.failedTranslations.set(e.cacheKey, Date.now()));
-                return;
-            }
 
-            if (translated === taggedText) {
-                console.warn('[AIEngine] Batch returned unchanged input');
-                msgs.forEach(e => this.panel.failedTranslations.set(e.cacheKey, Date.now()));
-                return;
-            }
-
-            for (let i = 0; i < msgs.length; i++) {
-                const entry = msgs[i];
-                const startTag = `[m${i}]`;
-                const endTag = `[em${i}]`;
-                const startPos = translated.indexOf(startTag);
-                const endPos = translated.indexOf(endTag);
-                if (startPos !== -1 && endPos !== -1 && endPos > startPos) {
-                    const raw = translated.substring(startPos + startTag.length, endPos);
-                    const isSame = raw.trim() === (entry.text || '').trim();
-                    if (!(this.panel.sourceLang !== this.panel.targetLang && isSame)) {
-                        const cleaned = this.wrapText(this.cleanTranslatedText(raw), this.panel.maxLineWidth);
-                        this.setCacheValue(entry.cacheKey, cleaned);
-                        continue;
-                    }
+            // Process each message individually
+            for (const m of msgData) {
+                const startTag = `[m${m.index}]`;
+                const endTag = `[em${m.index}]`;
+                const startPos = rawTranslated.indexOf(startTag);
+                const endPos = rawTranslated.indexOf(endTag);
+                
+                if (startPos === -1 || endPos === -1 || endPos <= startPos) {
+                    console.warn('[AIEngine] Batch message missing slice', m.index);
+                    this.panel.failedTranslations.set(m.entry.cacheKey, Date.now());
+                    continue;
                 }
-                console.warn('[AIEngine] Batch message missing/unchanged slice', i, msgs[i]);
-                this.panel.failedTranslations.set(entry.cacheKey, Date.now());
+
+                const rawSlice = rawTranslated.substring(startPos + startTag.length, endPos);
+                
+                // Postprocess this specific message with its own tag tracking
+                const { text: translated, valid } = this.postprocessTags(rawSlice, m.tagCounts, m.caseMap);
+                
+                if (!valid) {
+                    console.warn('[AIEngine] Batch message tag mismatch', m.index, {
+                        expected: m.tagCounts,
+                        text: rawSlice.substring(0, 50)
+                    });
+                    this.panel.failedTranslations.set(m.entry.cacheKey, Date.now());
+                    continue;
+                }
+
+                const isSame = translated.trim() === (m.entry.text || '').trim();
+                if (this.panel.sourceLang !== this.panel.targetLang && isSame) {
+                    console.warn('[AIEngine] Batch message unchanged', m.index);
+                    this.panel.failedTranslations.set(m.entry.cacheKey, Date.now());
+                    continue;
+                }
+
+                const cleaned = this.wrapText(this.cleanTranslatedText(translated), this.panel.maxLineWidth);
+                this.setCacheValue(m.entry.cacheKey, cleaned);
             }
 
-            for (let i = 0; i < spks.length; i++) {
-                const orig = spks[i];
-                const startTag = `[s${i}]`;
-                const endTag = `[es${i}]`;
-                const startPos = translated.indexOf(startTag);
-                const endPos = translated.indexOf(endTag);
-                if (startPos !== -1 && endPos !== -1 && endPos > startPos) {
-                    const raw = translated.substring(startPos + startTag.length, endPos);
-                    const key = this.getCacheKey(orig, 'speaker');
-                    const normalized = this.normalizeSpeakerNameCase(raw);
-                    this.setCacheValue(key, normalized);
-                } else {
-                    console.warn('[AIEngine] Batch speaker missing slice', i);
+            // Process each speaker individually
+            for (const s of spkData) {
+                const startTag = `[s${s.index}]`;
+                const endTag = `[es${s.index}]`;
+                const startPos = rawTranslated.indexOf(startTag);
+                const endPos = rawTranslated.indexOf(endTag);
+                
+                if (startPos === -1 || endPos === -1 || endPos <= startPos) {
+                    console.warn('[AIEngine] Batch speaker missing slice', s.index);
+                    continue;
                 }
+
+                const rawSlice = rawTranslated.substring(startPos + startTag.length, endPos);
+                
+                // Postprocess this specific speaker with its own tag tracking
+                const { text: translated, valid } = this.postprocessTags(rawSlice, s.tagCounts, s.caseMap);
+                
+                if (!valid) {
+                    console.warn('[AIEngine] Batch speaker tag mismatch', s.index);
+                    continue;
+                }
+
+                const key = this.getCacheKey(s.original, 'speaker');
+                const normalized = this.normalizeSpeakerNameCase(translated);
+                this.setCacheValue(key, normalized);
             }
         } catch (error) {
             console.error('[AIEngine] Batch error:', error.message);

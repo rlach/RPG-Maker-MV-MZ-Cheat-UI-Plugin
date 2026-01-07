@@ -8,36 +8,7 @@ export default class DatpmtEngine extends BaseTranslationEngine {
     getName() {
         return 'Datpmt';
     }
-
-    async translate(text, sourceLang, targetLang, options = {}) {
-        console.log(`[Datpmt] Translating: [${sourceLang} -> ${targetLang}]`, text.substring(0, 50));
-        const url = 'https://api.datpmt.com/api/v2/dictionary/translate';
-        const params = {
-            string: text,
-            from_lang: sourceLang || 'auto',
-            to_lang: targetLang || 'en'
-        };
-
-        const response = await axios.get(url, { params });
-        const data = response && response.data;
-
-        const candidate = [
-            data && data.data && data.data.translated_text,
-            data && data.data && data.data.translate_string,
-            data && data.data && data.data.translation,
-            data && data.translation,
-            data && data.translatedText,
-            data && data.result,
-            typeof data === 'string' ? data : null
-        ].find(value => typeof value === 'string' && value.length > 0);
-
-        if (candidate) {
-            return candidate;
-        }
-
-        return text;
-    }
-
+    
     async batchTranslateMessagesAndSpeakers(entries, speakers) {
         const msgs = Array.isArray(entries) ? entries : [];
         const spks = Array.isArray(speakers) ? speakers : [];

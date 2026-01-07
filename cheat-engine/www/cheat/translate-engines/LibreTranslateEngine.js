@@ -62,40 +62,6 @@ export default class LibreTranslateEngine extends BaseTranslationEngine {
         };
     }
 
-    async translate(text, sourceLang, targetLang, options = {}) {
-        const host = (this.host || 'http://127.0.0.1:5000').replace(/\/$/, '');
-        const url = `${host}/translate`;
-        
-        const payload = {
-            q: text,
-            source: sourceLang === 'auto' ? 'auto' : sourceLang,
-            target: targetLang,
-            format: options && options.format ? options.format : 'text'
-        };
-        
-        if (this.apiKey && this.apiKey.trim()) {
-            payload.api_key = this.apiKey.trim();
-        }
-        
-        console.log(`[LibreTranslate] Translating: [${sourceLang} -> ${targetLang}]`, text.substring(0, 50));
-        
-        try {
-            const response = await axios.post(url, payload);
-            const data = response && response.data;
-            
-            if (data && data.translatedText) {
-                console.log('[LibreTranslate] Response:', data.translatedText.substring(0, 50));
-                return data.translatedText;
-            }
-            
-            console.log('[LibreTranslate] returned no translatedText');
-            return text;
-        } catch (error) {
-            console.error('[LibreTranslate] error:', error.message);
-            return text;
-        }
-    }
-
     // HTML helpers
     escapeHtml(str) {
         return String(str)
