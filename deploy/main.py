@@ -96,24 +96,30 @@ if __name__ == '__main__':
     paths = Paths()
 
     for game_type in GameTypes:
+        # clean up temp directory if it exists
+        if os.path.exists(paths.temp.root_dir):
+            shutil.rmtree(paths.temp.root_dir)
+        
         # copy js sources to temp directory
         shutil.copytree(paths.origin.root_dir, paths.temp.root_dir)
 
-        # merge cheat sources
-        merge_directory(
-            os.path.join(paths.temp.get_initialize_path(game_type), os.path.basename(paths.temp.get_cheat_source_path())),
-            paths.temp.get_cheat_source_path())
+        # merge cheat sources if the directory exists
+        cheat_source = os.path.join(paths.temp.get_initialize_path(game_type), os.path.basename(paths.temp.get_cheat_source_path()))
+        if os.path.exists(cheat_source):
+            merge_directory(cheat_source, paths.temp.get_cheat_source_path())
 
-        # copy js
-        shutil.copytree(
-            os.path.join(paths.temp.get_initialize_path(game_type), os.path.basename(paths.temp.get_js_source_path())),
-            paths.temp.get_js_source_path())
+        # copy js if the directory exists
+        js_source = os.path.join(paths.temp.get_initialize_path(game_type), os.path.basename(paths.temp.get_js_source_path()))
+        if os.path.exists(js_source):
+            shutil.copytree(js_source, paths.temp.get_js_source_path())
 
         # remove initialize path
         shutil.rmtree(paths.temp.get_initialize_path())
 
         # compress to zip file
-        shutil.rmtree(os.path.join(paths.temp.root_dir, '.idea'))
+        idea_dir = os.path.join(paths.temp.root_dir, '.idea')
+        if os.path.exists(idea_dir):
+            shutil.rmtree(idea_dir)
         create_cheat_version_file(args.version, paths)
         shutil.make_archive(paths.get_output_file_path(game_type, args.version), 'gztar', paths.temp.root_dir)
 

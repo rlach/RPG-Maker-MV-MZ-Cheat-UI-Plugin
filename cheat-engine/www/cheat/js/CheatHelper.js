@@ -1,5 +1,7 @@
 import {Alert} from './AlertHelper.js'
 import {KeyValueStorage} from './KeyValueStorage.js'
+import {TranslateOnTheFlyState} from './TranslateOnTheFlyState.js'
+import {MESSAGE_LOG} from './MessageLogStore.js'
 
 export class GeneralCheat {
     // static saveCheatSettings () {
@@ -605,6 +607,14 @@ export class MessageCheat {
         };
 
 
+        // Log every message that reaches the window
+        const _Window_Message_startMessage = Window_Message.prototype.startMessage;
+        Window_Message.prototype.startMessage = function () {
+            MessageCheat.logCurrentMessage();
+            _Window_Message_startMessage.call(this);
+        };
+
+
         // --------------------------- 배틀 로그 관련
         // Accelerates the battle log output speed
         const _Window_BattleLog_messageSpeed = Window_BattleLog.prototype.messageSpeed;
@@ -617,6 +627,48 @@ export class MessageCheat {
 
             return ret;
         };
+    }
+
+    static toggleRealtimeTranslation (notify = true) {
+        const enabled = TranslateOnTheFlyState.toggleEnabled()
+
+        if (window.__TranslateOnTheFlyPanel && typeof window.__TranslateOnTheFlyPanel.applyExternalToggle === 'function') {
+            window.__TranslateOnTheFlyPanel.applyExternalToggle(enabled, false)
+        }
+
+        if (notify) {
+            Alert.success(`Real-time translation: ${enabled ? 'enabled' : 'disabled'}`)
+        }
+
+        return enabled
+    }
+
+    static logCurrentMessage () {
+        try {
+            if (!$gameMessage || typeof $gameMessage.allText !== 'function') {
+                return
+            }
+
+            const text = $gameMessage.allText() || ''
+            const choices = $gameMessage.choices ? $gameMessage.choices() : []
+            let combined = text
+
+            if (Array.isArray(choices) && choices.length > 0) {
+                const lines = choices.map((choice, index) => `[${index + 1}] ${choice}`)
+                combined = combined ? `${combined}\n${lines.join('\n')}` : lines.join('\n')
+            }
+
+            if (!combined || combined.trim().length === 0) {
+                return
+            }
+
+            MESSAGE_LOG.addEntry(combined, {
+                translated: !!TranslateOnTheFlyState.isEnabled() && !MessageCheat.skip,
+                skipped: !!MessageCheat.skip
+            })
+        } catch (err) {
+            console.warn('[MessageCheat] Failed to log message', err)
+        }
     }
 
     static startSkip (gameSpeed) {

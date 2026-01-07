@@ -8,8 +8,11 @@ import VariableSettingPanel from './panels/VariableSettingPanel.js'
 import SwitchSettingPanel from './panels/SwitchSettingPanel.js'
 import SaveRecallPanel from './panels/SaveRecallPanel.js'
 import TeleportPanel from './panels/TeleportPanel.js'
+import TextLogPanel from './panels/TextLogPanel.js'
 import ShortcutPanel from './panels/ShortcutPanel.js'
 import TranslateSettingsPanel from './panels/TranslateSettingsPanel.js'
+import TranslateOnTheFlyPanel from './panels/TranslateOnTheFlyPanel.js'
+import TranslateNamesPanel from './panels/TranslateNamesPanel.js'
 
 export default {
     name: 'CheatModal',
@@ -25,8 +28,11 @@ export default {
         SwitchSettingPanel,
         SaveRecallPanel,
         TeleportPanel,
+        TextLogPanel,
         ShortcutPanel,
-        TranslateSettingsPanel
+        TranslateSettingsPanel,
+        TranslateOnTheFlyPanel,
+        TranslateNamesPanel
     },
 
     template: `
@@ -152,6 +158,11 @@ export default {
                   component: 'teleport-panel'
               },
               {
+                  name: 'Text Log',
+                  icon: 'mdi-text-box-outline',
+                  component: 'text-log-panel'
+              },
+              {
                   name: 'Settings',
                   icon: 'mdi-cog',
                   children: [
@@ -159,6 +170,16 @@ export default {
                           name: 'Translate',
                           icon: 'mdi-google-translate',
                           component: 'translate-settings-panel'
+                      },
+                      {
+                          name: 'Translate On The Fly',
+                          icon: 'mdi-translate',
+                          component: 'translate-on-the-fly-panel'
+                      },
+                      {
+                          name: 'Translate Names',
+                          icon: 'mdi-account-edit',
+                          component: 'translate-names-panel'
                       }
                   ]
               }

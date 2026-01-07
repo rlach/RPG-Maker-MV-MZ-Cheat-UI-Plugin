@@ -143,8 +143,12 @@ export default {
 
         onItemChange (item) {
             // modify value
-            $gameVariables.setValue(item.id, item.value)
-
+            let value = item.value
+            // Convert to number if it's a numeric string
+            if (!isNaN(value) && value !== '' && value !== null) {
+                value = Number(value)
+            }
+            $gameVariables.setValue(item.id, value)
             // refresh
             item.value = $gameVariables.value(item.id)
         },

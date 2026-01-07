@@ -86,6 +86,10 @@ const defaultShortcutSettings = {
         }
     },
 
+    toggleRealtimeTranslation: {
+        shortcut: 'alt t'
+    },
+
     openDevTool: {
         shortcut: 'f12'
     }
@@ -299,6 +303,14 @@ const shortcutConfig = {
 
         leaveAction (param) {
             MessageCheat.stopSkip()
+        }
+    },
+
+    toggleRealtimeTranslation: {
+        name: 'Toggle real-time translation',
+        desc: 'Enable or disable live message translation',
+        enterAction () {
+            MessageCheat.toggleRealtimeTranslation(true)
         }
     },
 
