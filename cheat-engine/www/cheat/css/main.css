@@ -64,6 +64,14 @@ body::-webkit-scrollbar {
     z-index: 1011 !important;
 }
 
+/* Allow resizing the overlay card by grabbing its corner */
+.resizable-overlay {
+    resize: both;
+    overflow: hidden;
+    min-width: 620px;
+    min-height: 340px;
+}
+
 /*.x-small-field .v-input__control {*/
 /*    height: 35px;*/
 /*    width: 1px;*/
@@ -89,3 +97,8 @@ body::-webkit-scrollbar {
 /*.x-small-field .v-text-field__slot .v-label--active {*/
 /*    top: 16px;*/
 /*}*/
+
+/* White text for text fields in dark theme */
+.v-text-field input {
+    color: white !important;
+}

@@ -5,30 +5,31 @@ export default {
     name: 'TextLogPanel',
 
     template: `
-<v-card flat class="ma-0 pa-0">
+<v-card flat class="ma-0 pa-0" style="background: transparent; height: 100%; display: grid; grid-template-rows: auto auto 1fr;">
     <v-card-subtitle class="pb-0 font-weight-bold">Text Log</v-card-subtitle>
     
-    <v-tabs v-model="activeTab" dense>
+    <v-tabs v-model="activeTab" dense class="flex-shrink-0">
         <v-tab>Messages</v-tab>
         <v-tab>Console</v-tab>
     </v-tabs>
 
-    <v-tabs-items v-model="activeTab">
+    <v-tabs-items v-model="activeTab" style="background: transparent; overflow: hidden; height: 100%;">
         <!-- Messages Tab -->
-        <v-tab-item>
-            <v-card flat>
-                <v-card-text class="py-0 caption">
+        <v-tab-item style="height: 100%;">
+            <div style="height: 100%; display: flex; flex-direction: column; gap: 6px; padding: 0 0 6px 0;">
+                <div class="py-1 px-4 caption" style="margin: 0;">
                     Latest messages are at the bottom. Text is selectable and can be copied.
-                </v-card-text>
-                <v-card-actions class="py-1 px-2">
+                </div>
+                <div class="py-1 px-2 d-flex align-center" style="margin: 0;">
                     <v-spacer></v-spacer>
                     <v-btn
                         small
                         text
                         color="primary"
                         :disabled="!hasSelection"
-                        @click="onCopy">
-                        Copy
+                        @click="onCopy"
+                        style="opacity: 1 !important;">
+                        <span :style="!hasSelection ? 'color: rgba(255,255,255,0.4)' : ''">Copy</span>
                     </v-btn>
                     <v-btn
                         small
@@ -37,11 +38,11 @@ export default {
                         @click="onClearMessages">
                         Clear Log
                     </v-btn>
-                </v-card-actions>
-                <v-card-text class="py-0">
+                </div>
+                <div style="flex: 1; min-height: 0; padding: 0 8px 0 8px;">
                     <div
                         ref="messageLogContainer"
-                        style="max-height: 260px; overflow-y: auto; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 8px; user-select: text;">
+                        style="height: 100%; overflow-y: auto; background: white; color: black; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 8px; user-select: text;">
                         <pre
                             v-for="entry in messageEntries"
                             :key="entry.id"
@@ -49,25 +50,39 @@ export default {
 {{ formatMessageEntry(entry) }}
                         </pre>
                     </div>
-                </v-card-text>
-            </v-card>
+                </div>
+            </div>
         </v-tab-item>
 
         <!-- Console Tab -->
-        <v-tab-item>
-            <v-card flat>
-                <v-card-text class="py-0 caption">
+        <v-tab-item style="height: 100%;">
+            <div style="height: 100%; display: flex; flex-direction: column; gap: 6px; padding: 0 0 6px 0;">
+                <div class="py-1 px-4 caption" style="margin: 0;">
                     Console logs are captured here. Latest logs at the bottom.
-                </v-card-text>
-                <v-card-actions class="py-1 px-2">
+                </div>
+                <div class="py-1 px-2 d-flex align-center" style="margin: 0;">
+                    <span style="font-size: 12px; white-space: nowrap; color: white;">Max logs:</span>
+                    <v-text-field
+                        v-model.number="consoleLogLimit"
+                        type="text"
+                        inputmode="numeric"
+                        dense
+                        outlined
+                        hide-details
+                        class="ml-2"
+                        style="max-width: 80px; font-size: 12px; color: white;"
+                        @keydown="onConsoleLogLimitKeydown"
+                        @change="onConsoleLogLimitChange"
+                    ></v-text-field>
                     <v-spacer></v-spacer>
                     <v-btn
                         small
                         text
                         color="primary"
                         :disabled="!hasSelection"
-                        @click="onCopy">
-                        Copy
+                        @click="onCopy"
+                        style="opacity: 1 !important;">
+                        <span :style="!hasSelection ? 'color: rgba(255,255,255,0.4)' : ''">Copy</span>
                     </v-btn>
                     <v-btn
                         small
@@ -76,27 +91,11 @@ export default {
                         @click="onClearConsole">
                         Clear Log
                     </v-btn>
-                </v-card-actions>
-                <v-card-text class="py-2 px-2">
-                    <div class="d-flex align-center gap-2">
-                        <span style="font-size: 12px; white-space: nowrap;">Max logs:</span>
-                        <v-text-field
-                            v-model.number="consoleLogLimit"
-                            type="text"
-                            inputmode="numeric"
-                            dense
-                            outlined
-                            hide-details
-                            style="max-width: 80px; font-size: 12px;"
-                            @keydown="onConsoleLogLimitKeydown"
-                            @change="onConsoleLogLimitChange"
-                        ></v-text-field>
-                    </div>
-                </v-card-text>
-                <v-card-text class="py-0">
+                </div>
+                <div style="flex: 1; min-height: 0; padding: 0 8px 0 8px;">
                     <div
                         ref="consoleLogContainer"
-                        style="max-height: 260px; overflow-y: auto; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 8px; user-select: text;">
+                        style="height: 100%; overflow-y: auto; background: white; color: black; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 8px; user-select: text;">
                         <pre
                             v-for="entry in consoleEntries"
                             :key="entry.id"
@@ -105,8 +104,8 @@ export default {
 {{ formatConsoleEntry(entry) }}
                         </pre>
                     </div>
-                </v-card-text>
-            </v-card>
+                </div>
+            </div>
         </v-tab-item>
     </v-tabs-items>
 </v-card>

@@ -12,6 +12,8 @@ import TranslateOnTheFlyPanel from '../panels/TranslateOnTheFlyPanel.js'
 // initialize vue
 const vuetify = new Vuetify()
 
+window.__VUETIFY_INSTANCE__ = vuetify
+
 new Vue({
     vuetify,
     components: { MainComponent }
@@ -27,4 +29,34 @@ try {
     }
 } catch (err) {
     console.warn('[TranslateOnTheFly] Failed to auto-mount translator', err)
+}
+
+// Override SceneManager to keep game active when cheat window (main or external) has focus
+if (typeof SceneManager !== 'undefined' && !window.__CHEAT_EXTERNAL_WINDOW__) {
+    SceneManager.isGameActive = function() {
+        try {
+            // Check if main game window has focus
+            const mainWindowActive = window.document.hasFocus()
+            
+            // Check if external cheat window has focus
+            let externalWindowActive = false
+            const manager = window.__CHEAT_WINDOW_MANAGER__
+            if (manager && manager.externalWindow) {
+                try {
+                    const extWin = manager.externalWindow
+                    if (extWin && !extWin.closed) {
+                        externalWindowActive = extWin.document.hasFocus()
+                    }
+                } catch (e) {
+                    // Cross-origin or closed window - ignore
+                }
+            }
+            
+            return mainWindowActive || externalWindowActive
+        } catch (e) {
+            console.log('[Cheat] SceneManager.isGameActive override error, falling back to original', e)
+            return true
+        }
+    }
+    console.log('[Cheat] SceneManager.isGameActive override installed')
 }

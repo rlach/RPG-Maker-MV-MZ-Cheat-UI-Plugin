@@ -3,6 +3,10 @@ import {MessageCheat} from '../js/CheatHelper.js'
 import { KeyValueStorage } from '../js/KeyValueStorage.js'
 
 export function customizeRPGMakerFunctions (mainComponent) {
+    if (window.__CHEAT_EXTERNAL_WINDOW__) {
+        return
+    }
+
     // Load custom actor names from saved overrides
     loadActorNameOverrides()
 

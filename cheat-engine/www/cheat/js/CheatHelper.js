@@ -767,4 +767,7 @@ function initialize () {
     const intervals = initializeActions.forEach(action => multiRetryAction(action, intervalTimeout, maxTryCount))
 }
 
-initialize()
+// Don't initialize in external cheat window - no game engine there
+if (!window.opener) {
+    initialize()
+}

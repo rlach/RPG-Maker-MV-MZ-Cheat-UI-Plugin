@@ -1,17 +1,21 @@
 import BaseTranslationEngine from './BaseTranslationEngine.js';
 
+const DEFAULT_SYSTEM_PROMPT = 'You are translating scripts that contain []. Altering contents or order of any such tags, removing or adding tags will break the script. DO NOT REMOVE OR ADD ANY TAGS. DO NOT CHANGE ORDER OF THE TAGS. EVER. PRESENT TAGS EXACTLY AS THEY ARE.Only translate the text, do not comment or add anything else. Do not bold, DO NOT FORMAT THE RESPONSE, RETURN IT ALL IN ONE LINE';
+
 // Unified AI engine supporting GPT4All and Open WebUI providers
 export default class AIEngine extends BaseTranslationEngine {
     constructor(panel) {
         super(panel);
-        this.provider = 'gpt4all'; // 'gpt4all' | 'openwebui'
-        this.host = 'http://localhost:4891';
+        this.provider = 'openwebui'; // 'gpt4all' | 'openwebui'
+        this.host = 'http://localhost:8080';
         this.apiKey = '';
         this.selectedModel = '';
         this.models = [];
         this.loadingModels = false;
         this.modelsError = '';
         this.allowNewlineMismatch = false;
+        this.systemPrompt = DEFAULT_SYSTEM_PROMPT;
+        this.lastAiResponse = '';
 
         // Map panel-saved keys to internal fields for seamless restore via Object.assign
         Object.defineProperties(this, {
@@ -46,6 +50,14 @@ export default class AIEngine extends BaseTranslationEngine {
             aiAllowNewlineMismatch: {
                 get: () => this.allowNewlineMismatch,
                 set: (v) => { this.allowNewlineMismatch = !!v; }
+            },
+            aiSystemPrompt: {
+                get: () => this.systemPrompt,
+                set: (v) => { this.systemPrompt = v || DEFAULT_SYSTEM_PROMPT; }
+            },
+            aiLastResponse: {
+                get: () => this.lastAiResponse,
+                set: (v) => { this.lastAiResponse = v || ''; }
             }
         });
     }
@@ -148,7 +160,9 @@ export default class AIEngine extends BaseTranslationEngine {
             aiModels: this.models,
             aiLoadingModels: this.loadingModels,
             aiModelsError: this.modelsError,
-            aiAllowNewlineMismatch: this.allowNewlineMismatch
+            aiAllowNewlineMismatch: this.allowNewlineMismatch,
+            aiSystemPrompt: this.systemPrompt,
+            aiLastResponse: this.lastAiResponse
         };
     }
 
@@ -229,6 +243,11 @@ export default class AIEngine extends BaseTranslationEngine {
             },
             onChangeAiAllowNewlineMismatch() {
                 self.allowNewlineMismatch = panel.aiAllowNewlineMismatch;
+                panel.saveSettings();
+            },
+            onChangeAiSystemPrompt() {
+                const next = panel.aiSystemPrompt || DEFAULT_SYSTEM_PROMPT;
+                self.systemPrompt = next;
                 panel.saveSettings();
             }
         };
@@ -437,14 +456,15 @@ export default class AIEngine extends BaseTranslationEngine {
         // Build tagged batch text
         const taggedItems = itemData.map(item => {
             const shortTag = typeToTag[item.type] || item.type;
-            return `[${shortTag}${item.index}]${item.preprocessed}[e${shortTag}${item.index}]`;
+            return `[${shortTag}${item.index}]${item.preprocessed}[e${shortTag}${item.index}]X`;
         }).join('');
         
         const nameHints = this.buildNameHints(taggedItems);
 
         const sourceName = this.getLanguageName(this.panel.sourceLang);
         const targetName = this.getLanguageName(this.panel.targetLang);
-        const systemPrompt = `Translate from ${sourceName} to ${targetName}. You are translating scripts that contain []. Altering contents or order of any such tags, removing or adding tags will break the script. DO NOT REMOVE OR ADD ANY TAGS. Only translate the text, do not comment or add anything else:`;
+        const prompt = (this.systemPrompt || DEFAULT_SYSTEM_PROMPT).trim() || DEFAULT_SYSTEM_PROMPT;
+        const systemPrompt = `Translate from ${sourceName} to ${targetName}. ${prompt}:`;
         const content = systemPrompt + '[start]' + (nameHints ? nameHints + '\n' : '') + taggedItems + '[end]';
         
         console.log('[AIEngine] Batch translate items:', items.length, 'content length:', content.length);
@@ -472,7 +492,20 @@ export default class AIEngine extends BaseTranslationEngine {
             }
 
             const message = data.choices[0].message;
-            if (!message || !message.content) {
+            console.log('[AIEngine] Response message:', message);
+
+            const asFlatString = (value) => {
+                if (Array.isArray(value)) {
+                    return value.map(v => typeof v === 'string' ? v : '').join('');
+                }
+                return typeof value === 'string' ? value : '';
+            };
+
+            const primaryContent = message && typeof message === 'object' ? asFlatString(message.content) : '';
+            const fallbackContent = message && typeof message === 'object' ? asFlatString(message.reasoning_content) : '';
+            const responseContent = primaryContent && primaryContent.trim() ? primaryContent : fallbackContent;
+
+            if (!message || !responseContent) {
                 console.warn('[AIEngine] Batch returned no content');
                 return {
                     successes: [],
@@ -480,7 +513,11 @@ export default class AIEngine extends BaseTranslationEngine {
                 };
             }
 
-            const rawTranslated = message.content;
+            const rawTranslated = responseContent;
+            this.lastAiResponse = rawTranslated || '';
+            if (this.panel) {
+                this.panel.aiLastResponse = this.lastAiResponse;
+            }
             console.log('[AIEngine] Response content:', rawTranslated);
             const successes = [];
             const failures = [];
@@ -508,6 +545,18 @@ export default class AIEngine extends BaseTranslationEngine {
                 }
 
                 const rawSlice = rawTranslated.substring(startPos + startTag.length, endPos);
+
+                // Reject slices that still contain any opening/closing item tags (t/s/ch)
+                if (/\[(?:e?t|e?s|e?ch)\d+\]/i.test(rawSlice)) {
+                    failures.push({
+                        type: itemD.type,
+                        id: itemD.id,
+                        value: itemD.value,
+                        cacheKey: itemD.cacheKey,
+                        rejectReason: 'Response contains leftover tags'
+                    });
+                    continue;
+                }
                 
                 // Postprocess with tag tracking
                 const { text: translated, valid, expectedCounts, actualCounts } = this.postprocessTags(rawSlice, itemD.tagCounts, itemD.caseMap);

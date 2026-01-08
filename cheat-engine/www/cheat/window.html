@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <base href="./">
+    <title>Cheat UI</title>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@mdi/font@6.x/css/materialdesignicons.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+    <link href="css/main.css" rel="stylesheet">
+    <style>
+        html, body { 
+            margin: 0; 
+            padding: 0;
+            width: 100%; 
+            height: 100%; 
+            overflow: hidden;
+            background: #1e1e1e;
+        }
+        #app {
+            width: 100%;
+            height: 100%;
+        }
+        /* Override CheatModal fixed size */
+        .z-index-cheat-0.v-card {
+            width: 100% !important;
+            height: 100% !important;
+        }
+    </style>
+    <script>
+        console.log('[CheatWindow] window.html loading...')
+        window.__CHEAT_EXTERNAL_WINDOW__ = true
+        
+        // Get parent window reference
+        const parentWin = window.opener
+        
+        // Log to parent window console as well for debugging
+        if (parentWin && parentWin.console) {
+            const oldLog = console.log
+            const oldError = console.error
+            const oldWarn = console.warn
+            
+            console.log = function(...args) {
+                oldLog.apply(console, args)
+                try { parentWin.console.log('[ExtWindow]', ...args) } catch(e) {}
+            }
+            console.error = function(...args) {
+                oldError.apply(console, args)
+                try { parentWin.console.error('[ExtWindow]', ...args) } catch(e) {}
+            }
+            console.warn = function(...args) {
+                oldWarn.apply(console, args)
+                try { parentWin.console.warn('[ExtWindow]', ...args) } catch(e) {}
+            }
+            console.log('[CheatWindow] Console forwarding set up')
+        }
+        
+        if (!parentWin) {
+            console.error('[CheatWindow] No parent window (opener)')
+            throw new Error('External cheat window must be opened from parent window')
+        }
+        
+        // Sync key RPG Maker globals from parent
+        const sharePrefixes = ['$game', '$data']
+        const shareNames = [
+            'SceneManager', 'AudioManager', 'SoundManager', 'ImageManager', 'DataManager', 'BattleManager', 'ConfigManager',
+            'StorageManager', 'PluginManager', 'Input', 'TouchInput', 'Graphics', 'TextManager', 'Utils', 'Game_Interpreter',
+            'Game_Message', 'Game_Temp', 'Game_System', 'Game_Switches', 'Game_Variables', 'Window_Message', 'Window_ChoiceList',
+            'Scene_Map', 'Scene_Battle', 'Game_Map'
+        ]
+
+        for (const key of Object.keys(parentWin)) {
+            if (sharePrefixes.some(prefix => key.startsWith(prefix)) || shareNames.includes(key)) {
+                try {
+                    window[key] = parentWin[key]
+                } catch (err) {
+                    // ignore if cannot copy
+                }
+            }
+        }
+        
+        // Get default component from URL or parent
+        const params = new URLSearchParams(window.location.search)
+        const fromQuery = params.get('component')
+        if (fromQuery) {
+            window.__CHEAT_DEFAULT_COMPONENT__ = fromQuery
+        } else if (parentWin.__CHEAT_DEFAULT_COMPONENT__) {
+            window.__CHEAT_DEFAULT_COMPONENT__ = parentWin.__CHEAT_DEFAULT_COMPONENT__
+        }
+        
+        console.log('[CheatWindow] Globals synced from parent')
+    </script>
+    <script src="libs/axios.min.js"></script>
+</head>
+<body>
+<div style="position: fixed; top: 5px; right: 5px; z-index: 9999;">
+    <button onclick="openDevTools()" style="background: #333; color: white; border: 1px solid #666; padding: 5px 10px; cursor: pointer;">Dev Tools (F12)</button>
+</div>
+<div id="app"></div>
+<script>
+    function openDevTools() {
+        if (typeof require !== 'undefined') {
+            try {
+                require('nw.gui').Window.get().showDevTools()
+            } catch (e) {
+                console.error('Failed to open dev tools:', e)
+            }
+        }
+    }
+</script>
+<script type="module">
+    console.log('[CheatWindow] Module script loading')
+    
+    ;(async function() {
+        // parentWin is already declared in the parent <script> tag and available globally
+        if (!window.opener || !window.opener.Vue) {
+            console.error('[CheatWindow] Parent window or Vue not available')
+            throw new Error('Parent window with Vue not found')
+        }
+        
+        const parentWin = window.opener
+        
+        // Share Vue, Vuetify, and libraries from parent
+        window.Vue = parentWin.Vue
+        window.Vuetify = parentWin.Vuetify
+        window.axios = parentWin.axios
+        
+        console.log('[CheatWindow] Shared Vue from parent:', typeof window.Vue)
+        
+        // Import cheat components
+        try {
+            // Force fresh import by adding timestamp to bypass module cache
+            const timestamp = Date.now()
+            
+            console.log('[CheatWindow] Importing CheatModal...')
+            const CheatModal = (await import(`./CheatModal.js?t=${timestamp}`)).default
+            console.log('[CheatWindow] CheatModal imported:', CheatModal)
+            console.log('[CheatWindow] CheatModal components:', Object.keys(CheatModal.components || {}))
+            
+            // Register all CheatModal components globally in external window Vue context
+            if (CheatModal.components) {
+                for (const [name, component] of Object.entries(CheatModal.components)) {
+                    console.log('[CheatWindow] Registering global component:', name)
+                    Vue.component(name, component)
+                }
+            }
+            
+            console.log('[CheatWindow] Importing AlertSnackbar...')
+            const AlertSnackbar = (await import('./components/AlertSnackbar.js')).default
+            console.log('[CheatWindow] AlertSnackbar imported')
+            
+            console.log('[CheatWindow] Importing ConfirmDialog...')
+            const ConfirmDialog = (await import('./components/ConfirmDialog.js')).default
+            console.log('[CheatWindow] ConfirmDialog imported')
+            
+            console.log('[CheatWindow] Importing TranslateOnTheFlyPanel...')
+            const TranslateOnTheFlyPanel = (await import('./panels/TranslateOnTheFlyPanel.js')).default
+            console.log('[CheatWindow] TranslateOnTheFlyPanel imported')
+            
+            // Get vuetify from parent (created when parent setup.js loaded)
+            const parentVuetify = parentWin.__VUETIFY_INSTANCE__
+            
+            if (!parentVuetify) {
+                console.warn('[CheatWindow] Parent Vuetify not found, creating new instance')
+                const Vuetify = parentWin.Vuetify
+                window.__VUETIFY_INSTANCE__ = new Vuetify()
+            } else {
+                window.__VUETIFY_INSTANCE__ = parentVuetify
+            }
+            
+            // Mount Vue app in external window - render CheatModal directly (no overlay needed)
+            const defaultComponent = parentWin.__CHEAT_DEFAULT_COMPONENT__ || 'general-panel'
+            
+            // Kebab-case to PascalCase mapping
+            const kebabToPascal = (str) => {
+                return str.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('')
+            }
+            
+            const app = new Vue({
+                vuetify: window.__VUETIFY_INSTANCE__,
+                components: { CheatModal, AlertSnackbar, ConfirmDialog },
+                data: () => ({ 
+                    currentComponentName: kebabToPascal(defaultComponent)  // Convert to PascalCase immediately
+                }),
+                methods: {
+                    onComponentChange(val) {
+                        console.log('[CheatWindow] Component changed from external to:', val)
+                        // Convert kebab-case to PascalCase for cross-window compatibility
+                        this.currentComponentName = kebabToPascal(val)
+                    }
+                },
+                render (h) {
+                    return h('v-app', { 
+                        props: { dark: true },
+                        style: { height: '100%' }
+                    }, [
+                        h('v-main', { 
+                            style: { height: '100%', padding: '0' }
+                        }, [
+                            h('cheat-modal', { 
+                                props: { currentComponentName: this.currentComponentName },
+                                on: {
+                                    change: this.onComponentChange
+                                }
+                            })
+                        ]),
+                        h('alert-snackbar'),
+                        h('confirm-dialog')
+                    ])
+                }
+            })
+            
+            // Mount without selector first, then manually append to DOM
+            app.$mount()
+            const appContainer = document.querySelector('#app')
+            appContainer.appendChild(app.$el)
+            
+            // Expose for debugging
+            window.__CHEAT_APP__ = app
+            
+            console.log('[CheatWindow] Vue app mounted in external window, app:', app)
+            console.log('[CheatWindow] App element:', app.$el)
+            console.log('[CheatWindow] Initial component:', app.currentComponentName)
+            
+            console.log('[CheatWindow] Vue app mounted in external window')
+            
+            // Boot translation hook
+            try {
+                if (!window.__TranslateOnTheFlyPanel) {
+                    const HiddenTranslator = Vue.extend(TranslateOnTheFlyPanel)
+                    const mountPoint = document.createElement('div')
+                    new HiddenTranslator({ vuetify: window.__VUETIFY_INSTANCE__ }).$mount(mountPoint)
+                    console.log('[CheatWindow] Hidden translator mounted')
+                }
+            } catch (err) {
+                console.warn('[CheatWindow] Failed to mount translator', err)
+            }
+        } catch (err) {
+            console.error('[CheatWindow] Failed to import or mount components:', err)
+            document.body.innerHTML = '<div style="color: white; padding: 20px;">Error loading cheat window:<br><pre>' + err.stack + '</pre></div>'
+        }
+    })()
+</script>
+</body>
+</html>

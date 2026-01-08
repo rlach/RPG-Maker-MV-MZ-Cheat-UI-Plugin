@@ -1,4 +1,5 @@
 import { GeneralCheat, GameSpeedCheat, SpeedCheat, SceneCheat } from '../js/CheatHelper.js'
+import { CHEAT_WINDOW_MANAGER } from '../js/CheatWindowManager.js'
 
 export default {
     name: 'GeneralPanel',
@@ -15,6 +16,12 @@ export default {
             v-model="noClip"
             label="No Clip"
             @change="onNoClipChange">
+        </v-checkbox>
+
+        <v-checkbox
+            v-model="openInSeparateWindow"
+            label="Open in separate window"
+            @change="onOpenInSeparateWindowChange">
         </v-checkbox>
     </v-card-text>
     
@@ -153,6 +160,8 @@ export default {
             speed: 0,
             fixSpeed: false,
 
+            openInSeparateWindow: CHEAT_WINDOW_MANAGER.isSeparateWindowEnabled(),
+
             minSpeed: 1,
             maxSpeed: 10,
             stepSpeed: 0.5,
@@ -177,6 +186,8 @@ export default {
             this.fixSpeed = SpeedCheat.isFixed()
             this.gold = $gameParty._gold
 
+            this.openInSeparateWindow = CHEAT_WINDOW_MANAGER.isSeparateWindowEnabled()
+
             this.gameSpeed = GameSpeedCheat.getRate()
             const gameSpeedSceneOption = GameSpeedCheat.getSceneOption()
             if (gameSpeedSceneOption === GameSpeedCheat.sceneOptions().all) {
@@ -189,6 +200,22 @@ export default {
         onNoClipChange () {
             GeneralCheat.toggleNoClip()
             this.initializeVariables()
+        },
+
+        onOpenInSeparateWindowChange () {
+            CHEAT_WINDOW_MANAGER.setSeparateWindowEnabled(this.openInSeparateWindow)
+            
+            if (this.openInSeparateWindow) {
+                // Explicitly close overlay when enabling separate window
+                this.$root.show = false
+                // Open external window
+                setTimeout(() => {
+                    CHEAT_WINDOW_MANAGER.openExternalWindow()
+                }, 100)
+            } else {
+                // Close external window when disabling
+                CHEAT_WINDOW_MANAGER.closeExternalWindow()
+            }
         },
 
         onSpeedChange () {

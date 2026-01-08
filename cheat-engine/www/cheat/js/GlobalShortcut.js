@@ -405,7 +405,10 @@ function parseKeyObjectToString(src) {
 
 class GlobalShortcut {
     constructor () {
-        this.initialize()
+        // Don't initialize shortcuts in external window
+        if (!window.opener) {
+            this.initialize()
+        }
     }
 
     initialize () {

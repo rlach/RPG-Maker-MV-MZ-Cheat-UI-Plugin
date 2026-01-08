@@ -13,6 +13,7 @@ import ShortcutPanel from './panels/ShortcutPanel.js'
 import TranslateSettingsPanel from './panels/TranslateSettingsPanel.js'
 import TranslateOnTheFlyPanel from './panels/TranslateOnTheFlyPanel.js'
 import TranslateNamesPanel from './panels/TranslateNamesPanel.js'
+import { CHEAT_WINDOW_MANAGER } from './js/CheatWindowManager.js'
 
 export default {
     name: 'CheatModal',
@@ -38,9 +39,9 @@ export default {
     template: `
 <v-card 
     dark
-    class="z-index-cheat-0"
-    width="700" 
-    height="400">
+    class="z-index-cheat-0 resizable-overlay"
+    :width="overlayWidth" 
+    :height="overlayHeight">
     <v-row 
         class="fill-height ma-0 pa-0">
         <div
@@ -163,7 +164,7 @@ export default {
                   component: 'text-log-panel'
               },
               {
-                  name: 'Settings',
+                  name: 'Translations',
                   icon: 'mdi-cog',
                   children: [
                       {
@@ -182,8 +183,11 @@ export default {
                           component: 'translate-names-panel'
                       }
                   ]
-              }
-          ]
+                            }
+                    ],
+                    overlayWidth: 700,
+                    overlayHeight: 400,
+                    resizeObserver: null
       }
     },
 
@@ -198,6 +202,14 @@ export default {
     },
 
     mounted () {
+        const size = CHEAT_WINDOW_MANAGER.getOverlaySize()
+        if (size && Number.isFinite(size.width) && Number.isFinite(size.height)) {
+            this.overlayWidth = size.width
+            this.overlayHeight = size.height
+        }
+
+        this.initResizeObserver()
+
         let navItem = this.componentNameToNavItem[this.currentComponentName]
 
         if (!navItem) {
@@ -208,6 +220,34 @@ export default {
     },
 
     methods: {
+        initResizeObserver () {
+            if (!window.ResizeObserver) {
+                return
+            }
+
+            this.resizeObserver = new ResizeObserver(entries => {
+                if (!entries || !entries.length) return
+                const rect = entries[0].contentRect
+                if (!rect) return
+                const newWidth = Math.round(rect.width)
+                const newHeight = Math.round(rect.height)
+
+                const changed = newWidth !== this.overlayWidth || newHeight !== this.overlayHeight
+                this.overlayWidth = newWidth
+                this.overlayHeight = newHeight
+
+                if (changed) {
+                    CHEAT_WINDOW_MANAGER.setOverlaySize(newWidth, newHeight)
+                }
+            })
+
+            this.$nextTick(() => {
+                if (this.$el && this.resizeObserver) {
+                    this.resizeObserver.observe(this.$el)
+                }
+            })
+        },
+
         onNavTreeUpdate (data) {
             if (data && data.length === 1) {
                 this.$emit('change', data[0].component)
@@ -224,6 +264,18 @@ export default {
             } else {
                 leafFunc(node)
             }
+        }
+    },
+
+    beforeDestroy () {
+        if (this.resizeObserver && this.$el) {
+            try {
+                this.resizeObserver.unobserve(this.$el)
+            } catch (e) {}
+        }
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect()
+            this.resizeObserver = null
         }
     }
 }

@@ -6,6 +6,7 @@ import ConfirmDialog from './components/ConfirmDialog.js'
 import { customizeRPGMakerFunctions } from './init/customize_functions.js'
 import {Key} from './js/KeyCodes.js'
 import {Alert} from'./js/AlertHelper.js'
+import { CHEAT_WINDOW_MANAGER } from './js/CheatWindowManager.js'
 
 export default {
     name: 'MainComponent',
@@ -34,10 +35,11 @@ export default {
     `,
 
     data () {
+        const defaultComponent = window.__CHEAT_DEFAULT_COMPONENT__ || null
         return {
             currentKey: Key.createEmpty(),
             show: false,
-            currentComponentName: null
+            currentComponentName: defaultComponent
         }
     },
 
@@ -45,6 +47,8 @@ export default {
         const self = this
 
         customizeRPGMakerFunctions(self)
+
+        CHEAT_WINDOW_MANAGER.setMainComponent(this)
 
         GeneralCheat.toggleCheatModal = (componentName = null) => {
             this.toggleCheatModal(componentName)
@@ -88,34 +92,62 @@ export default {
         onGlobalKeyUp (e) {
             GLOBAL_SHORTCUT.runKeyLeaveEvent(e, Key.fromKey(this.currentKey))
             this.currentKey.remove(e.keyCode)
-            GLOBAL_SHORTCUT.runKeyEnterEvent(e, Key.fromKey(this.currentKey))
+            // Don't run enter action if only modifier keys remain
+            // Modifier key codes: Ctrl=17, Alt=18, Shift=16, Meta=91/93
+            const remainingKey = Key.fromKey(this.currentKey)
+            const isOnlyModifiers = remainingKey.code === 0 || 
+                                   remainingKey.code === 16 || 
+                                   remainingKey.code === 17 || 
+                                   remainingKey.code === 18 ||
+                                   remainingKey.code === 91 ||
+                                   remainingKey.code === 93
+            if (!isOnlyModifiers && !remainingKey.isEmpty()) {
+                GLOBAL_SHORTCUT.runKeyEnterEvent(e, remainingKey)
+            }
         },
 
         openCheatModal (componentName) {
+            console.log('[MainComponent] openCheatModal called, separateWindow?', CHEAT_WINDOW_MANAGER.isSeparateWindowEnabled())
+            if (CHEAT_WINDOW_MANAGER.isSeparateWindowEnabled()) {
+                // Do NOT show overlay - use external window instead
+                console.log('[MainComponent] Using external window')
+                this.show = false
+                CHEAT_WINDOW_MANAGER.openCheatUi(componentName || this.currentComponentName)
+                return
+            }
+
+            // Overlay mode
+            console.log('[MainComponent] Using overlay mode')
             if (componentName) {
                 this.currentComponentName = componentName
             }
-
             this.show = true
         },
 
         toggleCheatModal (componentName) {
+            console.log('[MainComponent] toggleCheatModal called, separateWindow?', CHEAT_WINDOW_MANAGER.isSeparateWindowEnabled())
+            if (CHEAT_WINDOW_MANAGER.isSeparateWindowEnabled()) {
+                // Use external window - ensure overlay is closed
+                console.log('[MainComponent] Toggling external window')
+                this.show = false
+                CHEAT_WINDOW_MANAGER.toggleCheatUi(componentName || this.currentComponentName)
+                return
+            }
+
+            // Overlay mode
             const prevComponentName = this.currentComponentName
 
             if (componentName) {
                 this.currentComponentName = componentName
             }
 
-            // close
             if (this.show) {
-                // hide modal if only componentName unchanged
                 if (!componentName || componentName === prevComponentName) {
                     this.show = false
                 }
                 return
             }
 
-            // open
             this.show = true
         },
 
