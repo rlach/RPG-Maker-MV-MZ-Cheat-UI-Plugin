@@ -1,5 +1,6 @@
 import {TRANSLATE_SETTINGS, TRANSLATOR} from '../js/TranslateHelper.js'
 import {Alert} from '../js/AlertHelper.js'
+import {getRowsPerPage, setRowsPerPage} from '../js/TableSettings.js'
 
 export default {
     name: 'TeleportPanel',
@@ -45,7 +46,7 @@ export default {
         :items="maps"
         :search="search"
         :custom-filter="tableItemFilter"
-        :items-per-page="5">
+        :items-per-page.sync="rowsPerPage">
         <template v-slot:top>
             <v-text-field
                 label="Search..."
@@ -97,6 +98,8 @@ export default {
             search: '',
             excludeFullPath: false,
 
+            rowsPerPage: getRowsPerPage(),
+
             maps: [],
 
             tableHeaders: [
@@ -122,6 +125,22 @@ export default {
 
     created () {
         this.initializeVariables()
+    },
+
+    watch: {
+        rowsPerPage (val) {
+            const parsed = Number(val)
+            if (!Number.isFinite(parsed) || parsed <= 0) {
+                return
+            }
+
+            if (parsed !== val) {
+                this.rowsPerPage = parsed
+                return
+            }
+
+            setRowsPerPage(parsed)
+        }
     },
 
     computed: {

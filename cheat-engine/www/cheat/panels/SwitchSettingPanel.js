@@ -1,6 +1,7 @@
 import {ConfirmDialog} from '../js/DialogHelper.js'
 import {TRANSLATOR} from '../js/TranslateHelper.js'
 import {TRANSLATE_SETTINGS} from '../js/TranslateHelper.js'
+import {getRowsPerPage, setRowsPerPage} from '../js/TableSettings.js'
 
 export default {
     name: 'SwitchSettingPanel',
@@ -14,7 +15,7 @@ export default {
         :items="filteredTableItems"
         :search="search"
         :custom-filter="tableItemFilter"
-        :items-per-page="5">
+        :items-per-page.sync="rowsPerPage">
         <template v-slot:top>
             <v-text-field
                 label="Search..."
@@ -91,6 +92,8 @@ export default {
             search: '',
             excludeNameless: false,
 
+            rowsPerPage: getRowsPerPage(),
+
             switchNames: [],
 
             tableHeaders: [
@@ -109,6 +112,22 @@ export default {
 
     created () {
         this.initializeVariables()
+    },
+
+    watch: {
+        rowsPerPage (val) {
+            const parsed = Number(val)
+            if (!Number.isFinite(parsed) || parsed <= 0) {
+                return
+            }
+
+            if (parsed !== val) {
+                this.rowsPerPage = parsed
+                return
+            }
+
+            setRowsPerPage(parsed)
+        }
     },
 
     computed: {

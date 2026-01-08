@@ -2,6 +2,7 @@ import KeyInputField from '../components/KeyInputField.js'
 import { GLOBAL_SHORTCUT } from '../js/GlobalShortcut.js'
 import {Key} from '../js/KeyCodes.js'
 import {Alert} from '../js/AlertHelper.js'
+import {getRowsPerPage, setRowsPerPage} from '../js/TableSettings.js'
 
 export default {
     name: 'ShortcutPanel',
@@ -75,7 +76,7 @@ export default {
         :items="filteredShortcuts"
         :search="search"
         :custom-filter="tableItemFilter"
-        :items-per-page="5">
+        :items-per-page.sync="rowsPerPage">
         <template
             v-slot:item.shortcut="{ item }">
             <key-input-field
@@ -159,6 +160,8 @@ export default {
             search: '',
             shortcutSearch: Key.createEmpty(),
 
+            rowsPerPage: getRowsPerPage(),
+
             tableHeaders: [
                 {
                     text: 'Name',
@@ -182,6 +185,22 @@ export default {
 
     created () {
         this.initializeVariables()
+    },
+
+    watch: {
+        rowsPerPage (val) {
+            const parsed = Number(val)
+            if (!Number.isFinite(parsed) || parsed <= 0) {
+                return
+            }
+
+            if (parsed !== val) {
+                this.rowsPerPage = parsed
+                return
+            }
+
+            setRowsPerPage(parsed)
+        }
     },
 
     computed: {

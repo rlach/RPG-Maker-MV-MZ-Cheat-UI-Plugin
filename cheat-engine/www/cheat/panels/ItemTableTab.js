@@ -1,3 +1,5 @@
+import {getRowsPerPage, setRowsPerPage} from '../js/TableSettings.js'
+
 export default {
     name: 'ItemTableTab',
 
@@ -10,7 +12,7 @@ export default {
         :items="filteredTableItems"
         :search="search"
         :custom-filter="tableItemFilter"
-        :items-per-page="5">
+        :items-per-page.sync="rowsPerPage">
         <template v-slot:top>
             <v-text-field
                 label="Search..."
@@ -97,6 +99,7 @@ export default {
             search: '',
             excludeNameless: false,
             onlyOwnedItems: false,
+            rowsPerPage: getRowsPerPage(),
             tableHeaders: [],
             tableItems: []
         }
@@ -125,6 +128,20 @@ export default {
             handler () {
                 this.initializeVariables()
             }
+        },
+
+        rowsPerPage (val) {
+            const parsed = Number(val)
+            if (!Number.isFinite(parsed) || parsed <= 0) {
+                return
+            }
+
+            if (parsed !== val) {
+                this.rowsPerPage = parsed
+                return
+            }
+
+            setRowsPerPage(parsed)
         }
     },
 

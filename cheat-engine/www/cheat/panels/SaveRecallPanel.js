@@ -1,5 +1,6 @@
 import {KEY_VALUE_STORAGE} from '../js/KeyValueStorage.js'
 import {TRANSLATE_SETTINGS, TRANSLATOR} from '../js/TranslateHelper.js'
+import {getRowsPerPage, setRowsPerPage} from '../js/TableSettings.js'
 
 export default {
     name: 'SaveRecallPanel',
@@ -47,7 +48,7 @@ export default {
         :items="tableItems"
         :search="search"
         :custom-filter="tableItemFilter"
-        :items-per-page="5">
+        :items-per-page.sync="rowsPerPage">
         <template v-slot:top>
             <v-text-field
                 label="Search..."
@@ -132,6 +133,8 @@ export default {
 
             search: '',
 
+            rowsPerPage: getRowsPerPage(),
+
             locations: [],
 
             currentMapName: '',
@@ -160,6 +163,22 @@ export default {
     mounted () {
         this.initializeVariables()
         this.$refs.locationAliasField.focus()
+    },
+
+    watch: {
+        rowsPerPage (val) {
+            const parsed = Number(val)
+            if (!Number.isFinite(parsed) || parsed <= 0) {
+                return
+            }
+
+            if (parsed !== val) {
+                this.rowsPerPage = parsed
+                return
+            }
+
+            setRowsPerPage(parsed)
+        }
     },
 
     computed: {
