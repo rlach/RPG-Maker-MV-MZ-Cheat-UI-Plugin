@@ -26,7 +26,30 @@ export default class MyMemoryEngine extends BaseTranslationEngine {
         });
 
         const joined = payloadParts.join('');
-        const translatedJoinedRaw = await this.translate(joined, this.panel.sourceLang, this.panel.targetLang, { skipWrap: false });
+        
+        // Call MyMemory API directly (CORRECT endpoint from old panel)
+        let translatedJoinedRaw;
+        try {
+            const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(joined)}&langpair=${this.panel.sourceLang}|${this.panel.targetLang}`;
+            const response = await axios.get(url);
+            
+            if (!response.data || !response.data.responseData || !response.data.responseData.translatedText) {
+                throw new Error('Invalid API response');
+            }
+            
+            translatedJoinedRaw = response.data.responseData.translatedText;
+        } catch (error) {
+            console.error('[MyMemory] API error:', error);
+            const failures = items.map(item => ({
+                type: item.type,
+                id: item.id,
+                value: item.value,
+                cacheKey: item.cacheKey,
+                rejectReason: 'API error: ' + error.message
+            }));
+            return { successes: [], failures };
+        }
+        
         const translatedJoined = translatedJoinedRaw === joined ? null : translatedJoinedRaw;
 
         const successes = [];

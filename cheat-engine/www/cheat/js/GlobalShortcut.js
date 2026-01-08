@@ -90,6 +90,10 @@ const defaultShortcutSettings = {
         shortcut: 'alt t'
     },
 
+    translateCurrentMessage: {
+        shortcut: 'alt r'
+    },
+
     openDevTool: {
         shortcut: 'f12'
     }
@@ -311,6 +315,14 @@ const shortcutConfig = {
         desc: 'Enable or disable live message translation',
         enterAction () {
             MessageCheat.toggleRealtimeTranslation(true)
+        }
+    },
+
+    translateCurrentMessage: {
+        name: 'Translate current message(s)',
+        desc: 'Translate the currently displayed message and choices',
+        enterAction () {
+            MessageCheat.translateCurrentMessage()
         }
     },
 

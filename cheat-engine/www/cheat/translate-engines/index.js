@@ -3,12 +3,14 @@ import MyMemoryEngine from './MyMemoryEngine.js';
 import DatpmtEngine from './DatpmtEngine.js';
 import LibreTranslateEngine from './LibreTranslateEngine.js';
 import AIEngine from './AIEngine.js';
+import DummyEngine from './DummyEngine.js';
 
 export {
     MyMemoryEngine,
     DatpmtEngine,
     LibreTranslateEngine,
-    AIEngine
+    AIEngine,
+    DummyEngine
 };
 
 // Factory function to create engine instances
@@ -23,6 +25,8 @@ export function createEngine(engineId, panel) {
         case 'gpt4all':
         case 'ai':
             return new AIEngine(panel);
+        case 'dummy':
+            return new DummyEngine(panel);
         default:
             console.warn(`[TranslationEngines] Unknown engine: ${engineId}, falling back to MyMemory`);
             return new MyMemoryEngine(panel);
@@ -35,6 +39,7 @@ export function getAvailableEngines() {
         { value: 'mymemory', text: 'MyMemory' },
         { value: 'datpmt', text: 'Datpmt' },
         { value: 'libretranslate', text: 'LibreTranslate' },
-        { value: 'gpt4all', text: 'AI Engine' }
+        { value: 'gpt4all', text: 'AI Engine' },
+        { value: 'dummy', text: 'Dummy' }
     ];
 }

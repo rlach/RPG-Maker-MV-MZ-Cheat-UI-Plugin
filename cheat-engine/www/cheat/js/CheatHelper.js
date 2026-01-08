@@ -643,6 +643,42 @@ export class MessageCheat {
         return enabled
     }
 
+    static translateCurrentMessage () {
+        try {
+            // Check if panel is available
+            if (!window.__TranslateOnTheFlyPanel || typeof window.__TranslateOnTheFlyPanel.translateAndApplyCurrentMessage !== 'function') {
+                console.warn('[MessageCheat] TranslateOnTheFlyPanel not available')
+                Alert.error('Translation panel not initialized')
+                return
+            }
+
+            // Use tracked $gameMessage from panel instead of global one
+            const gameMessage = window.__TranslateOnTheFlyPanel.currentGameMessage || $gameMessage;
+            
+            if (!gameMessage || typeof gameMessage.allText !== 'function') {
+                console.warn('[MessageCheat] No gameMessage available')
+                Alert.warn('No message to translate')
+                return
+            }
+
+            const text = gameMessage.allText()
+            const choices = gameMessage.choices ? gameMessage.choices() : []
+            const hasChoices = Array.isArray(choices) && choices.length > 0
+            
+            if ((!text || text.trim().length === 0) && !hasChoices) {
+                console.warn('[MessageCheat] Message text is empty and no choices')
+                Alert.warn('No message to translate')
+                return
+            }
+
+            console.log('[MessageCheat] Translating current message:', text.substring(0, 50) + '...', hasChoices ? `with ${choices.length} choices` : '')
+            window.__TranslateOnTheFlyPanel.translateAndApplyCurrentMessage()
+        } catch (err) {
+            console.error('[MessageCheat] Failed to translate current message', err)
+            Alert.error('Failed to translate message: ' + err.message)
+        }
+    }
+
     static logCurrentMessage () {
         try {
             if (!$gameMessage || typeof $gameMessage.allText !== 'function') {

@@ -104,7 +104,40 @@ export default class LibreTranslateEngine extends BaseTranslationEngine {
         });
         const htmlPayload = `<div id="tof-batch">${htmlParts.join('')}</div>`;
 
-        const translatedHtml = await this.translate(htmlPayload, this.panel.sourceLang, this.panel.targetLang, { format: 'html' });
+        // Call LibreTranslate API directly
+        let translatedHtml;
+        try {
+            const url = `${this.host}/translate`;
+            const payload = {
+                q: htmlPayload,
+                source: this.panel.sourceLang === 'auto' ? 'auto' : this.panel.sourceLang,
+                target: this.panel.targetLang,
+                format: 'html'
+            };
+            
+            if (this.apiKey && this.apiKey.trim()) {
+                payload.api_key = this.apiKey.trim();
+            }
+            
+            const response = await axios.post(url, payload);
+            
+            if (!response.data || !response.data.translatedText) {
+                throw new Error('Invalid API response');
+            }
+            
+            translatedHtml = response.data.translatedText;
+        } catch (error) {
+            console.error('[LibreTranslate] API error:', error);
+            const failures = items.map(item => ({
+                type: item.type,
+                id: item.id,
+                value: item.value,
+                cacheKey: item.cacheKey,
+                rejectReason: 'API error: ' + error.message
+            }));
+            return { successes: [], failures };
+        }
+        
         const html = translatedHtml && translatedHtml.trim().length ? translatedHtml : null;
 
         const successes = [];

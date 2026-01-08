@@ -288,7 +288,11 @@ export default {
             aiSelectedModel: '',
             aiModels: [],
             aiLoadingModels: false,
-            aiModelsError: ''
+            aiModelsError: '',
+            aiAllowNewlineMismatch: false,
+            // Track the current message window and $gameMessage for live refresh
+            currentMessageWindow: null,
+            currentGameMessage: null
         };
     },
 
@@ -480,13 +484,59 @@ export default {
                 candidates.push($gameTroop._interpreter);
             }
 
-            return candidates.find((it) => it && typeof it.isRunning === 'function' && it.isRunning() && it._waitMode === 'message');
+            // Helper to recursively find deepest child interpreter
+            const getDeepestChild = (interp) => {
+                if (!interp) return null;
+                if (interp._childInterpreter) {
+                    const child = getDeepestChild(interp._childInterpreter);
+                    return child || interp;
+                }
+                return interp;
+            };
+
+            // Expand candidates to include all child interpreters recursively
+            const expandedCandidates = [];
+            for (const candidate of candidates) {
+                expandedCandidates.push(candidate);
+                let child = candidate._childInterpreter;
+                while (child) {
+                    expandedCandidates.push(child);
+                    child = child._childInterpreter;
+                }
+            }
+
+            console.log('[findMessageInterpreter] Found candidates:', expandedCandidates.length, expandedCandidates.map(it => ({
+                isRunning: it && typeof it.isRunning === 'function' && it.isRunning(),
+                waitMode: it && it._waitMode,
+                haslist: it && Array.isArray(it._list),
+                listLength: it && it._list && it._list.length,
+                index: it && it._index
+            })));
+
+            // First: look for interpreter waiting on message
+            const found = expandedCandidates.find((it) => it && typeof it.isRunning === 'function' && it.isRunning() && it._waitMode === 'message');
+            
+            if (found) {
+                return found;
+            }
+
+            // Fallback: try to find any running interpreter with a list
+            const fallback = expandedCandidates.find((it) => it && typeof it.isRunning === 'function' && it.isRunning() && it._list && it._list.length > 0);
+            if (fallback) {
+                console.log('[findMessageInterpreter] Using fallback interpreter (not waiting for message but has list)');
+                return fallback;
+            }
+            
+            return null;
         },
 
         collectAheadItems(currentText, currentSpeaker, interpreter, options = {}) {
             const charLimit = options.charLimit || 5000;
             const maxLookahead = options.maxLookahead || 50;
             const maxDepth = options.maxDepth !== undefined ? options.maxDepth : 999;
+            
+            console.log('[Lookahead] Starting collection', { charLimit, maxLookahead, maxDepth, currentText, currentSpeaker });
+            
             const NL = '\n';
             const items = []; // Unified list: { type: 'text'|'speaker'|'choice', id: string, value: string }
             let totalChars = 0;
@@ -514,27 +564,43 @@ export default {
 
             // If maxDepth is 0, only return current message
             if (maxDepth === 0 || !interpreter || !Array.isArray(interpreter._list)) {
+                console.log('[Lookahead] Stopped: early return', { 
+                    reason: maxDepth === 0 ? 'maxDepth is 0' : !interpreter ? 'no interpreter' : 'interpreter._list not array',
+                    maxDepth, 
+                    hasInterpreter: !!interpreter, 
+                    isListArray: interpreter && Array.isArray(interpreter._list),
+                    totalItems: items.length 
+                });
                 return items;
             }
 
             const list = interpreter._list;
-            const startIndex = Math.max(0, interpreter._index || 0);
-            const baseIndent = interpreter.currentCommand && typeof interpreter.currentCommand === 'function'
-                ? (interpreter.currentCommand() && interpreter.currentCommand().indent) || 0
-                : 0;
+            const startIndex = 0;
+            // Don't use baseIndent to filter - we want to collect ALL messages even in nested blocks
+            // baseIndent is only used to understand structure, not to skip items
+
+            console.log('[Lookahead] Scanning list', { listLength: list.length, startIndex });
 
             let i = startIndex;
             let scanned = 0;
-            while (i < list.length && scanned < maxLookahead) {
+            // Scan through entire list when we have interpreter
+            while (i < list.length) {
                 scanned++;
                 const cmd = list[i];
-                if (!cmd || typeof cmd.code !== 'number') break;
-                if (cmd.indent !== undefined && cmd.indent < baseIndent) break;
-                if (cmd.code === 0) break;
-                if (cmd.indent !== undefined && cmd.indent > baseIndent) {
+                if (!cmd || typeof cmd.code !== 'number') {
+                    console.log('[Lookahead] Skipping: no cmd or invalid code', { cmd, i, scanned });
                     i++;
                     continue;
                 }
+                
+                // Stop only at code 0 (end of event)
+                if (cmd.code === 0) {
+                    console.log('[Lookahead] Skipping: code 0 (end)', { cmd, i, scanned });
+                    i++;
+                    continue;
+                }
+                
+                // Don't skip based on indent - collect ALL messages even in nested blocks
 
                 if (cmd.code === 401) {
                     i++;
@@ -546,14 +612,21 @@ export default {
                     const lines = [];
                     let j = i + 1;
                     
-                    while (j < list.length && list[j] && list[j].code === 401 && list[j].indent === cmd.indent) {
+                    // Collect all following 401 lines (message text continuation) regardless of indent
+                    while (j < list.length && list[j] && list[j].code === 401) {
                         lines.push(list[j].parameters && list[j].parameters[0]);
                         j++;
                     }
                     
                     const joined = lines.join(NL);
-                    if (!pushItem('text', joined)) break;
-                    if (speaker && !pushItem('speaker', speaker)) break;
+                    if (!pushItem('text', joined)) {
+                        console.log('[Lookahead] CharLimit reached (text), continuing scan', { cmd, joined, totalChars, charLimit, i, scanned });
+                        // Don't break, just skip and continue
+                    }
+                    if (speaker && !pushItem('speaker', speaker)) {
+                        console.log('[Lookahead] CharLimit reached (speaker), continuing scan', { cmd, speaker, totalChars, charLimit, i, scanned });
+                        // Don't break, just skip and continue
+                    }
                     
                     i = j;
                     continue;
@@ -563,7 +636,10 @@ export default {
                     const choices = cmd.parameters && cmd.parameters[0];
                     if (Array.isArray(choices)) {
                         for (const choice of choices) {
-                            if (!pushItem('choice', choice)) break;
+                            if (!pushItem('choice', choice)) {
+                                console.log('[Lookahead] CharLimit reached (choice), continuing scan', { cmd, choice, totalChars, charLimit, i, scanned });
+                                // Don't break, just skip this choice and continue
+                            }
                         }
                     }
                     i++;
@@ -573,6 +649,15 @@ export default {
                 i++;
                 continue;
             }
+
+            // Log completion info
+            console.log('[Lookahead] Scan completed', { 
+                totalScanned: scanned,
+                listLength: list.length,
+                totalItems: items.length, 
+                totalChars,
+                reason: i >= list.length ? 'end of list' : 'loop ended'
+            });
 
             return items;
         },
@@ -717,12 +802,12 @@ export default {
         },
 
         onChangeSourceLang() {
-            this.translationCache.clear();
+            // Don't clear cache - keys contain source/target lang, so they don't conflict
             this.saveSettings();
         },
 
         onChangeTargetLang() {
-            this.translationCache.clear();
+            // Don't clear cache - keys contain source/target lang, so they don't conflict
             this.saveSettings();
         },
         onChangeTranslationEngine() {
@@ -756,17 +841,17 @@ export default {
                 this[methodName] = engineConfigMethods[methodName].bind(this.engine);
             });
             
-            this.translationCache.clear();
+            // Don't clear cache - keys contain engine name, so they don't conflict
             this.saveSettings();
         },
 
         onChangeTextWrapping() {
-            this.translationCache.clear();
+            // Don't clear cache - wrapping doesn't affect cache validity
             this.saveSettings();
         },
 
         onChangeMaxWidth() {
-            this.translationCache.clear();
+            // Don't clear cache - wrapping is applied on display, not stored in cache
             this.saveSettings();
         },
 
@@ -819,6 +904,12 @@ export default {
 
             // Override canStart to block until translation is ready
             Window_Message.prototype.canStart = function() {
+                // Store reference to this message window and $gameMessage for Alt+R refresh
+                self.currentMessageWindow = this;
+                console.log('[TranslateOnTheFly] canStart hook engaged, message window:', this);
+                self.currentGameMessage = $gameMessage;
+                console.log('[TranslateOnTheFly] canStart hook engaged, $gameMessage:', $gameMessage);
+                
                 const originalCanStart = Window_Message.prototype._originalCanStart.call(this);
                 const translationEnabled = self.isTranslationEnabled();
                 const skipping = self.isSkippingMessages();
@@ -1551,6 +1642,181 @@ export default {
 
             // Delegate to engine
             return await this.engine.translate(payload, sourceLang, targetLang, options);
+        },
+
+        async translateAndApplyCurrentMessage() {
+            try {
+                // Use stored $gameMessage reference instead of global one
+                const gameMessage = this.currentGameMessage || $gameMessage;
+                
+                if (!gameMessage || typeof gameMessage.allText !== 'function') {
+                    console.warn('[TranslateOnTheFly] No gameMessage available');
+                    return;
+                }
+                
+                // Verify engine exists
+                if (!this.engine || typeof this.engine.batchTranslate !== 'function') {
+                    console.error('[TranslateOnTheFly] No engine available or batchTranslate not found', {
+                        hasEngine: !!this.engine,
+                        engineType: this.engine ? this.engine.constructor.name : 'null',
+                        hasBatchTranslate: this.engine && typeof this.engine.batchTranslate === 'function'
+                    });
+                    Alert.error('Translation engine not initialized');
+                    return;
+                }
+
+                // Get original text (before translation) or current text
+                const originalText = gameMessage._translateOriginalText || gameMessage.allText();
+                
+                // Get original speaker (before translation) or current speaker
+                const originalSpeakerName = gameMessage._translateOriginalSpeaker || gameMessage._speakerName || '';
+                
+                // Get original choices (before translation) or current choices
+                const choices = gameMessage.choices ? gameMessage.choices() : [];
+                const originalChoices = gameMessage._translateOriginalChoices || choices;
+                const hasChoices = Array.isArray(originalChoices) && originalChoices.length > 0;
+                
+                // Validate that we have something to translate (text, speaker, or choices)
+                const hasText = originalText && originalText.trim().length > 0;
+                const hasSpeaker = originalSpeakerName && originalSpeakerName.trim().length > 0;
+                
+                if (!hasText && !hasSpeaker && !hasChoices) {
+                    console.warn('[TranslateOnTheFly] Message text is empty and no choices or speaker');
+                    return;
+                }
+
+                console.log('[TranslateOnTheFly] Translating current message:', {
+                    text: hasText ? originalText.substring(0, 50) : '(no text)',
+                    speaker: originalSpeakerName,
+                    choices: originalChoices
+                });
+
+                // Build items array
+                const items = [];
+                let itemIdCounter = 0;
+
+                // Add text
+                const textKey = this.getCacheKey(originalText, 'text');
+                items.push({ 
+                    type: 'text', 
+                    id: `text_${itemIdCounter++}`, 
+                    value: originalText,
+                    cacheKey: textKey
+                });
+
+                // Add speaker
+                if (originalSpeakerName && originalSpeakerName.trim().length > 0) {
+                    const speakerKey = this.getCacheKey(originalSpeakerName, 'speaker');
+                    items.push({ 
+                        type: 'speaker', 
+                        id: `speaker_${itemIdCounter++}`, 
+                        value: originalSpeakerName,
+                        cacheKey: speakerKey
+                    });
+                }
+
+                // Add choices
+                if (hasChoices) {
+                    for (let i = 0; i < originalChoices.length; i++) {
+                        const choice = originalChoices[i];
+                        const choiceKey = this.getCacheKey(choice, 'choice');
+                        items.push({ 
+                            type: 'choice', 
+                            id: `choice_${itemIdCounter++}`, 
+                            value: choice,
+                            cacheKey: choiceKey
+                        });
+                    }
+                }
+
+                // Clear cache for these items to force re-translation
+                for (const item of items) {
+                    this.translationCache.delete(item.cacheKey);
+                }
+
+                // Translate using batch
+                this.showSpinner();
+                const result = await this.engine.batchTranslate(items);
+                this.hideSpinner();
+
+                console.log('[TranslateOnTheFly] Translation result:', {
+                    successes: result.successes.length,
+                    failures: result.failures.length
+                });
+
+                // Cache successes
+                for (const success of result.successes) {
+                    this.setCacheValue(success.cacheKey, success.translated);
+                }
+
+                // Log failures
+                for (const failure of result.failures) {
+                    console.warn(`[TranslateOnTheFly] Failed to translate ${failure.type}:`, failure.value, '→', failure.rejectReason);
+                }
+
+                // Apply translations
+                const translatedText = this.translationCache.get(textKey);
+                if (translatedText) {
+                    this.replaceMessageText(translatedText);
+                    this.translationCount++;
+                    this.lastTranslation = {
+                        original: originalText.substring(0, 100),
+                        translated: translatedText.substring(0, 100)
+                    };
+                    this.saveSettings();
+                }
+
+                // Apply speaker
+                if (originalSpeakerName) {
+                    const speakerKey = this.getCacheKey(originalSpeakerName, 'speaker');
+                    const translatedSpeaker = this.translationCache.get(speakerKey);
+                    if (translatedSpeaker) {
+                        this.replaceSpeakerName(translatedSpeaker);
+                    }
+                }
+
+                // Apply choices
+                if (hasChoices) {
+                    const translatedChoices = originalChoices.map(choice => {
+                        const choiceKey = this.getCacheKey(choice, 'choice');
+                        return this.translationCache.get(choiceKey) || choice;
+                    });
+                    this.replaceChoiceText(translatedChoices);
+                }
+
+                // Force refresh the currently displayed message window
+                if (this.currentMessageWindow && this.currentMessageWindow.isOpen()) {
+                    const msgWindow = this.currentMessageWindow;
+                    
+                    console.log('[TranslateOnTheFly] Refreshing message window by close/open cycle');
+                    
+                    // Save current state
+                    const wasOpen = msgWindow.isOpen();
+                    const currentOpenness = msgWindow.openness;
+                    
+                    if (wasOpen) {
+                        if(translatedText) {
+                            msgWindow.contents.clear();
+                            const tState = msgWindow.createTextState(translatedText, 0, 0, 5);
+                            msgWindow._textState = tState;
+                            msgWindow.pause = false;
+                        }
+                    }
+                    
+                    // If choices are displayed, refresh them too
+                    if (hasChoices && SceneManager._scene && SceneManager._scene._choiceListWindow) {
+                        const choiceWindow = SceneManager._scene._choiceListWindow;
+                        if (choiceWindow.isOpen()) {
+                            choiceWindow.refresh();
+                        }
+                    }
+                }
+
+                console.log('[TranslateOnTheFly] Translation applied and window refreshed');
+            } catch (error) {
+                console.error('[TranslateOnTheFly] Translation error:', error);
+                this.hideSpinner();
+            }
         }
     }
 };

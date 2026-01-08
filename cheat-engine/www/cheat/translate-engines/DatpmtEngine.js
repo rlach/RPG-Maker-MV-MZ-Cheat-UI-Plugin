@@ -26,7 +26,48 @@ export default class DatpmtEngine extends BaseTranslationEngine {
         });
 
         const joined = payloadParts.join('');
-        const translatedJoinedRaw = await this.translate(joined, this.panel.sourceLang, this.panel.targetLang, { skipWrap: false });
+        
+        // Call Datpmt API directly (CORRECT endpoint from old panel)
+        let translatedJoinedRaw;
+        try {
+            const url = 'https://api.datpmt.com/api/v2/dictionary/translate';
+            const params = {
+                string: joined,
+                from_lang: this.panel.sourceLang || 'auto',
+                to_lang: this.panel.targetLang || 'en'
+            };
+            
+            const response = await axios.get(url, { params });
+            const data = response && response.data;
+            
+            // Try multiple possible response paths (from old panel)
+            const candidate = [
+                data && data.data && data.data.translated_text,
+                data && data.data && data.data.translate_string,
+                data && data.data && data.data.translation,
+                data && data.translation,
+                data && data.translatedText,
+                data && data.result,
+                typeof data === 'string' ? data : null
+            ].find(value => typeof value === 'string' && value.length > 0);
+            
+            if (!candidate) {
+                throw new Error('No translation found in response');
+            }
+            
+            translatedJoinedRaw = candidate;
+        } catch (error) {
+            console.error('[Datpmt] API error:', error);
+            const failures = items.map(item => ({
+                type: item.type,
+                id: item.id,
+                value: item.value,
+                cacheKey: item.cacheKey,
+                rejectReason: 'API error: ' + error.message
+            }));
+            return { successes: [], failures };
+        }
+        
         const translatedJoined = translatedJoinedRaw === joined ? null : translatedJoinedRaw;
 
         const successes = [];
