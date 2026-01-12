@@ -236,7 +236,7 @@ export default {
                 { text: 'Ask AI to fix it', value: 'askAIToFix' },
                 { text: 'None', value: 'none' }
             ],
-            aiSystemPrompt: 'You are translating scripts that contain []. Altering contents or order of any such tags, removing or adding tags will break the script. DO NOT REMOVE OR ADD ANY TAGS. Only translate the text, do not comment or add anything else. Do not bold, DO NOT FORMAT THE RESPONSE, RETURN IT ALL IN ONE LINE',
+            aiSystemPrompt: 'You are translating scripts that contain [[tags]]. Altering contents or order of any such tags, removing or adding tags will break the script. DO NOT REMOVE OR ADD ANY TAGS. Only translate the text, do not comment or add anything else. Do not bold, DO NOT FORMAT THE RESPONSE, RETURN IT ALL IN ONE LINE',
             aiLastResponse: '',
             // Track the current message window and $gameMessage for live refresh
             currentMessageWindow: null,
@@ -1320,7 +1320,22 @@ export default {
                 // Mark that we're in refresh - addCommand will collect names
                 this._collectingCommands = true;
                 this._collectedCommands = [];
-
+                
+                // First time only: collect system command terms for translation
+                if (!self._systemCommandsCollected && $dataSystem && $dataSystem.terms && $dataSystem.terms.commands) {
+                    const systemCommands = $dataSystem.terms.commands.filter(cmd => !!cmd);
+                    for (const cmdName of systemCommands) {
+                        this._collectedCommands.push({ 
+                            name: cmdName, 
+                            symbol: 'dummy', 
+                            enabled: true, 
+                            ext: null 
+                        });
+                    }
+                    self._systemCommandsCollected = true;
+                    console.log(`[TranslateOnTheFly] Collected ${systemCommands.length} system commands for translation`);
+                }
+                           
                 // Call original makeCommandList to collect all command names
                 this.clearCommandList();
                 this.makeCommandList();
@@ -1552,6 +1567,78 @@ export default {
             }
 
             return this._spinnerEl;
+        },
+
+        ensureProgressBoxElements() {
+            const hostDoc = this.getSpinnerHostDocument();
+            if (!hostDoc) {
+                return null;
+            }
+
+            if (!this._progressBoxStyle) {
+                const existingStyle = hostDoc.getElementById('tof-progress-box-style');
+                const style = existingStyle || hostDoc.createElement('style');
+                style.id = 'tof-progress-box-style';
+                style.textContent = [
+                    '#tof-progress-box { position: fixed; right: 12px; bottom: 72px; padding: 8px 12px; display: none; background: rgba(50, 50, 50, 0.75); border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); pointer-events: none; z-index: 9998; font-family: Arial, sans-serif; text-align: right; }',
+                    '#tof-progress-box .tof-progress-line { color: #fff; font-size: 12px; line-height: 1.5; margin: 1px 0; white-space: nowrap; }',
+                    '#tof-progress-box .tof-progress-line.map-progress { font-weight: bold; color: #82d4f8; }',
+                    '#tof-progress-box .tof-progress-line.message-progress { color: #ccc; }'
+                ].join('');
+                if (!existingStyle) {
+                    hostDoc.head.appendChild(style);
+                }
+                this._progressBoxStyle = style;
+            }
+
+            if (!this._progressBoxEl) {
+                const existingEl = hostDoc.getElementById('tof-progress-box');
+                const el = existingEl || hostDoc.createElement('div');
+                el.id = 'tof-progress-box';
+                el.innerHTML = '<div class="tof-progress-line map-progress" id="tof-map-progress"></div><div class="tof-progress-line message-progress" id="tof-message-progress"></div>';
+                if (!existingEl) {
+                    hostDoc.body.appendChild(el);
+                }
+                this._progressBoxEl = el;
+            }
+
+            return this._progressBoxEl;
+        },
+
+        updateProgressBox(mapProgress = null, messageProgress = null, successes = null, failures = null) {
+            const el = this.ensureProgressBoxElements();
+            if (!el) {
+                return;
+            }
+
+            const mapProgressEl = el.querySelector('#tof-map-progress');
+            const messageProgressEl = el.querySelector('#tof-message-progress');
+
+            if (mapProgress !== null && mapProgressEl) {
+                mapProgressEl.textContent = mapProgress;
+                mapProgressEl.style.display = mapProgress ? 'block' : 'none';
+            }
+
+            if (messageProgress !== null && messageProgressEl) {
+                let progressText = messageProgress;
+                // Add error info if provided and there are failures
+                if (successes !== null && failures !== null && failures > 0) {
+                    progressText += ` (${successes} OK, ${failures} errors)`;
+                }
+                messageProgressEl.textContent = progressText;
+                messageProgressEl.style.display = messageProgress ? 'block' : 'none';
+            }
+
+            // Show box if any progress is set
+            const hasContent = (mapProgress && mapProgress.length > 0) || (messageProgress && messageProgress.length > 0);
+            el.style.display = hasContent ? 'block' : 'none';
+        },
+
+        hideProgressBox() {
+            const el = this.ensureProgressBoxElements();
+            if (el) {
+                el.style.display = 'none';
+            }
         },
 
         updateSpinnerVisibility() {
@@ -1877,7 +1964,7 @@ export default {
         startBackgroundTranslation() {
             // Defer to allow game data to load
             setTimeout(() => {
-                this.translateItemsAndSkillsInBackground();
+                this.translateGameObjectsInBackground();
             }, 2000);
         },
 
@@ -1896,7 +1983,7 @@ export default {
         },
 
         applyCachedTranslationsToData() {
-            if (!window.$dataItems || !window.$dataSkills) {
+            if (!window.$dataItems || !window.$dataSkills || !window.$dataArmors || !window.$dataWeapons) {
                 return;
             }
 
@@ -1958,12 +2045,67 @@ export default {
                 }
             }
 
+            // Apply cached translations to armors
+            for (let i = 1; i < $dataArmors.length; i++) {
+                const armor = $dataArmors[i];
+                if (!armor) continue;
+
+                // Store original values if not stored
+                if (!armor._translateOriginal) {
+                    armor._translateOriginal = {
+                        name: armor.name,
+                        description: armor.description
+                    };
+                }
+
+                // Apply cached translations
+                const fields = ['name', 'description'];
+                for (const field of fields) {
+                    const originalValue = armor._translateOriginal[field];
+                    if (originalValue && typeof originalValue === 'string' && originalValue.trim() !== '') {
+                        const cacheKey = this.getCacheKey(originalValue, `armor_${field}`);
+                        if (this.translationCache.has(cacheKey)) {
+                            armor[field] = this.translationCache.get(cacheKey);
+                            appliedCount++;
+                        }
+                    }
+                }
+            }
+
+            // Apply cached translations to weapons
+            for (let i = 1; i < $dataWeapons.length; i++) {
+                const weapon = $dataWeapons[i];
+                if (!weapon) continue;
+
+                // Store original values if not stored
+                if (!weapon._translateOriginal) {
+                    weapon._translateOriginal = {
+                        name: weapon.name,
+                        description: weapon.description
+                    };
+                }
+
+                // Apply cached translations
+                const fields = ['name', 'description'];
+                for (const field of fields) {
+                    const originalValue = weapon._translateOriginal[field];
+                    if (originalValue && typeof originalValue === 'string' && originalValue.trim() !== '') {
+                        const cacheKey = this.getCacheKey(originalValue, `weapon_${field}`);
+                        if (this.translationCache.has(cacheKey)) {
+                            weapon[field] = this.translationCache.get(cacheKey);
+                            appliedCount++;
+                        }
+                    }
+                }
+            }
+
             if (appliedCount > 0) {
-                console.log(`[TranslateOnTheFly] Applied ${appliedCount} cached translations to items and skills`);
+                console.log(`[TranslateOnTheFly] Applied ${appliedCount} cached translations to items, skills, armors and weapons`);
             }
         },
 
-        async translateItemsAndSkillsInBackground() {
+        async translateGameObjectsInBackground() {
+            console.log('[TranslateOnTheFly] Initiating background translation of game objects');
             // Prevent multiple simultaneous background translations
             if (this._backgroundTranslationInProgress) {
                 return;
@@ -1986,7 +2128,7 @@ export default {
             }
 
             // Check if data is loaded
-            if (!window.$dataItems || !window.$dataSkills) {
+            if (!window.$dataItems || !window.$dataSkills || !window.$dataArmors || !window.$dataWeapons) {
                 console.log('[TranslateOnTheFly] Game data not loaded yet, skipping background translation');
                 return;
             }
@@ -1994,14 +2136,17 @@ export default {
             this._backgroundTranslationInProgress = true;
 
             try {
-                console.log('[TranslateOnTheFly] Starting background translation of items and skills');
+                console.log('[TranslateOnTheFly] Starting background translation of items, skills, armors and weapons');
 
                 // First, apply all cached translations immediately
                 this.applyCachedTranslationsToData();
 
-                // Collect all items and skills that need translation
+                // Collect all items, skills, armors and weapons that need translation
                 const itemsToTranslate = [];
                 const skillsToTranslate = [];
+                const armorsToTranslate = [];
+                const weaponsToTranslate = [];
+                const mapsToTranslate = [];
 
                 // Process items (skip index 0 which is null)
                 for (let i = 1; i < $dataItems.length; i++) {
@@ -2025,7 +2170,40 @@ export default {
                     }
                 }
 
-                console.log(`[TranslateOnTheFly] Found ${itemsToTranslate.length} items and ${skillsToTranslate.length} skills to translate`);
+                // Process armors (skip index 0 which is null)
+                for (let i = 1; i < $dataArmors.length; i++) {
+                    const armor = $dataArmors[i];
+                    if (!armor) continue;
+
+                    const hasUntranslated = this.hasUntranslatedFields(armor, ['name', 'description'], 'armor');
+                    if (hasUntranslated) {
+                        armorsToTranslate.push(armor);
+                    }
+                }
+
+                // Process weapons (skip index 0 which is null)
+                for (let i = 1; i < $dataWeapons.length; i++) {
+                    const weapon = $dataWeapons[i];
+                    if (!weapon) continue;
+
+                    const hasUntranslated = this.hasUntranslatedFields(weapon, ['name', 'description'], 'weapon');
+                    if (hasUntranslated) {
+                        weaponsToTranslate.push(weapon);
+                    }
+                }
+
+                // Process maps (skip index 0 which is null)
+                for (let i = 1; i < $dataMapInfos.length; i++) {
+                    const map = $dataMapInfos[i];
+                    if (!map) continue;
+
+                    const hasUntranslated = this.hasUntranslatedFields(map, ['name'], 'map');
+                    if (hasUntranslated) {
+                        mapsToTranslate.push(map);
+                    }
+                }
+
+                console.log(`[TranslateOnTheFly] Found ${itemsToTranslate.length} items, ${skillsToTranslate.length} skills, ${armorsToTranslate.length} armors, ${weaponsToTranslate.length} weapons and ${mapsToTranslate.length} maps to translate`);
 
                 // Translate in batches of 10
                 const BATCH_SIZE = 10;
@@ -2042,6 +2220,27 @@ export default {
                     const batch = skillsToTranslate.slice(i, i + BATCH_SIZE);
                     await this.translateDataBatch(batch, ['name', 'description', 'message1', 'message2'], 'skill');
                     console.log(`[TranslateOnTheFly] Translated skills batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(skillsToTranslate.length / BATCH_SIZE)}`);
+                }
+
+                // Translate armors
+                for (let i = 0; i < armorsToTranslate.length; i += BATCH_SIZE) {
+                    const batch = armorsToTranslate.slice(i, i + BATCH_SIZE);
+                    await this.translateDataBatch(batch, ['name', 'description'], 'armor');
+                    console.log(`[TranslateOnTheFly] Translated armors batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(armorsToTranslate.length / BATCH_SIZE)}`);
+                }
+
+                // Translate weapons
+                for (let i = 0; i < weaponsToTranslate.length; i += BATCH_SIZE) {
+                    const batch = weaponsToTranslate.slice(i, i + BATCH_SIZE);
+                    await this.translateDataBatch(batch, ['name', 'description'], 'weapon');
+                    console.log(`[TranslateOnTheFly] Translated weapons batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(weaponsToTranslate.length / BATCH_SIZE)}`);
+                }
+
+                // Translate maps
+                for (let i = 0; i < mapsToTranslate.length; i += BATCH_SIZE) {
+                    const batch = mapsToTranslate.slice(i, i + BATCH_SIZE);
+                    await this.translateDataBatch(batch, ['name'], 'map');
+                    console.log(`[TranslateOnTheFly] Translated maps batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(mapsToTranslate.length / BATCH_SIZE)}`);
                 }
 
                 console.log('[TranslateOnTheFly] Background translation completed');
@@ -2311,6 +2510,351 @@ export default {
             } catch (error) {
                 console.error('[TranslateOnTheFly] Translation error:', error);
                 this.hideSpinner();
+            }
+        },
+
+        async translateAllMaps() {
+            try {
+                // Check if translation is enabled
+                if (!this.isTranslationEnabled()) {
+                    Alert.warn('Real-time translation is disabled');
+                    return;
+                }
+
+                // Check if engine is configured
+                if (!this.engine || !this.isEngineFullyConfigured()) {
+                    Alert.error('Translation engine not fully configured');
+                    return;
+                }
+
+                // Check if map data is loaded
+                if (!$dataMapInfos || !Array.isArray($dataMapInfos)) {
+                    Alert.error('Map info not loaded');
+                    return;
+                }
+
+                console.log('[TranslateOnTheFly] Starting translation of all maps');
+
+                // Collect all valid map IDs
+                const validMaps = [];
+                for (let i = 0; i < $dataMapInfos.length; i++) {
+                    const mapInfo = $dataMapInfos[i];
+                    if (mapInfo && mapInfo.id) {
+                        validMaps.push({ id: mapInfo.id, name: mapInfo.name || `Map ${mapInfo.id}` });
+                    }
+                }
+
+                if (validMaps.length === 0) {
+                    Alert.warn('No valid maps found');
+                    return;
+                }
+
+                console.log(`[TranslateOnTheFly] Found ${validMaps.length} maps to translate`);
+
+                let totalTranslated = 0;
+                let totalFailed = 0;
+
+                // Process each map
+                for (let i = 0; i < validMaps.length; i++) {
+                    const mapInfo = validMaps[i];
+                    const mapId = mapInfo.id;
+                    const mapName = mapInfo.name;
+                    const mapNumber = i + 1;
+
+                    console.log(`[TranslateOnTheFly] Processing map ${mapNumber}/${validMaps.length}: ${mapName} (ID: ${mapId})`);
+
+                    try {
+                        // Load map data
+                        const filename = "Map%1.json".format(mapId.padZero(3));
+                        const mapData = await new Promise((resolve, reject) => {
+                            const xhr = new XMLHttpRequest();
+                            xhr.open('GET', `data/${filename}`, true);
+                            xhr.onload = () => {
+                                if (xhr.status === 200) {
+                                    try {
+                                        resolve(JSON.parse(xhr.responseText));
+                                    } catch (e) {
+                                        reject(new Error(`Failed to parse JSON: ${e.message}`));
+                                    }
+                                } else {
+                                    reject(new Error(`Failed to load file: ${xhr.status}`));
+                                }
+                            };
+                            xhr.onerror = () => reject(new Error('Network error'));
+                            xhr.send();
+                        });
+
+                        // Translate map events with progress info
+                        const result = await this.translateMapEvents(mapData, mapNumber, validMaps.length);
+                        if (result) {
+                            totalTranslated += result.successCount || 0;
+                            totalFailed += result.failureCount || 0;
+                        }
+                    } catch (error) {
+                        console.error(`[TranslateOnTheFly] Failed to load or translate map ${mapId}:`, error);
+                    }
+                }
+
+                this.hideProgressBox();
+                console.log(`[TranslateOnTheFly] All maps translation completed: ${totalTranslated} successes, ${totalFailed} failures`);
+                Alert.success(`All maps translated! ${totalTranslated} messages translated, ${totalFailed} failures`);
+            } catch (error) {
+                this.hideProgressBox();
+                console.error('[TranslateOnTheFly] translateAllMaps error:', error);
+                Alert.error('Failed to translate all maps: ' + error.message);
+            }
+        },
+
+        async translateMapEvents(mapData = null, mapNumber = null, totalMaps = null) {
+            try {
+                // Use provided mapData or fall back to $dataMap
+                const dataMap = mapData || $dataMap;
+
+                // Check if map is loaded
+                if (!dataMap) {
+                    console.warn('[TranslateOnTheFly] No map loaded');
+                    Alert.warn('No map to translate');
+                    return;
+                }
+
+                // Check if translation is enabled
+                if (!this.isTranslationEnabled()) {
+                    Alert.warn('Real-time translation is disabled');
+                    return;
+                }
+
+                // Check if engine is configured
+                if (!this.engine || !this.isEngineFullyConfigured()) {
+                    Alert.error('Translation engine not fully configured');
+                    return;
+                }
+
+                const mapName = dataMap.displayName || 'Map';
+                const mapProgressPrefix = (mapNumber !== null && totalMaps !== null) 
+                    ? `Map ${mapNumber}/${totalMaps} - ` 
+                    : '';
+
+                console.log('[TranslateOnTheFly] Starting map translation:', mapName);
+                this.showSpinner();
+
+                let totalMessages = 0;
+                let translatedMessages = 0;
+
+                // Iterate through all events on the map
+                const events = dataMap.events;
+                if (!Array.isArray(events)) {
+                    this.hideSpinner();
+                    Alert.warn('Invalid map event data');
+                    return;
+                }
+
+                // Collect all items to translate from all events
+                const itemsToTranslate = [];
+
+                for (let eventIdx = 0; eventIdx < events.length; eventIdx++) {
+                    const event = events[eventIdx];
+                    if (!event) continue;
+
+                    // Check if event has pages
+                    const pages = event.pages;
+                    if (!Array.isArray(pages)) continue;
+
+                    // Scan each page's command list
+                    for (let pageIdx = 0; pageIdx < pages.length; pageIdx++) {
+                        const page = pages[pageIdx];
+                        if (!page) continue;
+
+                        // Get the command list for this page
+                        const list = page.list;
+                        if (!Array.isArray(list)) continue;
+
+                        // Scan the list for messages and choices (reuse collectAheadItems scanner logic)
+                        let i = 0;
+                        while (i < list.length) {
+                            const cmd = list[i];
+                            if (!cmd || typeof cmd.code !== 'number') {
+                                i++;
+                                continue;
+                            }
+
+                            if (cmd.code === 0) {
+                                i++;
+                                continue;
+                            }
+
+                            // Message block (code 101)
+                            if (cmd.code === 101) {
+                                const speaker = (cmd.parameters && cmd.parameters[4]) || '';
+                                const lines = [];
+                                let j = i + 1;
+
+                                // Collect message continuation lines
+                                while (j < list.length && list[j] && list[j].code === 401) {
+                                    lines.push(list[j].parameters && list[j].parameters[0]);
+                                    j++;
+                                }
+
+                                const messageText = lines.join('\n').trim();
+                                if (messageText) {
+                                    const cacheKey = this.getCacheKey(messageText, 'text');
+                                    if (!this.translationCache.has(cacheKey)) {
+                                        itemsToTranslate.push({
+                                            type: 'text',
+                                            id: `map_${eventIdx}_${pageIdx}_text_${totalMessages}`,
+                                            value: messageText,
+                                            cacheKey: cacheKey,
+                                            eventIdx: eventIdx,
+                                            pageIdx: pageIdx,
+                                            cmdIdx: i
+                                        });
+                                        totalMessages++;
+                                    }
+                                }
+
+                                if (speaker) {
+                                    const speakerKey = this.getCacheKey(speaker, 'speaker');
+                                    if (!this.translationCache.has(speakerKey)) {
+                                        itemsToTranslate.push({
+                                            type: 'speaker',
+                                            id: `map_${eventIdx}_${pageIdx}_speaker_${totalMessages}`,
+                                            value: speaker,
+                                            cacheKey: speakerKey,
+                                            eventIdx: eventIdx,
+                                            pageIdx: pageIdx,
+                                            cmdIdx: i
+                                        });
+                                    }
+                                }
+
+                                i = j;
+                                continue;
+                            }
+
+                            // Show Choices (code 102)
+                            if (cmd.code === 102) {
+                                const choices = cmd.parameters && cmd.parameters[0];
+                                if (Array.isArray(choices)) {
+                                    for (const choice of choices) {
+                                        const choiceKey = this.getCacheKey(choice, 'choice');
+                                        if (!this.translationCache.has(choiceKey)) {
+                                            itemsToTranslate.push({
+                                                type: 'choice',
+                                                id: `map_${eventIdx}_${pageIdx}_choice_${totalMessages}`,
+                                                value: choice,
+                                                cacheKey: choiceKey,
+                                                eventIdx: eventIdx,
+                                                pageIdx: pageIdx,
+                                                cmdIdx: i
+                                            });
+                                            totalMessages++;
+                                        }
+                                    }
+                                }
+                                i++;
+                                continue;
+                            }
+
+                            i++;
+                        }
+                    }
+                }
+
+                console.log(`[TranslateOnTheFly] Found ${itemsToTranslate.length} items to translate on map ${mapName}`);
+
+                if (itemsToTranslate.length === 0) {
+                    this.hideSpinner();
+                    if (!mapNumber) {
+                        Alert.info('All map messages are already translated');
+                    }
+                    return { successCount: 0, failureCount: 0 };
+                }
+
+                // Batch translate items with char limit per batch (1000 chars)
+                const CHAR_LIMIT = 1000;
+                let batchNum = 0;
+                let totalSuccesses = 0;
+                let totalFailures = 0;
+
+                try {
+                    let i = 0;
+                    while (i < itemsToTranslate.length) {
+                        batchNum++;
+                        const batch = [];
+                        let batchChars = 0;
+
+                        // Collect items for this batch up to char limit
+                        while (i < itemsToTranslate.length && batchChars < CHAR_LIMIT) {
+                            const item = itemsToTranslate[i];
+                            const itemLength = item.value.length;
+
+                            // If adding this item would exceed limit and batch is not empty, send what we have
+                            if (batchChars > 0 && batchChars + itemLength > CHAR_LIMIT) {
+                                break;
+                            }
+
+                            batch.push(item);
+                            batchChars += itemLength;
+                            i++;
+                        }
+
+                        console.log(`[TranslateOnTheFly] Translating batch ${batchNum}: ${batch.length} items, ${batchChars} chars`);
+
+                        // Show progress in UI box
+                        const currentProgress = totalSuccesses + totalFailures;
+                        const totalItems = itemsToTranslate.length;
+                        const messageProgressText = `${currentProgress}/${totalItems}`;
+                        
+                        if (mapNumber !== null && totalMaps !== null) {
+                            // Dual progress: map progress + message progress (NO MAP NAME - spoilers!)
+                            const mapProgressText = `Map ${mapNumber}/${totalMaps}`;
+                            this.updateProgressBox(mapProgressText, messageProgressText, totalSuccesses, totalFailures);
+                        } else {
+                            // Single progress: just message count
+                            this.updateProgressBox(null, messageProgressText, totalSuccesses, totalFailures);
+                        }
+
+                        // Translate this batch
+                        const result = await this.engine.batchTranslate(batch);
+                        
+                        // Cache successes
+                        for (const success of result.successes) {
+                            this.setCacheValue(success.cacheKey, success.translated);
+                            translatedMessages++;
+                            totalSuccesses++;
+                        }
+
+                        // Log failures
+                        for (const failure of result.failures) {
+                            console.warn(`[TranslateOnTheFly] Failed to translate ${failure.type}:`, failure.value.substring(0, 50), '→', failure.rejectReason);
+                            this.failedTranslations.set(failure.cacheKey, Date.now());
+                            totalFailures++;
+                        }
+                    }
+
+                    this.hideSpinner();
+                    if (!mapNumber) {
+                        this.hideProgressBox();
+                        Alert.success(`Translated ${totalSuccesses}/${itemsToTranslate.length} map messages in ${batchNum} batches`);
+                    }
+                    console.log(`[TranslateOnTheFly] Map translation completed: ${totalSuccesses} successes, ${totalFailures} failures`);
+                    return { successCount: totalSuccesses, failureCount: totalFailures };
+                } catch (error) {
+                    this.hideSpinner();
+                    if (!mapNumber) {
+                        this.hideProgressBox();
+                        Alert.error('Failed to translate map: ' + error.message);
+                    }
+                    console.error('[TranslateOnTheFly] Map batch translation error:', error);
+                    return { successCount: totalSuccesses, failureCount: totalFailures };
+                }
+            } catch (error) {
+                this.hideSpinner();
+                this.hideProgressBox();
+                console.error('[TranslateOnTheFly] Map translation error:', error);
+                if (!mapNumber) {
+                    Alert.error('Failed to translate map: ' + error.message);
+                }
+                return { successCount: 0, failureCount: 0 };
             }
         }
     }

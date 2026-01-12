@@ -679,6 +679,47 @@ export class MessageCheat {
         }
     }
 
+    static translateCurrentMap () {
+        try {
+            // Check if panel is available
+            if (!window.__TranslateOnTheFlyPanel || typeof window.__TranslateOnTheFlyPanel.translateMapEvents !== 'function') {
+                console.warn('[MessageCheat] TranslateOnTheFlyPanel not available')
+                Alert.error('Translation panel not initialized')
+                return
+            }
+
+            // Check if map is loaded
+            if (!$dataMap) {
+                console.warn('[MessageCheat] No map loaded')
+                Alert.warn('No map to translate')
+                return
+            }
+
+            console.log('[MessageCheat] Translating current map:', $dataMap.displayName || '(unknown)')
+            window.__TranslateOnTheFlyPanel.translateMapEvents()
+        } catch (err) {
+            console.error('[MessageCheat] Failed to translate map', err)
+            Alert.error('Failed to translate map: ' + err.message)
+        }
+    }
+
+    static translateAllMaps () {
+        try {
+            // Check if panel is available
+            if (!window.__TranslateOnTheFlyPanel || typeof window.__TranslateOnTheFlyPanel.translateAllMaps !== 'function') {
+                console.warn('[MessageCheat] TranslateOnTheFlyPanel not available')
+                Alert.error('Translation panel not initialized')
+                return
+            }
+
+            console.log('[MessageCheat] Translating all maps')
+            window.__TranslateOnTheFlyPanel.translateAllMaps()
+        } catch (err) {
+            console.error('[MessageCheat] Failed to translate all maps', err)
+            Alert.error('Failed to translate all maps: ' + err.message)
+        }
+    }
+
     static logCurrentMessage () {
         try {
             if (!$gameMessage || typeof $gameMessage.allText !== 'function') {

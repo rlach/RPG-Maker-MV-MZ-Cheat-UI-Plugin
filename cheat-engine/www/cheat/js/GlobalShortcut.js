@@ -94,6 +94,14 @@ const defaultShortcutSettings = {
         shortcut: 'alt r'
     },
 
+    translateCurrentMap: {
+        shortcut: 'alt m'
+    },
+
+    translateAllMaps: {
+        shortcut: 'alt shift m'
+    },
+
     openDevTool: {
         shortcut: 'f12'
     }
@@ -323,6 +331,22 @@ const shortcutConfig = {
         desc: 'Translate the currently displayed message and choices',
         enterAction () {
             MessageCheat.translateCurrentMessage()
+        }
+    },
+
+    translateCurrentMap: {
+        name: 'Translate current map',
+        desc: 'Translate all messages in the current map events',
+        enterAction () {
+            MessageCheat.translateCurrentMap()
+        }
+    },
+
+    translateAllMaps: {
+        name: 'Translate all maps',
+        desc: 'Translate all messages in all maps in the game',
+        enterAction () {
+            MessageCheat.translateAllMaps()
         }
     },
 

@@ -95,6 +95,10 @@ if __name__ == '__main__':
 
     paths = Paths()
 
+    # Clean up temp directory at the start to avoid conflicts
+    if os.path.exists(paths.temp_root_path):
+        shutil.rmtree(paths.temp_root_path)
+
     for game_type in GameTypes:
         # clean up temp directory if it exists
         if os.path.exists(paths.temp.root_dir):
@@ -120,8 +124,28 @@ if __name__ == '__main__':
         idea_dir = os.path.join(paths.temp.root_dir, '.idea')
         if os.path.exists(idea_dir):
             shutil.rmtree(idea_dir)
+
+        # Create version file before restructuring
         create_cheat_version_file(args.version, paths)
-        shutil.make_archive(paths.get_output_file_path(game_type, args.version), 'gztar', paths.temp.root_dir)
+
+        # For MV: restructure to have everything under www/
+        # For MZ: keep everything in root (cheat, js, www/cheat-settings)
+        if game_type == GameTypes.MV:
+            # Create temporary build directory for MV structure
+            mv_build_dir = os.path.join(paths.temp_root_path, 'mv_build')
+            os.makedirs(mv_build_dir, exist_ok=True)
+            
+            # Move everything to www subdirectory
+            www_dir = os.path.join(mv_build_dir, 'www')
+            shutil.move(paths.temp.root_dir, www_dir)
+            
+            # Use mv_build_dir as the archive root for MV
+            archive_root = mv_build_dir
+        else:
+            # For MZ, use temp root directly
+            archive_root = paths.temp.root_dir
+        
+        shutil.make_archive(paths.get_output_file_path(game_type, args.version), 'gztar', archive_root)
 
         # remove temp directory
         shutil.rmtree(paths.temp_root_path)
