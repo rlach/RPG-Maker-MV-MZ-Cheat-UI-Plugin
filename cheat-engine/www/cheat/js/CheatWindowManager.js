@@ -100,10 +100,11 @@ class CheatWindowManager {
         const query = this.lastComponent ? `?component=${encodeURIComponent(this.lastComponent)}` : ''
         try {
             console.log('[CheatWindowManager] Opening external window with query:', query)
-            this.externalWindow = window.open(`cheat/window.html${query}`, 'cheat-ui-window', 'width=760,height=520,resizable=yes')
-            console.log('[CheatWindowManager] External window opened:', this.externalWindow)
-            
-            if (this.externalWindow) {
+            nw.Window.open(`cheat/window.html${query}`, {}, (newWin) => {
+                this.externalWindow = newWin;
+                console.log('[CheatWindowManager] External window opened callback:', newWin);
+
+                if (this.externalWindow) {
                 this.externalWindow.__CHEAT_PARENT_WINDOW__ = window
                 this.externalWindow.addEventListener('beforeunload', () => {
                     console.log('[CheatWindowManager] External window closing')
@@ -122,6 +123,7 @@ class CheatWindowManager {
             } else {
                 console.error('[CheatWindowManager] Failed to create external window')
             }
+            })
         } catch (err) {
             console.error('[CheatWindowManager] Exception opening external window:', err)
         }

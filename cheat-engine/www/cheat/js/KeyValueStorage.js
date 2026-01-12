@@ -1,6 +1,6 @@
 export class KeyValueStorage {
     constructor (filePath) {
-        if (Utils.isNwjs()) {
+        if (Utils?.isNwjs()) {
             this.filePath = filePath
             this.fileEncoding = 'utf-8'
             this.fileSystem = require('fs')
@@ -8,7 +8,7 @@ export class KeyValueStorage {
     }
 
     getItem (key) {
-        if (!Utils.isNwjs()) {
+        if (!Utils?.isNwjs()) {
             return localStorage.getItem(key)
         }
 
@@ -16,7 +16,7 @@ export class KeyValueStorage {
     }
 
     setItem (key, value) {
-        if (!Utils.isNwjs()) {
+        if (!Utils?.isNwjs()) {
             localStorage.setItem(key, value)
             return
         }

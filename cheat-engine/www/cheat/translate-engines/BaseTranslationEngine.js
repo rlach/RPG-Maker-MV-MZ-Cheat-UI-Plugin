@@ -49,6 +49,16 @@ export default class BaseTranslationEngine {
     }
 
     /**
+     * Check if engine is fully configured
+     * @returns {boolean}
+     */
+    isFullyConfigured() {
+        // Default: assume fully configured
+        // Override in subclasses if additional configuration is required
+        return true;
+    }
+
+    /**
      * Get methods for engine-specific configuration
      * @returns {object}
      */

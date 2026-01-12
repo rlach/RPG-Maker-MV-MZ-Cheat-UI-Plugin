@@ -44,9 +44,10 @@ export default {
                         ref="messageLogContainer"
                         style="height: 100%; overflow-y: auto; background: white; color: black; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 8px; user-select: text;">
                         <pre
-                            v-for="entry in messageEntries"
+                            v-for="(entry, index) in messageEntries"
                             :key="entry.id"
-                            style="white-space: pre-wrap; margin: 0 0 6px 0; font-family: 'Fira Code', 'Consolas', monospace; font-size: 12px;">
+                            :style="{ 'background-color': index % 2 === 0 ? 'white' : '#f5f5f5' }"
+                            style="white-space: pre-wrap; margin: 0; font-family: 'Fira Code', 'Consolas', monospace; font-size: 12px; margin-bottom: -18px;">
 {{ formatMessageEntry(entry) }}
                         </pre>
                     </div>
@@ -157,8 +158,8 @@ export default {
             const hours = String(date.getHours()).padStart(2, '0')
             const minutes = String(date.getMinutes()).padStart(2, '0')
             const seconds = String(date.getSeconds()).padStart(2, '0')
-            const label = entry.translated ? 'TL' : 'ORIG'
-            return `[${hours}:${minutes}:${seconds}][${label}] ${entry.text}`
+            const speaker = entry.speakerName ? ` ${entry.speakerName}: ` : ' '
+            return `[${hours}:${minutes}:${seconds}]${speaker}${entry.text}`
         },
 
         formatConsoleEntry (entry) {

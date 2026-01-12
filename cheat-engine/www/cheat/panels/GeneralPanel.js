@@ -83,7 +83,7 @@ export default {
             <template v-slot:append>
                 <v-icon color="grey lighten-3" @click="addGameSpeed(stepGameSpeed)">mdi-chevron-right</v-icon>
                 <span class="grey--text text--lighten-1 align-self-center ml-2 mr-2">x{{gameSpeed.toFixed(1)}}</span>
-                <v-icon size="16" color="grey lighten-3 ml-2" @click="setGameSpeed(1)">mdi-restore</v-icon>
+                <v-icon size="16" color="grey lighten-3 ml-2" @click="setGameSpeed()">mdi-restore</v-icon>
             </template>
         </v-slider>
         
@@ -160,6 +160,17 @@ export default {
             speed: 0,
             fixSpeed: false,
 
+            rootWindow: null,
+            rootWindowManager: null,
+            rootMainComponent: null,
+
+            cheatApi: {
+                GeneralCheat,
+                GameSpeedCheat,
+                SpeedCheat,
+                SceneCheat
+            },
+
             openInSeparateWindow: CHEAT_WINDOW_MANAGER.isSeparateWindowEnabled(),
 
             minSpeed: 1,
@@ -176,51 +187,91 @@ export default {
     },
 
     created () {
+        const root = (window.__CHEAT_EXTERNAL_WINDOW__ && window.opener && !window.opener.closed) ? window.opener : window
+        this.rootWindow = root
+        this.rootWindowManager = root.__CHEAT_WINDOW_MANAGER__ || CHEAT_WINDOW_MANAGER
+        this.rootMainComponent = root.__CHEAT_MAIN_COMPONENT__ || null
+        this.cheatApi = {
+            GeneralCheat: root.GeneralCheat || GeneralCheat,
+            GameSpeedCheat: root.GameSpeedCheat || GameSpeedCheat,
+            SpeedCheat: root.SpeedCheat || SpeedCheat,
+            SceneCheat: root.SceneCheat || SceneCheat
+        }
+
         this.initializeVariables()
     },
 
     methods: {
-        initializeVariables () {
-            this.noClip = $gamePlayer._through
-            this.speed = $gamePlayer.moveSpeed()
-            this.fixSpeed = SpeedCheat.isFixed()
-            this.gold = $gameParty._gold
-
-            this.openInSeparateWindow = CHEAT_WINDOW_MANAGER.isSeparateWindowEnabled()
-
-            this.gameSpeed = GameSpeedCheat.getRate()
-            const gameSpeedSceneOption = GameSpeedCheat.getSceneOption()
-            if (gameSpeedSceneOption === GameSpeedCheat.sceneOptions().all) {
-                this.applyAllForGameSpeed = true
-            } else if (gameSpeedSceneOption === GameSpeedCheat.sceneOptions().battle) {
-                this.applyBattleForGameSpeed = true
+        getRootWindow () {
+            const root = this.rootWindow
+            if (root && root.closed !== true) {
+                return root
             }
+            return window
+        },
+
+        initializeVariables () {
+            const root = this.getRootWindow()
+            const gamePlayer = root.$gamePlayer
+            const gameParty = root.$gameParty
+            const speedCheat = this.cheatApi.SpeedCheat
+            const gameSpeedCheat = this.cheatApi.GameSpeedCheat || GameSpeedCheat
+
+            this.noClip = gamePlayer ? gamePlayer._through : false
+            this.speed = gamePlayer && typeof gamePlayer.moveSpeed === 'function' ? gamePlayer.moveSpeed() : 0
+            this.fixSpeed = speedCheat && speedCheat.isFixed ? speedCheat.isFixed() : false
+            this.gold = gameParty ? gameParty._gold : 0
+
+            const manager = this.rootWindowManager || CHEAT_WINDOW_MANAGER
+            this.openInSeparateWindow = manager.isSeparateWindowEnabled()
+
+            this.gameSpeed = gameSpeedCheat && gameSpeedCheat.getRate ? gameSpeedCheat.getRate() : 1
+            const gameSpeedSceneOption = gameSpeedCheat && gameSpeedCheat.getSceneOption ? gameSpeedCheat.getSceneOption() : null
+            const options = gameSpeedCheat && gameSpeedCheat.sceneOptions ? gameSpeedCheat.sceneOptions() : { all: null, battle: null }
+            this.applyAllForGameSpeed = gameSpeedSceneOption === options.all
+            this.applyBattleForGameSpeed = gameSpeedSceneOption === options.battle
         },
 
         onNoClipChange () {
-            GeneralCheat.toggleNoClip()
+            if (this.cheatApi.GeneralCheat && this.cheatApi.GeneralCheat.toggleNoClip) {
+                this.cheatApi.GeneralCheat.toggleNoClip()
+            }
             this.initializeVariables()
         },
 
         onOpenInSeparateWindowChange () {
-            CHEAT_WINDOW_MANAGER.setSeparateWindowEnabled(this.openInSeparateWindow)
-            
+            const manager = this.rootWindowManager || CHEAT_WINDOW_MANAGER
+            manager.setSeparateWindowEnabled(this.openInSeparateWindow)
+
             if (this.openInSeparateWindow) {
-                // Explicitly close overlay when enabling separate window
-                this.$root.show = false
-                // Open external window
+                if (this.rootMainComponent) {
+                    this.rootMainComponent.show = false
+                } else {
+                    this.$root.show = false
+                }
                 setTimeout(() => {
-                    CHEAT_WINDOW_MANAGER.openExternalWindow()
-                }, 100)
+                    manager.openExternalWindow()
+                }, 0)
             } else {
-                // Close external window when disabling
-                CHEAT_WINDOW_MANAGER.closeExternalWindow()
+                manager.closeExternalWindow()
+                setTimeout(() => {
+                    if (this.rootMainComponent) {
+                        this.rootMainComponent.show = true
+                    } else {
+                        this.$root.show = true
+                    }
+                }, 0)
             }
         },
 
         onSpeedChange () {
-            SpeedCheat.setSpeed(this.speed, this.fixSpeed)
-            SpeedCheat.__writeSettings(this.speed, this.fixSpeed)
+            const speedCheat = this.cheatApi.SpeedCheat
+            if (speedCheat && speedCheat.setSpeed) {
+                speedCheat.setSpeed(this.speed, this.fixSpeed)
+            }
+            if (speedCheat && speedCheat.__writeSettings) {
+                speedCheat.__writeSettings(this.speed, this.fixSpeed)
+            }
             this.initializeVariables()
         },
 
@@ -234,40 +285,59 @@ export default {
                 return
             }
 
-            const diff = this.gold - $gameParty._gold
-
-            if (diff < 0) {
-                $gameParty.loseGold(-diff)
-            } else if (diff > 0) {
-                $gameParty.gainGold(diff)
+            const root = this.getRootWindow()
+            const gameParty = root.$gameParty
+            if (!gameParty) {
+                return
             }
 
-            this.gold = $gameParty._gold
+            const diff = this.gold - gameParty._gold
+
+            if (diff < 0) {
+                gameParty.loseGold(-diff)
+            } else if (diff > 0) {
+                gameParty.gainGold(diff)
+            }
+
+            this.gold = gameParty._gold
             this.initializeVariables()
         },
 
         gotoTitle () {
-            SceneCheat.gotoTitle()
+            if (this.cheatApi.SceneCheat && this.cheatApi.SceneCheat.gotoTitle) {
+                this.cheatApi.SceneCheat.gotoTitle()
+            }
         },
 
         toggleSaveScene () {
-            SceneCheat.toggleSaveScene()
+            if (this.cheatApi.SceneCheat && this.cheatApi.SceneCheat.toggleSaveScene) {
+                this.cheatApi.SceneCheat.toggleSaveScene()
+            }
         },
 
         toggleLoadScene () {
-            SceneCheat.toggleLoadScene()
+            if (this.cheatApi.SceneCheat && this.cheatApi.SceneCheat.toggleLoadScene) {
+                this.cheatApi.SceneCheat.toggleLoadScene()
+            }
         },
 
         onGameSpeedChange () {
+            const gameSpeedCheat = this.cheatApi.GameSpeedCheat || GameSpeedCheat
+            const options = gameSpeedCheat && gameSpeedCheat.sceneOptions ? gameSpeedCheat.sceneOptions() : { all: null, battle: null }
+
             let sceneOption = null
             if (this.applyAllForGameSpeed) {
-                sceneOption = GameSpeedCheat.sceneOptions().all
+                sceneOption = options.all
             } else if (this.applyBattleForGameSpeed) {
-                sceneOption = GameSpeedCheat.sceneOptions().battle
+                sceneOption = options.battle
             }
 
-            GameSpeedCheat.setGameSpeed(this.gameSpeed, sceneOption)
-            GameSpeedCheat.__writeSettings(this.gameSpeed, sceneOption)
+            if (gameSpeedCheat && gameSpeedCheat.setGameSpeed) {
+                gameSpeedCheat.setGameSpeed(this.gameSpeed, sceneOption)
+            }
+            if (gameSpeedCheat && gameSpeedCheat.__writeSettings) {
+                gameSpeedCheat.__writeSettings(this.gameSpeed, sceneOption)
+            }
             this.initializeVariables()
         },
 
@@ -276,7 +346,7 @@ export default {
             this.onGameSpeedChange()
         },
 
-        setGameSpeed (amount) {
+        setGameSpeed () {
             this.gameSpeed = 1
             this.onGameSpeedChange()
         },

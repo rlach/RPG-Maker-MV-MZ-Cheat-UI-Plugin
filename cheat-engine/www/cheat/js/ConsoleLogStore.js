@@ -95,8 +95,20 @@ class ConsoleLogStore {
         }
     }
 }
+// Prefer the parent (main) window's console log store so external windows mirror the same logs
+const __rootWindow = (window.__CHEAT_EXTERNAL_WINDOW__ && window.opener && !window.opener.closed)
+    ? window.opener
+    : window
 
-export const CONSOLE_LOG = new ConsoleLogStore();
+const __rootConsoleLog = __rootWindow.__CONSOLE_LOG__ || new ConsoleLogStore()
 
-// Auto-intercept on load
+// Persist on root for reuse and mirror locally for convenience
+__rootWindow.__CONSOLE_LOG__ = __rootConsoleLog
+if (__rootWindow !== window) {
+    window.__CONSOLE_LOG__ = __rootConsoleLog
+}
+
+export const CONSOLE_LOG = __rootConsoleLog;
+
+// Auto-intercept only once (intercept guards internally)
 CONSOLE_LOG.intercept();

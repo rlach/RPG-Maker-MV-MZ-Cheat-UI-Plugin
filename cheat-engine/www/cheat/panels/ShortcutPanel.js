@@ -13,6 +13,17 @@ export default {
 
     template: `
 <v-card flat class="ma-0 pa-0">
+    <v-alert
+        v-if="showUnavailable"
+        type="warning"
+        dense
+        border="left"
+        colored-border
+        class="ma-0 mb-2"
+    >
+        Unavailable in external window mode (main shortcuts not reachable)
+    </v-alert>
+    <template v-if="!showUnavailable">
     <v-row>
         <v-col
             cols="12"
@@ -147,11 +158,15 @@ export default {
             </td>
         </template>
     </v-data-table>
+    </template>
 </v-card>
     `,
 
     data () {
         return {
+            isExternalWindow: !!window.__CHEAT_EXTERNAL_WINDOW__,
+            shortcutApi: null,
+            showUnavailable: false,
             shortcuts: [],
 
             tableExpanded: [],
@@ -184,6 +199,17 @@ export default {
     },
 
     created () {
+        if (this.isExternalWindow && window.opener && !window.opener.closed && window.opener.GLOBAL_SHORTCUT) {
+            this.shortcutApi = window.opener.GLOBAL_SHORTCUT
+        } else {
+            this.shortcutApi = GLOBAL_SHORTCUT
+        }
+
+        if (!this.shortcutApi || (this.isExternalWindow && this.shortcutApi === GLOBAL_SHORTCUT)) {
+            this.showUnavailable = true
+            return
+        }
+
         this.initializeVariables()
     },
 
@@ -217,7 +243,7 @@ export default {
 
     methods: {
         restoreToDefault () {
-            GLOBAL_SHORTCUT.restoreDefaultSettings()
+            this.shortcutApi.restoreDefaultSettings()
             this.initializeVariables()
         },
 
@@ -239,22 +265,22 @@ export default {
 
         onShortcutChange (key, item) {
             try {
-                GLOBAL_SHORTCUT.setShortcut(item.id, key)
+                this.shortcutApi.setShortcut(item.id, key)
             } catch (err) {
                 Alert.error(err.message)
             }
 
-            item.shortcut = GLOBAL_SHORTCUT.getShortcut(item.id)
+            item.shortcut = this.shortcutApi.getShortcut(item.id)
         },
 
         onParameterChange(value, item, paramId) {
             try {
-                GLOBAL_SHORTCUT.setParam(item.id, paramId, value)
+                this.shortcutApi.setParam(item.id, paramId, value)
             } catch (err) {
                 Alert.error(err.message)
             }
 
-            item.param[paramId].value = GLOBAL_SHORTCUT.getParam(item.id, paramId)
+            item.param[paramId].value = this.shortcutApi.getParam(item.id, paramId)
         },
 
         convertToInternalData (settings, config) {
@@ -285,8 +311,13 @@ export default {
         },
 
         initializeVariables () {
-            this.shortcuts = Object.keys(GLOBAL_SHORTCUT.shortcutConfig).map(key => {
-                return this.convertToInternalData(GLOBAL_SHORTCUT.shortcutSettings[key], GLOBAL_SHORTCUT.shortcutConfig[key])
+            if (!this.shortcutApi || !this.shortcutApi.shortcutConfig) {
+                this.showUnavailable = true
+                return
+            }
+
+            this.shortcuts = Object.keys(this.shortcutApi.shortcutConfig).map(key => {
+                return this.convertToInternalData(this.shortcutApi.shortcutSettings[key], this.shortcutApi.shortcutConfig[key])
             })
         },
 

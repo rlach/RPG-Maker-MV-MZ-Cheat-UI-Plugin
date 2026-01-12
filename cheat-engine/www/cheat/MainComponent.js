@@ -4,7 +4,7 @@ import { GeneralCheat } from './js/CheatHelper.js'
 import AlertSnackbar from './components/AlertSnackbar.js'
 import ConfirmDialog from './components/ConfirmDialog.js'
 import { customizeRPGMakerFunctions } from './init/customize_functions.js'
-import {Key} from './js/KeyCodes.js'
+import {Key, UNASSIGNED_KEY_CODE} from './js/KeyCodes.js'
 import {Alert} from'./js/AlertHelper.js'
 import { CHEAT_WINDOW_MANAGER } from './js/CheatWindowManager.js'
 
@@ -49,6 +49,11 @@ export default {
         customizeRPGMakerFunctions(self)
 
         CHEAT_WINDOW_MANAGER.setMainComponent(this)
+        try {
+            window.__CHEAT_MAIN_COMPONENT__ = this
+        } catch (err) {
+            // best-effort exposure for external window coordination
+        }
 
         GeneralCheat.toggleCheatModal = (componentName = null) => {
             this.toggleCheatModal(componentName)
@@ -78,7 +83,51 @@ export default {
     },
 
     methods: {
+        isCombiningKeyCode (keyCode) {
+            return keyCode === 16 || keyCode === 17 || keyCode === 18 || keyCode === 91 || keyCode === 93
+        },
+
+        resetStuckPrimaryWhenModifierPressed (keyCode) {
+            if (!this.isCombiningKeyCode(keyCode)) {
+                return
+            }
+
+            // If a non-modifier was left pressed when focus left, clear it before processing
+            if (this.currentKey.code !== UNASSIGNED_KEY_CODE && !this.isCombiningKeyCode(this.currentKey.code)) {
+                this.currentKey = Key.createEmpty()
+            }
+        },
+
+        shouldIgnoreGlobalShortcut (e) {
+            const target = e && e.target
+            if (!target) {
+                return false
+            }
+
+            const tag = target.tagName ? target.tagName.toLowerCase() : ''
+            if (tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'option') {
+                return true
+            }
+
+            if (target.isContentEditable) {
+                return true
+            }
+
+            const role = target.getAttribute && target.getAttribute('role')
+            if (role === 'textbox') {
+                return true
+            }
+
+            return false
+        },
+
         onGlobalKeyDown (e) {
+            this.resetStuckPrimaryWhenModifierPressed(e.keyCode)
+
+            if (this.shouldIgnoreGlobalShortcut(e)) {
+                return
+            }
+
             if (e.repeat) {
                 GLOBAL_SHORTCUT.runKeyRepeatEvent(e, Key.fromKey(this.currentKey))
             } else {
@@ -90,6 +139,10 @@ export default {
         },
 
         onGlobalKeyUp (e) {
+            if (this.shouldIgnoreGlobalShortcut(e)) {
+                return
+            }
+
             GLOBAL_SHORTCUT.runKeyLeaveEvent(e, Key.fromKey(this.currentKey))
             this.currentKey.remove(e.keyCode)
             // Don't run enter action if only modifier keys remain
@@ -152,7 +205,7 @@ export default {
         },
 
         async checkVersion () {
-            if (!Utils.isNwjs()) {
+            if (!Utils?.isNwjs()) {
                 return
             }
 

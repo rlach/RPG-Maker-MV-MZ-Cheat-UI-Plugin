@@ -91,10 +91,13 @@
         console.log('[CheatWindow] Globals synced from parent')
     </script>
     <script src="libs/axios.min.js"></script>
+    <!-- Load Vue/Vuetify locally in this window so event listeners bind to this document -->
+    <script src="libs/vue.js"></script>
+    <script src="libs/vuetify.js"></script>
 </head>
 <body>
 <div style="position: fixed; top: 5px; right: 5px; z-index: 9999;">
-    <button onclick="openDevTools()" style="background: #333; color: white; border: 1px solid #666; padding: 5px 10px; cursor: pointer;">Dev Tools (F12)</button>
+    <button onclick="openDevTools()" style="background: #333; color: white; border: 1px solid #666; padding: 5px 10px; cursor: pointer;">Dev Tools</button>
 </div>
 <div id="app"></div>
 <script>
@@ -113,19 +116,30 @@
     
     ;(async function() {
         // parentWin is already declared in the parent <script> tag and available globally
-        if (!window.opener || !window.opener.Vue) {
-            console.error('[CheatWindow] Parent window or Vue not available')
-            throw new Error('Parent window with Vue not found')
+        if (!window.Vue || !window.Vuetify) {
+            console.error('[CheatWindow] Vue/Vuetify not loaded locally')
+            throw new Error('Vue/Vuetify must be loaded in external window')
+        }
+
+        // Ensure Vuetify is installed on the local Vue (CDN builds may not auto-install)
+        if (!window.Vue.__vuetify_installed__) {
+            try {
+                window.Vue.use(window.Vuetify)
+                window.Vue.__vuetify_installed__ = true
+            } catch (e) {
+                console.error('[CheatWindow] Failed to install Vuetify on local Vue', e)
+                throw e
+            }
         }
         
         const parentWin = window.opener
         
-        // Share Vue, Vuetify, and libraries from parent
-        window.Vue = parentWin.Vue
-        window.Vuetify = parentWin.Vuetify
-        window.axios = parentWin.axios
+        // Fallback: share axios from parent if local not loaded
+        if (!window.axios && parentWin && parentWin.axios) {
+            window.axios = parentWin.axios
+        }
         
-        console.log('[CheatWindow] Shared Vue from parent:', typeof window.Vue)
+        console.log('[CheatWindow] Using local Vue:', typeof window.Vue)
         
         // Import cheat components
         try {
@@ -157,16 +171,19 @@
             const TranslateOnTheFlyPanel = (await import('./panels/TranslateOnTheFlyPanel.js')).default
             console.log('[CheatWindow] TranslateOnTheFlyPanel imported')
             
-            // Get vuetify from parent (created when parent setup.js loaded)
-            const parentVuetify = parentWin.__VUETIFY_INSTANCE__
-            
-            if (!parentVuetify) {
-                console.warn('[CheatWindow] Parent Vuetify not found, creating new instance')
-                const Vuetify = parentWin.Vuetify
-                window.__VUETIFY_INSTANCE__ = new Vuetify()
-            } else {
-                window.__VUETIFY_INSTANCE__ = parentVuetify
-            }
+            // Create a Vuetify instance bound to THIS window so overlays/menus/sliders attach here
+            const Vuetify = window.Vuetify
+            window.__VUETIFY_INSTANCE__ = new Vuetify({
+                // Force overlays/menus to attach to this window's body
+                defaults: {
+                    VMenu: { attach: () => document.body },
+                    VSelect: { attach: () => document.body },
+                    VAutocomplete: { attach: () => document.body },
+                    VCombobox: { attach: () => document.body },
+                    VDialog: { attach: () => document.body },
+                    VOverflowBtn: { attach: () => document.body }
+                }
+            })
             
             // Mount Vue app in external window - render CheatModal directly (no overlay needed)
             const defaultComponent = parentWin.__CHEAT_DEFAULT_COMPONENT__ || 'general-panel'

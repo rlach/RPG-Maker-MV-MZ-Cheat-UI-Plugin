@@ -687,6 +687,7 @@ export class MessageCheat {
 
             const text = $gameMessage.allText() || ''
             const choices = $gameMessage.choices ? $gameMessage.choices() : []
+            const speakerName = ($gameMessage._speakerName || '').trim()
             let combined = text
 
             if (Array.isArray(choices) && choices.length > 0) {
@@ -698,9 +699,12 @@ export class MessageCheat {
                 return
             }
 
+            console.log('[MessageCheat] Logging message:', combined)
+
             MESSAGE_LOG.addEntry(combined, {
                 translated: !!TranslateOnTheFlyState.isEnabled() && !MessageCheat.skip,
-                skipped: !!MessageCheat.skip
+                skipped: !!MessageCheat.skip,
+                speakerName: speakerName || null
             })
         } catch (err) {
             console.warn('[MessageCheat] Failed to log message', err)
@@ -731,6 +735,17 @@ export class MessageCheat {
 
         this.skip = false
     }
+}
+
+// Expose cheat helpers on the window so external cheat windows can reuse the same instances
+try {
+    window.GeneralCheat = GeneralCheat
+    window.GameSpeedCheat = GameSpeedCheat
+    window.SpeedCheat = SpeedCheat
+    window.SceneCheat = SceneCheat
+    window.MessageCheat = MessageCheat
+} catch (err) {
+    // Non-fatal: best-effort exposure only
 }
 
 

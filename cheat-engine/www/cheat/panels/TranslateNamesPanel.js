@@ -143,13 +143,35 @@ export default {
             databaseNames: [],
             cacheEntries: new Map(),
             actorNameOverrides: new Map(), // Store custom actor names
-            error: null
+            error: null,
+
+            rootWindow: null,
+            sharedState: null
         };
     },
 
     created() {
-        this.kvStorage = new KeyValueStorage('./www/cheat-settings/translate-cache.json');
-        this.actorNameStorage = new KeyValueStorage('./www/cheat-settings/actor-names.json');
+        this.rootWindow = (window.__CHEAT_EXTERNAL_WINDOW__ && window.opener && !window.opener.closed) ? window.opener : window;
+
+        // Shared state so the external window uses the same caches as the main window
+        this.sharedState = this.rootWindow.__TRANSLATE_NAMES_SHARED__ || {
+            cacheEntries: new Map(),
+            actorNameOverrides: new Map()
+        };
+        this.rootWindow.__TRANSLATE_NAMES_SHARED__ = this.sharedState;
+        if (this.rootWindow !== window) {
+            window.__TRANSLATE_NAMES_SHARED__ = this.sharedState;
+        }
+
+        this.cacheEntries = this.sharedState.cacheEntries;
+        this.actorNameOverrides = this.sharedState.actorNameOverrides;
+
+        this.kvStorage = this.rootWindow.__TRANSLATE_CACHE_STORAGE__ || new KeyValueStorage('./www/cheat-settings/translate-cache.json');
+        this.rootWindow.__TRANSLATE_CACHE_STORAGE__ = this.kvStorage;
+
+        this.actorNameStorage = this.rootWindow.__TRANSLATE_ACTOR_STORAGE__ || new KeyValueStorage('./www/cheat-settings/actor-names.json');
+        this.rootWindow.__TRANSLATE_ACTOR_STORAGE__ = this.actorNameStorage;
+
         this.loadActorNameOverrides(); // Load overrides FIRST before loading database
         this.refresh();
         this.loadDatabaseNames();
@@ -198,12 +220,24 @@ export default {
             try {
                 const json = this.kvStorage.getItem('data');
                 const entries = json ? JSON.parse(json) : [];
-                this.cacheEntries = new Map(Array.isArray(entries) ? entries : []);
-                this.entries = this.buildNameEntries(this.cacheEntries);
+                const targetMap = this.sharedState ? this.sharedState.cacheEntries : this.cacheEntries;
+                targetMap.clear();
+                if (Array.isArray(entries)) {
+                    for (const [key, value] of entries) {
+                        targetMap.set(key, value);
+                    }
+                }
+                this.cacheEntries = targetMap;
+                this.entries = this.buildNameEntries(targetMap);
             } catch (err) {
                 console.warn('[TranslateNamesPanel] Failed to load cache', err);
                 this.error = err;
-                this.cacheEntries = new Map();
+                if (this.sharedState && this.sharedState.cacheEntries) {
+                    this.sharedState.cacheEntries.clear();
+                    this.cacheEntries = this.sharedState.cacheEntries;
+                } else {
+                    this.cacheEntries = new Map();
+                }
                 this.entries = [];
             } finally {
                 this.loading = false;
@@ -214,9 +248,12 @@ export default {
             try {
                 this.databaseNames = [];
                 // Get all actors from database (skip ID 0 which is empty/null)
-                if (typeof $dataActors !== 'undefined' && Array.isArray($dataActors)) {
-                    for (let i = 1; i < $dataActors.length; i++) {
-                        const actor = $dataActors[i];
+                const root = this.rootWindow || window;
+                const dataActors = root.$dataActors || window.$dataActors;
+
+                if (typeof dataActors !== 'undefined' && Array.isArray(dataActors)) {
+                    for (let i = 1; i < dataActors.length; i++) {
+                        const actor = dataActors[i];
                         if (actor && actor.name) {
                             // Use override if exists, otherwise use original name
                             const overrideName = this.actorNameOverrides.get(`actor_${i}`);
@@ -276,8 +313,10 @@ export default {
             }
             
             // Update game actor instance if it exists
-            if (typeof $gameActors !== 'undefined') {
-                const gameActor = $gameActors.actor(actor.id);
+            const root = this.rootWindow || window;
+            const gameActors = root.$gameActors || (typeof $gameActors !== 'undefined' ? $gameActors : null);
+            if (gameActors && typeof gameActors.actor === 'function') {
+                const gameActor = gameActors.actor(actor.id);
                 if (gameActor) {
                     gameActor._name = actor.name;
                 }
@@ -292,10 +331,22 @@ export default {
             try {
                 const json = this.actorNameStorage.getItem('data');
                 const entries = json ? JSON.parse(json) : [];
-                this.actorNameOverrides = new Map(Array.isArray(entries) ? entries : []);
+                const targetMap = this.sharedState ? this.sharedState.actorNameOverrides : this.actorNameOverrides;
+                targetMap.clear();
+                if (Array.isArray(entries)) {
+                    for (const [key, value] of entries) {
+                        targetMap.set(key, value);
+                    }
+                }
+                this.actorNameOverrides = targetMap;
             } catch (err) {
                 console.warn('[TranslateNamesPanel] Failed to load actor name overrides', err);
-                this.actorNameOverrides = new Map();
+                if (this.sharedState && this.sharedState.actorNameOverrides) {
+                    this.sharedState.actorNameOverrides.clear();
+                    this.actorNameOverrides = this.sharedState.actorNameOverrides;
+                } else {
+                    this.actorNameOverrides = new Map();
+                }
             }
         },
 

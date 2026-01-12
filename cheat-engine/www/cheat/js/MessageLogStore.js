@@ -60,5 +60,17 @@ class MessageLogStore {
         }
     }
 }
+// Prefer the parent (main) window's log store so external windows see the same log
+const __rootWindow = (window.__CHEAT_EXTERNAL_WINDOW__ && window.opener && !window.opener.closed)
+    ? window.opener
+    : window
 
-export const MESSAGE_LOG = new MessageLogStore()
+const __rootMessageLog = __rootWindow.__MESSAGE_LOG__ || new MessageLogStore()
+
+// Persist on the root window and mirror locally for convenience
+__rootWindow.__MESSAGE_LOG__ = __rootMessageLog
+if (__rootWindow !== window) {
+    window.__MESSAGE_LOG__ = __rootMessageLog
+}
+
+export const MESSAGE_LOG = __rootMessageLog

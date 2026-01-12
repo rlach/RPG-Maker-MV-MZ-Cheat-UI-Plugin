@@ -330,7 +330,7 @@ const shortcutConfig = {
         name: 'Open dev tool',
         desc: 'Open Chromium dev tool',
         enterAction (param) {
-            if (Utils.isNwjs()) {
+            if (Utils?.isNwjs()) {
                 require('nw.gui').Window.get().showDevTools()
             }
         }
@@ -510,7 +510,7 @@ class GlobalShortcut {
      */
     readRawShortcutSettings () {
         // if nwjs environment, read shortcut settings from file
-        if (Utils.isNwjs()) {
+        if (Utils?.isNwjs()) {
             const fs = require('fs')
             const path = require('path')
 
@@ -557,7 +557,7 @@ class GlobalShortcut {
     }
 
     writeRawShortcutSettings (shortcutSettings) {
-        if (Utils.isNwjs()) {
+        if (Utils?.isNwjs()) {
             const fs = require('fs')
             const path = require('path')
 
@@ -584,7 +584,7 @@ class GlobalShortcut {
     }
 
     restoreDefaultSettings () {
-        if (Utils.isNwjs()) {
+        if (Utils?.isNwjs()) {
             // remove settings file
             try {
                 require('fs').unlinkSync(this.shortcutSettingsFile)
