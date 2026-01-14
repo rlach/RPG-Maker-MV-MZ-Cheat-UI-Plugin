@@ -703,7 +703,7 @@ export default class AIEngine extends BaseTranslationEngine {
                     },
                     {
                         "role": "user",
-                        "content": "This is not valid JSON! Fix it!"
+                        "content": "This is not valid JSON map! Fix it! The map has to contain key-value pairs."
                     }
                 ],
                 max_tokens: 10000,
@@ -1055,7 +1055,7 @@ export default class AIEngine extends BaseTranslationEngine {
                 
                 // Validate unknown tags before postprocessing
                 const unknownTagCheck = this.validateUnknownTags(rawSlice, itemD.preprocessed);
-                if (!unknownTagCheck.valid) {
+                if (!unknownTagCheck.valid && (itemD.type === 'text' || itemD.type === 'choice')) {
                     failures.push({
                         type: itemD.type,
                         id: itemD.id,
@@ -1083,8 +1083,13 @@ export default class AIEngine extends BaseTranslationEngine {
 
                 const isSame = translated.trim() === (itemD.value || '').trim();
                 if (this.panel.sourceLang !== this.panel.targetLang && isSame) {
-                    // Only report as translation unchanged if the string contains at least one letter
-                    const hasLetters = /[a-zA-Z]/i.test(itemD.value);
+                    // Only report as translation unchanged if the string contains at least one letter (excluding tags)
+                    // Remove all tags from value to check if it contains actual translatable text
+                    let valueWithoutTags = itemD.value;
+                    for (const config of TAG_CONFIGS) {
+                        valueWithoutTags = valueWithoutTags.replace(config.prePattern, '');
+                    }
+                    const hasLetters = /[a-zA-Z]/i.test(valueWithoutTags);
                     if (hasLetters) {
                         failures.push({
                             type: itemD.type,
@@ -1095,7 +1100,7 @@ export default class AIEngine extends BaseTranslationEngine {
                         });
                         continue;
                     }
-                    // If no letters (e.g., ".....", "!!!"), accept as valid translation
+                    // If no letters (e.g., ".....", "!!!" or text with only tags), accept as valid translation
                 }
 
                 // Clean and wrap text/choice types

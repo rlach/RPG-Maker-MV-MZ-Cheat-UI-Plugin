@@ -4,6 +4,9 @@ import { KeyValueStorage } from '../js/KeyValueStorage.js';
 import { TranslateOnTheFlyState } from '../js/TranslateOnTheFlyState.js';
 import { AIEngine, createEngine, getAvailableEngines } from '../translate-engines/index.js';
 
+const CHAR_LIMIT = 1000;
+const BATCH_ITEMS_LIMIT = 20;
+
 export default {
     name: 'TranslateOnTheFlyPanel',
 
@@ -30,8 +33,7 @@ export default {
             dense
             hide-details
             @click.self.stop
-            @change="onChangeCacheOnly"
-            :disabled="enabled === true">
+            @change="onChangeCacheOnly">
         </v-switch>
 
         <v-switch
@@ -292,6 +294,9 @@ export default {
             console.log('[TranslateOnTheFly] Translation enabled from saved settings');
             // Start background translation of items and skills
             this.startBackgroundTranslation();
+        } else if (this.translateCacheWhenDisabled) {
+            console.log('[TranslateOnTheFly] Applying cached translations to data objects');
+            this.applyCachedTranslationsToData();
         }
     },
 
@@ -299,10 +304,6 @@ export default {
         if (this.stateUnsubscribe) {
             this.stateUnsubscribe();
             this.stateUnsubscribe = null;
-        }
-
-        if (window.__TranslateOnTheFlyPanel === this) {
-            delete window.__TranslateOnTheFlyPanel;
         }
 
         if (this._spinnerEl && this._spinnerEl.parentNode) {
@@ -494,7 +495,7 @@ export default {
         },
 
         collectAheadItems(currentText, currentSpeaker, interpreter, options = {}) {
-            const charLimit = options.charLimit || 1000;
+            const charLimit = options.charLimit || CHAR_LIMIT;
             const maxLookahead = options.maxLookahead || 50;
             const maxDepth = options.maxDepth !== undefined ? options.maxDepth : 999;
             
@@ -655,7 +656,7 @@ export default {
         async startAheadTranslation({ currentText, currentSpeakerName, cacheKey, maxDepth }) {
             try {
                 const interpreter = this.findMessageInterpreter();
-                const items = this.collectAheadItems(currentText, currentSpeakerName, interpreter, { charLimit: 1000, maxDepth });
+                const items = this.collectAheadItems(currentText, currentSpeakerName, interpreter, { charLimit: CHAR_LIMIT, maxDepth });
 
                 // Add current choices from $gameMessage if present
                 if ($gameMessage && $gameMessage.isChoice && $gameMessage.isChoice()) {
@@ -1303,6 +1304,29 @@ export default {
                 return Window_Message.prototype._originalStartInput.call(this);
             };
 
+            if (!DataManager._extractSaveContents) {
+                DataManager._extractSaveContents = DataManager.extractSaveContents;
+            }
+
+            DataManager.extractSaveContents = function(contents) { 
+                DataManager._extractSaveContents(contents);;
+                console.log('[TranslateOnTheFly] Extracted save contents, applying cached translations if any');
+
+                window.__TranslateOnTheFlyPanel.applyCachedTranslations($dataActors, ['name', 'nickname', 'profile'], 'actor', $gameActors, 'actor');
+                console.log('[TranslateOnTheFly] Applied cached translations to $dataActors and $gameActors');
+            }
+
+            if(!DataManager._createGameObjects) {
+                DataManager._createGameObjects = DataManager.createGameObjects;
+            }
+
+            DataManager.createGameObjects = function() {
+                DataManager._createGameObjects();
+                console.log('[TranslateOnTheFly] Created game objects, applying cached translations if any');
+                window.__TranslateOnTheFlyPanel.applyCachedTranslations($dataActors, ['name', 'nickname', 'profile'], 'actor', $gameActors, 'actor');
+                console.log('[TranslateOnTheFly] Applied cached translations to $dataActors and $gameActors');
+            }
+
             // Hook Window_Command.prototype.refresh to translate commands before rendering
             if (!Window_Command.prototype._originalRefresh) {
                 Window_Command.prototype._originalRefresh = Window_Command.prototype.refresh;
@@ -1321,6 +1345,7 @@ export default {
                 this._collectingCommands = true;
                 this._collectedCommands = [];
                 
+                console.log('[TranslateOnTheFly] Refreshing command window, collecting commands for translation', $dataSystem);
                 // First time only: collect system command terms for translation
                 if (!self._systemCommandsCollected && $dataSystem && $dataSystem.terms && $dataSystem.terms.commands) {
                     const systemCommands = $dataSystem.terms.commands.filter(cmd => !!cmd);
@@ -1329,7 +1354,8 @@ export default {
                             name: cmdName, 
                             symbol: 'dummy', 
                             enabled: true, 
-                            ext: null 
+                            ext: null,
+                            isAdditional: true
                         });
                     }
                     self._systemCommandsCollected = true;
@@ -1389,6 +1415,7 @@ export default {
                         self.hideSpinner();
                     }
                 }
+                this._collectedCommands = this._collectedCommands.filter(cmd => cmd && !cmd.isAdditional);
 
                 // Now add all commands with translations (from cache or original)
                 this.clearCommandList();
@@ -1412,6 +1439,7 @@ export default {
 
                 // Continue with original refresh logic (after makeCommandList)
                 delete this._collectedCommands;
+                this.createContents();
                 Window_Selectable.prototype.refresh.call(this);
             };
 
@@ -1421,9 +1449,8 @@ export default {
             }
 
             Window_Command.prototype.addCommand = function(name, symbol, enabled = true, ext = null) {
-                // If we're collecting commands for translation, just store them
-                console.log('[TranslateOnTheFly] Collected command for translation:', name, symbol);
                 if (this._collectingCommands) {
+                    console.log('[TranslateOnTheFly] Collected command for translation:', name, symbol);
                     this._collectedCommands.push({ name, symbol, enabled, ext });
                     return;
                 }
@@ -1982,125 +2009,64 @@ export default {
             return true;
         },
 
+        applyCachedTranslations(dataContainer, fields, cacheKeyPrefix, instanceContainer, instanceFunctionName) {
+            let appliedCount = 0;
+            for (let i = 1; i < dataContainer.length; i++) {
+                const item = dataContainer[i];
+                if (!item) continue;
+
+                let itemInstance;
+                if(instanceContainer && instanceFunctionName && typeof instanceContainer[instanceFunctionName] === 'function') {
+                    itemInstance = instanceContainer[instanceFunctionName](item.id);
+                } 
+
+                // Store original values if not stored
+                if (!item._translateOriginal) {
+                    item._translateOriginal = {};
+                    for (const field of fields) {
+                         item._translateOriginal[field] = item[field];
+                    }
+                }
+
+                // Apply cached translations
+                for (const field of fields) {
+                    const originalValue = item._translateOriginal[field];
+                    if (originalValue && typeof originalValue === 'string' && originalValue.trim() !== '') {
+                        const cacheKey = this.getCacheKey(originalValue, `${cacheKeyPrefix}_${field}`);
+                        if (this.translationCache.has(cacheKey)) {
+                            item[field] = this.translationCache.get(cacheKey);
+                            if(itemInstance) {
+                                itemInstance[`_${field}`] = item[field];
+                            }
+                            appliedCount++;
+                        }
+                    }
+                }
+            }
+            return appliedCount;
+        },
+
         applyCachedTranslationsToData() {
-            if (!window.$dataItems || !window.$dataSkills || !window.$dataArmors || !window.$dataWeapons) {
+            if (!window.$dataItems || !window.$dataSkills || !window.$dataArmors || !window.$dataWeapons || !window.$dataMapInfos) {
+                console.log('[TranslateOnTheFly] Game data not fully loaded, cannot apply cached translations');
+                setTimeout(() => {
+                    this.applyCachedTranslationsToData();
+                }, 2000);
                 return;
             }
 
             let appliedCount = 0;
 
             // Apply cached translations to items
-            for (let i = 1; i < $dataItems.length; i++) {
-                const item = $dataItems[i];
-                if (!item) continue;
-
-                // Store original values if not stored
-                if (!item._translateOriginal) {
-                    item._translateOriginal = {
-                        name: item.name,
-                        description: item.description
-                    };
-                }
-
-                // Apply cached translations
-                const fields = ['name', 'description'];
-                for (const field of fields) {
-                    const originalValue = item._translateOriginal[field];
-                    if (originalValue && typeof originalValue === 'string' && originalValue.trim() !== '') {
-                        const cacheKey = this.getCacheKey(originalValue, `item_${field}`);
-                        if (this.translationCache.has(cacheKey)) {
-                            item[field] = this.translationCache.get(cacheKey);
-                            appliedCount++;
-                        }
-                    }
-                }
-            }
-
-            // Apply cached translations to skills
-            for (let i = 1; i < $dataSkills.length; i++) {
-                const skill = $dataSkills[i];
-                if (!skill) continue;
-
-                // Store original values if not stored
-                if (!skill._translateOriginal) {
-                    skill._translateOriginal = {
-                        name: skill.name,
-                        description: skill.description,
-                        message1: skill.message1,
-                        message2: skill.message2
-                    };
-                }
-
-                // Apply cached translations
-                const fields = ['name', 'description', 'message1', 'message2'];
-                for (const field of fields) {
-                    const originalValue = skill._translateOriginal[field];
-                    if (originalValue && typeof originalValue === 'string' && originalValue.trim() !== '') {
-                        const cacheKey = this.getCacheKey(originalValue, `skill_${field}`);
-                        if (this.translationCache.has(cacheKey)) {
-                            skill[field] = this.translationCache.get(cacheKey);
-                            appliedCount++;
-                        }
-                    }
-                }
-            }
-
-            // Apply cached translations to armors
-            for (let i = 1; i < $dataArmors.length; i++) {
-                const armor = $dataArmors[i];
-                if (!armor) continue;
-
-                // Store original values if not stored
-                if (!armor._translateOriginal) {
-                    armor._translateOriginal = {
-                        name: armor.name,
-                        description: armor.description
-                    };
-                }
-
-                // Apply cached translations
-                const fields = ['name', 'description'];
-                for (const field of fields) {
-                    const originalValue = armor._translateOriginal[field];
-                    if (originalValue && typeof originalValue === 'string' && originalValue.trim() !== '') {
-                        const cacheKey = this.getCacheKey(originalValue, `armor_${field}`);
-                        if (this.translationCache.has(cacheKey)) {
-                            armor[field] = this.translationCache.get(cacheKey);
-                            appliedCount++;
-                        }
-                    }
-                }
-            }
-
-            // Apply cached translations to weapons
-            for (let i = 1; i < $dataWeapons.length; i++) {
-                const weapon = $dataWeapons[i];
-                if (!weapon) continue;
-
-                // Store original values if not stored
-                if (!weapon._translateOriginal) {
-                    weapon._translateOriginal = {
-                        name: weapon.name,
-                        description: weapon.description
-                    };
-                }
-
-                // Apply cached translations
-                const fields = ['name', 'description'];
-                for (const field of fields) {
-                    const originalValue = weapon._translateOriginal[field];
-                    if (originalValue && typeof originalValue === 'string' && originalValue.trim() !== '') {
-                        const cacheKey = this.getCacheKey(originalValue, `weapon_${field}`);
-                        if (this.translationCache.has(cacheKey)) {
-                            weapon[field] = this.translationCache.get(cacheKey);
-                            appliedCount++;
-                        }
-                    }
-                }
-            }
+            appliedCount += this.applyCachedTranslations($dataItems, ['name', 'description'], 'item');
+            appliedCount += this.applyCachedTranslations($dataSkills, ['name', 'description', 'message1', 'message2'], 'skill');
+            appliedCount += this.applyCachedTranslations($dataArmors, ['name', 'description'], 'armor');
+            appliedCount += this.applyCachedTranslations($dataWeapons, ['name', 'description'], 'weapon');
+            appliedCount += this.applyCachedTranslations($dataMapInfos, ['name'], 'map');
+            appliedCount += this.applyCachedTranslations($dataActors, ['name', 'nickname', 'profile'], 'actor', $gameActors, 'actor');
 
             if (appliedCount > 0) {
-                console.log(`[TranslateOnTheFly] Applied ${appliedCount} cached translations to items, skills, armors and weapons`);
+                console.log(`[TranslateOnTheFly] Applied ${appliedCount} cached translations to objects`);
             }
         },
 
@@ -2112,6 +2078,7 @@ export default {
             }
 
             if (!this.isTranslationEnabled()) {
+                console.log('[TranslateOnTheFly] Translation disabled by user', this.useCacheOnly);
                 return;
             }
 
@@ -2147,6 +2114,7 @@ export default {
                 const armorsToTranslate = [];
                 const weaponsToTranslate = [];
                 const mapsToTranslate = [];
+                const actorsToTranslate = [];
 
                 // Process items (skip index 0 which is null)
                 for (let i = 1; i < $dataItems.length; i++) {
@@ -2203,8 +2171,18 @@ export default {
                     }
                 }
 
-                console.log(`[TranslateOnTheFly] Found ${itemsToTranslate.length} items, ${skillsToTranslate.length} skills, ${armorsToTranslate.length} armors, ${weaponsToTranslate.length} weapons and ${mapsToTranslate.length} maps to translate`);
+                // Process actors (skip index 0 which is null)
+                for (let i = 1; i < $dataActors.length; i++) {
+                    const actor = $dataActors[i];
+                    if (!actor) continue;
 
+                    const hasUntranslated = this.hasUntranslatedFields(actor, ['name', 'nickname', 'profile'], 'actor');
+                    if (hasUntranslated) {
+                        actorsToTranslate.push(actor);
+                    }
+                }
+
+                console.log(`[TranslateOnTheFly] Found ${itemsToTranslate.length} items, ${skillsToTranslate.length} skills, ${armorsToTranslate.length} armors, ${weaponsToTranslate.length} weapons, ${mapsToTranslate.length} maps and ${actorsToTranslate.length} actors to translate`);
                 // Translate in batches of 10
                 const BATCH_SIZE = 10;
                 
@@ -2241,6 +2219,13 @@ export default {
                     const batch = mapsToTranslate.slice(i, i + BATCH_SIZE);
                     await this.translateDataBatch(batch, ['name'], 'map');
                     console.log(`[TranslateOnTheFly] Translated maps batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(mapsToTranslate.length / BATCH_SIZE)}`);
+                }
+
+                // Translate actors
+                for (let i = 0; i < actorsToTranslate.length; i += BATCH_SIZE) {
+                    const batch = actorsToTranslate.slice(i, i + BATCH_SIZE);
+                    await this.translateDataBatch(batch, ['name', 'nickname', 'profile'], 'actor');
+                    console.log(`[TranslateOnTheFly] Translated actors batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(actorsToTranslate.length / BATCH_SIZE)}`);
                 }
 
                 console.log('[TranslateOnTheFly] Background translation completed');
@@ -2554,6 +2539,23 @@ export default {
                 let totalTranslated = 0;
                 let totalFailed = 0;
 
+                
+                console.log('[TranslateOnTheFly] Translating common events first');
+                try {
+                    const result = await this.translateMapEvents({
+                    events: [{
+                        pages: $dataCommonEvents
+                    }],
+                    displayName: 'Common Events'
+                }, null, null);
+                        if (result) {
+                            totalTranslated += result.successCount || 0;
+                            totalFailed += result.failureCount || 0;
+                        }
+                } catch (error) {
+                    console.error('[TranslateOnTheFly] Failed to translate common events:', error);
+                }
+
                 // Process each map
                 for (let i = 0; i < validMaps.length; i++) {
                     const mapInfo = validMaps[i];
@@ -2609,6 +2611,7 @@ export default {
             try {
                 // Use provided mapData or fall back to $dataMap
                 const dataMap = mapData || $dataMap;
+                console.log('[TranslateOnTheFly] translateMapEvents called for map:', mapNumber, dataMap);
 
                 // Check if map is loaded
                 if (!dataMap) {
@@ -2769,22 +2772,32 @@ export default {
                     return { successCount: 0, failureCount: 0 };
                 }
 
+                // Deduplicate items by cacheKey across the entire map
+                const uniqueItemsMap = new Map();
+                for (const item of itemsToTranslate) {
+                    if (!uniqueItemsMap.has(item.cacheKey)) {
+                        uniqueItemsMap.set(item.cacheKey, item);
+                    }
+                }
+                const uniqueItems = Array.from(uniqueItemsMap.values());
+
+                console.log(`[TranslateOnTheFly] After deduplication: ${uniqueItems.length} unique items (was ${itemsToTranslate.length})`);
+
                 // Batch translate items with char limit per batch (1000 chars)
-                const CHAR_LIMIT = 1000;
                 let batchNum = 0;
                 let totalSuccesses = 0;
                 let totalFailures = 0;
 
                 try {
                     let i = 0;
-                    while (i < itemsToTranslate.length) {
+                    while (i < uniqueItems.length) {
                         batchNum++;
                         const batch = [];
                         let batchChars = 0;
 
                         // Collect items for this batch up to char limit
-                        while (i < itemsToTranslate.length && batchChars < CHAR_LIMIT) {
-                            const item = itemsToTranslate[i];
+                        while (i < uniqueItems.length && batchChars < CHAR_LIMIT && batch.length < BATCH_ITEMS_LIMIT) {
+                            const item = uniqueItems[i];
                             const itemLength = item.value.length;
 
                             // If adding this item would exceed limit and batch is not empty, send what we have
@@ -2801,7 +2814,7 @@ export default {
 
                         // Show progress in UI box
                         const currentProgress = totalSuccesses + totalFailures;
-                        const totalItems = itemsToTranslate.length;
+                        const totalItems = uniqueItems.length;
                         const messageProgressText = `${currentProgress}/${totalItems}`;
                         
                         if (mapNumber !== null && totalMaps !== null) {
@@ -2814,6 +2827,7 @@ export default {
                         }
 
                         // Translate this batch
+                        shuffle(batch); // Shuffle to avoid patterns
                         const result = await this.engine.batchTranslate(batch);
                         
                         // Cache successes
@@ -2834,7 +2848,7 @@ export default {
                     this.hideSpinner();
                     if (!mapNumber) {
                         this.hideProgressBox();
-                        Alert.success(`Translated ${totalSuccesses}/${itemsToTranslate.length} map messages in ${batchNum} batches`);
+                        Alert.success(`Translated ${totalSuccesses}/${uniqueItems.length} map messages in ${batchNum} batches`);
                     }
                     console.log(`[TranslateOnTheFly] Map translation completed: ${totalSuccesses} successes, ${totalFailures} failures`);
                     return { successCount: totalSuccesses, failureCount: totalFailures };
@@ -2859,3 +2873,11 @@ export default {
         }
     }
 };
+
+const shuffle = (arr) => {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}

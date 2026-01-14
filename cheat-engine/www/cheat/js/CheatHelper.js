@@ -646,6 +646,7 @@ export class MessageCheat {
     static translateCurrentMessage () {
         try {
             // Check if panel is available
+            console.log('[MessageCheat] translateCurrentMessage called', window.__TranslateOnTheFlyPanel);
             if (!window.__TranslateOnTheFlyPanel || typeof window.__TranslateOnTheFlyPanel.translateAndApplyCurrentMessage !== 'function') {
                 console.warn('[MessageCheat] TranslateOnTheFlyPanel not available')
                 Alert.error('Translation panel not initialized')

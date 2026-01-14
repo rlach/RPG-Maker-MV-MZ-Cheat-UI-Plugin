@@ -1,5 +1,3 @@
-import { KeyValueStorage } from '../js/KeyValueStorage.js'
-
 export default {
     name: 'TranslateNamesPanel',
 
@@ -140,45 +138,18 @@ export default {
             filter: '',
             dbFilter: '',
             entries: [],
-            databaseNames: [],
-            cacheEntries: new Map(),
-            actorNameOverrides: new Map(), // Store custom actor names
-            error: null,
-
-            rootWindow: null,
-            sharedState: null
+            databaseNames: []
         };
     },
 
     created() {
-        this.rootWindow = (window.__CHEAT_EXTERNAL_WINDOW__ && window.opener && !window.opener.closed) ? window.opener : window;
-
-        // Shared state so the external window uses the same caches as the main window
-        this.sharedState = this.rootWindow.__TRANSLATE_NAMES_SHARED__ || {
-            cacheEntries: new Map(),
-            actorNameOverrides: new Map()
-        };
-        this.rootWindow.__TRANSLATE_NAMES_SHARED__ = this.sharedState;
-        if (this.rootWindow !== window) {
-            window.__TRANSLATE_NAMES_SHARED__ = this.sharedState;
-        }
-
-        this.cacheEntries = this.sharedState.cacheEntries;
-        this.actorNameOverrides = this.sharedState.actorNameOverrides;
-
-        this.kvStorage = this.rootWindow.__TRANSLATE_CACHE_STORAGE__ || new KeyValueStorage('./www/cheat-settings/translate-cache.json');
-        this.rootWindow.__TRANSLATE_CACHE_STORAGE__ = this.kvStorage;
-
-        this.actorNameStorage = this.rootWindow.__TRANSLATE_ACTOR_STORAGE__ || new KeyValueStorage('./www/cheat-settings/actor-names.json');
-        this.rootWindow.__TRANSLATE_ACTOR_STORAGE__ = this.actorNameStorage;
-
-        this.loadActorNameOverrides(); // Load overrides FIRST before loading database
         this.refresh();
         this.loadDatabaseNames();
     },
 
     computed: {
         filteredEntries() {
+            console.log('filtering entries with term:', this.entries);
             const term = (this.filter || '').toLowerCase();
             if (!term) {
                 return this.entries;
@@ -211,33 +182,12 @@ export default {
 
     methods: {
         refresh() {
-            this.loadCache();
-        },
-
-        loadCache() {
             this.loading = true;
-            this.error = null;
             try {
-                const json = this.kvStorage.getItem('data');
-                const entries = json ? JSON.parse(json) : [];
-                const targetMap = this.sharedState ? this.sharedState.cacheEntries : this.cacheEntries;
-                targetMap.clear();
-                if (Array.isArray(entries)) {
-                    for (const [key, value] of entries) {
-                        targetMap.set(key, value);
-                    }
-                }
-                this.cacheEntries = targetMap;
-                this.entries = this.buildNameEntries(targetMap);
+                const cache = window.__TranslateOnTheFlyCache;
+                this.entries = this.buildNameEntries(cache);
             } catch (err) {
                 console.warn('[TranslateNamesPanel] Failed to load cache', err);
-                this.error = err;
-                if (this.sharedState && this.sharedState.cacheEntries) {
-                    this.sharedState.cacheEntries.clear();
-                    this.cacheEntries = this.sharedState.cacheEntries;
-                } else {
-                    this.cacheEntries = new Map();
-                }
                 this.entries = [];
             } finally {
                 this.loading = false;
@@ -247,20 +197,23 @@ export default {
         loadDatabaseNames() {
             try {
                 this.databaseNames = [];
-                // Get all actors from database (skip ID 0 which is empty/null)
-                const root = this.rootWindow || window;
-                const dataActors = root.$dataActors || window.$dataActors;
+                const dataActors = window.$dataActors;
 
                 if (typeof dataActors !== 'undefined' && Array.isArray(dataActors)) {
+                    const cache = window.__TranslateOnTheFlyCache;
                     for (let i = 1; i < dataActors.length; i++) {
                         const actor = dataActors[i];
                         if (actor && actor.name) {
-                            // Use override if exists, otherwise use original name
-                            const overrideName = this.actorNameOverrides.get(`actor_${i}`);
+                            const originalName = actor._translateOriginal ? actor._translateOriginal.name : actor.name;
+                            // Try to get cached name translation
+                            const cacheKey =  `actor_name:ja-en-${originalName}`;
+                            const cachedName = cache ? cache.get(cacheKey) : null;
+                            
                             this.databaseNames.push({
                                 id: i,
-                                originalName: actor.name,
-                                name: overrideName || actor.name,
+                                originalName: originalName,
+                                name: cachedName || actor.name,
+                                cacheKey: cacheKey,
                                 _actor: actor
                             });
                         }
@@ -274,6 +227,9 @@ export default {
 
         buildNameEntries(map) {
             const result = [];
+            if (!map || typeof map.entries !== 'function') {
+                return result;
+            }
             for (const [key, value] of map.entries()) {
                 if (!this.isSpeakerNameKey(key)) {
                     continue;
@@ -297,9 +253,7 @@ export default {
                 return '';
             }
 
-            const match = key.match(/^speaker:[^-]+-([A-Za-z]{2}(?:-[A-Za-z]{2})?)-([A-Za-z]{2}(?:-[A-Za-z]{2})?)-(.*)$/);
-            const payload = match && match[3] ? match[3] : '';
-            return payload.startsWith('name_') ? payload.substring(5) : payload;
+            return key.replace(/.*name_/, '');
         },
 
         onEntryChange(entry) {
@@ -313,49 +267,16 @@ export default {
             }
             
             // Update game actor instance if it exists
-            const root = this.rootWindow || window;
-            const gameActors = root.$gameActors || (typeof $gameActors !== 'undefined' ? $gameActors : null);
-            if (gameActors && typeof gameActors.actor === 'function') {
-                const gameActor = gameActors.actor(actor.id);
+            if (window.$gameActors && typeof window.$gameActors.actor === 'function') {
+                const gameActor = window.$gameActors.actor(actor.id);
                 if (gameActor) {
                     gameActor._name = actor.name;
                 }
             }
             
-            // Save the override
-            this.actorNameOverrides.set(`actor_${actor.id}`, actor.name);
-            this.persistActorNameOverrides();
-        },
-
-        loadActorNameOverrides() {
-            try {
-                const json = this.actorNameStorage.getItem('data');
-                const entries = json ? JSON.parse(json) : [];
-                const targetMap = this.sharedState ? this.sharedState.actorNameOverrides : this.actorNameOverrides;
-                targetMap.clear();
-                if (Array.isArray(entries)) {
-                    for (const [key, value] of entries) {
-                        targetMap.set(key, value);
-                    }
-                }
-                this.actorNameOverrides = targetMap;
-            } catch (err) {
-                console.warn('[TranslateNamesPanel] Failed to load actor name overrides', err);
-                if (this.sharedState && this.sharedState.actorNameOverrides) {
-                    this.sharedState.actorNameOverrides.clear();
-                    this.actorNameOverrides = this.sharedState.actorNameOverrides;
-                } else {
-                    this.actorNameOverrides = new Map();
-                }
-            }
-        },
-
-        persistActorNameOverrides() {
-            try {
-                const payload = JSON.stringify(Array.from(this.actorNameOverrides.entries()));
-                this.actorNameStorage.setItem('data', payload);
-            } catch (err) {
-                console.warn('[TranslateNamesPanel] Failed to persist actor name overrides', err);
+            // Save to cache
+            if (actor.cacheKey) {
+                window.__TranslateOnTheFlyPanel.setCacheValue(actor.cacheKey, actor.name);
             }
         },
 
@@ -367,42 +288,11 @@ export default {
             entry.saving = true;
             const valueToSave = entry.value || '';
 
-            this.cacheEntries.set(entry.key, valueToSave);
-            this.persistCache();
-            this.syncTranslatePanel(entry.key, valueToSave);
-            this.syncSharedCache(entry.key, valueToSave);
+            // Save to cache through the panel
+            window.__TranslateOnTheFlyPanel.setCacheValue(entry.key, valueToSave);
 
             entry.saving = false;
             entry.dirty = false;
         },
-
-        persistCache() {
-            try {
-                const payload = JSON.stringify(Array.from(this.cacheEntries.entries()));
-                this.kvStorage.setItem('data', payload);
-            } catch (err) {
-                console.warn('[TranslateNamesPanel] Failed to persist cache', err);
-            }
-        },
-
-        syncTranslatePanel(key, value) {
-            const panel = window.__TranslateOnTheFlyPanel;
-            if (panel && typeof panel.setCacheValue === 'function') {
-                panel.setCacheValue(key, value);
-            }
-        },
-
-        syncSharedCache(key, value) {
-            if (!key) {
-                return;
-            }
-
-            const shared = window.__TranslateOnTheFlyCache;
-            if (shared && typeof shared.set === 'function') {
-                shared.set(key, value);
-            } else {
-                window.__TranslateOnTheFlyCache = new Map([[key, value]]);
-            }
-        }
     }
 };

@@ -354,6 +354,10 @@ const shortcutConfig = {
         name: 'Open dev tool',
         desc: 'Open Chromium dev tool',
         enterAction (param) {
+            if(process.versions["nw-flavor"] !== "sdk") {
+                Alert.info('Dev tool is not available in normal nwjs build. Update to sdk build to use this feature.\nFor MV suggested version is 0.49.2\nYou can also access the console in overlay -> Text Log -> Console.', null, 5000)
+                return
+            }
             if (Utils?.isNwjs()) {
                 require('nw.gui').Window.get().showDevTools()
             }

@@ -9,6 +9,16 @@ class CheatWindowManager {
         this.lastComponent = null
         this.overlaySize = { width: 700, height: 400 }
         this.__load()
+
+        const main = nw.Window.get();
+
+        main.on('close', () => {
+            if (this.externalWindow && !this.externalWindow.closed) {
+                this.externalWindow.close(true);
+            }
+
+            main.close(true);
+        });
     }
 
     __load () {
