@@ -1,5 +1,60 @@
+;(function() {
+    try {
+        if (typeof require === 'function' && typeof process === 'object') {
+            const fs = require('fs')
+            const path = require('path')
+            const logDir = path.join(process.cwd(), 'www')
+            try {
+                if (!fs.existsSync(logDir)) {
+                    fs.mkdirSync(logDir, { recursive: true })
+                }
+            } catch (e) {
+                // ignore
+            }
+            const logFile = path.join(logDir, 'cheat.log')
+
+            const formatArgs = (args) => args.map(a => {
+                try {
+                    if (typeof a === 'string') return a
+                    return JSON.stringify(a)
+                } catch (e) {
+                    return String(a)
+                }
+            }).join(' ')
+
+            const writeLine = (level, args) => {
+                try {
+                    const line = `[${new Date().toISOString()}] ${level.toUpperCase()} ${formatArgs(args)}\n`
+                    fs.appendFileSync(logFile, line)
+                } catch (e) {
+                    // ignore write failures
+                }
+            }
+
+            const origLog = console.log.bind(console)
+            const origWarn = console.warn.bind(console)
+            const origError = console.error.bind(console)
+
+            console.log = function(...args) {
+                writeLine('log', args)
+                try { origLog(...args) } catch (e) {}
+            }
+            console.warn = function(...args) {
+                writeLine('warn', args)
+                try { origWarn(...args) } catch (e) {}
+            }
+            console.error = function(...args) {
+                writeLine('error', args)
+                try { origError(...args) } catch (e) {}
+            }
+        }
+    } catch (e) {
+        // fail silently in environments without fs/require
+    }
+})()
+
 const compareVersions = (a, b) =>
-  a.split('.').map(Number).find((v, i) => v !== +b.split('.')[i]) > 0
+    a.split('.').map(Number).find((v, i) => v !== +b.split('.')[i]) > 0
 
 
 function validateNwjsVersion () {

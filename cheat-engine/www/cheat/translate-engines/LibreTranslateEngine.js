@@ -52,7 +52,6 @@ export default class LibreTranslateEngine extends BaseTranslationEngine {
         return {
             onChangeLibreTranslateHost() {
                 self.host = this.libreTranslateHost;
-                self.panel.translationCache.clear();
                 self.panel.saveSettings();
             },
             onChangeLibreTranslateApiKey() {

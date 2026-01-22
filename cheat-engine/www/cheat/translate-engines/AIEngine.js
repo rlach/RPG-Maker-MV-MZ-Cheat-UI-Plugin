@@ -81,9 +81,11 @@ export default class AIEngine extends BaseTranslationEngine {
         this.loadingModels = false;
         this.modelsError = '';
         this.allowNewlineMismatch = false;
-        this.invalidJsonHandlingStrategy = 'resendFirstHalf'; // 'resendFirstHalf' | 'askAIToFix' | 'none'
+        this.invalidJsonHandlingStrategy = 'resendFirstHalf'; // 'resendFirstHalf' | 'askAIToFix' | 'useJsonFixer' | 'none'
         this.systemPrompt = DEFAULT_SYSTEM_PROMPT;
-        this.lastAiResponse = '';
+        // Allow calling external JSON fixer API (user-configurable)
+        this.useJsonFixer = true;
+        this._aiFixRecursionMaxDepth = 0;
 
         // Map panel-saved keys to internal fields for seamless restore via Object.assign
         Object.defineProperties(this, {
@@ -127,9 +129,13 @@ export default class AIEngine extends BaseTranslationEngine {
                 get: () => this.systemPrompt,
                 set: (v) => { this.systemPrompt = v || DEFAULT_SYSTEM_PROMPT; }
             },
-            aiLastResponse: {
-                get: () => this.lastAiResponse,
-                set: (v) => { this.lastAiResponse = v || ''; }
+            aiFixRecursionMaxDepth: {
+                get: () => this._aiFixRecursionMaxDepth,
+                set: (v) => { this._aiFixRecursionMaxDepth = Number(v) || 0; }
+            },
+            userJsonFixer: {
+                get: () => this.useJsonFixer,
+                set: (v) => { this.useJsonFixer = !!v; }
             }
         });
     }
@@ -207,7 +213,7 @@ export default class AIEngine extends BaseTranslationEngine {
                            @change="onChangeAiModel"
                            class="mb-2"
                        ></v-select>
-                       
+
                        <v-checkbox
                            v-model="aiAllowNewlineMismatch"
                            label="Allow non-essential tag mismatches"
@@ -228,6 +234,31 @@ export default class AIEngine extends BaseTranslationEngine {
                            @change="onChangeAiInvalidJsonHandlingStrategy"
                            class="mt-2"
                        ></v-select>
+
+                       <v-text-field
+                           v-if="aiInvalidJsonHandlingStrategy === 'askAIToFix'"
+                           v-model.number="aiFixRecursionMaxDepth"
+                           label="AI fix recursion max depth (0 = infinite)"
+                           outlined
+                           dense
+                           type="number"
+                           min="0"
+                           max="100"
+                           hide-details
+                           :disabled="!enabled"
+                           @keydown.stop
+                           @change="onChangeAiFixRecursionMaxDepth"
+                           class="mt-2"
+                       ></v-text-field>
+
+                       <v-checkbox
+                           v-model="useJsonFixer"
+                           label="Allow calls to json fixer (external API, don't send sensitive data)"
+                           :disabled="!enabled"
+                           @change="onChangeUseJsonFixer"
+                           class="mb-2"
+                           hide-details
+                       ></v-checkbox>
            
                        <v-textarea
                            v-model="aiSystemPrompt"
@@ -242,11 +273,6 @@ export default class AIEngine extends BaseTranslationEngine {
                            @change="onChangeAiSystemPrompt"
                            class="mb-2"
                        ></v-textarea>
-           
-                       <div v-if="aiLastResponse" class="mt-1">
-                           <div class="text-caption font-weight-medium">Last AI response</div>
-                           <pre class="text-caption grey--text text--lighten-1" style="white-space: pre-wrap; word-break: break-word;">{{ aiLastResponse }}</pre>
-                       </div>
         `;
     }
 
@@ -266,7 +292,8 @@ export default class AIEngine extends BaseTranslationEngine {
             aiAllowNewlineMismatch: this.allowNewlineMismatch,
             aiInvalidJsonHandlingStrategy: this.invalidJsonHandlingStrategy,
             aiSystemPrompt: this.systemPrompt,
-            aiLastResponse: this.lastAiResponse
+            aiFixRecursionMaxDepth: this.aiFixRecursionMaxDepth,
+            useJsonFixer: this.useJsonFixer
         };
     }
 
@@ -326,7 +353,6 @@ export default class AIEngine extends BaseTranslationEngine {
                 self.selectedModel = '';
                 panel.aiModelsError = '';
                 self.modelsError = '';
-                panel.translationCache.clear();
                 panel.saveSettings();
             },
             onChangeAiHost() {
@@ -337,17 +363,14 @@ export default class AIEngine extends BaseTranslationEngine {
                 self.selectedModel = '';
                 panel.aiModelsError = '';
                 self.modelsError = '';
-                panel.translationCache.clear();
                 panel.saveSettings();
             },
             onChangeAiApiKey() {
                 self.apiKey = panel.aiApiKey || '';
-                panel.translationCache.clear();
                 panel.saveSettings();
             },
             onChangeAiModel() {
                 self.selectedModel = panel.aiSelectedModel;
-                panel.translationCache.clear();
                 panel.saveSettings();
             },
             onChangeAiAllowNewlineMismatch() {
@@ -361,6 +384,16 @@ export default class AIEngine extends BaseTranslationEngine {
             onChangeAiSystemPrompt() {
                 const next = panel.aiSystemPrompt || DEFAULT_SYSTEM_PROMPT;
                 self.systemPrompt = next;
+                panel.saveSettings();
+            }
+            ,
+            onChangeAiFixRecursionMaxDepth() {
+                self.aiFixRecursionMaxDepth = Number(panel.aiFixRecursionMaxDepth) || 0;
+                panel.saveSettings();
+            }
+            ,
+            onChangeUseJsonFixer() {
+                self.useJsonFixer = !!panel.useJsonFixer;
                 panel.saveSettings();
             }
         };
@@ -692,7 +725,7 @@ export default class AIEngine extends BaseTranslationEngine {
         }
     }
 
-    async retryJsonParsing(originalContent, invalidJsonResponse, errorMessage) {
+    async retryJsonParsing(originalContent, invalidJsonResponse, errorMessage, depth = 0) {
         // Retry with JSON parsing error feedback
         try {
             const retryPayload = {
@@ -760,12 +793,13 @@ export default class AIEngine extends BaseTranslationEngine {
             try {
                 JSON.parse(responseContent);
             } catch (parseError) {
-                if (responseContent === invalidJsonResponse) {
-                    console.warn('[AIEngine] JSON parsing retry returned same invalid response, aborting further retries.');
+                const reachedDepthLimit = (this.aiFixRecursionMaxDepth > 0 && depth >= this.aiFixRecursionMaxDepth);
+                if (responseContent === invalidJsonResponse || reachedDepthLimit) {
+                    console.warn('[AIEngine] JSON parsing retry returned same invalid response or reached recursion depth, aborting further retries.');
                     return responseContent;
                 }
                 console.warn('[AIEngine] JSON parsing retry still invalid:', responseContent);
-                return this.retryJsonParsing(originalContent, responseContent, parseError.message);
+                return this.retryJsonParsing(originalContent, responseContent, parseError.message, depth + 1);
             }
 
             return responseContent;
@@ -965,10 +999,6 @@ export default class AIEngine extends BaseTranslationEngine {
             }
 
             let rawTranslated = responseContent;
-            this.lastAiResponse = rawTranslated || '';
-            if (this.panel) {
-                this.panel.aiLastResponse = this.lastAiResponse;
-            }
             console.log('[AIEngine] Response content:', rawTranslated);
 
             // Parse JSON response
@@ -986,8 +1016,11 @@ export default class AIEngine extends BaseTranslationEngine {
                     retryResponse = await this.resendFirstHalfOfItems(itemData, payload);
                 } else if (this.invalidJsonHandlingStrategy === 'askAIToFix' || this.invalidJsonHandlingStrategy === 'resendFirstHalf' && itemData.length === 1) {
                     console.log('[AIEngine] Using askAIToFix strategy (retryJsonParsing)...');
-                    retryResponse = await this.retryJsonParsing(content, rawTranslated, parseError);
-                } else if (this.invalidJsonHandlingStrategy === 'none') {
+                        retryResponse = await this.retryJsonParsing(content, rawTranslated, parseError.message, 0);
+                } else if(this.invalidJsonHandlingStrategy === 'useJsonFixer') {
+                    console.log('[AIEngine] Using useJsonFixer strategy (useJsonFixerApi)...');
+                    retryResponse = await this.useJsonFixerApi(rawTranslated);
+                } if (this.invalidJsonHandlingStrategy === 'none') {
                     console.log('[AIEngine] Using none strategy - no retry');
                     retryResponse = null;
                 }
@@ -998,10 +1031,6 @@ export default class AIEngine extends BaseTranslationEngine {
                         translatedMap = JSON.parse(retryResponse);
                         console.log('[AIEngine] Retry response parsed successfully');
                         rawTranslated = retryResponse;
-                        this.lastAiResponse = rawTranslated;
-                        if (this.panel) {
-                            this.panel.aiLastResponse = this.lastAiResponse;
-                        }
                     } catch (retryParseError) {
                         console.error('[AIEngine] Failed to parse retry JSON response:', retryParseError.message);
                         translatedMap = await this.useJsonFixerApi(retryResponse);
@@ -1035,10 +1064,6 @@ export default class AIEngine extends BaseTranslationEngine {
                         console.log('[AIEngine] Retry response parsed successfully', retryMap);
                         rawTranslated = retryResponse;
                         translatedMap = retryMap;
-                        this.lastAiResponse = rawTranslated;
-                        if (this.panel) {
-                            this.panel.aiLastResponse = this.lastAiResponse;
-                        }
                     } catch (retryParseError) {
                         console.error('[AIEngine] Failed to parse retry response:', retryParseError.message);
                         return {
@@ -1173,6 +1198,10 @@ export default class AIEngine extends BaseTranslationEngine {
     }
 
     async useJsonFixerApi(invalidJson) {
+        if (!this.useJsonFixer) {
+            console.warn('[AIEngine] JSON fixer API calls disabled by user setting');
+            return null;
+        }
         const apiUrl = 'https://mangiucugna.pythonanywhere.com/api/repair-json';
         try {
             const response = await axios.post(apiUrl, { malformedJSON: invalidJson });

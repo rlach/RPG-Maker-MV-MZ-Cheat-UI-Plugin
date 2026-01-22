@@ -4,9 +4,6 @@ import { KeyValueStorage } from '../js/KeyValueStorage.js';
 import { TranslateOnTheFlyState } from '../js/TranslateOnTheFlyState.js';
 import { AIEngine, createEngine, getAvailableEngines } from '../translate-engines/index.js';
 
-const CHAR_LIMIT = 1000;
-const BATCH_ITEMS_LIMIT = 20;
-
 export default {
     name: 'TranslateOnTheFlyPanel',
 
@@ -38,7 +35,7 @@ export default {
 
         <v-switch
             v-model="tryTranslateAhead"
-            label="Try to translate ahead (batch nearby messages)"
+            label="Translate full event instead of single message"
             dense
             hide-details
             @click.self.stop
@@ -142,7 +139,7 @@ export default {
     <v-card-text class="py-0">
         <v-text-field
             v-model.number="maxLineWidth"
-            label="Maximum line width (characters)"
+            label="Maximum line width for dialogue (characters)"
             outlined
             dense
             type="number"
@@ -155,17 +152,44 @@ export default {
             @focus="$event.target.select()">
         </v-text-field>
     </v-card-text>
+
+    <v-card-subtitle class="pb-0 mt-4 font-weight-bold">Batching</v-card-subtitle>
+    <v-card-text class="py-0">
+        <v-text-field
+            v-model.number="charLimit"
+            label="Max characters per translation batch"
+            outlined
+            dense
+            type="number"
+            min="200"
+            max="10000"
+            hide-details
+            :disabled="!enabled"
+            @keydown.self.stop
+            @change="onChangeCharLimit"
+            class="mb-2"
+        ></v-text-field>
+
+        <v-text-field
+            v-model.number="batchItemsLimit"
+            label="Max items per translation batch"
+            outlined
+            dense
+            type="number"
+            min="1"
+            max="100"
+            hide-details
+            :disabled="!enabled"
+            @keydown.self.stop
+            @change="onChangeBatchItemsLimit"
+        ></v-text-field>
+    </v-card-text>
     
     <v-card-subtitle class="pb-0 mt-4 font-weight-bold">Translation Status</v-card-subtitle>
     <v-card-text class="py-0">
         <div class="caption">
             <div>Total Translations: {{translationCount}}</div>
             <div>Cached Texts: {{cachedCount}}</div>
-            <div v-if="lastTranslation" class="mt-2">
-                <strong>Last Translation:</strong>
-                <div class="text--secondary">{{lastTranslation.original}}</div>
-                <div class="primary--text">{{lastTranslation.translated}}</div>
-            </div>
         </div>
     </v-card-text>
     
@@ -190,13 +214,15 @@ export default {
             sourceLang: 'ja',
             targetLang: 'en',
             translationCount: 0,
-            lastTranslation: null,
             enableTextWrapping: true,
             maxLineWidth: 60,
             translationEngine: 'mymemory',
             translateCacheWhenDisabled: false,
-            tryTranslateAhead: false,
+            tryTranslateAhead: true,
             translateGameObjects: true,
+            // Batching / performance
+            charLimit: 1000,
+            batchItemsLimit: 20,
             spinnerActiveCount: 0,
             translationEngineOptions: engineOptions,
             engineSettings: {}, // Stores engine-specific configuration
@@ -236,13 +262,15 @@ export default {
             aiInvalidJsonHandlingStrategyOptions: [
                 { text: 'Resend first half of texts', value: 'resendFirstHalf' },
                 { text: 'Ask AI to fix it', value: 'askAIToFix' },
+                { text: 'Use JsonFixer', value: 'useJsonFixer' },
                 { text: 'None', value: 'none' }
             ],
             aiSystemPrompt: 'You are translating scripts that contain [[tags]]. Altering contents or order of any such tags, removing or adding tags will break the script. DO NOT REMOVE OR ADD ANY TAGS. Only translate the text, do not comment or add anything else. Do not bold, DO NOT FORMAT THE RESPONSE, RETURN IT ALL IN ONE LINE',
-            aiLastResponse: '',
             // Track the current message window and $gameMessage for live refresh
             currentMessageWindow: null,
-            currentGameMessage: null
+            currentGameMessage: null,
+            useJsonFixer: true,
+            aiFixRecursionMaxDepth: 0,
         };
     },
 
@@ -362,6 +390,8 @@ export default {
             this.translationCount = data.translationCount || 0;
             this.enableTextWrapping = data.enableTextWrapping !== undefined ? data.enableTextWrapping : true;
             this.maxLineWidth = data.maxLineWidth || 60;
+            this.charLimit = data.charLimit || 1000;
+            this.batchItemsLimit = data.batchItemsLimit || 20;
             this.translationEngine = data.translationEngine || 'mymemory';
             this.translateCacheWhenDisabled = data.translateCacheWhenDisabled || false;
             this.tryTranslateAhead = data.tryTranslateAhead || false;
@@ -377,9 +407,6 @@ export default {
             // Collect engine-specific settings before saving
             if (this.engine) {
                 const engineConfig = { ...this.engine.getConfigData() };
-                if (Object.prototype.hasOwnProperty.call(engineConfig, 'aiLastResponse')) {
-                    delete engineConfig.aiLastResponse;
-                }
                 if (!this.engineSettings) {
                     this.engineSettings = {};
                 }
@@ -393,6 +420,8 @@ export default {
                 translationCount: this.translationCount,
                 enableTextWrapping: this.enableTextWrapping,
                 maxLineWidth: this.maxLineWidth,
+                charLimit: this.charLimit,
+                batchItemsLimit: this.batchItemsLimit,
                 translationEngine: this.translationEngine,
                 translateCacheWhenDisabled: this.translateCacheWhenDisabled,
                 tryTranslateAhead: this.tryTranslateAhead,
@@ -495,7 +524,7 @@ export default {
         },
 
         collectAheadItems(currentText, currentSpeaker, interpreter, options = {}) {
-            const charLimit = options.charLimit || CHAR_LIMIT;
+            const charLimit = options.charLimit || this.charLimit;
             const maxLookahead = options.maxLookahead || 50;
             const maxDepth = options.maxDepth !== undefined ? options.maxDepth : 999;
             
@@ -656,7 +685,7 @@ export default {
         async startAheadTranslation({ currentText, currentSpeakerName, cacheKey, maxDepth }) {
             try {
                 const interpreter = this.findMessageInterpreter();
-                const items = this.collectAheadItems(currentText, currentSpeakerName, interpreter, { charLimit: CHAR_LIMIT, maxDepth });
+                const items = this.collectAheadItems(currentText, currentSpeakerName, interpreter, { charLimit: this.charLimit, maxDepth });
 
                 // Add current choices from $gameMessage if present
                 if ($gameMessage && $gameMessage.isChoice && $gameMessage.isChoice()) {
@@ -738,10 +767,6 @@ export default {
                         this._translationApplied = true;
 
                         this.translationCount += result.successes.filter(s => s.type === 'text').length;
-                        this.lastTranslation = {
-                            original: currentText.substring(0, 100),
-                            translated: translated.substring(0, 100)
-                        };
                         this.saveSettings();
                     } else {
                         // Translation failed, show original
@@ -848,6 +873,18 @@ export default {
 
         onChangeMaxWidth() {
             // Don't clear cache - wrapping is applied on display, not stored in cache
+            this.saveSettings();
+        },
+
+        onChangeCharLimit() {
+            // Persist new batch character limit
+            // Ensure sensible minimum
+            if (!this.charLimit || this.charLimit < 200) this.charLimit = 200;
+            this.saveSettings();
+        },
+
+        onChangeBatchItemsLimit() {
+            if (!this.batchItemsLimit || this.batchItemsLimit < 1) this.batchItemsLimit = 1;
             this.saveSettings();
         },
 
@@ -2446,10 +2483,6 @@ export default {
                 if (translatedText) {
                     this.replaceMessageText(translatedText);
                     this.translationCount++;
-                    this.lastTranslation = {
-                        original: originalText.substring(0, 100),
-                        translated: translatedText.substring(0, 100)
-                    };
                     this.saveSettings();
                 }
 
@@ -2804,12 +2837,12 @@ export default {
                         let batchChars = 0;
 
                         // Collect items for this batch up to char limit
-                        while (i < uniqueItems.length && batchChars < CHAR_LIMIT && batch.length < BATCH_ITEMS_LIMIT) {
+                        while (i < uniqueItems.length && batchChars < this.charLimit && batch.length < this.batchItemsLimit) {
                             const item = uniqueItems[i];
                             const itemLength = item.value.length;
 
                             // If adding this item would exceed limit and batch is not empty, send what we have
-                            if (batchChars > 0 && batchChars + itemLength > CHAR_LIMIT) {
+                            if (batchChars > 0 && batchChars + itemLength > this.charLimit) {
                                 break;
                             }
 
