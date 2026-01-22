@@ -2034,11 +2034,15 @@ export default {
                     if (originalValue && typeof originalValue === 'string' && originalValue.trim() !== '') {
                         const cacheKey = this.getCacheKey(originalValue, `${cacheKeyPrefix}_${field}`);
                         if (this.translationCache.has(cacheKey)) {
-                            item[field] = this.translationCache.get(cacheKey);
-                            if(itemInstance) {
-                                itemInstance[`_${field}`] = item[field];
+                            try {
+                                item[field] = this.translationCache.get(cacheKey);
+                                if(itemInstance) {
+                                    itemInstance[`_${field}`] = item[field];
+                                }
+                                appliedCount++;
+                            } catch (error) {
+                                console.log(error);
                             }
-                            appliedCount++;
                         }
                     }
                 }
@@ -2312,7 +2316,11 @@ export default {
                         if (originalValue && typeof originalValue === 'string' && originalValue.trim() !== '') {
                             const cacheKey = this.getCacheKey(originalValue, `${type}_${field}`);
                             if (this.translationCache.has(cacheKey)) {
-                                dataObject[field] = this.translationCache.get(cacheKey);
+                                try {
+                                    dataObject[field] = this.translationCache.get(cacheKey);
+                                }  catch (error) {
+                                    console.log(error);
+                                }
                             }
                         }
                     }
@@ -2547,7 +2555,7 @@ export default {
                         pages: $dataCommonEvents
                     }],
                     displayName: 'Common Events'
-                }, null, null);
+                }, -1, null);
                         if (result) {
                             totalTranslated += result.successCount || 0;
                             totalFailed += result.failureCount || 0;
@@ -2764,7 +2772,7 @@ export default {
 
                 console.log(`[TranslateOnTheFly] Found ${itemsToTranslate.length} items to translate on map ${mapName}`);
 
-                if (itemsToTranslate.length === 0) {
+                if (itemsToTranslate.length === 0 && !totalMaps) {
                     this.hideSpinner();
                     if (!mapNumber) {
                         Alert.info('All map messages are already translated');
@@ -2827,7 +2835,7 @@ export default {
                         }
 
                         // Translate this batch
-                        shuffle(batch); // Shuffle to avoid patterns
+                        // shuffle(batch); // Shuffle to avoid patterns
                         const result = await this.engine.batchTranslate(batch);
                         
                         // Cache successes

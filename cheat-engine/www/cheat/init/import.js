@@ -1,3 +1,7 @@
+const compareVersions = (a, b) =>
+  a.split('.').map(Number).find((v, i) => v !== +b.split('.')[i]) > 0
+
+
 function validateNwjsVersion () {
     if (!(typeof require === 'function' && typeof process === 'object')) {
         return true
@@ -6,7 +10,7 @@ function validateNwjsVersion () {
     const nwjsVersion = process.versions['node-webkit']
     const minRequiredNwjsVersion = '0.26.4'
 
-    if (nwjsVersion < minRequiredNwjsVersion) {
+    if (compareVersions(nwjsVersion, minRequiredNwjsVersion) < 0) {
         let msg = ''
         let docsUrl = ''
 

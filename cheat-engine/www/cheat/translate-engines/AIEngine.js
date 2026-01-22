@@ -28,7 +28,7 @@ const TAG_CONFIGS = [
     { type: 'nameWindowCenter', shortTag: 'nwc', prePattern: /\\(NC)<([^>]+)>/gi, postPattern: /\[{1,2}nwc([^\]]+)\]{1,2}/gi, hasParam: true, defaultCase: 'NC', requiredConsistency: false },
     { type: 'nameWindowRight', shortTag: 'nwr', prePattern: /\\(NR)<([^>]+)>/gi, postPattern: /\[{1,2}nwr([^\]]+)\]{1,2}/gi, hasParam: true, defaultCase: 'NR', requiredConsistency: false },
     // Line Break
-    { type: 'lineBreak', shortTag: 'br', prePattern: /<(br)>/gi, postPattern: /\[{1,2}br\]{1,2}/gi, hasParam: false, defaultCase: 'br', requiredConsistency: false},
+    { type: 'lineBreak', shortTag: 'br', prePattern: /<(br)>/gi, postPattern: /\[{1,2}br\]{1,2}/gi, hasParam: false, defaultCase: 'br', requiredConsistency: false },
     // Position
     { type: 'posX', shortTag: 'px', prePattern: /\\(PX)\[(\d+)\]/gi, postPattern: /\[{1,2}px(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'PX', requiredConsistency: false },
     { type: 'posY', shortTag: 'py', prePattern: /\\(PY)\[(\d+)\]/gi, postPattern: /\[{1,2}py(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'PY', requiredConsistency: false },
@@ -66,6 +66,8 @@ const TAG_CONFIGS = [
 ];
 
 const DEFAULT_SYSTEM_PROMPT = 'You are translating scripts that contain [[tags]]. Altering contents or order of any such tags, removing or adding tags will break the script. DO NOT REMOVE OR ADD ANY TAGS. DO NOT CHANGE ORDER OF THE TAGS. EVER. PRESENT TAGS EXACTLY AS THEY ARE.Only translate the text, do not comment or add anything else. Do not bold, DO NOT FORMAT THE RESPONSE, RETURN IT ALL IN ONE LINE';
+
+const typeToTag = { text: 'message', speaker: 'message', choice: 'message' };
 
 // Unified AI engine supporting GPT4All and Open WebUI providers
 export default class AIEngine extends BaseTranslationEngine {
@@ -424,7 +426,7 @@ export default class AIEngine extends BaseTranslationEngine {
         for (const config of TAG_CONFIGS) {
             const matches = result.match(config.prePattern) || [];
             tagCounts[config.type] = matches.length;
-            
+
             if (config.hasParam) {
                 result = result.replace(config.prePattern, (match, letter, num) => {
                     caseMap.push({ type: config.type, num, case: letter });
@@ -476,7 +478,7 @@ export default class AIEngine extends BaseTranslationEngine {
         for (const config of TAG_CONFIGS) {
             const matches = result.match(config.postPattern) || [];
             actualCounts[config.type] = matches.length;
-            
+
             if (config.hasParam) {
                 result = result.replace(config.postPattern, (match, num) => {
                     const caseLookupForType = caseLookup[config.type] || {};
@@ -529,18 +531,18 @@ export default class AIEngine extends BaseTranslationEngine {
     validateUnknownTags(rawText, originalPreprocessed) {
         // Extract all double square bracket tags from response
         const tagMatches = rawText.match(/\[{1,2}([^\]]+)\]{1,2}/gi) || [];
-        
+
         for (const tagMatch of tagMatches) {
             // Check if this tag matches any known postPattern
             let isKnownTag = false;
-            
+
             for (const config of TAG_CONFIGS) {
                 if (config.postPattern.test(tagMatch)) {
                     isKnownTag = true;
                     break;
                 }
             }
-            
+
             // If tag is unknown, check if it was in the original preprocessed text
             if (!isKnownTag) {
                 if (!originalPreprocessed.includes(tagMatch)) {
@@ -554,7 +556,7 @@ export default class AIEngine extends BaseTranslationEngine {
                 // Tag was in original, so it's OK (maybe leftover from preprocessing)
             }
         }
-        
+
         return { valid: true };
     }
 
@@ -591,7 +593,7 @@ export default class AIEngine extends BaseTranslationEngine {
                         "content": responseJson
                     }
                 ],
-                response_format: {type: "json_object"}
+                response_format: { type: "json_object" }
             };
 
             const url = this.getChatUrl();
@@ -651,10 +653,10 @@ export default class AIEngine extends BaseTranslationEngine {
                     }
                 ],
                 max_tokens: 10000,
-                temperature: 0.5,
+                temperature: 0.7,
                 frequency_penalty: 0,
                 presence_penalty: 0,
-                response_format: {type: "json_object"},
+                response_format: { type: "json_object" },
             };
 
             const url = this.getChatUrl();
@@ -690,27 +692,42 @@ export default class AIEngine extends BaseTranslationEngine {
         }
     }
 
-    async retryJsonParsing(originalPayload, invalidJsonResponse) {
+    async retryJsonParsing(originalContent, invalidJsonResponse, errorMessage) {
         // Retry with JSON parsing error feedback
         try {
             const retryPayload = {
-                ...originalPayload,
+                model: this.selectedModel,
                 messages: [
-                    ...originalPayload.messages,
                     {
-                        "role": "assistant",
-                        "content": invalidJsonResponse
+                        "role": "system",
+                        "content": "You fix translation jsons generated by LLM with malformed format. Only fix the json, do not comment or add anything else. Do not bold, DO NOT FORMAT THE RESPONSE, RETURN IT ALL IN ONE LINE"
                     },
                     {
                         "role": "user",
-                        "content": "This is not valid JSON map! Fix it! The map has to contain key-value pairs."
+                        "content": "Fix broken translation json. Each message in translation json should be related to the same message key in original. \n Original: { \"message23\": \"はい\" } \n Broken Translation JSON: { \"message23: \"Yes\" } \n Error: Missing closing quote after message23 key"
+                    },
+                    {
+                        "role": "assistant",
+                        "content": "{ \"message23\": \"はい\" } { \"message23\": \"Yes\" }"
+                    },
+                    {
+                        "role": "user",
+                        "content": "Wrong. You've returned both original and translation. Only return the fixed translation json."
+                    },
+                    {
+                        "role": "assistant",
+                        "content": "{ \"message23\": \"Yes\" }"
+                    },
+                    {
+                        "role": "user",
+                        "content": `Good. Now fix broken translation json. Each message in translation json should be related to the same message key in original. \n Original: ${originalContent} \n Broken Translation JSON: ${invalidJsonResponse} \n Error: ${errorMessage}`
                     }
                 ],
                 max_tokens: 10000,
-                temperature: 0.01,
+                temperature: 0.7,
                 frequency_penalty: 0,
                 presence_penalty: 0,
-                response_format: {type: "json_object"},
+                response_format: { type: "json_object" },
             };
 
             const url = this.getChatUrl();
@@ -739,6 +756,18 @@ export default class AIEngine extends BaseTranslationEngine {
                 return null;
             }
 
+            console.log('[AIEngine] JSON parsing retry response:', responseContent, invalidJsonResponse);
+            try {
+                JSON.parse(responseContent);
+            } catch (parseError) {
+                if (responseContent === invalidJsonResponse) {
+                    console.warn('[AIEngine] JSON parsing retry returned same invalid response, aborting further retries.');
+                    return responseContent;
+                }
+                console.warn('[AIEngine] JSON parsing retry still invalid:', responseContent);
+                return this.retryJsonParsing(originalContent, responseContent, parseError.message);
+            }
+
             return responseContent;
         } catch (error) {
             console.error('[AIEngine] JSON parsing retry error:', error.message);
@@ -751,10 +780,9 @@ export default class AIEngine extends BaseTranslationEngine {
         try {
             const halfCount = Math.ceil(itemData.length / 2);
             console.log(`[AIEngine] Resending with first ${halfCount} items out of ${itemData.length}`);
-            
+
             const firstHalfItems = itemData.slice(0, halfCount);
-            const typeToTag = { text: 't', speaker: 's', choice: 'ch' };
-            
+
             // Build JSON map with first half items
             const jsonMap = {};
             firstHalfItems.forEach(item => {
@@ -762,16 +790,16 @@ export default class AIEngine extends BaseTranslationEngine {
                 const key = `${shortTag}${item.index}`;
                 jsonMap[key] = item.preprocessed;
             });
-            
+
             const content = JSON.stringify(jsonMap);
-            
+
             // Keep all messages except the last one, then add new user message with half content
             const messages = payload.messages.slice(0, -1);
             messages.push({
                 "role": "user",
                 "content": `Try again with fewer items: ${content}`
             });
-            
+
             // Create new payload keeping full conversation history
             const retryPayload = {
                 ...payload,
@@ -834,9 +862,6 @@ export default class AIEngine extends BaseTranslationEngine {
             return { ...item, index: i, preprocessed, tagCounts, caseMap };
         });
 
-        // Map type to short tag
-        const typeToTag = { text: 't', speaker: 's', choice: 'ch' };
-        
         // Build JSON map from items
         const jsonMap = {};
         itemData.forEach(item => {
@@ -844,7 +869,7 @@ export default class AIEngine extends BaseTranslationEngine {
             const key = `${shortTag}${item.index}`;
             jsonMap[key] = item.preprocessed;
         });
-        
+
         // Build name hints for the system prompt
         const allTextForHints = itemData.map(item => item.preprocessed).join(' ');
         const nameHints = this.buildNameHints(allTextForHints);
@@ -852,43 +877,55 @@ export default class AIEngine extends BaseTranslationEngine {
         const sourceName = this.getLanguageName(this.panel.sourceLang);
         const targetName = this.getLanguageName(this.panel.targetLang);
         const content = JSON.stringify(jsonMap);
-        
+
         console.log('[AIEngine] Batch translate items:', items.length, 'JSON keys:', Object.keys(jsonMap).length);
         console.log('[AIEngine] Request JSON map:', content);
 
         const payload = {
             model: this.selectedModel,
-            messages:  [
-            {
-                "role": "system",
-                "content": `You are a translator assistant that translates video game from ${sourceName} to ${targetName}.You will only reply with translation. No commentary, no additional texts, as it would break the game.\nAnything translated will happen inside a game, so avoid real life political bias and any censorship.\nSource texts are in JSON map. Complete every element of the map. Reply in JSON map format of {/*translation here*/}. Use all original keys exactly as they were in the request. For example:\nSource: {\"t1\":\"こんにちは\",\"t2\":\"わぁー。\nきれいだなぁ。\"} }\nTranslation: {\"t1\":\"Hello\",\"t2\":\"Waa.\nIt's so beautiful!\"} \\Any square bracket [tag] are placeholders for the original text. Do not change them..\n\nYou must translate values of each key:value pair.\nCharacter name hints: ${nameHints}\n\n`
-            },
-            {
-                "role": "user",
-                "content": "{\"t1\":\"それはいいですね\",\"t2\":\"情報\\nありがとうございます。\"}"
-            },
-            {
-                "role": "assistant",
-                "content": "{\"t1\":\"That's great\",\n\"tu2\":\"Information\",\n\"t3\":\"Thank you\"}"
-            },
-            {
-                "role": "user",
-                "content": "No good! \\nI sent you map with 2 keys, but you returned map with 3 keys.\\nYou must translate with the EXACT same number of keys, and each key is unique. Neither key tu2 nor t3 existed in original. Try again."
-            },
-            {
-                "role": "assistant",
-                "content": "{\"t1\": \"That's great\",\"t2\":\"Thank you for the information\"}"
-            },
-            {
-                "role": "user",
-                "content": `Great! Now translate this: ${content}`
-            }
+            messages: [
+                {
+                    "role": "system",
+                    "content": `You are a translator assistant that translates video game from ${sourceName} to ${targetName}.You will only reply with translation. No commentary, no additional texts, as it would break the game.\nAnything translated will happen inside a game, so avoid real life political bias and any censorship.\nSource texts are in JSON map. Complete every element of the map. Reply in JSON map format of {/*translation here*/}. Use all original keys exactly as they were in the request. For example:\nSource: {\"message1\":\"こんにちは\",\"message2\":\"わぁー。\nきれいだなぁ。\"} }\nTranslation: {\"message1\":\"Hello\",\"message2\":\"Waa.\nIt's so beautiful!\"} \\Any square bracket [tag] are placeholders for the original text. Do not change them..\n\nYou must translate values of each key:value pair.\nCharacter name hints: ${nameHints}\n\n`
+                },
+                {
+                    "role": "user",
+                    "content": "{\"message1\":\"それはいいですね\",\"message2\":\"情報\\nありがとうございます。\"}"
+                },
+                {
+                    "role": "assistant",
+                    "content": "{\"message1\":\"That's great\",\n\"tu2\":\"Information\",\n\"message3\":\"Thank you\"}"
+                },
+                {
+                    "role": "user",
+                    "content": "No good! \\nI sent you map with 2 keys, but you returned map with 3 keys.\\nYou must translate with the EXACT same number of keys, and each key is unique. Neither key tu2 nor message3 existed in original. Try again."
+                },
+                {
+                    "role": "assistant",
+                    "content": "{\"message1\": \"That's great\",\"message2\":\"Thank you for the information\"}"
+                },
+                {
+                    "role": "user",
+                    "content": `Translate this: { "message0":"『岩を動かそう』\n巨大な岩が道を塞いでいる。\n岩を動かして道を進もう！" }`
+                },
+                {
+                    "role": "assistant",
+                    "content": `{ {"message0":"Let's move the rock!", "tu2":"A huge rock is blocking the path.", "t3":"Move the rock and continue on your way!", }`
+                },
+                {                   
+                    "role": "user",
+                    "content": "No good! You split message0 into 3 keys (message0, tu2, t3). You must translate with the EXACT same number of keys as original. Keep all lines inside the same key. Try again."
+                },
+                {
+                    "role": "user",
+                    "content": `Great! Now translate this: ${content}`
+                }
             ],
             max_tokens: 10000,
             temperature: 0.01,
             frequency_penalty: 0,
             presence_penalty: 0,
-            response_format: {type: "json_object"},
+            response_format: { type: "json_object" },
         };
 
         const url = this.getChatUrl();
@@ -896,7 +933,7 @@ export default class AIEngine extends BaseTranslationEngine {
         try {
             const response = await axios.post(url, payload, { headers: this.getAuthHeaders() });
             const data = response && response.data;
-            
+
             if (!data || !data.choices || !data.choices[0]) {
                 console.warn('[AIEngine] Batch returned empty response');
                 return {
@@ -933,7 +970,7 @@ export default class AIEngine extends BaseTranslationEngine {
                 this.panel.aiLastResponse = this.lastAiResponse;
             }
             console.log('[AIEngine] Response content:', rawTranslated);
-            
+
             // Parse JSON response
             let translatedMap;
             try {
@@ -941,20 +978,20 @@ export default class AIEngine extends BaseTranslationEngine {
             } catch (parseError) {
                 console.error('[AIEngine] Failed to parse JSON response:', parseError.message);
                 console.log('[AIEngine] Invalid JSON Handling Strategy:', this.invalidJsonHandlingStrategy);
-                
+
                 let retryResponse = null;
-                
+
                 if (this.invalidJsonHandlingStrategy === 'resendFirstHalf' && itemData.length > 1) {
                     console.log('[AIEngine] Using resendFirstHalf strategy...');
                     retryResponse = await this.resendFirstHalfOfItems(itemData, payload);
                 } else if (this.invalidJsonHandlingStrategy === 'askAIToFix' || this.invalidJsonHandlingStrategy === 'resendFirstHalf' && itemData.length === 1) {
                     console.log('[AIEngine] Using askAIToFix strategy (retryJsonParsing)...');
-                    retryResponse = await this.retryJsonParsing(payload, rawTranslated);
+                    retryResponse = await this.retryJsonParsing(content, rawTranslated, parseError);
                 } else if (this.invalidJsonHandlingStrategy === 'none') {
                     console.log('[AIEngine] Using none strategy - no retry');
                     retryResponse = null;
                 }
-                
+
                 console.log('[AIEngine] Retry response for JSON parsing:', retryResponse);
                 if (retryResponse) {
                     try {
@@ -967,10 +1004,13 @@ export default class AIEngine extends BaseTranslationEngine {
                         }
                     } catch (retryParseError) {
                         console.error('[AIEngine] Failed to parse retry JSON response:', retryParseError.message);
-                        return {
-                            successes: [],
-                            failures: items.map(item => ({ ...item, rejectReason: 'Invalid JSON response (retry also failed)' }))
-                        };
+                        translatedMap = await this.useJsonFixerApi(retryResponse);
+                        if (!translatedMap) {
+                            return {
+                                successes: [],
+                                failures: items.map(item => ({ ...item, rejectReason: 'Invalid JSON response (retry also failed)' }))
+                            };
+                        }
                     }
                 } else {
                     console.warn('[AIEngine] JSON parsing strategy returned null or failed');
@@ -984,11 +1024,11 @@ export default class AIEngine extends BaseTranslationEngine {
             // Validate response language
             console.log('[AIEngine] Validating response language...');
             const isValid = await this.validateResponseLanguage(rawTranslated, targetName, sourceName);
-            
+
             if (!isValid) {
                 console.log('[AIEngine] Validation failed, retrying with error feedback...');
                 const retryResponse = await this.retryTranslationWithError(payload, rawTranslated, targetName);
-                
+
                 if (retryResponse) {
                     try {
                         const retryMap = JSON.parse(retryResponse);
@@ -1016,21 +1056,18 @@ export default class AIEngine extends BaseTranslationEngine {
             } else {
                 console.log('[AIEngine] Validation passed');
             }
-            
+
             const successes = [];
             const failures = [];
-
-            // Map type to short tag
-            const typeToTag = { text: 't', speaker: 's', choice: 'ch' };
 
             // Process each item individually
             for (const itemD of itemData) {
                 const shortTag = typeToTag[itemD.type] || itemD.type;
                 const key = `${shortTag}${itemD.index}`;
-                
+
                 // Get translated value from JSON map
                 const rawSlice = translatedMap[key];
-                
+
                 if (rawSlice === undefined || rawSlice === null) {
                     failures.push({
                         type: itemD.type,
@@ -1041,7 +1078,7 @@ export default class AIEngine extends BaseTranslationEngine {
                     });
                     continue;
                 }
-                
+
                 if (typeof rawSlice !== 'string') {
                     failures.push({
                         type: itemD.type,
@@ -1052,7 +1089,7 @@ export default class AIEngine extends BaseTranslationEngine {
                     });
                     continue;
                 }
-                
+
                 // Validate unknown tags before postprocessing
                 const unknownTagCheck = this.validateUnknownTags(rawSlice, itemD.preprocessed);
                 if (!unknownTagCheck.valid && (itemD.type === 'text' || itemD.type === 'choice')) {
@@ -1065,10 +1102,10 @@ export default class AIEngine extends BaseTranslationEngine {
                     });
                     continue;
                 }
-                
+
                 // Postprocess with tag tracking
                 const { text: translated, valid, expectedCounts, actualCounts } = this.postprocessTags(rawSlice, itemD.tagCounts, itemD.caseMap);
-                
+
                 // Check if invalid due to tag mismatch
                 if (!valid) {
                     failures.push({
@@ -1132,6 +1169,23 @@ export default class AIEngine extends BaseTranslationEngine {
                     rejectReason: `Exception: ${error.message}`
                 }))
             };
+        }
+    }
+
+    async useJsonFixerApi(invalidJson) {
+        const apiUrl = 'https://mangiucugna.pythonanywhere.com/api/repair-json';
+        try {
+            const response = await axios.post(apiUrl, { malformedJSON: invalidJson });
+            if (response && response.data && response.data[0]) {
+                console.log('[AIEngine] JSON fixed using external API');
+                return response.data[0];
+            } else {
+                console.warn('[AIEngine] JSON fixer API returned invalid response');
+                return null;
+            }
+        } catch (error) {
+            console.error('[AIEngine] JSON fixer API error:', error.message);
+            return null;
         }
     }
 
