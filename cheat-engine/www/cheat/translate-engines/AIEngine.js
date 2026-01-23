@@ -1143,6 +1143,7 @@ export default class AIEngine extends BaseTranslationEngine {
                     continue;
                 }
 
+                /* Temporary disable, other fixes shoould handle unchanged translations. Maybe.
                 const isSame = translated.trim() === (itemD.value || '').trim();
                 if (this.panel.sourceLang !== this.panel.targetLang && isSame) {
                     // Only report as translation unchanged if the string contains at least one letter (excluding tags)
@@ -1164,11 +1165,14 @@ export default class AIEngine extends BaseTranslationEngine {
                     }
                     // If no letters (e.g., ".....", "!!!" or text with only tags), accept as valid translation
                 }
+                */
 
-                // Clean and wrap text/choice types
+                // Clean and wrap text/choice types and descriptions
                 let finalTranslated = translated;
-                if (itemD.type === 'text' || itemD.type === 'choice') {
-                    finalTranslated = this.wrapText(this.cleanTranslatedText(translated), this.panel.maxLineWidth);
+                const isDescriptionType = (typeof itemD.type === 'string' && itemD.type.endsWith('_description'));
+                if (itemD.type === 'text' || itemD.type === 'choice' || isDescriptionType) {
+                    const maxWidth = isDescriptionType ? (this.panel.descriptionMaxLineWidth || this.panel.maxLineWidth) : this.panel.maxLineWidth;
+                    finalTranslated = this.wrapText(this.cleanTranslatedText(translated), maxWidth);
                 } else if (itemD.type === 'speaker') {
                     finalTranslated = this.normalizeSpeakerNameCase(translated);
                 }
