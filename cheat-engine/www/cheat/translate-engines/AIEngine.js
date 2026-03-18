@@ -67,12 +67,12 @@ const TAG_CONFIGS = [
 
 const DEFAULT_SYSTEM_PROMPT = 'You are translating scripts that contain [[tags]]. Altering contents or order of any such tags, removing or adding tags will break the script. DO NOT REMOVE OR ADD ANY TAGS. DO NOT CHANGE ORDER OF THE TAGS. EVER. PRESENT TAGS EXACTLY AS THEY ARE. Only translate the text. Return only flat one-line JSON with exact same keys. No markdown, no comments, no code blocks, no pretty formatting.';
 
-const typeToTag = { text: 'message', speaker: 'message', choice: 'message' };
+const typeToTag = { text: 'm', speaker: 'm', choice: 'm' };
 
 const requestSettings = {
     temperature: 0.7,
-    frequency_penalty: 0,
-    presence_penalty: 0,
+    repetition_penalty: 1.0,
+    presence_penalty: 1.5,
     "top_p": 0.8,
     "top_k": 20,
     response_format: { type: "json_object" },
@@ -87,6 +87,7 @@ const STREAM_MONITOR_CHECK_INTERVAL = 64;
 const STREAM_OPEN_BRACE_MAX_CHARS = 100;
 const STREAM_JSON_TRIM_MAX_CHARS = 400;
 const STREAM_JSONL_TRIM_MAX_CHARS = 400;
+const LLM_MAX_CONSECUTIVE_IDENTICAL_CHARS = 5;
 
 const STREAM_CANCEL_REASON = Object.freeze({
     NO_OPENING_BRACE: 'no_opening_brace',
@@ -106,6 +107,94 @@ const asFlatString = (value) => {
         return value.map(v => typeof v === 'string' ? v : '').join('');
     }
     return typeof value === 'string' ? value : '';
+};
+
+const limitConsecutiveIdenticalChars = (text, maxConsecutive = LLM_MAX_CONSECUTIVE_IDENTICAL_CHARS) => {
+    if (typeof text !== 'string' || !text) {
+        return text;
+    }
+
+    const limit = Number.isFinite(maxConsecutive)
+        ? Math.max(1, Math.floor(maxConsecutive))
+        : LLM_MAX_CONSECUTIVE_IDENTICAL_CHARS;
+
+    let result = '';
+    let previousChar = '';
+    let runLength = 0;
+
+    for (const ch of text) {
+        if (ch === previousChar) {
+            runLength += 1;
+        } else {
+            previousChar = ch;
+            runLength = 1;
+        }
+
+        if (runLength <= limit) {
+            result += ch;
+        }
+    }
+
+    return result;
+};
+
+const preprocessOutgoingMessageContent = (content) => {
+    if (typeof content === 'string') {
+        return limitConsecutiveIdenticalChars(content);
+    }
+
+    if (Array.isArray(content)) {
+        return content.map(item => preprocessOutgoingMessageContent(item));
+    }
+
+    if (content && typeof content === 'object') {
+        const next = { ...content };
+
+        if (typeof next.text === 'string') {
+            next.text = limitConsecutiveIdenticalChars(next.text);
+        }
+
+        if (typeof next.content === 'string' || Array.isArray(next.content) || (next.content && typeof next.content === 'object')) {
+            next.content = preprocessOutgoingMessageContent(next.content);
+        }
+
+        if (typeof next.reasoning_content === 'string') {
+            next.reasoning_content = limitConsecutiveIdenticalChars(next.reasoning_content);
+        }
+
+        return next;
+    }
+
+    return content;
+};
+
+const preprocessPayloadForLlm = (payload) => {
+    if (!payload || typeof payload !== 'object') {
+        return payload;
+    }
+
+    const nextPayload = { ...payload };
+    if (!Array.isArray(payload.messages)) {
+        return nextPayload;
+    }
+
+    nextPayload.messages = payload.messages.map(message => {
+        if (!message || typeof message !== 'object') {
+            return message;
+        }
+
+        const nextMessage = { ...message };
+        if (Object.prototype.hasOwnProperty.call(nextMessage, 'content')) {
+            nextMessage.content = preprocessOutgoingMessageContent(nextMessage.content);
+        }
+        if (typeof nextMessage.reasoning_content === 'string') {
+            nextMessage.reasoning_content = limitConsecutiveIdenticalChars(nextMessage.reasoning_content);
+        }
+
+        return nextMessage;
+    });
+
+    return nextPayload;
 };
 
 const stripThinkBlocks = (text) => {
@@ -1453,13 +1542,14 @@ export default class AIEngine extends BaseTranslationEngine {
         const expectedKeys = Array.isArray(options.expectedKeys) ? options.expectedKeys : [];
         const isBackgroundJob = !!options.isBackgroundJob;
         const monitorState = this.buildStreamMonitorState(expectedKeys);
+        const outgoingPayload = preprocessPayloadForLlm(payload);
         const requestMeta = {
             isBackgroundJob,
             externalCancelReason: null,
             startedAt: Date.now()
         };
         const requestPayload = {
-            ...payload,
+            ...outgoingPayload,
             stream: true
         };
 
@@ -2031,15 +2121,19 @@ export default class AIEngine extends BaseTranslationEngine {
             messages: [
                 {
                     "role": "system",
+                    "content": this.systemPrompt
+                },
+                {
+                    "role": "system",
                     "content": `Translate video game text from ${sourceName} to ${targetName}. Return only flat one-line JSON object with exactly the same keys as input. No markdown, no comments, no extra keys, no missing keys, no duplicate keys, no arrays, no pretty formatting. Preserve every [[tag]] exactly and keep tag order unchanged. Character name hints: ${nameHints}`
                 },
                 {
                     "role": "user",
-                    "content": "{\"message1\":\"それはいいですね\",\"message2\":\"情報\\nありがとうございます。\"}"
+                    "content": `{"${typeToTag.text}0":"それはいいですね","${typeToTag.text}1":"情報\\nありがとうございます。"}`
                 },
                 {
                     "role": "assistant",
-                    "content": "{\"message1\":\"That's great\",\"message2\":\"Thank you for the information\"}"
+                    "content": `{"${typeToTag.text}0":"That's great","${typeToTag.text}1":"Thank you for the information"}`
                 },
                 {
                     "role": "user",
