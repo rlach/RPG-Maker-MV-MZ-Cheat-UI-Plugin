@@ -2959,11 +2959,6 @@ export default {
             const isBackgroundJob = !!options.backgroundJob;
             console.log('[TranslateOnTheFly] Starting translation of game data arrays');
 
-            if (!this.isTranslationEnabled()) {
-                console.log('[TranslateOnTheFly] Translation disabled, skipping game arrays');
-                return;
-            }
-
             if (!this.isEngineFullyConfigured()) {
                 console.log('[TranslateOnTheFly] Engine not fully configured, skipping game arrays');
                 return;
@@ -3162,11 +3157,6 @@ export default {
             console.log('[TranslateOnTheFly] Initiating background translation of game objects');
             // Prevent multiple simultaneous background translations
             if (this._backgroundTranslationInProgress) {
-                return;
-            }
-
-            if (!this.isTranslationEnabled()) {
-                console.log('[TranslateOnTheFly] Translation disabled by user', this.useCacheOnly);
                 return;
             }
 
@@ -3765,12 +3755,6 @@ export default {
 
         async translateAllMaps() {
             try {
-                // Check if translation is enabled
-                if (!this.isTranslationEnabled()) {
-                    Alert.warn('Real-time translation is disabled');
-                    return;
-                }
-
                 // Check if engine is configured
                 if (!this.engine || !this.isEngineFullyConfigured()) {
                     Alert.error('Translation engine not fully configured');
@@ -3882,12 +3866,6 @@ export default {
                 if (!dataMap) {
                     console.warn('[TranslateOnTheFly] No map loaded');
                     Alert.warn('No map to translate');
-                    return;
-                }
-
-                // Check if translation is enabled
-                if (!this.isTranslationEnabled()) {
-                    Alert.warn('Real-time translation is disabled');
                     return;
                 }
 

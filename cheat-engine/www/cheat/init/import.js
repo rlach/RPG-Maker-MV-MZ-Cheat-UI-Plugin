@@ -1,4 +1,6 @@
 ;(function() {
+    const USE_LOGGING = false;
+    if(!USE_LOGGING) return;
     try {
         if (typeof require === 'function' && typeof process === 'object') {
             const fs = require('fs')
