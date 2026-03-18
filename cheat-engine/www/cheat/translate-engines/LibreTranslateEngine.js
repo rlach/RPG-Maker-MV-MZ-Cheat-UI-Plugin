@@ -23,7 +23,6 @@ export default class LibreTranslateEngine extends BaseTranslationEngine {
                 outlined
                 dense
                 hide-details
-                :disabled="!enabled"
                 @change="onChangeLibreTranslateHost"
                 class="mb-2">
             </v-text-field>
@@ -34,7 +33,6 @@ export default class LibreTranslateEngine extends BaseTranslationEngine {
                 dense
                 hide-details
                 type="password"
-                :disabled="!enabled"
                 @change="onChangeLibreTranslateApiKey">
             </v-text-field>
         `;

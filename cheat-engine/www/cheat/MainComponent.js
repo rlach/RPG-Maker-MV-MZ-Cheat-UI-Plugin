@@ -1,6 +1,6 @@
 import CheatModal from './CheatModal.js'
 import { GLOBAL_SHORTCUT } from "./js/GlobalShortcut.js"
-import { GeneralCheat } from './js/CheatHelper.js'
+import { GeneralCheat, MessageCheat } from './js/CheatHelper.js'
 import AlertSnackbar from './components/AlertSnackbar.js'
 import ConfirmDialog from './components/ConfirmDialog.js'
 import { customizeRPGMakerFunctions } from './init/customize_functions.js'
@@ -122,9 +122,19 @@ export default {
         },
 
         onGlobalKeyDown (e) {
+            console.log('[TOF-DEBUG][MainComponent] keydown', {
+                keyCode: e.keyCode,
+                ctrl: !!e.ctrlKey,
+                alt: !!e.altKey,
+                shift: !!e.shiftKey,
+                meta: !!e.metaKey,
+                targetTag: e && e.target && e.target.tagName ? e.target.tagName : null
+            })
+
             this.resetStuckPrimaryWhenModifierPressed(e.keyCode)
 
             if (this.shouldIgnoreGlobalShortcut(e)) {
+                console.log('[TOF-DEBUG][MainComponent] keydown ignored due to focused input/contenteditable')
                 return
             }
 
@@ -134,7 +144,26 @@ export default {
                 GLOBAL_SHORTCUT.runKeyLeaveEvent(e, Key.fromKey(this.currentKey))
                 this.currentKey.add(e.keyCode)
                 this.currentKey.adjustCombiningKey(e)
-                GLOBAL_SHORTCUT.runKeyEnterEvent(e, Key.fromKey(this.currentKey))
+
+                // Fallback path for object-translation modal shortcut if shortcut map is stale
+                const currentKey = Key.fromKey(this.currentKey)
+                const modalShortcut = (GLOBAL_SHORTCUT && typeof GLOBAL_SHORTCUT.getShortcut === 'function')
+                    ? GLOBAL_SHORTCUT.getShortcut('openObjectTranslationModal')
+                    : null
+                console.log('[TOF-DEBUG][MainComponent] currentKey vs configured modal shortcut', {
+                    currentKey: currentKey && currentKey.asString ? currentKey.asString() : null,
+                    modalShortcut: modalShortcut && modalShortcut.asString ? modalShortcut.asString() : null
+                })
+                if (modalShortcut && typeof modalShortcut.equals === 'function' && currentKey.equals(modalShortcut)) {
+                    console.log('[TOF-DEBUG][MainComponent] fallback shortcut matched -> MessageCheat.openObjectTranslationModal()')
+                    MessageCheat.openObjectTranslationModal()
+                    e.preventDefault()
+                    e.stopImmediatePropagation()
+                    e.stopPropagation()
+                    return
+                }
+
+                GLOBAL_SHORTCUT.runKeyEnterEvent(e, currentKey)
             }
         },
 

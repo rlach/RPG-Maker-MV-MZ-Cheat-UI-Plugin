@@ -1,5 +1,5 @@
 import { Alert } from '../js/AlertHelper.js';
-import { MessageCheat } from '../js/CheatHelper.js';
+import { MessageCheat, GeneralCheat } from '../js/CheatHelper.js';
 import { KeyValueStorage } from '../js/KeyValueStorage.js';
 import { TranslateOnTheFlyState } from '../js/TranslateOnTheFlyState.js';
 import { AIEngine, createEngine, getAvailableEngines } from '../translate-engines/index.js';
@@ -50,6 +50,15 @@ export default {
             @click.self.stop
             @change="onChangeTranslateGameObjects">
         </v-switch>
+
+        <v-switch
+            v-model="cancelBackgroundForOnTheFly"
+            label="Allow cancelling of background translations when on-the-fly is needed"
+            dense
+            hide-details
+            @click.self.stop
+            @change="onChangeCancelBackgroundForOnTheFly">
+        </v-switch>
     </v-card-text>
 
     <v-card-subtitle class="pb-0 mt-4 font-weight-bold">Language Settings</v-card-subtitle>
@@ -62,7 +71,6 @@ export default {
             outlined
             dense
             hide-details
-            :disabled="!enabled"
             @change="onChangeTranslationEngine"
             class="mb-2">
         </v-select>
@@ -74,7 +82,6 @@ export default {
             outlined
             dense
             hide-details
-            :disabled="!enabled"
             @change="onChangeSourceLang"
             class="mb-2">
         </v-select>
@@ -86,7 +93,6 @@ export default {
             outlined
             dense
             hide-details
-            :disabled="!enabled"
             @change="onChangeTargetLang">
         </v-select>
 
@@ -99,7 +105,6 @@ export default {
                 outlined
                 dense
                 hide-details
-                :disabled="!enabled"
                 @keydown.stop
                 @change="onChangeLibreTranslateHost"
                 class="mb-2"
@@ -111,13 +116,12 @@ export default {
                 dense
                 hide-details
                 type="password"
-                :disabled="!enabled"
                 @keydown.stop
                 @change="onChangeLibreTranslateApiKey"
             ></v-text-field>
         </div>
 
-        <!-- AI Engine (GPT4All / Open WebUI) config -->
+        <!-- AI Engine (OpenAPI compatible / Open WebUI) config -->
         ${AIEngine.getConfigTemplate()}
         </div>
     </v-card-text>
@@ -130,7 +134,6 @@ export default {
             label="Keep translated strings under max width (in characters)"
             dense
             hide-details
-            :disabled="!enabled"
             @click.self.stop
             @change="onChangeTextWrapping">
         </v-switch>
@@ -146,7 +149,7 @@ export default {
             min="20"
             max="200"
             hide-details
-            :disabled="!enabled || !enableTextWrapping"
+            :disabled="!enableTextWrapping"
             @keydown.self.stop
             @change="onChangeMaxWidth"
             @focus="$event.target.select()">
@@ -161,7 +164,7 @@ export default {
             min="20"
             max="200"
             hide-details
-            :disabled="!enabled || !enableTextWrapping"
+            :disabled="!enableTextWrapping"
             @keydown.self.stop
             @change="onChangeDescriptionMaxWidth"
             @focus="$event.target.select()">
@@ -179,7 +182,6 @@ export default {
             min="200"
             max="10000"
             hide-details
-            :disabled="!enabled"
             @keydown.self.stop
             @change="onChangeCharLimit"
             class="mb-2"
@@ -194,7 +196,6 @@ export default {
             min="1"
             max="100"
             hide-details
-            :disabled="!enabled"
             @keydown.self.stop
             @change="onChangeBatchItemsLimit"
         ></v-text-field>
@@ -213,12 +214,41 @@ export default {
             small
             outlined
             color="warning"
-            :disabled="!enabled || cachedCount === 0"
+            :disabled="cachedCount === 0"
             @click="clearCache">
             <v-icon small left>mdi-delete</v-icon>
             Clear Cache
         </v-btn>
     </v-card-text>
+
+    <v-dialog v-model="objectTranslationDialogVisible" max-width="640">
+        <v-card dark>
+            <v-card-title class="subtitle-1 font-weight-bold">Object Translation</v-card-title>
+            <v-card-text class="caption pb-1">Select what to translate. Counts show remaining objects and total.</v-card-text>
+            <v-card-text class="pt-1">
+                <div
+                    v-for="item in objectTranslationModalStats"
+                    :key="item.id"
+                    class="d-flex align-center justify-space-between py-1"
+                >
+                    <v-checkbox
+                        v-model="objectTranslationSelection[item.id]"
+                        :label="item.label"
+                        :disabled="item.total <= 0"
+                        hide-details
+                        dense
+                        class="ma-0 pa-0"
+                    ></v-checkbox>
+                    <span class="caption grey--text text--lighten-1">left {{item.left}} of {{item.total}}</span>
+                </div>
+            </v-card-text>
+            <v-card-actions>
+                <v-spacer></v-spacer>
+                <v-btn text color="grey" @click="closeObjectTranslationModal">Cancel</v-btn>
+                <v-btn text color="primary" @click="startObjectTranslationFromModal">Start</v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
 </v-card>
     `,
 
@@ -236,6 +266,7 @@ export default {
             translateCacheWhenDisabled: false,
             tryTranslateAhead: true,
             translateGameObjects: true,
+            cancelBackgroundForOnTheFly: false,
             // Batching / performance
             charLimit: 1000,
             batchItemsLimit: 20,
@@ -261,10 +292,10 @@ export default {
             // LibreTranslate
             libreTranslateHost: 'http://127.0.0.1:5000',
             libreTranslateApiKey: '',
-            // AI Engine (GPT4All / Open WebUI)
-            aiProvider: 'gpt4all',
+            // AI Engine (OpenAPI compatible / Open WebUI)
+            aiProvider: 'openApi',
             aiProviderOptions: [
-                { text: 'Gpt4All', value: 'gpt4all' },
+                { text: 'OpenAPI compatible', value: 'openApi' },
                 { text: 'Open WebUI', value: 'openwebui' }
             ],
             aiHost: 'http://localhost:4891',
@@ -274,9 +305,10 @@ export default {
             aiLoadingModels: false,
             aiModelsError: '',
             aiAllowNewlineMismatch: false,
+            aiAskIfTextTranslated: true,
             aiInvalidJsonHandlingStrategy: 'resendFirstHalf',
             aiInvalidJsonHandlingStrategyOptions: [
-                { text: 'Resend first half of texts', value: 'resendFirstHalf' },
+                { text: 'Split into two half-batches', value: 'resendFirstHalf' },
                 { text: 'Ask AI to fix it', value: 'askAIToFix' },
                 { text: 'Use JsonFixer', value: 'useJsonFixer' },
                 { text: 'None', value: 'none' }
@@ -287,6 +319,18 @@ export default {
             currentGameMessage: null,
             useJsonFixer: true,
             aiFixRecursionMaxDepth: 0,
+            objectTranslationDialogVisible: false,
+            objectTranslationModalStats: [],
+            objectTranslationSelection: {},
+            objectTranslationJob: {
+                active: false,
+                currentTypeLabel: '',
+                currentDone: 0,
+                currentTotal: 0,
+                totalDone: 0,
+                totalTarget: 0,
+                runErrors: 0
+            }
         };
     },
 
@@ -298,6 +342,15 @@ export default {
         this.pendingTranslations = new Map();
         this.failedTranslations = new Map(); // Track failed translation attempts to prevent retry spam
         this.translationInProgress = false;
+        this._foregroundDialogBatchState = {
+            active: false,
+            operationKey: '',
+            sourceTrigger: '',
+            startedAt: 0,
+            promise: null
+        };
+        this._foregroundBatchWatchdogMs = 60000;
+        this._foregroundPreemptedOperationKey = '';
         this.loadSettings(); // Load settings first so 'enabled' is set
         this.loadCacheFromDisk();
         
@@ -333,12 +386,19 @@ export default {
         });
 
         window.__TranslateOnTheFlyPanel = this;
+        console.log('[TOF-DEBUG][TranslateOnTheFlyPanel] created and exposed on window', {
+            deferredOpenFlag: !!window.__TOF_OPEN_OBJECT_TRANSLATION_MODAL__
+        });
+
+        if (window.__TOF_OPEN_OBJECT_TRANSLATION_MODAL__) {
+            window.__TOF_OPEN_OBJECT_TRANSLATION_MODAL__ = false;
+            setTimeout(() => {
+                console.log('[TOF-DEBUG][TranslateOnTheFlyPanel] deferred open flag consumed -> opening object translation modal');
+                this.openObjectTranslationModal();
+            }, 0);
+        }
         
-        if (this.enabled) {
-            console.log('[TranslateOnTheFly] Translation enabled from saved settings');
-            // Start background translation of items and skills
-            this.startBackgroundTranslation();
-        } else if (this.translateCacheWhenDisabled) {
+        if (this.translateCacheWhenDisabled) {
             console.log('[TranslateOnTheFly] Applying cached translations to data objects');
             this.applyCachedTranslationsToData();
         }
@@ -358,6 +418,16 @@ export default {
         if (this._spinnerStyle && this._spinnerStyle.parentNode) {
             this._spinnerStyle.parentNode.removeChild(this._spinnerStyle);
             this._spinnerStyle = null;
+        }
+
+        if (this._objectTranslationModalEl && this._objectTranslationModalEl.parentNode) {
+            this._objectTranslationModalEl.parentNode.removeChild(this._objectTranslationModalEl);
+            this._objectTranslationModalEl = null;
+        }
+
+        if (this._objectTranslationModalStyle && this._objectTranslationModalStyle.parentNode) {
+            this._objectTranslationModalStyle.parentNode.removeChild(this._objectTranslationModalStyle);
+            this._objectTranslationModalStyle = null;
         }
     },
 
@@ -409,13 +479,19 @@ export default {
                 this.descriptionMaxLineWidth = data.descriptionMaxLineWidth || 59;
             this.charLimit = data.charLimit || 1000;
             this.batchItemsLimit = data.batchItemsLimit || 20;
-            this.translationEngine = data.translationEngine || 'mymemory';
+            const savedEngine = data.translationEngine || 'mymemory';
+            this.translationEngine = savedEngine === 'gpt4all' ? 'openApi' : savedEngine;
             this.translateCacheWhenDisabled = data.translateCacheWhenDisabled || false;
             this.tryTranslateAhead = data.tryTranslateAhead || false;
             this.translateGameObjects = data.translateGameObjects !== undefined ? data.translateGameObjects : true;
+            this.cancelBackgroundForOnTheFly = data.cancelBackgroundForOnTheFly !== undefined ? data.cancelBackgroundForOnTheFly : false;
             
             // Load engine-specific settings
             this.engineSettings = data.engineSettings || {};
+            if (this.engineSettings.gpt4all && !this.engineSettings.openApi) {
+                this.engineSettings.openApi = this.engineSettings.gpt4all;
+                delete this.engineSettings.gpt4all;
+            }
             
             TranslateOnTheFlyState.setEnabled(this.enabled, { notify: false });
         },
@@ -444,6 +520,7 @@ export default {
                 translateCacheWhenDisabled: this.translateCacheWhenDisabled,
                 tryTranslateAhead: this.tryTranslateAhead,
                 translateGameObjects: this.translateGameObjects,
+                cancelBackgroundForOnTheFly: this.cancelBackgroundForOnTheFly,
                 engineSettings: this.engineSettings || {}
             };
             this.kvStorage.setItem('data', JSON.stringify(data));
@@ -460,10 +537,623 @@ export default {
 
         onChangeTranslateGameObjects() {
             this.saveSettings();
-            if (this.translateGameObjects && this.isTranslationEnabled()) {
-                // Start background translation if enabled
-                this.startBackgroundTranslation();
+        },
+
+        onChangeCancelBackgroundForOnTheFly() {
+            this.saveSettings();
+        },
+
+        getObjectTranslationTypeDefs() {
+            return [
+                { id: 'items', label: 'items', kind: 'data', getContainer: () => window.$dataItems, fields: ['name', 'description'], cachePrefix: 'item' },
+                { id: 'skills', label: 'skills', kind: 'data', getContainer: () => window.$dataSkills, fields: ['name', 'description', 'message1', 'message2'], cachePrefix: 'skill' },
+                { id: 'classes', label: 'classes', kind: 'data', getContainer: () => window.$dataClasses, fields: ['name'], cachePrefix: 'class' },
+                { id: 'enemies', label: 'enemies', kind: 'data', getContainer: () => window.$dataEnemies, fields: ['name'], cachePrefix: 'enemy' },
+                { id: 'armors', label: 'armors', kind: 'data', getContainer: () => window.$dataArmors, fields: ['name', 'description'], cachePrefix: 'armor' },
+                { id: 'weapons', label: 'weapons', kind: 'data', getContainer: () => window.$dataWeapons, fields: ['name', 'description'], cachePrefix: 'weapon' },
+                { id: 'maps', label: 'maps', kind: 'data', getContainer: () => window.$dataMapInfos, fields: ['name'], cachePrefix: 'map' },
+                { id: 'actors', label: 'actors', kind: 'data', getContainer: () => window.$dataActors, fields: ['name', 'nickname', 'profile'], cachePrefix: 'actor' },
+                { id: 'systemMessages', label: 'system messages', kind: 'systemMessages' }
+            ];
+        },
+
+        getObjectTranslationStats() {
+            const defs = this.getObjectTranslationTypeDefs();
+            return defs.map(def => {
+                if (def.kind === 'systemMessages') {
+                    const stats = this.countSystemMessagesStats();
+                    return { ...def, ...stats };
+                }
+
+                const container = def.getContainer && def.getContainer();
+                if (!Array.isArray(container)) {
+                    return { ...def, total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
+                }
+
+                let total = 0;
+                let left = 0;
+                let totalStrings = 0;
+                let leftStrings = 0;
+
+                for (let i = 1; i < container.length; i++) {
+                    const item = container[i];
+                    if (!item) continue;
+                    total++;
+
+                    if (!item._translateOriginal) {
+                        item._translateOriginal = {};
+                        for (const field of def.fields) {
+                            item._translateOriginal[field] = item[field];
+                        }
+                    }
+
+                    let hasUntranslated = false;
+                    for (const field of def.fields) {
+                        const originalValue = item._translateOriginal[field];
+                        if (!originalValue || typeof originalValue !== 'string' || originalValue.trim() === '') {
+                            continue;
+                        }
+
+                        totalStrings++;
+                        const cacheKey = this.getCacheKey(originalValue, `${def.cachePrefix}_${field}`);
+                        if (!this.translationCache.has(cacheKey)) {
+                            leftStrings++;
+                            hasUntranslated = true;
+                        }
+                    }
+
+                    if (hasUntranslated) {
+                        left++;
+                    }
+                }
+
+                return { ...def, total, left, totalStrings, leftStrings };
+            });
+        },
+
+        countSystemMessagesStats() {
+            if (!window.$dataSystem || !$dataSystem.terms || !$dataSystem.terms.messages || typeof $dataSystem.terms.messages !== 'object') {
+                return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
             }
+
+            const source = $dataSystem.terms.messagesOriginal || $dataSystem.terms.messages;
+            const keys = Object.keys(source || {});
+
+            let total = 0;
+            let left = 0;
+            for (const key of keys) {
+                const value = source[key];
+                if (typeof value !== 'string' || value.trim() === '') {
+                    continue;
+                }
+                total++;
+                if (!this.translationCache.has(key)) {
+                    left++;
+                }
+            }
+
+            return {
+                total,
+                left,
+                totalStrings: total,
+                leftStrings: left
+            };
+        },
+
+        ensureObjectTranslationModalElements() {
+            const currentDoc = (typeof document !== 'undefined') ? document : null;
+            const parentDoc = this.getSpinnerHostDocument();
+
+            let hostDoc = currentDoc;
+            if (window.__CHEAT_EXTERNAL_WINDOW__ && window.opener && !window.opener.closed && window.opener.document) {
+                hostDoc = window.opener.document;
+            } else if (!hostDoc) {
+                hostDoc = parentDoc;
+            }
+
+            if (!hostDoc) {
+                console.warn('[TOF-DEBUG][TranslateOnTheFlyPanel] ensureObjectTranslationModalElements: no host document');
+                return null;
+            }
+
+            console.log('[TOF-DEBUG][TranslateOnTheFlyPanel] ensureObjectTranslationModalElements', {
+                hostHref: hostDoc.location ? hostDoc.location.href : null,
+                isExternalWindow: !!window.__CHEAT_EXTERNAL_WINDOW__
+            });
+
+            if (this._objectTranslationModalEl && this._objectTranslationModalEl.ownerDocument !== hostDoc) {
+                if (this._objectTranslationModalEl.parentNode) {
+                    this._objectTranslationModalEl.parentNode.removeChild(this._objectTranslationModalEl);
+                }
+                this._objectTranslationModalEl = null;
+            }
+
+            if (this._objectTranslationModalStyle && this._objectTranslationModalStyle.ownerDocument !== hostDoc) {
+                if (this._objectTranslationModalStyle.parentNode) {
+                    this._objectTranslationModalStyle.parentNode.removeChild(this._objectTranslationModalStyle);
+                }
+                this._objectTranslationModalStyle = null;
+            }
+
+            if (!this._objectTranslationModalStyle) {
+                const existingStyle = hostDoc.getElementById('tof-object-translation-modal-style');
+                const style = existingStyle || hostDoc.createElement('style');
+                style.id = 'tof-object-translation-modal-style';
+                style.textContent = [
+                    '#tof-object-translation-modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 10000; background: rgba(0, 0, 0, 0.55); }',
+                    '#tof-object-translation-modal .tof-modal-card { width: 540px; max-width: calc(100vw - 24px); max-height: calc(100vh - 24px); overflow: auto; background: #1f1f1f; color: #f2f2f2; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.45); }',
+                    '#tof-object-translation-modal .tof-modal-header { padding: 14px 16px 8px 16px; font-size: 16px; font-weight: 700; }',
+                    '#tof-object-translation-modal .tof-modal-sub { padding: 0 16px 8px 16px; color: #bdbdbd; font-size: 12px; }',
+                    '#tof-object-translation-modal .tof-modal-list { padding: 0 16px 10px 16px; }',
+                    '#tof-object-translation-modal .tof-modal-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }',
+                    '#tof-object-translation-modal .tof-modal-item:last-child { border-bottom: none; }',
+                    '#tof-object-translation-modal .tof-modal-item label { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }',
+                    '#tof-object-translation-modal .tof-modal-meta { color: #9e9e9e; font-size: 12px; white-space: nowrap; }',
+                    '#tof-object-translation-modal .tof-modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px 16px 16px; }',
+                    '#tof-object-translation-modal .tof-btn { border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12px; font-weight: 700; }',
+                    '#tof-object-translation-modal .tof-btn-start { background: #42a5f5; color: #fff; }',
+                    '#tof-object-translation-modal .tof-btn-cancel { background: #616161; color: #fff; }'
+                ].join('');
+                if (!existingStyle) {
+                    hostDoc.head.appendChild(style);
+                }
+                this._objectTranslationModalStyle = style;
+            }
+
+            if (!this._objectTranslationModalEl) {
+                const existingEl = hostDoc.getElementById('tof-object-translation-modal');
+                const el = existingEl || hostDoc.createElement('div');
+                el.id = 'tof-object-translation-modal';
+                el.innerHTML = [
+                    '<div class="tof-modal-card">',
+                    '  <div class="tof-modal-header">Object Translation</div>',
+                    '  <div class="tof-modal-sub">Select what to translate. Counts show remaining objects and total.</div>',
+                    '  <div class="tof-modal-list" id="tof-object-translation-list"></div>',
+                    '  <div class="tof-modal-actions">',
+                    '    <button class="tof-btn tof-btn-cancel" id="tof-object-translation-cancel">Cancel</button>',
+                    '    <button class="tof-btn tof-btn-start" id="tof-object-translation-start">Start</button>',
+                    '  </div>',
+                    '</div>'
+                ].join('');
+                if (!existingEl) {
+                    hostDoc.body.appendChild(el);
+                }
+                this._objectTranslationModalEl = el;
+            }
+
+            return this._objectTranslationModalEl;
+        },
+
+        openObjectTranslationModal() {
+            console.log('[TOF-DEBUG][TranslateOnTheFlyPanel] openObjectTranslationModal called', {
+                jobActive: !!(this.objectTranslationJob && this.objectTranslationJob.active)
+            });
+
+            if (this.objectTranslationJob.active) {
+                Alert.warn('Object translation is already in progress');
+                return;
+            }
+
+            if (this.checkIfDataIsLOaded()) {
+                console.warn('[TOF-DEBUG][TranslateOnTheFlyPanel] openObjectTranslationModal aborted: data not loaded');
+                Alert.warn('Game data is not fully loaded yet');
+                return;
+            }
+
+            const stats = this.getObjectTranslationStats();
+            this.objectTranslationModalStats = stats;
+            for (const item of stats) {
+                if (this.objectTranslationSelection[item.id] === undefined) {
+                    this.$set(this.objectTranslationSelection, item.id, item.left > 0);
+                }
+            }
+            this.objectTranslationDialogVisible = true;
+        },
+
+        closeObjectTranslationModal() {
+            this.objectTranslationDialogVisible = false;
+        },
+
+        async startObjectTranslationFromModal() {
+            const selected = [];
+            const stats = this.objectTranslationModalStats || [];
+            for (const item of stats) {
+                const isChecked = !!this.objectTranslationSelection[item.id];
+                if (isChecked) {
+                    this.objectTranslationSelection[item.id] = true;
+                    selected.push(item.id);
+                } else {
+                    this.objectTranslationSelection[item.id] = false;
+                }
+            }
+
+            if (!selected.length) {
+                Alert.warn('Select at least one type to translate');
+                return;
+            }
+
+            this.closeObjectTranslationModal();
+            await this.runObjectTranslationJob(selected);
+        },
+
+        hasPendingDialogTranslation() {
+            if (this.isForegroundDialogBatchActive()) {
+                return true;
+            }
+
+            if (!this.pendingTranslations || this.pendingTranslations.size === 0) {
+                return false;
+            }
+
+            for (const key of this.pendingTranslations.keys()) {
+                if (typeof key !== 'string') continue;
+                if (key.startsWith('text:') || key.startsWith('speaker:') || key.startsWith('choice:')) {
+                    return true;
+                }
+            }
+
+            return false;
+        },
+
+        isForegroundDialogBatchActive() {
+            return !!(this._foregroundDialogBatchState && this._foregroundDialogBatchState.active);
+        },
+
+        async waitForForegroundDialogBatch() {
+            const state = this._foregroundDialogBatchState;
+            if (state && state.active && state.promise) {
+                try {
+                    await state.promise;
+                } catch (e) {
+                    // Foreground errors are handled by the caller pipeline.
+                }
+            }
+        },
+
+        async waitForBackgroundTranslationSlot() {
+            const hasBackgroundJob = () => {
+                return !!(
+                    this.objectTranslationJob && this.objectTranslationJob.active
+                    || this._backgroundTranslationInProgress
+                );
+            };
+
+            while (hasBackgroundJob() && this.hasPendingDialogTranslation()) {
+                await new Promise(resolve => setTimeout(resolve, 75));
+            }
+        },
+
+        isBackgroundPreemptedResult(result) {
+            if (!result || typeof result !== 'object') {
+                return false;
+            }
+
+            if (Array.isArray(result.successes) && result.successes.length > 0) {
+                return false;
+            }
+
+            if (!Array.isArray(result.failures) || result.failures.length === 0) {
+                return false;
+            }
+
+            return result.failures.every(failure => {
+                return !!(failure && (failure.preempted || failure.cancelReason === 'background_preempted'));
+            });
+        },
+
+        async batchTranslateWithBackgroundRetry(items, label = 'background batch') {
+            const safeItems = Array.isArray(items) ? items : [];
+            if (safeItems.length === 0) {
+                return { successes: [], failures: [] };
+            }
+
+            const maxPreemptedRetries = 5;
+            let attempts = 0;
+
+            while (attempts <= maxPreemptedRetries) {
+                await this.waitForBackgroundTranslationSlot();
+                const result = await this.engine.batchTranslate(safeItems, { backgroundJob: true });
+
+                if (!this.isBackgroundPreemptedResult(result)) {
+                    return result;
+                }
+
+                attempts += 1;
+                if (attempts > maxPreemptedRetries) {
+                    return result;
+                }
+
+                console.log(`[TranslateOnTheFly] Background batch preempted (${label}), instant retry ${attempts}/${maxPreemptedRetries}`);
+                await this.waitForForegroundDialogBatch();
+            }
+
+            return { successes: [], failures: [] };
+        },
+
+        buildForegroundOperationKey({ currentText, currentSpeakerName, maxDepth }) {
+            const interpreter = this.findMessageInterpreter();
+            const normalized = this.resolveOriginalMessageContext(currentText, currentSpeakerName, interpreter);
+            const normalizedText = normalized.text || currentText || '';
+            const normalizedSpeaker = normalized.speaker || currentSpeakerName || '';
+
+            const choices = ($gameMessage && typeof $gameMessage.choices === 'function')
+                ? ($gameMessage._translateOriginalChoices || $gameMessage.choices() || [])
+                : [];
+
+            const choiceKeyPart = Array.isArray(choices)
+                ? choices.map(choice => this.getCacheKey(choice, 'choice')).join('|')
+                : '';
+
+            const mapId = (window.$gameMap && typeof $gameMap.mapId === 'function') ? $gameMap.mapId() : 0;
+            const eventId = interpreter && typeof interpreter._eventId === 'number' ? interpreter._eventId : 0;
+            const index = interpreter && typeof interpreter._index === 'number' ? interpreter._index : 0;
+            const depth = Number(maxDepth) || 0;
+
+            return [
+                mapId,
+                eventId,
+                index,
+                depth,
+                this.getCacheKey(normalizedText, 'text'),
+                this.getCacheKey(normalizedSpeaker, 'speaker'),
+                choiceKeyPart
+            ].join('::');
+        },
+
+        preemptBackgroundForForeground(operationKey, sourceTrigger = 'unknown') {
+            if (!this.cancelBackgroundForOnTheFly) {
+                return false;
+            }
+
+            if (!this.engine || typeof this.engine.cancelActiveBackgroundRequest !== 'function') {
+                return false;
+            }
+
+            if (this._foregroundPreemptedOperationKey === operationKey) {
+                return false;
+            }
+
+            if (typeof this.engine.hasActiveBackgroundRequest === 'function' && !this.engine.hasActiveBackgroundRequest()) {
+                return false;
+            }
+
+            const cancelled = this.engine.cancelActiveBackgroundRequest();
+            if (cancelled) {
+                this._foregroundPreemptedOperationKey = operationKey;
+                console.log(`[TranslateOnTheFly] Foreground preempted active background request (trigger: ${sourceTrigger})`);
+            }
+
+            return cancelled;
+        },
+
+        requestForegroundDialogBatch({ currentText, currentSpeakerName, cacheKey, maxDepth, sourceTrigger = 'unknown' }) {
+            if (!this._foregroundDialogBatchState) {
+                this._foregroundDialogBatchState = {
+                    active: false,
+                    operationKey: '',
+                    sourceTrigger: '',
+                    startedAt: 0,
+                    promise: null
+                };
+            }
+
+            const state = this._foregroundDialogBatchState;
+            const operationKey = this.buildForegroundOperationKey({ currentText, currentSpeakerName, maxDepth });
+
+            if (state.active && state.promise) {
+                return state.promise;
+            }
+
+            this.preemptBackgroundForForeground(operationKey, sourceTrigger);
+
+            const promise = Promise.resolve().then(() => this.startAheadTranslation({
+                currentText,
+                currentSpeakerName,
+                cacheKey,
+                maxDepth
+            }));
+
+            state.active = true;
+            state.operationKey = operationKey;
+            state.sourceTrigger = sourceTrigger;
+            state.startedAt = Date.now();
+            state.promise = promise;
+
+            const watchdogMs = this._foregroundBatchWatchdogMs || 60000;
+            setTimeout(() => {
+                if (!state.active || state.promise !== promise) {
+                    return;
+                }
+
+                console.warn(`[TranslateOnTheFly] Foreground batch watchdog released lock after ${watchdogMs}ms`);
+                state.active = false;
+                state.operationKey = '';
+                state.sourceTrigger = '';
+                state.startedAt = 0;
+                state.promise = null;
+            }, watchdogMs);
+
+            return promise.finally(() => {
+                if (state.promise !== promise) {
+                    return;
+                }
+
+                state.active = false;
+                state.operationKey = '';
+                state.sourceTrigger = '';
+                state.startedAt = 0;
+                state.promise = null;
+                this._foregroundPreemptedOperationKey = '';
+            });
+        },
+
+        updateObjectTranslationProgress() {
+            const job = this.objectTranslationJob;
+            const currentLine = `${job.currentDone}/${job.currentTotal} ${job.currentTypeLabel} translated`;
+            const totalLine = `${job.totalDone}/${job.totalTarget} total strings translated (run errors: ${job.runErrors}, total errors: ${this.failedTranslations.size})`;
+            this.updateProgressBox(currentLine, totalLine);
+        },
+
+        async runObjectTranslationJob(selectedTypeIds) {
+            if (this.objectTranslationJob.active) {
+                Alert.warn('Object translation is already in progress');
+                return;
+            }
+
+            if (!this.engine || typeof this.engine.batchTranslate !== 'function') {
+                Alert.error('Translation engine not initialized');
+                return;
+            }
+
+            if (!this.isEngineFullyConfigured()) {
+                Alert.warn('Translation engine is not fully configured');
+                return;
+            }
+
+            const allStats = this.getObjectTranslationStats();
+            const selectedStats = allStats.filter(stat => selectedTypeIds.includes(stat.id));
+            const defsById = new Map(this.getObjectTranslationTypeDefs().map(def => [def.id, def]));
+
+            const totalTarget = selectedStats.reduce((sum, stat) => sum + (stat.leftStrings || 0), 0);
+
+            this.objectTranslationJob = {
+                active: true,
+                currentTypeLabel: '',
+                currentDone: 0,
+                currentTotal: 0,
+                totalDone: 0,
+                totalTarget,
+                runErrors: 0
+            };
+
+            try {
+                this.applyCachedTranslationsToData();
+
+                for (const stat of selectedStats) {
+                    const def = defsById.get(stat.id);
+                    if (!def || stat.left <= 0) {
+                        continue;
+                    }
+
+                    this.objectTranslationJob.currentTypeLabel = stat.label;
+                    this.objectTranslationJob.currentDone = 0;
+                    this.objectTranslationJob.currentTotal = stat.left;
+                    this.updateObjectTranslationProgress();
+
+                    if (def.kind === 'systemMessages') {
+                        const batchResult = await this.translateSystemMessagesBatch(true);
+                        this.objectTranslationJob.currentDone = stat.left;
+                        this.objectTranslationJob.totalDone += batchResult.successes;
+                        this.objectTranslationJob.runErrors += batchResult.failures;
+                        this.updateObjectTranslationProgress();
+                        continue;
+                    }
+
+                    const container = def.getContainer && def.getContainer();
+                    if (!Array.isArray(container)) {
+                        continue;
+                    }
+
+                    const pendingObjects = [];
+                    for (let i = 1; i < container.length; i++) {
+                        const item = container[i];
+                        if (!item) continue;
+                        const hasUntranslated = this.hasUntranslatedFields(item, def.fields, def.cachePrefix);
+                        if (hasUntranslated) {
+                            pendingObjects.push(item);
+                        }
+                    }
+
+                    const BATCH_SIZE = 10;
+                    for (let i = 0; i < pendingObjects.length; i += BATCH_SIZE) {
+                        const batch = pendingObjects.slice(i, i + BATCH_SIZE);
+                        const batchResult = await this.translateDataBatch(batch, def.fields, def.cachePrefix, { backgroundJob: true });
+                        this.objectTranslationJob.currentDone += batch.length;
+                        this.objectTranslationJob.totalDone += batchResult.successes;
+                        this.objectTranslationJob.runErrors += batchResult.failures;
+                        this.updateObjectTranslationProgress();
+                    }
+                }
+
+                Alert.success(`Object translation finished. ${this.objectTranslationJob.totalDone}/${this.objectTranslationJob.totalTarget} strings translated`);
+            } catch (error) {
+                console.error('[TranslateOnTheFly] Object translation job failed:', error);
+                Alert.error(`Object translation failed: ${error.message || error}`);
+            } finally {
+                this.objectTranslationJob.active = false;
+                this.hideProgressBox();
+            }
+        },
+
+        async translateSystemMessagesBatch(backgroundJob = false) {
+            if (!(window.$dataSystem && $dataSystem.terms && $dataSystem.terms.messages && typeof $dataSystem.terms.messages === 'object')) {
+                return { successes: 0, failures: 0 };
+            }
+
+            const hasMessagesOriginal = !!$dataSystem.terms.messagesOriginal;
+            const sourceMessages = hasMessagesOriginal ? $dataSystem.terms.messagesOriginal : $dataSystem.terms.messages;
+            if (!hasMessagesOriginal) {
+                $dataSystem.terms.messagesOriginal = Object.assign({}, $dataSystem.terms.messages || {});
+            }
+
+            const pending = [];
+            for (const key of Object.keys(sourceMessages || {})) {
+                const val = sourceMessages[key];
+                if (typeof val !== 'string' || val.trim() === '') {
+                    continue;
+                }
+                if (!this.translationCache.has(key)) {
+                    pending.push({ type: 'system_message', id: `msg_${key}`, value: val, cacheKey: key });
+                }
+            }
+
+            if (!pending.length) {
+                return { successes: 0, failures: 0 };
+            }
+
+            let successes = 0;
+            let failures = 0;
+            const batches = [];
+            let cur = [];
+            let curChars = 0;
+            for (const item of pending) {
+                const len = (item.value || '').length;
+                if (cur.length >= (this.batchItemsLimit || 20) || (curChars + len) > (this.charLimit || 1000)) {
+                    if (cur.length) batches.push(cur);
+                    cur = [];
+                    curChars = 0;
+                }
+                cur.push(item);
+                curChars += len;
+            }
+            if (cur.length) batches.push(cur);
+
+            for (const batch of batches) {
+                this.showSpinner();
+                const batchItems = batch.map(x => ({ type: x.type, id: x.id, value: x.value, cacheKey: x.cacheKey }));
+                const res = backgroundJob
+                    ? await this.batchTranslateWithBackgroundRetry(batchItems, 'system messages')
+                    : await this.engine.batchTranslate(batchItems, { backgroundJob: false });
+                this.hideSpinner();
+
+                for (const s of res.successes) {
+                    if (s.cacheKey) {
+                        this.setCacheValue(s.cacheKey, s.translated);
+                        if ($dataSystem.terms.messages && Object.prototype.hasOwnProperty.call($dataSystem.terms.messages, s.cacheKey)) {
+                            $dataSystem.terms.messages[s.cacheKey] = s.translated;
+                        }
+                    }
+                }
+
+                for (const f of res.failures) {
+                    this.failedTranslations.set(f.cacheKey, Date.now());
+                }
+
+                successes += res.successes.length;
+                failures += res.failures.length;
+            }
+
+            return { successes, failures };
         },
 
         findMessageInterpreter() {
@@ -541,20 +1231,105 @@ export default {
             return null;
         },
 
+        getInterpreterCurrentMessageEntry(interpreter) {
+            if (!interpreter || !Array.isArray(interpreter._list) || interpreter._list.length === 0) {
+                return null;
+            }
+
+            const list = interpreter._list;
+            const start = Math.max(0, Math.min(list.length - 1, Number(interpreter._index) || 0));
+
+            const extractAt = (messageCmdIndex) => {
+                if (messageCmdIndex < 0 || messageCmdIndex >= list.length) {
+                    return null;
+                }
+                const cmd = list[messageCmdIndex];
+                if (!cmd || cmd.code !== 101) {
+                    return null;
+                }
+
+                const speaker = (cmd.parameters && cmd.parameters[4]) || '';
+                const lines = [];
+                let j = messageCmdIndex + 1;
+                while (j < list.length && list[j] && list[j].code === 401) {
+                    lines.push(list[j].parameters && list[j].parameters[0]);
+                    j++;
+                }
+
+                if (lines.length === 0) {
+                    return null;
+                }
+
+                return {
+                    text: lines.join('\n'),
+                    speaker
+                };
+            };
+
+            for (let i = start; i >= 0; i--) {
+                const found = extractAt(i);
+                if (found) {
+                    return found;
+                }
+            }
+
+            for (let i = start + 1; i < list.length; i++) {
+                const found = extractAt(i);
+                if (found) {
+                    return found;
+                }
+            }
+
+            return null;
+        },
+
+        resolveOriginalMessageContext(currentText, currentSpeaker, interpreter) {
+            let resolvedText = currentText || '';
+            let resolvedSpeaker = currentSpeaker || '';
+
+            if (window.$gameMessage) {
+                if (typeof $gameMessage._translateOriginalText === 'string' && $gameMessage._translateOriginalText.length > 0) {
+                    resolvedText = $gameMessage._translateOriginalText;
+                }
+                if (typeof $gameMessage._translateOriginalSpeaker === 'string' && $gameMessage._translateOriginalSpeaker.length > 0) {
+                    resolvedSpeaker = $gameMessage._translateOriginalSpeaker;
+                }
+            }
+
+            const entry = this.getInterpreterCurrentMessageEntry(interpreter);
+            if (entry) {
+                const displayedText = (window.$gameMessage && typeof $gameMessage.allText === 'function') ? ($gameMessage.allText() || '') : '';
+                const seemsDisplayedText = !!(resolvedText && displayedText && resolvedText === displayedText);
+
+                if (!resolvedText || seemsDisplayedText) {
+                    resolvedText = entry.text || resolvedText;
+                }
+                if (!resolvedSpeaker) {
+                    resolvedSpeaker = entry.speaker || resolvedSpeaker;
+                }
+            }
+
+            return {
+                text: resolvedText || '',
+                speaker: resolvedSpeaker || ''
+            };
+        },
+
         collectAheadItems(currentText, currentSpeaker, interpreter, options = {}) {
             const charLimit = options.charLimit || this.charLimit;
-            const maxLookahead = options.maxLookahead || 50;
+            const maxItems = options.maxItems || this.batchItemsLimit || 20;
             const maxDepth = options.maxDepth !== undefined ? options.maxDepth : 999;
             
-            console.log('[Lookahead] Starting collection', { charLimit, maxLookahead, maxDepth, currentText, currentSpeaker });
+            console.log('[Lookahead] Starting collection', { charLimit, maxItems, maxDepth, currentText, currentSpeaker });
             
             const NL = '\n';
             const items = []; // Unified list: { type: 'text'|'speaker'|'choice', id: string, value: string }
             let totalChars = 0;
             let itemIdCounter = 0;
-            let charLimitReached = false;
+            let stopReason = '';
+            const seenCacheKeys = new Set();
 
-            const pushItem = (type, value, skipCharLimit = false) => {
+            const pushItem = (type, value, force = false) => {
                 // Skip empty strings, null, undefined (but continue scanning)
                 if (value == null || typeof value !== 'string' || value.trim() === '') {
                     return true; // Skip empty, continue
@@ -562,38 +1337,34 @@ export default {
                 
                 // Check cache first - skip cached items (don't add to translation)
                 const cacheKey = this.getCacheKey(value, type);
-                if (this.translationCache.has(cacheKey)) {
+                if (!force && this.translationCache.has(cacheKey)) {
+                    return true; // Skip cached, continue
+                }
+
+                // Avoid duplicates in one batch
+                if (seenCacheKeys.has(cacheKey)) {
                     return true; // Skip cached, continue
                 }
                 
-                // For current items (skipCharLimit=true), always add
-                if (skipCharLimit) {
-                    const id = `${type}_${itemIdCounter++}`;
-                    items.push({ type, id, value, cacheKey });
-                    totalChars += value.length;
-                    return true;
+                if (!force && items.length >= maxItems) {
+                    stopReason = 'items limit reached';
+                    return false;
                 }
-                
-                // For ahead items: check if limit already reached
-                if (charLimitReached) {
-                    return false; // Stop - limit reached
+
+                if (!force && (totalChars + value.length) > charLimit) {
+                    stopReason = 'charLimit reached';
+                    return false;
                 }
-                
-                // Add the item
+
                 const id = `${type}_${itemIdCounter++}`;
                 items.push({ type, id, value, cacheKey });
                 totalChars += value.length;
-                
-                // After adding, check if we exceeded limit
-                if (totalChars > charLimit) {
-                    charLimitReached = true;
-                    return false; // Stop after this item
-                }
+                seenCacheKeys.add(cacheKey);
                 
                 return true; // Continue
             };
 
-            // Always include current text and speaker first (skip charLimit for these)
+            // Always include current text and speaker first (forced)
             if (currentText) pushItem('text', currentText, true);
             if (currentSpeaker) pushItem('speaker', currentSpeaker, true);
 
@@ -610,100 +1381,90 @@ export default {
             }
 
             const list = interpreter._list;
-            const startIndex = 0;
-            // Don't use baseIndent to filter - we want to collect ALL messages even in nested blocks
-            // baseIndent is only used to understand structure, not to skip items
-
-            console.log('[Lookahead] Scanning list', { listLength: list.length, startIndex });
-
-            let i = startIndex;
-            let scanned = 0;
-            // Scan event until charLimit reached or end of event
-            while (i < list.length && !charLimitReached) {
-                scanned++;
+            const entries = [];
+            for (let i = 0; i < list.length; i++) {
                 const cmd = list[i];
                 if (!cmd || typeof cmd.code !== 'number') {
-                    console.log('[Lookahead] Skipping: no cmd or invalid code', { cmd, i, scanned });
-                    i++;
-                    continue;
-                }
-                
-                // Stop only at code 0 (end of event)
-                if (cmd.code === 0) {
-                    console.log('[Lookahead] Skipping: code 0 (end)', { cmd, i, scanned });
-                    i++;
-                    continue;
-                }
-                
-                // Don't skip based on indent - collect ALL messages even in nested blocks
-
-                if (cmd.code === 401) {
-                    i++;
                     continue;
                 }
 
-                if (cmd.code === 101) { // Message block
+                if (cmd.code === 101) {
                     const speaker = (cmd.parameters && cmd.parameters[4]) || '';
                     const lines = [];
                     let j = i + 1;
-                    
-                    // Collect all following 401 lines (message text continuation) regardless of indent
                     while (j < list.length && list[j] && list[j].code === 401) {
                         lines.push(list[j].parameters && list[j].parameters[0]);
                         j++;
                     }
-                    
+
                     const joined = lines.join(NL);
-                    if (!pushItem('text', joined)) {
-                        console.log('[Lookahead] CharLimit reached (text), stopping', { joined, totalChars, charLimit, i, scanned });
-                        break; // Stop scanning
+                    entries.push({ cmdIndex: i, type: 'text', value: joined });
+                    if (speaker) {
+                        entries.push({ cmdIndex: i, type: 'speaker', value: speaker });
                     }
-                    if (speaker && !pushItem('speaker', speaker)) {
-                        console.log('[Lookahead] CharLimit reached (speaker), stopping', { speaker, totalChars, charLimit, i, scanned });
-                        break; // Stop scanning
-                    }
-                    
-                    i = j;
+                    i = j - 1;
                     continue;
                 }
 
-                if (cmd.code === 102) { // Show Choices
+                if (cmd.code === 102) {
                     const choices = cmd.parameters && cmd.parameters[0];
                     if (Array.isArray(choices)) {
                         for (const choice of choices) {
-                            if (!pushItem('choice', choice)) {
-                                console.log('[Lookahead] CharLimit reached (choice), stopping', { choice, totalChars, charLimit, i, scanned });
-                                charLimitReached = true;
-                                break;
-                            }
+                            entries.push({ cmdIndex: i, type: 'choice', value: choice });
                         }
-                        if (charLimitReached) break; // Exit outer loop too
                     }
-                    i++;
-                    continue;
                 }
+            }
 
-                i++;
-                continue;
+            if (!entries.length) {
+                return items;
+            }
+
+            const startCmdIndex = Math.max(0, Number(interpreter._index) || 0);
+            let pivot = entries.findIndex(e => e.cmdIndex >= startCmdIndex && e.type === 'text' && e.value === currentText);
+            if (pivot < 0) {
+                pivot = entries.findIndex(e => e.type === 'text' && e.value === currentText);
+            }
+            if (pivot < 0) {
+                pivot = entries.findIndex(e => e.cmdIndex >= startCmdIndex);
+            }
+            if (pivot < 0) {
+                pivot = 0;
+            }
+
+            for (let k = 0; k < entries.length; k++) {
+                const idx = (pivot + k) % entries.length;
+                const entry = entries[idx];
+                if (!pushItem(entry.type, entry.value)) {
+                    break;
+                }
             }
 
             // Log completion info
             console.log('[Lookahead] Scan completed', { 
-                totalScanned: scanned,
+                totalCandidates: entries.length,
                 listLength: list.length,
                 totalItems: items.length, 
                 totalChars,
-                charLimitReached,
-                reason: charLimitReached ? 'charLimit reached' : (i >= list.length ? 'end of list' : 'loop ended')
+                reason: stopReason || 'loop ended'
             });
 
             return items;
         },
 
         async startAheadTranslation({ currentText, currentSpeakerName, cacheKey, maxDepth }) {
+            let pendingKeys = null;
             try {
                 const interpreter = this.findMessageInterpreter();
-                const items = this.collectAheadItems(currentText, currentSpeakerName, interpreter, { charLimit: this.charLimit, maxDepth });
+                const normalized = this.resolveOriginalMessageContext(currentText, currentSpeakerName, interpreter);
+                const normalizedCurrentText = normalized.text || currentText || '';
+                const normalizedCurrentSpeaker = normalized.speaker || currentSpeakerName || '';
+
+                const items = this.collectAheadItems(normalizedCurrentText, normalizedCurrentSpeaker, interpreter, {
+                    charLimit: this.charLimit,
+                    maxItems: this.batchItemsLimit,
+                    maxDepth
+                });
 
                 // Add current choices from $gameMessage if present
                 if ($gameMessage && $gameMessage.isChoice && $gameMessage.isChoice()) {
@@ -713,12 +1474,15 @@ export default {
                             const choice = currentChoices[i];
                             const choiceCacheKey = this.getCacheKey(choice, 'choice');
                             if (!this.translationCache.has(choiceCacheKey)) {
-                                items.push({
-                                    type: 'choice',
-                                    id: `current_choice_${i}`,
-                                    value: choice,
-                                    cacheKey: choiceCacheKey
-                                });
+                                if (!items.some(item => item.cacheKey === choiceCacheKey)) {
+                                    items.push({
+                                        type: 'choice',
+                                        id: `current_choice_${i}`,
+                                        value: choice,
+                                        cacheKey: choiceCacheKey,
+                                        mandatory: true
+                                    });
+                                }
                             }
                         }
                     }
@@ -751,18 +1515,70 @@ export default {
                         uniqueMap.set(item.cacheKey, item);
                     }
                 }
-                const uniqueItems = Array.from(uniqueMap.values());
+                const uniqueItemsRaw = Array.from(uniqueMap.values());
+
+                const mandatoryCacheKeys = new Set();
+                if (normalizedCurrentText) {
+                    mandatoryCacheKeys.add(this.getCacheKey(normalizedCurrentText, 'text'));
+                }
+                if (normalizedCurrentSpeaker) {
+                    mandatoryCacheKeys.add(this.getCacheKey(normalizedCurrentSpeaker, 'speaker'));
+                }
+                if ($gameMessage && $gameMessage.isChoice && $gameMessage.isChoice()) {
+                    const currentChoices = $gameMessage._translateOriginalChoices || $gameMessage.choices();
+                    if (Array.isArray(currentChoices)) {
+                        for (const choice of currentChoices) {
+                            mandatoryCacheKeys.add(this.getCacheKey(choice, 'choice'));
+                        }
+                    }
+                }
+
+                const mandatoryItems = [];
+                const optionalItems = [];
+                for (const item of uniqueItemsRaw) {
+                    if (item.mandatory || mandatoryCacheKeys.has(item.cacheKey)) {
+                        mandatoryItems.push(item);
+                    } else {
+                        optionalItems.push(item);
+                    }
+                }
+
+                const maxItems = this.batchItemsLimit || 20;
+                const maxChars = this.charLimit || 1000;
+                const uniqueItems = [];
+                let charsUsed = 0;
+
+                for (const item of mandatoryItems) {
+                    uniqueItems.push(item);
+                    charsUsed += (item.value || '').length;
+                }
+
+                for (const item of optionalItems) {
+                    if (uniqueItems.length >= maxItems) {
+                        break;
+                    }
+
+                    const nextLen = (item.value || '').length;
+                    if ((charsUsed + nextLen) > maxChars) {
+                        break;
+                    }
+
+                    uniqueItems.push(item);
+                    charsUsed += nextLen;
+                }
 
                 // Mark as pending (all uncached, including duplicates)
-                for (const item of uncached) {
+                pendingKeys = new Set();
+                for (const item of uniqueItems) {
                     this.pendingTranslations.set(item.cacheKey, true);
+                    pendingKeys.add(item.cacheKey);
                 }
 
                 console.log(`[TranslateOnTheFly] Batch translating ${uniqueItems.length} items (${uniqueItems.filter(i => i.type === 'text').length} texts, ${uniqueItems.filter(i => i.type === 'speaker').length} speakers, ${uniqueItems.filter(i => i.type === 'choice').length} choices)`);
 
                 // Batch translate via engine (only unique items)
                 this.showSpinner();
-                const result = await this.engine.batchTranslate(uniqueItems);
+                const result = await this.engine.batchTranslate(uniqueItems, { backgroundJob: false });
                 this.hideSpinner();
 
                 // Apply successes to cache
@@ -788,7 +1604,7 @@ export default {
                         this.saveSettings();
                     } else {
                         // Translation failed, show original
-                        this.replaceMessageText(currentText);
+                        this.replaceMessageText(normalizedCurrentText || currentText || '');
                         this._translationApplied = true;
                     }
                 }
@@ -811,13 +1627,15 @@ export default {
                 if (cacheKey) {
                     this.failedTranslations.set(cacheKey, Date.now());
                 }
-                this.replaceMessageText(currentText);
+                this.replaceMessageText(currentText || '');
                 this._translationApplied = true;
             } finally {
                 this.hideSpinner();
                 // Clear pending flags
-                for (const key of this.pendingTranslations.keys()) {
-                    this.pendingTranslations.delete(key);
+                if (pendingKeys) {
+                    for (const key of pendingKeys) {
+                        this.pendingTranslations.delete(key);
+                    }
                 }
             }
         },
@@ -827,8 +1645,6 @@ export default {
             this.saveSettings();
             if (this.enabled) {
                 console.log('[TranslateOnTheFly] Translation enabled');
-                // Start background translation of items and skills
-                this.startBackgroundTranslation();
             } else {
                 console.log('[TranslateOnTheFly] Translation disabled');
             }
@@ -876,12 +1692,6 @@ export default {
             
             // Don't clear cache - keys contain engine name, so they don't conflict
             this.saveSettings();
-
-            // If background translation was waiting for full config, try starting it now
-            if (this.translateGameObjects && this.isTranslationEnabled() && this.isEngineFullyConfigured()) {
-                console.log('[TranslateOnTheFly] Engine now fully configured, starting background translation');
-                this.startBackgroundTranslation();
-            }
         },
 
         onChangeTextWrapping() {
@@ -1066,6 +1876,7 @@ export default {
                     
                     // If translation is pending, keep blocking
                     if (allowTranslation && (
+                        self.isForegroundDialogBatchActive() ||
                         (cacheKey && self.pendingTranslations.has(cacheKey)) ||
                         (hasChoices && choiceCacheKeys.some(key => self.pendingTranslations.has(key)))
                     )) {
@@ -1093,12 +1904,13 @@ export default {
                         const maxDepth = self.tryTranslateAhead ? 999 : 0; // 0 = only current message, 999 = scan ahead
                         const logPrefix = maxDepth > 0 ? 'ahead translation batch' : 'translation';
                         console.log(`[TranslateOnTheFly] Starting 01 ${logPrefix} for:`, originalText.substring(0, 50));
-                        
-                        self.startAheadTranslation({
+
+                        self.requestForegroundDialogBatch({
                             currentText: originalText,
                             currentSpeakerName: originalSpeakerName,
                             cacheKey,
-                            maxDepth
+                            maxDepth,
+                            sourceTrigger: 'Starting 01'
                         });
                     }
 
@@ -1140,11 +1952,12 @@ export default {
                         const logPrefix = maxDepth > 0 ? 'ahead translation batch for choices' : 'translation for choices';
                         console.log(`[TranslateOnTheFly] Starting 02 ${logPrefix}`);
 
-                        self.startAheadTranslation({
+                        self.requestForegroundDialogBatch({
                             currentText: originalText || '',
                             currentSpeakerName: originalSpeakerName,
                             cacheKey: cacheKey || self.getCacheKey(originalText || '', 'text'),
-                            maxDepth
+                            maxDepth,
+                            sourceTrigger: 'Starting 02'
                         });
                     }
 
@@ -1172,39 +1985,16 @@ export default {
                         }
                     }
 
-                    // Start translation for speaker name if needed
+                    // Start translation for speaker via unified foreground batch path.
                     if (allowTranslation && hasSpeakerName && !speakerReady) {
-                        if (self.tryTranslateAhead) {
-                            return false; // ahead batch will handle speaker
-                        }
-
-                        if (self.pendingTranslations.has(speakerKey)) {
-                            return false; // wait for speaker translation already pending
-                        }
-
-                        console.log('[TranslateOnTheFly] Starting speaker translation for:', originalSpeakerName.substring(0, 50));
-                        self.pendingTranslations.set(speakerKey, true);
-
-                        self.translateSpeakerName(originalSpeakerName)
-                            .then(translatedSpeaker => {
-                                const safeSpeaker = translatedSpeaker || originalSpeakerName;
-                                // Only cache if translated (different from original)
-                                if (translatedSpeaker && translatedSpeaker !== originalSpeakerName) {
-                                    self.setCacheValue(speakerKey, safeSpeaker);
-                                } else {
-                                    // Do not cache original speaker on failure/no-change
-                                    self.failedTranslations.set(speakerKey, Date.now());
-                                }
-                                self.replaceSpeakerName(safeSpeaker);
-                            })
-                            .catch(error => {
-                                console.error('[TranslateOnTheFly] Speaker translation error:', error);
-                                // Never cache original on error; mark failed for cooldown
-                                self.failedTranslations.set(speakerKey, Date.now());
-                            })
-                            .finally(() => {
-                                self.pendingTranslations.delete(speakerKey);
-                            });
+                        const maxDepth = self.tryTranslateAhead ? 999 : 0;
+                        self.requestForegroundDialogBatch({
+                            currentText: originalText || '',
+                            currentSpeakerName: originalSpeakerName,
+                            cacheKey: cacheKey || self.getCacheKey(originalText || '', 'text'),
+                            maxDepth,
+                            sourceTrigger: 'speaker'
+                        });
                     }
                     
                     // Block start until all translations are done
@@ -1283,6 +2073,7 @@ export default {
                 const translationEnabled = self.isTranslationEnabled();
                 const skipping = self.isSkippingMessages();
                 const allowTranslation = translationEnabled && !skipping;
+                const useCacheOnly = (translationEnabled && skipping) || (!translationEnabled && self.translateCacheWhenDisabled);
 
                 const originalText = $gameMessage._translateOriginalText || $gameMessage.allText();
                 const hasText = !!(originalText && originalText.trim().length > 0);
@@ -1290,6 +2081,10 @@ export default {
                 const originalSpeakerName = $gameMessage._translateOriginalSpeaker || $gameMessage._speakerName || '';
 
                 if (allowTranslation) {
+                    if (self.isForegroundDialogBatchActive()) {
+                        return false;
+                    }
+
                     // Block input if main text translation is still pending or missing
                     if (hasText && textKey) {
                         if (self.pendingTranslations.has(textKey)) {
@@ -1303,10 +2098,19 @@ export default {
                     }
                 }
 
-                if (translationEnabled && $gameMessage.isChoice()) {
+                if ((translationEnabled || useCacheOnly) && $gameMessage.isChoice()) {
                     const choices = $gameMessage.choices();
                     const originalChoices = $gameMessage._translateOriginalChoices || choices;
                     const choiceKeys = originalChoices.map(choice => self.getCacheKey(choice, 'choice'));
+
+                    if (useCacheOnly) {
+                        const translatedChoices = originalChoices.map((choice, idx) => {
+                            const key = choiceKeys[idx];
+                            return self.translationCache.get(key) || choice;
+                        });
+                        self.replaceChoiceText(translatedChoices);
+                        return Window_Message.prototype._originalStartInput.call(this);
+                    }
 
                     // If choices translation is pending, wait
                     if (allowTranslation && choiceKeys.some(key => self.pendingTranslations.has(key))) {
@@ -1340,11 +2144,12 @@ export default {
                             const logPrefix = maxDepth > 0 ? 'ahead translation batch for choices (startInput fallback)' : 'translation for choices (startInput fallback)';
                             console.log(`[TranslateOnTheFly] Starting 03 ${logPrefix}`);
 
-                            self.startAheadTranslation({
+                            self.requestForegroundDialogBatch({
                                 currentText: originalText || '',
                                 currentSpeakerName: originalSpeakerName,
                                 cacheKey: textKey || self.getCacheKey(originalText || '', 'text'),
-                                maxDepth
+                                maxDepth,
+                                sourceTrigger: 'Starting 03'
                             });
                         }
 
@@ -2150,7 +2955,8 @@ export default {
             }
         },
 
-        async translateGameArrays() {
+        async translateGameArrays(options = {}) {
+            const isBackgroundJob = !!options.backgroundJob;
             console.log('[TranslateOnTheFly] Starting translation of game data arrays');
 
             if (!this.isTranslationEnabled()) {
@@ -2257,7 +3063,10 @@ export default {
                 for (const batch of batches) {
                     try {
                         this.showSpinner();
-                        const result = await this.engine.batchTranslate(batch.map(b => ({ type: b.type, id: b.id, value: b.value, cacheKey: b.cacheKey })));
+                        const batchItems = batch.map(b => ({ type: b.type, id: b.id, value: b.value, cacheKey: b.cacheKey }));
+                        const result = isBackgroundJob
+                            ? await this.batchTranslateWithBackgroundRetry(batchItems, 'game arrays')
+                            : await this.engine.batchTranslate(batchItems, { backgroundJob: false });
                         this.hideSpinner();
 
                         // For each success, store translation under all associated types (create keys per type)
@@ -2491,56 +3300,56 @@ export default {
                 // Translate items
                 for (let i = 0; i < itemsToTranslate.length; i += BATCH_SIZE) {
                     const batch = itemsToTranslate.slice(i, i + BATCH_SIZE);
-                    await this.translateDataBatch(batch, ['name', 'description'], 'item');
+                    await this.translateDataBatch(batch, ['name', 'description'], 'item', { backgroundJob: true });
                     console.log(`[TranslateOnTheFly] Translated items batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(itemsToTranslate.length / BATCH_SIZE)}`);
                 }
 
                 // Translate classes
                 for (let i = 0; i < classesToTranslate.length; i += BATCH_SIZE) {
                     const batch = classesToTranslate.slice(i, i + BATCH_SIZE);
-                    await this.translateDataBatch(batch, ['name'], 'class');
+                    await this.translateDataBatch(batch, ['name'], 'class', { backgroundJob: true });
                     console.log(`[TranslateOnTheFly] Translated classes batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(classesToTranslate.length / BATCH_SIZE)}`);
                 }
 
                 // Translate enemies
                 for (let i = 0; i < enemiesToTranslate.length; i += BATCH_SIZE) {
                     const batch = enemiesToTranslate.slice(i, i + BATCH_SIZE);
-                    await this.translateDataBatch(batch, ['name'], 'enemy');
+                    await this.translateDataBatch(batch, ['name'], 'enemy', { backgroundJob: true });
                     console.log(`[TranslateOnTheFly] Translated enemies batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(enemiesToTranslate.length / BATCH_SIZE)}`);
                 }
 
                 // Translate skills
                 for (let i = 0; i < skillsToTranslate.length; i += BATCH_SIZE) {
                     const batch = skillsToTranslate.slice(i, i + BATCH_SIZE);
-                    await this.translateDataBatch(batch, ['name', 'description', 'message1', 'message2'], 'skill');
+                    await this.translateDataBatch(batch, ['name', 'description', 'message1', 'message2'], 'skill', { backgroundJob: true });
                     console.log(`[TranslateOnTheFly] Translated skills batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(skillsToTranslate.length / BATCH_SIZE)}`);
                 }
 
                 // Translate armors
                 for (let i = 0; i < armorsToTranslate.length; i += BATCH_SIZE) {
                     const batch = armorsToTranslate.slice(i, i + BATCH_SIZE);
-                    await this.translateDataBatch(batch, ['name', 'description'], 'armor');
+                    await this.translateDataBatch(batch, ['name', 'description'], 'armor', { backgroundJob: true });
                     console.log(`[TranslateOnTheFly] Translated armors batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(armorsToTranslate.length / BATCH_SIZE)}`);
                 }
 
                 // Translate weapons
                 for (let i = 0; i < weaponsToTranslate.length; i += BATCH_SIZE) {
                     const batch = weaponsToTranslate.slice(i, i + BATCH_SIZE);
-                    await this.translateDataBatch(batch, ['name', 'description'], 'weapon');
+                    await this.translateDataBatch(batch, ['name', 'description'], 'weapon', { backgroundJob: true });
                     console.log(`[TranslateOnTheFly] Translated weapons batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(weaponsToTranslate.length / BATCH_SIZE)}`);
                 }
 
                 // Translate maps
                 for (let i = 0; i < mapsToTranslate.length; i += BATCH_SIZE) {
                     const batch = mapsToTranslate.slice(i, i + BATCH_SIZE);
-                    await this.translateDataBatch(batch, ['name'], 'map');
+                    await this.translateDataBatch(batch, ['name'], 'map', { backgroundJob: true });
                     console.log(`[TranslateOnTheFly] Translated maps batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(mapsToTranslate.length / BATCH_SIZE)}`);
                 }
 
                 // Translate actors
                 for (let i = 0; i < actorsToTranslate.length; i += BATCH_SIZE) {
                     const batch = actorsToTranslate.slice(i, i + BATCH_SIZE);
-                    await this.translateDataBatch(batch, ['name', 'nickname', 'profile'], 'actor');
+                    await this.translateDataBatch(batch, ['name', 'nickname', 'profile'], 'actor', { backgroundJob: true });
                     console.log(`[TranslateOnTheFly] Translated actors batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(actorsToTranslate.length / BATCH_SIZE)}`);
                 }
 
@@ -2556,7 +3365,7 @@ export default {
                                 if (!this.translationCache.has(gtKey)) {
                                     try {
                                         this.showSpinner();
-                                        const res = await this.engine.batchTranslate([{ type: 'gameTitle', id: 'sys_gameTitle', value: originalTitle, cacheKey: gtKey }]);
+                                        const res = await this.batchTranslateWithBackgroundRetry([{ type: 'gameTitle', id: 'sys_gameTitle', value: originalTitle, cacheKey: gtKey }], 'gameTitle');
                                         this.hideSpinner();
                                         if (res.successes && res.successes.length > 0) {
                                             this.setCacheValue(gtKey, res.successes[0].translated);
@@ -2642,7 +3451,7 @@ export default {
                             for (const b of messageBatches) {
                                 try {
                                     this.showSpinner();
-                                    const res = await this.engine.batchTranslate(b.map(x => ({ type: x.type, id: x.id, value: x.value, cacheKey: x.cacheKey })));
+                                    const res = await this.batchTranslateWithBackgroundRetry(b.map(x => ({ type: x.type, id: x.id, value: x.value, cacheKey: x.cacheKey })), 'system messages background');
                                     this.hideSpinner();
 
                                     for (const s of res.successes) {
@@ -2672,7 +3481,7 @@ export default {
                     console.error('[TranslateOnTheFly] system messages handling error', err);
                 }
 
-                await this.translateGameArrays();
+                await this.translateGameArrays({ backgroundJob: true });
 
                 console.log('[TranslateOnTheFly] Background translation completed', $dataSystem);
             } catch (error) {
@@ -2705,7 +3514,7 @@ export default {
             return false; // All fields are cached or empty
         },
 
-        async translateDataBatch(dataObjects, fields, type) {
+        async translateDataBatch(dataObjects, fields, type, options = {}) {
             const items = [];
 
             // Collect all fields that need translation
@@ -2733,12 +3542,14 @@ export default {
             }
 
             if (items.length === 0) {
-                return; // Nothing to translate
+                return { successes: 0, failures: 0 }; // Nothing to translate
             }
 
             // Batch translate
             try {
-                const result = await this.engine.batchTranslate(items);
+                const result = options.backgroundJob
+                    ? await this.batchTranslateWithBackgroundRetry(items, `${type} data batch`)
+                    : await this.engine.batchTranslate(items, { backgroundJob: false });
 
                 // Apply translations to cache and data objects
                 for (const success of result.successes) {
@@ -2768,8 +3579,16 @@ export default {
                     }
                 }
 
+                return {
+                    successes: result.successes.length,
+                    failures: result.failures.length
+                };
             } catch (error) {
                 console.error('[TranslateOnTheFly] Data batch translation error:', error);
+                return {
+                    successes: 0,
+                    failures: items.length
+                };
             }
         },
 

@@ -68,7 +68,9 @@ export default {
         <div
             :style="'width: calc(100% - ' + navWidth + 'px - 1px);'"
             class="fill-height d-inline pa-2 overflow-y-auto hide-scrollbar">
-            <component :is="currentComponentName"></component>
+            <keep-alive>
+                <component :is="currentComponentName"></component>
+            </keep-alive>
         </div>
     </v-row>
 </v-card>

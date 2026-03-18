@@ -22,6 +22,7 @@ export function createEngine(engineId, panel) {
             return new DatpmtEngine(panel);
         case 'libretranslate':
             return new LibreTranslateEngine(panel);
+        case 'openApi':
         case 'gpt4all':
         case 'ai':
             return new AIEngine(panel);
@@ -39,7 +40,7 @@ export function getAvailableEngines() {
         { value: 'mymemory', text: 'MyMemory' },
         { value: 'datpmt', text: 'Datpmt' },
         { value: 'libretranslate', text: 'LibreTranslate' },
-        { value: 'gpt4all', text: 'AI Engine' },
+        { value: 'openApi', text: 'AI Engine' },
         { value: 'dummy', text: 'Dummy' }
     ];
 }

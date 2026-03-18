@@ -721,6 +721,56 @@ export class MessageCheat {
         }
     }
 
+    static openObjectTranslationModal () {
+        try {
+            console.log('[TOF-DEBUG][MessageCheat] openObjectTranslationModal invoked', {
+                hasPanel: !!window.__TranslateOnTheFlyPanel,
+                hasOpenFn: !!(window.__TranslateOnTheFlyPanel && typeof window.__TranslateOnTheFlyPanel.openObjectTranslationModal === 'function')
+            })
+            const panel = window.__TranslateOnTheFlyPanel
+            if (panel && typeof panel.openObjectTranslationModal === 'function') {
+                console.log('[TOF-DEBUG][MessageCheat] panel exists -> opening modal directly')
+                panel.openObjectTranslationModal()
+                return
+            }
+
+            window.__TOF_OPEN_OBJECT_TRANSLATION_MODAL__ = true
+            console.log('[TOF-DEBUG][MessageCheat] panel missing -> setting deferred flag and opening cheat modal tab')
+
+            // Panel component is lazily mounted; open cheat modal on Translate On The Fly tab first
+            if (typeof GeneralCheat.openCheatModal === 'function') {
+                GeneralCheat.openCheatModal('translate-on-the-fly-panel')
+            }
+
+            const startedAt = Date.now()
+            const retryTimer = setInterval(() => {
+                const nextPanel = window.__TranslateOnTheFlyPanel
+                console.log('[TOF-DEBUG][MessageCheat] waiting for panel mount', {
+                    elapsedMs: Date.now() - startedAt,
+                    hasPanel: !!nextPanel,
+                    hasOpenFn: !!(nextPanel && typeof nextPanel.openObjectTranslationModal === 'function')
+                })
+                if (nextPanel && typeof nextPanel.openObjectTranslationModal === 'function') {
+                    clearInterval(retryTimer)
+                    window.__TOF_OPEN_OBJECT_TRANSLATION_MODAL__ = false
+                    console.log('[TOF-DEBUG][MessageCheat] panel mounted -> opening modal now')
+                    nextPanel.openObjectTranslationModal()
+                    return
+                }
+
+                if (Date.now() - startedAt > 4000) {
+                    clearInterval(retryTimer)
+                    console.warn('[MessageCheat] TranslateOnTheFlyPanel not available after opening modal')
+                    console.warn('[TOF-DEBUG][MessageCheat] timeout waiting for panel mount')
+                    Alert.error('Translation panel not initialized')
+                }
+            }, 100)
+        } catch (err) {
+            console.error('[MessageCheat] Failed to open object translation modal', err)
+            Alert.error('Failed to open object translation modal: ' + err.message)
+        }
+    }
+
     static logCurrentMessage () {
         try {
             if (!$gameMessage || typeof $gameMessage.allText !== 'function') {

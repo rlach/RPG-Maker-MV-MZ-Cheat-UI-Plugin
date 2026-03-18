@@ -102,6 +102,10 @@ const defaultShortcutSettings = {
         shortcut: 'alt shift m'
     },
 
+    openObjectTranslationModal: {
+        shortcut: 'alt shift t'
+    },
+
     openDevTool: {
         shortcut: 'f12'
     }
@@ -350,6 +354,14 @@ const shortcutConfig = {
         }
     },
 
+    openObjectTranslationModal: {
+        name: 'Open object translation modal',
+        desc: 'Select and start background translation for game objects',
+        enterAction () {
+            MessageCheat.openObjectTranslationModal()
+        }
+    },
+
     openDevTool: {
         name: 'Open dev tool',
         desc: 'Open Chromium dev tool',
@@ -500,11 +512,32 @@ class GlobalShortcut {
     }
 
     initializeShortcutMap () {
+        let migrated = false
+        const defaultSettings = parseStringToKeyObject(defaultShortcutSettings)
+
         for (const shortcutConfig of Object.values(this.shortcutConfig)) {
-            const shortcutSetting = this.shortcutSettings[shortcutConfig.id]
+            let shortcutSetting = this.shortcutSettings[shortcutConfig.id]
+
+            if (!shortcutSetting) {
+                shortcutSetting = defaultSettings[shortcutConfig.id]
+
+                if (!shortcutSetting) {
+                    shortcutSetting = {
+                        shortcut: Key.createEmpty(),
+                        param: {}
+                    }
+                }
+
+                this.shortcutSettings[shortcutConfig.id] = shortcutSetting
+                migrated = true
+            }
 
             this.shortcutMap.register(shortcutSetting.shortcut, shortcutConfig,
                 shortcutConfig.getEnterAction(shortcutSetting), shortcutConfig.getRepeatAction(shortcutSetting), shortcutConfig.getLeaveAction(shortcutSetting))
+        }
+
+        if (migrated) {
+            this.writeShortcutSettings()
         }
     }
 
