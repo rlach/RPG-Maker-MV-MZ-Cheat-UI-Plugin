@@ -2,6 +2,7 @@ import { Alert } from '../js/AlertHelper.js';
 import { MessageCheat, GeneralCheat } from '../js/CheatHelper.js';
 import { KeyValueStorage } from '../js/KeyValueStorage.js';
 import { TranslateOnTheFlyState } from '../js/TranslateOnTheFlyState.js';
+import { ensureTranslateCacheRuntime, notifyTranslateCacheRuntimeChanged } from '../js/TranslateCacheRuntime.js';
 import { AIEngine, createEngine, getAvailableEngines } from '../translate-engines/index.js';
 
 export default {
@@ -337,8 +338,9 @@ export default {
     created() {
         this.kvStorage = new KeyValueStorage('./www/cheat-settings/translate-on-the-fly.json');
         this.cacheStorage = new KeyValueStorage('./www/cheat-settings/translate-cache.json');
-        this.translationCache = window.__TranslateOnTheFlyCache || new Map();
-        window.__TranslateOnTheFlyCache = this.translationCache;
+        const runtime = ensureTranslateCacheRuntime(window.__TranslateOnTheFlyCache || new Map());
+        this.translationCache = runtime.cache;
+        this.lastSeenByCacheKey = runtime.lastSeenByCacheKey;
         this.pendingTranslations = new Map();
         this.failedTranslations = new Map(); // Track failed translation attempts to prevent retry spam
         this.translationInProgress = false;
@@ -529,6 +531,7 @@ export default {
         onChangeCacheOnly() {
             // When real-time is enabled, this flag is ignored; still persist for when disabled later
             this.saveSettings();
+            this.notifyCacheRuntime('settings-cache-only');
         },
 
         onChangeTryTranslateAhead() {
@@ -1337,7 +1340,7 @@ export default {
                 
                 // Check cache first - skip cached items (don't add to translation)
                 const cacheKey = this.getCacheKey(value, type);
-                if (!force && this.translationCache.has(cacheKey)) {
+                if (!force && this.hasUsableCacheValue(cacheKey)) {
                     return true; // Skip cached, continue
                 }
 
@@ -1473,7 +1476,7 @@ export default {
                         for (let i = 0; i < currentChoices.length; i++) {
                             const choice = currentChoices[i];
                             const choiceCacheKey = this.getCacheKey(choice, 'choice');
-                            if (!this.translationCache.has(choiceCacheKey)) {
+                            if (!this.hasUsableCacheValue(choiceCacheKey)) {
                                 if (!items.some(item => item.cacheKey === choiceCacheKey)) {
                                     items.push({
                                         type: 'choice',
@@ -1493,7 +1496,7 @@ export default {
                 }
 
                 // Filter out items already in cache
-                const uncached = items.filter(item => !this.translationCache.has(item.cacheKey));
+                const uncached = items.filter(item => !this.hasUsableCacheValue(item.cacheKey));
                 
                 if (uncached.length === 0) {
                     // All items cached, apply current text immediately
@@ -1590,6 +1593,9 @@ export default {
                 for (const failure of result.failures) {
                     console.warn(`[TranslateOnTheFly] Failed to translate ${failure.type}:`, failure.value, '→', failure.rejectReason);
                     this.failedTranslations.set(failure.cacheKey, Date.now());
+                    if (this.isRealtimeTrackableType(failure.type)) {
+                        this.setCacheValue(failure.cacheKey, '');
+                    }
                 }
 
                 // Apply the current text (now hopefully cached)
@@ -1643,6 +1649,7 @@ export default {
         onChangeEnabled() {
             TranslateOnTheFlyState.setEnabled(this.enabled);
             this.saveSettings();
+            this.notifyCacheRuntime('settings-enabled');
             if (this.enabled) {
                 console.log('[TranslateOnTheFly] Translation enabled');
             } else {
@@ -1653,11 +1660,13 @@ export default {
         onChangeSourceLang() {
             // Don't clear cache - keys contain source/target lang, so they don't conflict
             this.saveSettings();
+            this.notifyCacheRuntime('settings-language');
         },
 
         onChangeTargetLang() {
             // Don't clear cache - keys contain source/target lang, so they don't conflict
             this.saveSettings();
+            this.notifyCacheRuntime('settings-language');
         },
         onChangeTranslationEngine() {
             // Save current engine's configuration before switching
@@ -1723,9 +1732,112 @@ export default {
 
         clearCache() {
             const count = this.translationCache.size;
+            const seenCount = this.lastSeenByCacheKey ? this.lastSeenByCacheKey.size : 0;
             this.translationCache.clear();
+            if (this.lastSeenByCacheKey) {
+                this.lastSeenByCacheKey.clear();
+            }
             this.persistCache();
-            console.log(`[TranslateOnTheFly] Cleared ${count} cached translations`);
+            this.notifyCacheRuntime('cache-cleared');
+            console.log(`[TranslateOnTheFly] Cleared ${count} cached translations and ${seenCount} seen timestamps`);
+        },
+
+        shouldTrackRealtimeCacheUsage() {
+            return this.isTranslationEnabled() || !!this.translateCacheWhenDisabled;
+        },
+
+        isRealtimeTrackableType(type) {
+            return type === 'text' || type === 'choice';
+        },
+
+        isTranslatedCacheValue(value) {
+            if (typeof value !== 'string') {
+                return value !== null && value !== undefined;
+            }
+
+            return value !== '';
+        },
+
+        hasUsableCacheValue(cacheKey) {
+            if (!cacheKey || !this.translationCache || !this.translationCache.has(cacheKey)) {
+                return false;
+            }
+
+            return this.isTranslatedCacheValue(this.translationCache.get(cacheKey));
+        },
+
+        getCacheKeyType(cacheKey) {
+            if (typeof cacheKey !== 'string') {
+                return '';
+            }
+
+            const idx = cacheKey.indexOf(':');
+            if (idx <= 0) {
+                return '';
+            }
+
+            return cacheKey.slice(0, idx);
+        },
+
+        ensureRealtimeTrackedCacheEntry(value, type) {
+            if (!this.shouldTrackRealtimeCacheUsage() || !this.isRealtimeTrackableType(type)) {
+                return null;
+            }
+
+            if (typeof value !== 'string' || value.trim() === '') {
+                return null;
+            }
+
+            const cacheKey = this.getCacheKey(value, type);
+            if (!this.translationCache.has(cacheKey)) {
+                this.setCacheValue(cacheKey, '');
+            }
+
+            return cacheKey;
+        },
+
+        markCacheKeySeen(cacheKey, type = null) {
+            if (!this.shouldTrackRealtimeCacheUsage() || !this.lastSeenByCacheKey) {
+                return;
+            }
+
+            const resolvedType = type || this.getCacheKeyType(cacheKey);
+            if (!this.isRealtimeTrackableType(resolvedType)) {
+                return;
+            }
+
+            this.lastSeenByCacheKey.set(cacheKey, Date.now());
+            this.notifyCacheRuntime('seen-updated', cacheKey);
+        },
+
+        touchRealtimeEntry(value, type) {
+            const cacheKey = this.ensureRealtimeTrackedCacheEntry(value, type);
+            if (cacheKey) {
+                this.markCacheKeySeen(cacheKey, type);
+            }
+
+            return cacheKey;
+        },
+
+        deleteCacheValue(cacheKey, options = {}) {
+            if (!cacheKey || !this.translationCache.has(cacheKey)) {
+                return;
+            }
+
+            this.translationCache.delete(cacheKey);
+            if (options.deleteSeen !== false && this.lastSeenByCacheKey) {
+                this.lastSeenByCacheKey.delete(cacheKey);
+            }
+            if (options.persist !== false) {
+                this.persistCache();
+            }
+            if (options.notify !== false) {
+                this.notifyCacheRuntime('cache-delete', cacheKey);
+            }
+        },
+
+        notifyCacheRuntime(reason = 'unknown', key = null) {
+            notifyTranslateCacheRuntimeChanged(reason, key);
         },
 
         isTranslationEnabled() {
@@ -1748,6 +1860,7 @@ export default {
             TranslateOnTheFlyState.setEnabled(enabled);
             this.enabled = enabled;
             this.saveSettings();
+            this.notifyCacheRuntime('settings-enabled');
 
             if (notify) {
                 Alert.success(`Real-time translation: ${enabled ? 'enabled' : 'disabled'}`);
@@ -1800,7 +1913,7 @@ export default {
                 const cacheKey = hasText ? self.getCacheKey(originalText, 'text') : null;
                 const choices = ($gameMessage.choices && $gameMessage.choices()) || [];
                 const originalChoices = $gameMessage._translateOriginalChoices || choices;
-                const hasChoices = Array.isArray(choices) && choices.length > 0;
+                const hasChoices = Array.isArray(originalChoices) && originalChoices.length > 0;
                 const choiceCacheKeys = hasChoices ? originalChoices.map(choice => self.getCacheKey(choice, 'choice')) : [];
 
                 const originalSpeakerName = $gameMessage._translateOriginalSpeaker || $gameMessage._speakerName || '';
@@ -1816,9 +1929,20 @@ export default {
                     self.setCacheValue(speakerKey, legacyValue);
                 }
 
-                const textReady = !hasText || (cacheKey && self.translationCache.has(cacheKey));
-                const choicesReady = !hasChoices || choiceCacheKeys.every(key => self.translationCache.has(key));
-                const speakerReady = !hasSpeakerName || self.translationCache.has(speakerKey);
+                if (self.shouldTrackRealtimeCacheUsage()) {
+                    if (hasText) {
+                        self.touchRealtimeEntry(originalText, 'text');
+                    }
+                    if (hasChoices) {
+                        for (const choice of originalChoices) {
+                            self.touchRealtimeEntry(choice, 'choice');
+                        }
+                    }
+                }
+
+                const textReady = !hasText || (cacheKey && self.hasUsableCacheValue(cacheKey));
+                const choicesReady = !hasChoices || choiceCacheKeys.every(key => self.hasUsableCacheValue(key));
+                const speakerReady = !hasSpeakerName || self.hasUsableCacheValue(speakerKey);
 
                 if (useCacheOnly) {
                     if (!this._translationApplied && hasText && textReady) {
@@ -2048,7 +2172,7 @@ export default {
                 const choiceKeys = this._translateOriginalChoices.map(choice => self.getCacheKey(choice, 'choice'));
 
                 // If all choices already cached, replace immediately
-                if (choiceKeys.length > 0 && choiceKeys.every(key => self.translationCache.has(key))) {
+                if (choiceKeys.length > 0 && choiceKeys.every(key => self.hasUsableCacheValue(key))) {
                     const translated = this._translateOriginalChoices.map((choice, idx) => {
                         const key = choiceKeys[idx];
                         return self.translationCache.get(key) || choice;
@@ -2092,7 +2216,7 @@ export default {
                         }
 
                         // If translation already applied on this window, allow
-                        if (!this._translationApplied && !self.translationCache.has(textKey)) {
+                        if (!this._translationApplied && !self.hasUsableCacheValue(textKey)) {
                             return false; // text not translated/applied yet
                         }
                     }
@@ -2133,7 +2257,7 @@ export default {
 
                     // Choices should already be translated from main batch
                     // If not cached by now, something went wrong - use originals
-                    const choicesReady = choiceKeys.length === 0 || choiceKeys.every(key => self.translationCache.has(key));
+                    const choicesReady = choiceKeys.length === 0 || choiceKeys.every(key => self.hasUsableCacheValue(key));
                     if (!choicesReady && allowTranslation) {
                         console.warn('[TranslateOnTheFly] Choices not in cache (should have been translated with text)');
                         self.replaceChoiceText(originalChoices);
@@ -2391,8 +2515,10 @@ export default {
         },
 
         setCacheValue(key, value) {
-            this.translationCache.set(key, value);
+            const normalizedValue = typeof value === 'string' ? value : (value === null || value === undefined ? '' : String(value));
+            this.translationCache.set(key, normalizedValue);
             this.persistCache();
+            this.notifyCacheRuntime('cache-set', key);
         },
 
         loadCacheFromDisk() {
@@ -2404,18 +2530,23 @@ export default {
                 const entries = JSON.parse(json);
                 if (Array.isArray(entries)) {
                     if (!this.translationCache) {
-                        this.translationCache = new Map();
-                        window.__TranslateOnTheFlyCache = this.translationCache;
+                        const runtime = ensureTranslateCacheRuntime(new Map());
+                        this.translationCache = runtime.cache;
+                        this.lastSeenByCacheKey = runtime.lastSeenByCacheKey;
                     }
                     this.translationCache.clear();
                     for (const [k, v] of entries) {
-                        this.translationCache.set(k, v);
+                        const normalizedValue = typeof v === 'string' ? v : (v === null || v === undefined ? '' : String(v));
+                        this.translationCache.set(k, normalizedValue);
                     }
+                    this.notifyCacheRuntime('cache-loaded');
                 }
             } catch (error) {
                 console.warn('[TranslateOnTheFly] Failed to load cache, starting fresh', error);
-                this.translationCache = new Map();
-                window.__TranslateOnTheFlyCache = this.translationCache;
+                const runtime = ensureTranslateCacheRuntime(new Map());
+                this.translationCache = runtime.cache;
+                this.lastSeenByCacheKey = runtime.lastSeenByCacheKey;
+                this.notifyCacheRuntime('cache-load-failed-reset');
             }
         },
 
@@ -3669,8 +3800,10 @@ export default {
 
                 // Clear cache for these items to force re-translation
                 for (const item of items) {
-                    this.translationCache.delete(item.cacheKey);
+                    this.deleteCacheValue(item.cacheKey, { persist: false, notify: false, deleteSeen: false });
                 }
+                this.persistCache();
+                this.notifyCacheRuntime('cache-force-retranslate');
 
                 // Translate using batch
                 this.showSpinner();
@@ -3690,6 +3823,9 @@ export default {
                 // Log failures
                 for (const failure of result.failures) {
                     console.warn(`[TranslateOnTheFly] Failed to translate ${failure.type}:`, failure.value, '→', failure.rejectReason);
+                    if (this.isRealtimeTrackableType(failure.type)) {
+                        this.setCacheValue(failure.cacheKey, '');
+                    }
                 }
 
                 // Apply translations
@@ -3897,6 +4033,33 @@ export default {
                 // Collect all items to translate from all events
                 const itemsToTranslate = [];
 
+                const pushMapTextItem = (rawText, eventIdx, pageIdx, cmdIdx) => {
+                    if (typeof rawText !== 'string') {
+                        return;
+                    }
+
+                    // Keep original spacing intact for cache key and translation payload.
+                    if (rawText.trim() === '') {
+                        return;
+                    }
+
+                    const cacheKey = this.getCacheKey(rawText, 'text');
+                    if (this.translationCache.has(cacheKey)) {
+                        return;
+                    }
+
+                    itemsToTranslate.push({
+                        type: 'text',
+                        id: `map_${eventIdx}_${pageIdx}_text_${totalMessages}`,
+                        value: rawText,
+                        cacheKey: cacheKey,
+                        eventIdx: eventIdx,
+                        pageIdx: pageIdx,
+                        cmdIdx: cmdIdx
+                    });
+                    totalMessages++;
+                };
+
                 for (let eventIdx = 0; eventIdx < events.length; eventIdx++) {
                     const event = events[eventIdx];
                     if (!event) continue;
@@ -3940,22 +4103,8 @@ export default {
                                     j++;
                                 }
 
-                                const messageText = lines.join('\n').trim();
-                                if (messageText) {
-                                    const cacheKey = this.getCacheKey(messageText, 'text');
-                                    if (!this.translationCache.has(cacheKey)) {
-                                        itemsToTranslate.push({
-                                            type: 'text',
-                                            id: `map_${eventIdx}_${pageIdx}_text_${totalMessages}`,
-                                            value: messageText,
-                                            cacheKey: cacheKey,
-                                            eventIdx: eventIdx,
-                                            pageIdx: pageIdx,
-                                            cmdIdx: i
-                                        });
-                                        totalMessages++;
-                                    }
-                                }
+                                const messageText = lines.join('\n');
+                                pushMapTextItem(messageText, eventIdx, pageIdx, i);
 
                                 if (speaker) {
                                     const speakerKey = this.getCacheKey(speaker, 'speaker');
@@ -3972,6 +4121,28 @@ export default {
                                     }
                                 }
 
+                                i = j;
+                                continue;
+                            }
+
+                            // Some projects contain standalone 401 blocks without a preceding 101.
+                            // Collect them as message blocks so they are not skipped in map batch mode.
+                            if (cmd.code === 401) {
+                                const prevCmd = i > 0 ? list[i - 1] : null;
+                                if (prevCmd && (prevCmd.code === 101 || prevCmd.code === 401)) {
+                                    i++;
+                                    continue;
+                                }
+
+                                const lines = [];
+                                let j = i;
+                                while (j < list.length && list[j] && list[j].code === 401) {
+                                    lines.push(list[j].parameters && list[j].parameters[0]);
+                                    j++;
+                                }
+
+                                const messageText = lines.join('\n');
+                                pushMapTextItem(messageText, eventIdx, pageIdx, i);
                                 i = j;
                                 continue;
                             }

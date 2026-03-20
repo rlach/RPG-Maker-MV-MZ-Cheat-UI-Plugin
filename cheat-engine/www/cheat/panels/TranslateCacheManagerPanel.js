@@ -1,0 +1,491 @@
+import { KeyValueStorage } from '../js/KeyValueStorage.js'
+import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js'
+import {
+    ensureTranslateCacheRuntime,
+    notifyTranslateCacheRuntimeChanged,
+    onTranslateCacheRuntimeChanged,
+    parseCacheKeyForLangPair
+} from '../js/TranslateCacheRuntime.js'
+
+export default {
+    name: 'TranslateCacheManagerPanel',
+
+    template: `
+<v-card flat class="ma-0 pa-0">
+    <v-card-title class="subtitle-1 font-weight-bold pb-1">
+        Translation Cache Manager
+    </v-card-title>
+
+    <v-card-text class="pt-0 pb-1">
+        <div class="caption grey--text text--lighten-1">
+            Active language pair: {{sourceLang}} -> {{targetLang}}
+        </div>
+    </v-card-text>
+
+    <v-data-table
+        class="mt-1"
+        :headers="tableHeaders"
+        :items="entries"
+        :search="search"
+        :page.sync="page"
+        :sort-by.sync="sortBy"
+        :sort-desc.sync="sortDesc"
+        :custom-filter="tableItemFilter"
+        :items-per-page.sync="rowsPerPage">
+        <template v-slot:top>
+            <v-text-field
+                v-model="searchInput"
+                label="Search original / translation"
+                solo
+                dense
+                hide-details
+                background-color="grey darken-3"
+                @keydown.self.stop>
+            </v-text-field>
+        </template>
+
+        <template v-slot:item.seenSort="{ item }">
+            <span class="caption">{{item.seenDisplay}}</span>
+        </template>
+
+        <template v-slot:item.type="{ item }">
+            <span class="caption">{{item.type}}</span>
+        </template>
+
+        <template v-slot:item.original="{ item }">
+            <div
+                class="caption white--text"
+                style="white-space: pre-wrap; word-break: break-word;"
+                v-text="item.original">
+            </div>
+        </template>
+
+        <template v-slot:item.translation="{ item }">
+            <v-textarea
+                :value="getDraftValue(item)"
+                :rows="getRowLineCount(item, getDraftValue(item))"
+                auto-grow
+                no-resize
+                dense
+                hide-details
+                class="mt-0 pt-0"
+                @input="onTranslationInput(item, $event)"
+                @keydown.stop>
+            </v-textarea>
+        </template>
+
+        <template v-slot:item.actionsSort="{ item }">
+            <v-tooltip bottom>
+                <span>Copy original text</span>
+                <template v-slot:activator="{ on, attrs }">
+                    <v-btn
+                        icon
+                        x-small
+                        color="primary"
+                        v-bind="attrs"
+                        v-on="on"
+                        @click="copyOriginal(item)">
+                        <v-icon small>mdi-content-copy</v-icon>
+                    </v-btn>
+                </template>
+            </v-tooltip>
+        </template>
+    </v-data-table>
+</v-card>
+    `,
+
+    data () {
+        return {
+            searchInput: '',
+            search: '',
+            page: 1,
+            rowsPerPage: getRowsPerPage(),
+            sortBy: 'seenSort',
+            sortDesc: true,
+            sourceLang: 'ja',
+            targetLang: 'en',
+            entries: [],
+            draftByKey: {},
+            refreshTimer: null,
+            searchDebounceTimer: null,
+            tableHeaders: [
+                {
+                    text: 'Seen',
+                    value: 'seenSort',
+                    width: 88
+                },
+                {
+                    text: 'Type',
+                    value: 'type',
+                    width: 100
+                },
+                {
+                    text: 'Original',
+                    value: 'original',
+                    width: '40%'
+                },
+                {
+                    text: 'Translation',
+                    value: 'translation',
+                    width: '40%'
+                },
+                {
+                    text: 'Actions',
+                    value: 'actionsSort',
+                    width: 64
+                }
+            ]
+        }
+    },
+
+    created () {
+        this.settingsStorage = new KeyValueStorage('./www/cheat-settings/translate-on-the-fly.json')
+        this.cacheStorage = new KeyValueStorage('./www/cheat-settings/translate-cache.json')
+
+        const runtime = ensureTranslateCacheRuntime()
+        this.translationCache = runtime.cache
+        this.lastSeenByCacheKey = runtime.lastSeenByCacheKey
+
+        this.unsubscribeRuntime = onTranslateCacheRuntimeChanged(() => {
+            this.scheduleRefresh()
+        })
+
+        this.loadTableState()
+        this.refreshEntries()
+    },
+
+    activated () {
+        this.refreshEntries()
+    },
+
+    deactivated () {
+        this.flushPendingCacheEdits('panel-deactivated')
+    },
+
+    beforeDestroy () {
+        this.flushPendingCacheEdits('panel-before-destroy')
+
+        if (this.unsubscribeRuntime) {
+            this.unsubscribeRuntime()
+            this.unsubscribeRuntime = null
+        }
+
+        if (this.refreshTimer) {
+            clearTimeout(this.refreshTimer)
+            this.refreshTimer = null
+        }
+
+        if (this.searchDebounceTimer) {
+            clearTimeout(this.searchDebounceTimer)
+            this.searchDebounceTimer = null
+        }
+    },
+
+    watch: {
+        rowsPerPage (val) {
+            const parsed = Number(val)
+            if (!Number.isFinite(parsed) || parsed <= 0) {
+                return
+            }
+
+            if (parsed !== val) {
+                this.rowsPerPage = parsed
+                return
+            }
+
+            setRowsPerPage(parsed)
+            this.saveTableState()
+            this.flushPendingCacheEdits('rows-per-page')
+        },
+
+        page () {
+            this.saveTableState()
+            this.flushPendingCacheEdits('page')
+        },
+
+        sortBy () {
+            this.saveTableState()
+            this.flushPendingCacheEdits('sort')
+        },
+
+        sortDesc () {
+            this.saveTableState()
+            this.flushPendingCacheEdits('sort')
+        },
+
+        searchInput (value) {
+            this.scheduleSearchDebounce(value)
+        },
+
+        search () {
+            this.saveTableState()
+        }
+    },
+
+    methods: {
+        scheduleSearchDebounce (value) {
+            if (this.searchDebounceTimer) {
+                clearTimeout(this.searchDebounceTimer)
+            }
+
+            this.searchDebounceTimer = setTimeout(() => {
+                this.searchDebounceTimer = null
+                this.search = this.normalizeCacheValue(value)
+            }, 220)
+        },
+
+        scheduleRefresh () {
+            if (this.refreshTimer) {
+                clearTimeout(this.refreshTimer)
+            }
+
+            this.refreshTimer = setTimeout(() => {
+                this.refreshTimer = null
+                this.refreshEntries()
+            }, 80)
+        },
+
+        getActiveLanguagePair () {
+            const panel = window.__TranslateOnTheFlyPanel
+            if (panel && panel.sourceLang && panel.targetLang) {
+                return {
+                    sourceLang: panel.sourceLang,
+                    targetLang: panel.targetLang
+                }
+            }
+
+            try {
+                const json = this.settingsStorage.getItem('data')
+                if (!json) {
+                    return {
+                        sourceLang: 'ja',
+                        targetLang: 'en'
+                    }
+                }
+
+                const data = JSON.parse(json)
+                return {
+                    sourceLang: data.sourceLang || 'ja',
+                    targetLang: data.targetLang || 'en'
+                }
+            } catch (error) {
+                return {
+                    sourceLang: 'ja',
+                    targetLang: 'en'
+                }
+            }
+        },
+
+        isSeenTrackableType (type) {
+            return type === 'text' || type === 'choice'
+        },
+
+        normalizeCacheValue (value) {
+            if (typeof value === 'string') {
+                return value
+            }
+
+            if (value === null || value === undefined) {
+                return ''
+            }
+
+            return String(value)
+        },
+
+        formatSeenTimestamp (timestamp) {
+            if (!Number.isFinite(timestamp) || timestamp <= 0) {
+                return ''
+            }
+
+            const date = new Date(timestamp)
+            const hh = String(date.getHours()).padStart(2, '0')
+            const mm = String(date.getMinutes()).padStart(2, '0')
+            const ss = String(date.getSeconds()).padStart(2, '0')
+            return `${hh}:${mm}:${ss}`
+        },
+
+        countVisualLines (text) {
+            const value = this.normalizeCacheValue(text)
+            if (!value) {
+                return 1
+            }
+
+            const hardLines = value.split(/\r?\n/)
+            let total = 0
+            for (const line of hardLines) {
+                const normalizedLineLength = line.length || 1
+                total += Math.max(1, Math.ceil(normalizedLineLength / 64))
+            }
+
+            return Math.max(1, total)
+        },
+
+        getRowLineCount (item, draftValue = null) {
+            const originalLines = this.countVisualLines(item.original)
+            const translationLines = this.countVisualLines(draftValue === null ? item.translation : draftValue)
+            return Math.max(2, originalLines, translationLines)
+        },
+
+        getDraftValue (item) {
+            if (!item || !item.key) {
+                return ''
+            }
+
+            if (Object.prototype.hasOwnProperty.call(this.draftByKey, item.key)) {
+                return this.normalizeCacheValue(this.draftByKey[item.key])
+            }
+
+            return this.normalizeCacheValue(item.translation)
+        },
+
+        loadTableState () {
+            try {
+                const raw = localStorage.getItem('cheat.translateCacheManager.tableState')
+                if (!raw) {
+                    return
+                }
+
+                const parsed = JSON.parse(raw)
+                if (typeof parsed.sortBy === 'string' && parsed.sortBy.trim() !== '') {
+                    this.sortBy = parsed.sortBy
+                }
+                if (typeof parsed.sortDesc === 'boolean') {
+                    this.sortDesc = parsed.sortDesc
+                }
+                if (Number.isFinite(Number(parsed.page)) && Number(parsed.page) > 0) {
+                    this.page = Number(parsed.page)
+                }
+                if (typeof parsed.searchInput === 'string') {
+                    this.searchInput = parsed.searchInput
+                    this.search = parsed.searchInput
+                }
+            } catch (error) {
+                // Ignore malformed state and keep defaults.
+            }
+        },
+
+        saveTableState () {
+            try {
+                const payload = {
+                    sortBy: this.sortBy,
+                    sortDesc: !!this.sortDesc,
+                    page: this.page,
+                    searchInput: this.searchInput
+                }
+                localStorage.setItem('cheat.translateCacheManager.tableState', JSON.stringify(payload))
+            } catch (error) {
+                // Ignore persistence failures.
+            }
+        },
+
+        flushPendingCacheEdits (reason = 'unknown') {
+            const draftEntries = Object.entries(this.draftByKey || {})
+            if (!draftEntries.length) {
+                return
+            }
+
+            const changedKeys = []
+            for (const [cacheKey, draftValue] of draftEntries) {
+                const normalizedDraft = this.normalizeCacheValue(draftValue)
+                const currentValue = this.normalizeCacheValue(this.translationCache.get(cacheKey))
+
+                if (normalizedDraft === currentValue) {
+                    delete this.draftByKey[cacheKey]
+                    continue
+                }
+
+                this.translationCache.set(cacheKey, normalizedDraft)
+                changedKeys.push(cacheKey)
+                delete this.draftByKey[cacheKey]
+            }
+
+            if (!changedKeys.length) {
+                return
+            }
+
+            const panel = window.__TranslateOnTheFlyPanel
+            if (panel && typeof panel.persistCache === 'function') {
+                panel.persistCache()
+                if (typeof panel.notifyCacheRuntime === 'function') {
+                    panel.notifyCacheRuntime(reason)
+                }
+            } else {
+                this.cacheStorage.setItem('data', JSON.stringify(Array.from(this.translationCache.entries())))
+                notifyTranslateCacheRuntimeChanged(reason)
+            }
+
+            this.refreshEntries()
+        },
+
+        refreshEntries () {
+            const pair = this.getActiveLanguagePair()
+            this.sourceLang = pair.sourceLang
+            this.targetLang = pair.targetLang
+
+            const items = []
+            for (const [cacheKey, value] of this.translationCache.entries()) {
+                const parsed = parseCacheKeyForLangPair(cacheKey, this.sourceLang, this.targetLang)
+                if (!parsed) {
+                    continue
+                }
+
+                const seenTs = this.isSeenTrackableType(parsed.type)
+                    ? (this.lastSeenByCacheKey.get(cacheKey) || null)
+                    : null
+
+                const translation = this.normalizeCacheValue(value)
+
+                items.push({
+                    key: cacheKey,
+                    seenSort: Number.isFinite(seenTs) ? seenTs : 0,
+                    seenDisplay: this.formatSeenTimestamp(seenTs),
+                    type: parsed.type,
+                    original: parsed.original,
+                    translation,
+                    actionsSort: parsed.original
+                })
+            }
+
+            this.entries = items
+        },
+
+        tableItemFilter (value, search, item) {
+            if (search === null || search.trim() === '') {
+                return true
+            }
+
+            const term = search.toLowerCase()
+            return (item.original || '').toLowerCase().includes(term) || (item.translation || '').toLowerCase().includes(term)
+        },
+
+        onTranslationInput (item, value) {
+            const normalized = this.normalizeCacheValue(value)
+            this.$set(this.draftByKey, item.key, normalized)
+        },
+
+        async copyOriginal (item) {
+            const text = item && item.original ? String(item.original) : ''
+            if (!text) {
+                return
+            }
+
+            try {
+                if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text)
+                } else {
+                    const textarea = document.createElement('textarea')
+                    textarea.value = text
+                    textarea.style.position = 'fixed'
+                    textarea.style.top = '-1000px'
+                    document.body.appendChild(textarea)
+                    textarea.focus()
+                    textarea.select()
+                    document.execCommand('copy')
+                    document.body.removeChild(textarea)
+                }
+            } catch (error) {
+                console.warn('[TranslateCacheManagerPanel] Failed to copy original text', error)
+            }
+        }
+    }
+}

@@ -13,6 +13,7 @@ import ShortcutPanel from './panels/ShortcutPanel.js'
 import TranslateSettingsPanel from './panels/TranslateSettingsPanel.js'
 import TranslateOnTheFlyPanel from './panels/TranslateOnTheFlyPanel.js'
 import TranslateNamesPanel from './panels/TranslateNamesPanel.js'
+import TranslateCacheManagerPanel from './panels/TranslateCacheManagerPanel.js'
 import { CHEAT_WINDOW_MANAGER } from './js/CheatWindowManager.js'
 
 export default {
@@ -33,7 +34,8 @@ export default {
         ShortcutPanel,
         TranslateSettingsPanel,
         TranslateOnTheFlyPanel,
-        TranslateNamesPanel
+        TranslateNamesPanel,
+        TranslateCacheManagerPanel
     },
 
     template: `
@@ -183,6 +185,11 @@ export default {
                           name: 'Translate Names',
                           icon: 'mdi-account-edit',
                           component: 'translate-names-panel'
+                      },
+                      {
+                          name: 'Cache Manager',
+                          icon: 'mdi-table-search',
+                          component: 'translate-cache-manager-panel'
                       }
                   ]
                             }
