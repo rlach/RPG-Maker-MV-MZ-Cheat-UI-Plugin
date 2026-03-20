@@ -548,7 +548,7 @@ export default {
 
         getObjectTranslationTypeDefs() {
             return [
-                { id: 'items', label: 'items', kind: 'data', getContainer: () => window.$dataItems, fields: ['name', 'description'], cachePrefix: 'item' },
+                { id: 'items', label: 'items', kind: 'data', getContainer: () => window.$dataItems, fields: ['name', 'description', 'note'], cachePrefix: 'item' },
                 { id: 'skills', label: 'skills', kind: 'data', getContainer: () => window.$dataSkills, fields: ['name', 'description', 'message1', 'message2'], cachePrefix: 'skill' },
                 { id: 'classes', label: 'classes', kind: 'data', getContainer: () => window.$dataClasses, fields: ['name'], cachePrefix: 'class' },
                 { id: 'enemies', label: 'enemies', kind: 'data', getContainer: () => window.$dataEnemies, fields: ['name'], cachePrefix: 'enemy' },
@@ -585,7 +585,10 @@ export default {
 
                     if (!item._translateOriginal) {
                         item._translateOriginal = {};
-                        for (const field of def.fields) {
+                    }
+
+                    for (const field of def.fields) {
+                        if(!item._translateOriginal[field] && item[field]) {
                             item._translateOriginal[field] = item[field];
                         }
                     }
@@ -599,7 +602,7 @@ export default {
 
                         totalStrings++;
                         const cacheKey = this.getCacheKey(originalValue, `${def.cachePrefix}_${field}`);
-                        if (!this.translationCache.has(cacheKey)) {
+                        if (!this.hasUsableCacheValue(cacheKey)) {
                             leftStrings++;
                             hasUntranslated = true;
                         }
@@ -630,7 +633,7 @@ export default {
                     continue;
                 }
                 total++;
-                if (!this.translationCache.has(key)) {
+                if (!this.hasUsableCacheValue(key)) {
                     left++;
                 }
             }
@@ -1105,7 +1108,7 @@ export default {
                 if (typeof val !== 'string' || val.trim() === '') {
                     continue;
                 }
-                if (!this.translationCache.has(key)) {
+                if (!this.hasUsableCacheValue(key)) {
                     pending.push({ type: 'system_message', id: `msg_${key}`, value: val, cacheKey: key });
                 }
             }
@@ -2379,7 +2382,7 @@ export default {
 
                     const commandKey = self.getCacheKey(cmd.name, 'command');
                     // Only translate if not cached
-                    return !self.translationCache.has(commandKey);
+                    return !self.hasUsableCacheValue(commandKey);
                 });
 
                 // Batch translate all uncached commands
@@ -2423,7 +2426,7 @@ export default {
                     
                     if (cmd.name && typeof cmd.name === 'string' && cmd.name.trim() !== '') {
                         const commandKey = self.getCacheKey(cmd.name, 'command');
-                        if (self.translationCache.has(commandKey)) {
+                        if (self.hasUsableCacheValue(commandKey)) {
                             finalName = self.translationCache.get(commandKey);
                         }
                     }
@@ -2847,7 +2850,7 @@ export default {
                 const commandKey = this.getCacheKey(cleanName, 'command');
 
                 // Check cache first
-                if (this.translationCache.has(commandKey)) {
+                if (this.hasUsableCacheValue(commandKey)) {
                     return this.translationCache.get(commandKey);
                 }
 
@@ -2920,7 +2923,7 @@ export default {
                     value: choice,
                     cacheKey
                 };
-            }).filter(item => !this.translationCache.has(item.cacheKey));
+            }).filter(item => !this.hasUsableCacheValue(item.cacheKey));
 
             if (items.length === 0) {
                 // All individual choices cached, build result
@@ -3039,7 +3042,7 @@ export default {
                     const originalValue = item._translateOriginal[field];
                     if (originalValue && typeof originalValue === 'string' && originalValue.trim() !== '') {
                         const cacheKey = this.getCacheKey(originalValue, `${cacheKeyPrefix}_${field}`);
-                        if (this.translationCache.has(cacheKey)) {
+                        if (this.hasUsableCacheValue(cacheKey)) {
                             try {
                                 item[field] = this.translationCache.get(cacheKey);
                                 if(itemInstance) {
@@ -3154,7 +3157,7 @@ export default {
                 // Build a representative cacheKey using the first type
                 const firstType = Array.from(types)[0];
                 const cacheKey = this.getCacheKey(value, firstType);
-                if (!this.translationCache.has(cacheKey)) {
+                if (!this.hasUsableCacheValue(cacheKey)) {
                     pendingValues.push({ value, types: Array.from(types) });
                 }
             }
@@ -3253,7 +3256,7 @@ export default {
                         // Try all possible types for this value; prefer the entry.type first
                         const candidateTypes = [entry.type];
                         const cacheKeyPrimary = this.getCacheKey(trimmed, entry.type);
-                        if (this.translationCache.has(cacheKeyPrimary)) {
+                        if (this.hasUsableCacheValue(cacheKeyPrimary)) {
                             parentObj[entry.prop][i] = this.translationCache.get(cacheKeyPrimary);
                             continue;
                         }
@@ -3262,7 +3265,7 @@ export default {
                         let applied = false;
                         for (const e of arrays) {
                             const fallbackKey = this.getCacheKey(trimmed, e.type);
-                            if (this.translationCache.has(fallbackKey)) {
+                            if (this.hasUsableCacheValue(fallbackKey)) {
                                 parentObj[entry.prop][i] = this.translationCache.get(fallbackKey);
                                 applied = true;
                                 break;
@@ -3331,7 +3334,7 @@ export default {
                     const item = $dataItems[i];
                     if (!item) continue;
 
-                    const hasUntranslated = this.hasUntranslatedFields(item, ['name', 'description'], 'item');
+                    const hasUntranslated = this.hasUntranslatedFields(item, ['name', 'description', 'note'], 'item');
                     if (hasUntranslated) {
                         itemsToTranslate.push(item);
                     }
@@ -3421,7 +3424,7 @@ export default {
                 // Translate items
                 for (let i = 0; i < itemsToTranslate.length; i += BATCH_SIZE) {
                     const batch = itemsToTranslate.slice(i, i + BATCH_SIZE);
-                    await this.translateDataBatch(batch, ['name', 'description'], 'item', { backgroundJob: true });
+                    await this.translateDataBatch(batch, ['name', 'description', 'note'], 'item', { backgroundJob: true });
                     console.log(`[TranslateOnTheFly] Translated items batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(itemsToTranslate.length / BATCH_SIZE)}`);
                 }
 
@@ -3483,7 +3486,7 @@ export default {
 
                             if (originalTitle && originalTitle.trim() !== '') {
                                 const gtKey = 'gameTitle';
-                                if (!this.translationCache.has(gtKey)) {
+                                if (!this.hasUsableCacheValue(gtKey)) {
                                     try {
                                         this.showSpinner();
                                         const res = await this.batchTranslateWithBackgroundRetry([{ type: 'gameTitle', id: 'sys_gameTitle', value: originalTitle, cacheKey: gtKey }], 'gameTitle');
@@ -3491,7 +3494,7 @@ export default {
                                         if (res.successes && res.successes.length > 0) {
                                             this.setCacheValue(gtKey, res.successes[0].translated);
                                             $dataSystem.gameTitle = res.successes[0].translated;
-                                        } else if (this.translationCache.has(gtKey)) {
+                                        } else if (this.hasUsableCacheValue(gtKey)) {
                                             $dataSystem.gameTitle = this.translationCache.get(gtKey);
                                         }
                                     } catch (err) {
@@ -3526,7 +3529,7 @@ export default {
                             if (!trimmed) continue;
 
                             const cacheKey = key; // plain key as requested
-                            if (!this.translationCache.has(cacheKey)) {
+                            if (!this.hasUsableCacheValue(cacheKey)) {
                                 pending.push({ type: 'system_message', id: `msg_${key}`, value: val, cacheKey });
                             }
                         }
@@ -3544,7 +3547,7 @@ export default {
                         try {
                             const keysToApply = Object.keys($dataSystem.terms.messagesOriginal || $dataSystem.terms.messages || {});
                             for (const k of keysToApply) {
-                                if (this.translationCache.has(k)) {
+                                if (this.hasUsableCacheValue(k)) {
                                     $dataSystem.terms.messages[k] = this.translationCache.get(k);
                                 }
                             }
@@ -3626,7 +3629,7 @@ export default {
                 const value = dataObject._translateOriginal[field];
                 if (value && typeof value === 'string' && value.trim() !== '') {
                     const cacheKey = this.getCacheKey(value, `${type}_${field}`);
-                    if (!this.translationCache.has(cacheKey)) {
+                    if (!this.hasUsableCacheValue(cacheKey)) {
                         return true; // At least one field needs translation
                     }
                 }
@@ -3646,7 +3649,7 @@ export default {
                         const cacheKey = this.getCacheKey(originalValue, `${type}_${field}`);
                         
                         // Skip if already cached
-                        if (this.translationCache.has(cacheKey)) {
+                        if (this.hasUsableCacheValue(cacheKey)) {
                             continue;
                         }
 
@@ -3689,7 +3692,7 @@ export default {
                         const originalValue = dataObject._translateOriginal[field];
                         if (originalValue && typeof originalValue === 'string' && originalValue.trim() !== '') {
                             const cacheKey = this.getCacheKey(originalValue, `${type}_${field}`);
-                            if (this.translationCache.has(cacheKey)) {
+                            if (this.hasUsableCacheValue(cacheKey)) {
                                 try {
                                     dataObject[field] = this.translationCache.get(cacheKey);
                                 }  catch (error) {
@@ -4044,7 +4047,7 @@ export default {
                     }
 
                     const cacheKey = this.getCacheKey(rawText, 'text');
-                    if (this.translationCache.has(cacheKey)) {
+                    if (this.hasUsableCacheValue(cacheKey)) {
                         return;
                     }
 
@@ -4108,7 +4111,7 @@ export default {
 
                                 if (speaker) {
                                     const speakerKey = this.getCacheKey(speaker, 'speaker');
-                                    if (!this.translationCache.has(speakerKey)) {
+                                    if (!this.hasUsableCacheValue(speakerKey)) {
                                         itemsToTranslate.push({
                                             type: 'speaker',
                                             id: `map_${eventIdx}_${pageIdx}_speaker_${totalMessages}`,
@@ -4153,7 +4156,7 @@ export default {
                                 if (Array.isArray(choices)) {
                                     for (const choice of choices) {
                                         const choiceKey = this.getCacheKey(choice, 'choice');
-                                        if (!this.translationCache.has(choiceKey)) {
+                                        if (!this.hasUsableCacheValue(choiceKey)) {
                                             itemsToTranslate.push({
                                                 type: 'choice',
                                                 id: `map_${eventIdx}_${pageIdx}_choice_${totalMessages}`,
