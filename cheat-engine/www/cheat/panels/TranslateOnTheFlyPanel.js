@@ -1151,9 +1151,7 @@ export default {
                     }
                 }
 
-                for (const f of res.failures) {
-                    this.failedTranslations.set(f.cacheKey, Date.now());
-                }
+                this.markBatchFailuresAsUntranslated(res.failures, true);
 
                 successes += res.successes.length;
                 failures += res.failures.length;
@@ -1595,11 +1593,8 @@ export default {
                 // Log failures
                 for (const failure of result.failures) {
                     console.warn(`[TranslateOnTheFly] Failed to translate ${failure.type}:`, failure.value, '→', failure.rejectReason);
-                    this.failedTranslations.set(failure.cacheKey, Date.now());
-                    if (this.isRealtimeTrackableType(failure.type)) {
-                        this.setCacheValue(failure.cacheKey, '');
-                    }
                 }
+                this.markBatchFailuresAsUntranslated(result.failures, true);
 
                 // Apply the current text (now hopefully cached)
                 const firstTextItem = items.find(item => item.type === 'text');
@@ -1633,8 +1628,13 @@ export default {
 
             } catch (error) {
                 console.error('[TranslateOnTheFly] Ahead translation error:', error);
-                if (cacheKey) {
-                    this.failedTranslations.set(cacheKey, Date.now());
+                if (pendingKeys) {
+                    for (const key of pendingKeys) {
+                        this.failedTranslations.set(key, Date.now());
+                        if (!this.hasUsableCacheValue(key)) {
+                            this.setCacheValue(key, '');
+                        }
+                    }
                 }
                 this.replaceMessageText(currentText || '');
                 this._translationApplied = true;
@@ -1767,6 +1767,46 @@ export default {
             }
 
             return this.isTranslatedCacheValue(this.translationCache.get(cacheKey));
+        },
+
+        markBatchFailuresAsUntranslated(failures, markAsFailed = true) {
+            if (!Array.isArray(failures) || failures.length === 0) {
+                return;
+            }
+
+            for (const failure of failures) {
+                if (!failure || !failure.cacheKey) {
+                    continue;
+                }
+
+                if (markAsFailed) {
+                    this.failedTranslations.set(failure.cacheKey, Date.now());
+                }
+
+                if (!this.hasUsableCacheValue(failure.cacheKey)) {
+                    this.setCacheValue(failure.cacheKey, '');
+                }
+            }
+        },
+
+        markBatchItemsAsUntranslated(items, markAsFailed = false) {
+            if (!Array.isArray(items) || items.length === 0) {
+                return;
+            }
+
+            for (const item of items) {
+                if (!item || !item.cacheKey) {
+                    continue;
+                }
+
+                if (markAsFailed) {
+                    this.failedTranslations.set(item.cacheKey, Date.now());
+                }
+
+                if (!this.hasUsableCacheValue(item.cacheKey)) {
+                    this.setCacheValue(item.cacheKey, '');
+                }
+            }
         },
 
         getCacheKeyType(cacheKey) {
@@ -2410,11 +2450,12 @@ export default {
                         // Mark failures
                         for (const failure of result.failures) {
                             console.warn(`[TranslateOnTheFly] Failed to translate command:`, failure.value, '→', failure.rejectReason);
-                            self.failedTranslations.set(failure.cacheKey, Date.now());
                         }
+                        self.markBatchFailuresAsUntranslated(result.failures, true);
                     } catch (error) {
                         console.error('[TranslateOnTheFly] Batch command translation error:', error);
                         self.hideSpinner();
+                        self.markBatchItemsAsUntranslated(items, true);
                     }
                 }
                 this._collectedCommands = this._collectedCommands.filter(cmd => cmd && !cmd.isAdditional);
@@ -2876,6 +2917,7 @@ export default {
 
                 if (result.failures.length > 0) {
                     console.warn('[TranslateOnTheFly] Failed to translate command:', cleanName, '→', result.failures[0].rejectReason);
+                    this.markBatchFailuresAsUntranslated(result.failures, true);
                 }
 
                 return commandName;
@@ -2952,9 +2994,7 @@ export default {
 
             const complete = result.failures.length === 0;
             if (!complete) {
-                for (const failure of result.failures) {
-                    this.failedTranslations.set(failure.cacheKey, Date.now());
-                }
+                this.markBatchFailuresAsUntranslated(result.failures, true);
             }
 
             return { choices: translatedChoices, complete };
@@ -3213,11 +3253,12 @@ export default {
 
                         for (const failure of result.failures) {
                             console.warn('[TranslateOnTheFly] Failed to translate array value:', failure.value, '→', failure.rejectReason);
-                            this.failedTranslations.set(failure.cacheKey, Date.now());
                         }
+                        this.markBatchFailuresAsUntranslated(result.failures, true);
                     } catch (error) {
                         this.hideSpinner();
                         console.error('[TranslateOnTheFly] Error translating game arrays batch:', error);
+                        this.markBatchItemsAsUntranslated(batch, true);
                     }
                 }
             }
@@ -3494,6 +3535,8 @@ export default {
                                         if (res.successes && res.successes.length > 0) {
                                             this.setCacheValue(gtKey, res.successes[0].translated);
                                             $dataSystem.gameTitle = res.successes[0].translated;
+                                        } else if (res.failures && res.failures.length > 0) {
+                                            this.markBatchFailuresAsUntranslated(res.failures, true);
                                         } else if (this.hasUsableCacheValue(gtKey)) {
                                             $dataSystem.gameTitle = this.translationCache.get(gtKey);
                                         }
@@ -3592,11 +3635,12 @@ export default {
 
                                     for (const f of res.failures) {
                                         console.warn('[TranslateOnTheFly] Failed to translate system message:', f.value, '→', f.rejectReason);
-                                        this.failedTranslations.set(f.cacheKey, Date.now());
                                     }
+                                    this.markBatchFailuresAsUntranslated(res.failures, true);
                                 } catch (err) {
                                     this.hideSpinner();
                                     console.error('[TranslateOnTheFly] Error translating system messages batch:', err);
+                                    this.markBatchItemsAsUntranslated(b, true);
                                 }
                             }
                         }
@@ -3683,8 +3727,8 @@ export default {
                 // Log failures
                 for (const failure of result.failures) {
                     console.warn(`[TranslateOnTheFly] Failed to translate ${failure.type}:`, failure.value.substring(0, 50), '→', failure.rejectReason);
-                    this.failedTranslations.set(failure.cacheKey, Date.now());
                 }
+                this.markBatchFailuresAsUntranslated(result.failures, true);
 
                 // Apply cached translations to all data objects in this batch
                 for (const dataObject of dataObjects) {
@@ -3709,6 +3753,7 @@ export default {
                 };
             } catch (error) {
                 console.error('[TranslateOnTheFly] Data batch translation error:', error);
+                this.markBatchItemsAsUntranslated(items, true);
                 return {
                     successes: 0,
                     failures: items.length
@@ -3826,10 +3871,8 @@ export default {
                 // Log failures
                 for (const failure of result.failures) {
                     console.warn(`[TranslateOnTheFly] Failed to translate ${failure.type}:`, failure.value, '→', failure.rejectReason);
-                    if (this.isRealtimeTrackableType(failure.type)) {
-                        this.setCacheValue(failure.cacheKey, '');
-                    }
                 }
+                this.markBatchFailuresAsUntranslated(result.failures, true);
 
                 // Apply translations
                 const translatedText = this.translationCache.get(textKey);
@@ -4204,6 +4247,7 @@ export default {
                 let batchNum = 0;
                 let totalSuccesses = 0;
                 let totalFailures = 0;
+                let activeBatch = [];
 
                 try {
                     let i = 0;
@@ -4245,7 +4289,9 @@ export default {
 
                         // Translate this batch
                         // shuffle(batch); // Shuffle to avoid patterns
+                        activeBatch = batch;
                         const result = await this.engine.batchTranslate(batch);
+                        activeBatch = [];
                         
                         // Cache successes
                         for (const success of result.successes) {
@@ -4257,9 +4303,9 @@ export default {
                         // Log failures
                         for (const failure of result.failures) {
                             console.warn(`[TranslateOnTheFly] Failed to translate ${failure.type}:`, failure.value.substring(0, 50), '→', failure.rejectReason);
-                            this.failedTranslations.set(failure.cacheKey, Date.now());
                             totalFailures++;
                         }
+                        this.markBatchFailuresAsUntranslated(result.failures, true);
                     }
 
                     this.hideSpinner();
@@ -4270,6 +4316,7 @@ export default {
                     console.log(`[TranslateOnTheFly] Map translation completed: ${totalSuccesses} successes, ${totalFailures} failures`);
                     return { successCount: totalSuccesses, failureCount: totalFailures };
                 } catch (error) {
+                    this.markBatchItemsAsUntranslated(activeBatch, true);
                     this.hideSpinner();
                     if (!mapNumber) {
                         this.hideProgressBox();

@@ -3,69 +3,69 @@ import BaseTranslationEngine from './BaseTranslationEngine.js';
 // Tag configuration for preprocessing and postprocessing
 const TAG_CONFIGS = [
     // Tags with numeric parameter
-    { type: 'variable', shortTag: 'v', prePattern: /\\(V)\[(\d+)\]/gi, postPattern: /\[{1,2}v(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'V', requiredConsistency: true },
-    { type: 'actor', shortTag: 'an', prePattern: /\\(N)\[(\d+)\]/gi, postPattern: /\[{1,2}an(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'N', requiredConsistency: true },
-    { type: 'partyMember', shortTag: 'p', prePattern: /\\(P)\[(\d+)\]/gi, postPattern: /\[{1,2}p(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'P', requiredConsistency: true },
-    { type: 'color', shortTag: 'c', prePattern: /\\(C)\[(\d+)\]/gi, postPattern: /\[{1,2}c(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'C', requiredConsistency: false },
-    { type: 'icon', shortTag: 'i', prePattern: /\\(I)\[(\d+)\]/gi, postPattern: /\[{1,2}i(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'I', requiredConsistency: false },
+    { type: 'variable', shortTag: 'v', prePattern: /\\(V)\[(\d+)\]/gi, postPattern: /\[b=v(\d+)\]/gi, hasParam: true, defaultCase: 'V', requiredConsistency: true },
+    { type: 'actor', shortTag: 'an', prePattern: /\\(N)\[(\d+)\]/gi, postPattern: /\[b=an(\d+)\]/gi, hasParam: true, defaultCase: 'N', requiredConsistency: true },
+    { type: 'partyMember', shortTag: 'p', prePattern: /\\(P)\[(\d+)\]/gi, postPattern: /\[b=p(\d+)\]/gi, hasParam: true, defaultCase: 'P', requiredConsistency: true },
+    { type: 'color', shortTag: 'c', prePattern: /\\(C)\[(\d+)\]/gi, postPattern: /\[b=c(\d+)\]/gi, hasParam: true, defaultCase: 'C', requiredConsistency: false },
+    { type: 'icon', shortTag: 'i', prePattern: /\\(I)\[(\d+)\]/gi, postPattern: /\[b=i(\d+)\]/gi, hasParam: true, defaultCase: 'I', requiredConsistency: false },
     // Tags without parameter
-    { type: 'gold', shortTag: 'gold', prePattern: /\\(\$)/gi, postPattern: /\[{1,2}gold\]{1,2}/gi, hasParam: false, defaultCase: '$', requiredConsistency: true },
-    { type: 'sizeInc', shortTag: 'si', prePattern: /\\(\{)/gi, postPattern: /\[{1,2}si\]{1,2}/gi, hasParam: false, defaultCase: '{', requiredConsistency: false },
-    { type: 'sizeDec', shortTag: 'sd', prePattern: /\\(\})/gi, postPattern: /\[{1,2}sd\]{1,2}/gi, hasParam: false, defaultCase: '}', requiredConsistency: false },
-    { type: 'backslash', shortTag: 'bs', prePattern: /\\(\\)/gi, postPattern: /\[{1,2}bs\]{1,2}/gi, hasParam: false, defaultCase: '\\', requiredConsistency: false },
-    { type: 'waitQuarter', shortTag: 'wq', prePattern: /\\(\.)/gi, postPattern: /\[{1,2}wq\]{1,2}/gi, hasParam: false, defaultCase: '.', requiredConsistency: false },
-    { type: 'waitSecond', shortTag: 'ws', prePattern: /\\(\|)/gi, postPattern: /\[{1,2}ws\]{1,2}/gi, hasParam: false, defaultCase: '|', requiredConsistency: false },
-    { type: 'waitInput', shortTag: 'wi', prePattern: /\\(!)/gi, postPattern: /\[{1,2}wi\]{1,2}/gi, hasParam: false, defaultCase: '!', requiredConsistency: false },
-    { type: 'displayAll', shortTag: 'da', prePattern: /\\(>)/gi, postPattern: /\[{1,2}da\]{1,2}/gi, hasParam: false, defaultCase: '>', requiredConsistency: false },
-    { type: 'cancelDisplayAll', shortTag: 'cda', prePattern: /\\(<)/gi, postPattern: /\[{1,2}cda\]{1,2}/gi, hasParam: false, defaultCase: '<', requiredConsistency: false },
-    { type: 'noWaitInput', shortTag: 'nwi', prePattern: /\\(\^)/gi, postPattern: /\[{1,2}nwi\]{1,2}/gi, hasParam: false, defaultCase: '^', requiredConsistency: false },
+    { type: 'gold', shortTag: 'gold', prePattern: /\\(\$)/gi, postPattern: /\[b=gold\]/gi, hasParam: false, defaultCase: '$', requiredConsistency: true },
+    { type: 'sizeInc', shortTag: 'si', prePattern: /\\(\{)/gi, postPattern: /\[b=si\]/gi, hasParam: false, defaultCase: '{', requiredConsistency: false },
+    { type: 'sizeDec', shortTag: 'sd', prePattern: /\\(\})/gi, postPattern: /\[b=sd\]/gi, hasParam: false, defaultCase: '}', requiredConsistency: false },
+    { type: 'backslash', shortTag: 'bs', prePattern: /\\(\\)/gi, postPattern: /\[b=bs\]/gi, hasParam: false, defaultCase: '\\', requiredConsistency: false },
+    { type: 'waitQuarter', shortTag: 'wq', prePattern: /\\(\.)/gi, postPattern: /\[b=wq\]/gi, hasParam: false, defaultCase: '.', requiredConsistency: false },
+    { type: 'waitSecond', shortTag: 'ws', prePattern: /\\(\|)/gi, postPattern: /\[b=ws\]/gi, hasParam: false, defaultCase: '|', requiredConsistency: false },
+    { type: 'waitInput', shortTag: 'wi', prePattern: /\\(!)/gi, postPattern: /\[b=wi\]/gi, hasParam: false, defaultCase: '!', requiredConsistency: false },
+    { type: 'displayAll', shortTag: 'da', prePattern: /\\(>)/gi, postPattern: /\[b=da\]/gi, hasParam: false, defaultCase: '>', requiredConsistency: false },
+    { type: 'cancelDisplayAll', shortTag: 'cda', prePattern: /\\(<)/gi, postPattern: /\[b=cda\]/gi, hasParam: false, defaultCase: '<', requiredConsistency: false },
+    { type: 'noWaitInput', shortTag: 'nwi', prePattern: /\\(\^)/gi, postPattern: /\[b=nwi\]/gi, hasParam: false, defaultCase: '^', requiredConsistency: false },
     // { type: 'simpleN', shortTag: 'n', prePattern: /\\([nN])|\n|↵/gi, postPattern: /\[{1,2}n\]{1,2}/gi, hasParam: false, defaultCase: 'n', requiredConsistency: false },
     // Message core plugin parameters
     // Wait
-    { type: 'wait', shortTag: 'w', prePattern: /\\(W)\[(\d+)\]/gi, postPattern: /\[{1,2}w(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'W', requiredConsistency: false },
+    { type: 'wait', shortTag: 'w', prePattern: /\\(W)\[(\d+)\]/gi, postPattern: /\[b=w(\d+)\]/gi, hasParam: true, defaultCase: 'W', requiredConsistency: false },
     // NameWindow
-    { type: 'nameWindowLeft', shortTag: 'nwl', prePattern: /\\(N)<([^>]+)>/gi, postPattern: /\[{1,2}nwl([^\]]+)\]{1,2}/gi, hasParam: true, defaultCase: 'N', requiredConsistency: false },
-    { type: 'nameWindowCenter', shortTag: 'nwc', prePattern: /\\(NC)<([^>]+)>/gi, postPattern: /\[{1,2}nwc([^\]]+)\]{1,2}/gi, hasParam: true, defaultCase: 'NC', requiredConsistency: false },
-    { type: 'nameWindowRight', shortTag: 'nwr', prePattern: /\\(NR)<([^>]+)>/gi, postPattern: /\[{1,2}nwr([^\]]+)\]{1,2}/gi, hasParam: true, defaultCase: 'NR', requiredConsistency: false },
+    { type: 'nameWindowLeft', shortTag: 'nwl', prePattern: /\\(N)<([^>]+)>/gi, postPattern: /\[b=nwl([^\]]+)\]/gi, hasParam: true, defaultCase: 'N', requiredConsistency: false },
+    { type: 'nameWindowCenter', shortTag: 'nwc', prePattern: /\\(NC)<([^>]+)>/gi, postPattern: /\[b=nwc([^\]]+)\]/gi, hasParam: true, defaultCase: 'NC', requiredConsistency: false },
+    { type: 'nameWindowRight', shortTag: 'nwr', prePattern: /\\(NR)<([^>]+)>/gi, postPattern: /\[b=nwr([^\]]+)\]/gi, hasParam: true, defaultCase: 'NR', requiredConsistency: false },
     // Line Break
-    { type: 'lineBreak', shortTag: 'br', prePattern: /<(br)>/gi, postPattern: /\[{1,2}br\]{1,2}/gi, hasParam: false, defaultCase: 'br', requiredConsistency: false },
+    { type: 'lineBreak', shortTag: 'br', prePattern: /<(br)>/gi, postPattern: /\[b=br\]/gi, hasParam: false, defaultCase: 'br', requiredConsistency: false },
     // Position
-    { type: 'posX', shortTag: 'px', prePattern: /\\(PX)\[(\d+)\]/gi, postPattern: /\[{1,2}px(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'PX', requiredConsistency: false },
-    { type: 'posY', shortTag: 'py', prePattern: /\\(PY)\[(\d+)\]/gi, postPattern: /\[{1,2}py(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'PY', requiredConsistency: false },
+    { type: 'posX', shortTag: 'px', prePattern: /\\(PX)\[(\d+)\]/gi, postPattern: /\[b=px(\d+)\]/gi, hasParam: true, defaultCase: 'PX', requiredConsistency: false },
+    { type: 'posY', shortTag: 'py', prePattern: /\\(PY)\[(\d+)\]/gi, postPattern: /\[b=py(\d+)\]/gi, hasParam: true, defaultCase: 'PY', requiredConsistency: false },
     // Outline
-    { type: 'outlineColor', shortTag: 'oc', prePattern: /\\(OC)\[(\d+)\]/gi, postPattern: /\[{1,2}oc(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'OC', requiredConsistency: false },
-    { type: 'outlineWidth', shortTag: 'ow', prePattern: /\\(OW)\[(\d+)\]/gi, postPattern: /\[{1,2}ow(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'OW', requiredConsistency: false },
+    { type: 'outlineColor', shortTag: 'oc', prePattern: /\\(OC)\[(\d+)\]/gi, postPattern: /\[b=oc(\d+)\]/gi, hasParam: true, defaultCase: 'OC', requiredConsistency: false },
+    { type: 'outlineWidth', shortTag: 'ow', prePattern: /\\(OW)\[(\d+)\]/gi, postPattern: /\[b=ow(\d+)\]/gi, hasParam: true, defaultCase: 'OW', requiredConsistency: false },
     // Font
-    { type: 'fontReset', shortTag: 'fr', prePattern: /\\(FR)/gi, postPattern: /\[{1,2}fr\]{1,2}/gi, hasParam: false, defaultCase: 'FR', requiredConsistency: false, addSpace: true },
-    { type: 'fontSize', shortTag: 'fs', prePattern: /\\(FS)\[(\d+)\]/gi, postPattern: /\[{1,2}fs(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'FS', requiredConsistency: false },
-    { type: 'fontName', shortTag: 'fn', prePattern: /\\(FN)<([^>]+)>/gi, postPattern: /\[{1,2}fn([^\]]+)\]{1,2}/gi, hasParam: true, defaultCase: 'FN', requiredConsistency: false },
-    { type: 'fontBold', shortTag: 'fb', prePattern: /\\(FB)/gi, postPattern: /\[{1,2}fb\]{1,2}/gi, hasParam: false, defaultCase: 'FB', requiredConsistency: false, addSpace: true },
-    { type: 'fontItalic', shortTag: 'fi', prePattern: /\\(FI)/gi, postPattern: /\[{1,2}fi\]{1,2}/gi, hasParam: false, defaultCase: 'FI', requiredConsistency: false, addSpace: true },
+    { type: 'fontReset', shortTag: 'fr', prePattern: /\\(FR)/gi, postPattern: /\[b=fr\]/gi, hasParam: false, defaultCase: 'FR', requiredConsistency: false, addSpace: true },
+    { type: 'fontSize', shortTag: 'fs', prePattern: /\\(FS)\[(\d+)\]/gi, postPattern: /\[b=fs(\d+)\]/gi, hasParam: true, defaultCase: 'FS', requiredConsistency: false },
+    { type: 'fontName', shortTag: 'fn', prePattern: /\\(FN)<([^>]+)>/gi, postPattern: /\[b=fn([^\]]+)\]/gi, hasParam: true, defaultCase: 'FN', requiredConsistency: false },
+    { type: 'fontBold', shortTag: 'fb', prePattern: /\\(FB)/gi, postPattern: /\[b=fb\]/gi, hasParam: false, defaultCase: 'FB', requiredConsistency: false, addSpace: true },
+    { type: 'fontItalic', shortTag: 'fi', prePattern: /\\(FI)/gi, postPattern: /\[b=fi\]/gi, hasParam: false, defaultCase: 'FI', requiredConsistency: false, addSpace: true },
     // Actor
-    { type: 'actorFace', shortTag: 'af', prePattern: /\\(AF)\[(\d+)\]/gi, postPattern: /\[{1,2}af(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'AF', requiredConsistency: false },
-    { type: 'actorClass', shortTag: 'acl', prePattern: /\\(AC)\[(\d+)\]/gi, postPattern: /\[{1,2}acl(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'AC', requiredConsistency: false },
-    { type: 'actorNickname', shortTag: 'anck', prePattern: /\\(AN)\[(\d+)\]/gi, postPattern: /\[{1,2}anck(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'AN', requiredConsistency: false },
-    { type: 'justAC', shortTag: 'ac', prePattern: /\\(AC)/gi, postPattern: /\[{1,2}ac\]{1,2}/gi, hasParam: false, defaultCase: 'AC', requiredConsistency: false, addSpace: true },
+    { type: 'actorFace', shortTag: 'af', prePattern: /\\(AF)\[(\d+)\]/gi, postPattern: /\[b=af(\d+)\]/gi, hasParam: true, defaultCase: 'AF', requiredConsistency: false },
+    { type: 'actorClass', shortTag: 'acl', prePattern: /\\(AC)\[(\d+)\]/gi, postPattern: /\[b=acl(\d+)\]/gi, hasParam: true, defaultCase: 'AC', requiredConsistency: false },
+    { type: 'actorNickname', shortTag: 'anck', prePattern: /\\(AN)\[(\d+)\]/gi, postPattern: /\[b=anck(\d+)\]/gi, hasParam: true, defaultCase: 'AN', requiredConsistency: false },
+    { type: 'justAC', shortTag: 'ac', prePattern: /\\(AC)/gi, postPattern: /\[b=ac\]/gi, hasParam: false, defaultCase: 'AC', requiredConsistency: false, addSpace: true },
     // Party
-    { type: 'partyFace', shortTag: 'pf', prePattern: /\\(PF)\[(\d+)\]/gi, postPattern: /\[{1,2}pf(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'PF', requiredConsistency: false },
-    { type: 'partyClass', shortTag: 'pcl', prePattern: /\\(PC)\[(\d+)\]/gi, postPattern: /\[{1,2}pcl(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'PC', requiredConsistency: false },
-    { type: 'partyNickname', shortTag: 'pnck', prePattern: /\\(PN)\[(\d+)\]/gi, postPattern: /\[{1,2}pnck(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'PN', requiredConsistency: false },
+    { type: 'partyFace', shortTag: 'pf', prePattern: /\\(PF)\[(\d+)\]/gi, postPattern: /\[b=pf(\d+)\]/gi, hasParam: true, defaultCase: 'PF', requiredConsistency: false },
+    { type: 'partyClass', shortTag: 'pcl', prePattern: /\\(PC)\[(\d+)\]/gi, postPattern: /\[b=pcl(\d+)\]/gi, hasParam: true, defaultCase: 'PC', requiredConsistency: false },
+    { type: 'partyNickname', shortTag: 'pnck', prePattern: /\\(PN)\[(\d+)\]/gi, postPattern: /\[b=pnck(\d+)\]/gi, hasParam: true, defaultCase: 'PN', requiredConsistency: false },
     // Names
-    { type: 'className', shortTag: 'ncn', prePattern: /\\(NC)\[(\d+)\]/gi, postPattern: /\[{1,2}ncn(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'NC', requiredConsistency: false },
-    { type: 'itemName', shortTag: 'ni', prePattern: /\\(NI)\[(\d+)\]/gi, postPattern: /\[{1,2}ni(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'NI', requiredConsistency: false },
-    { type: 'weaponName', shortTag: 'nw', prePattern: /\\(NW)\[(\d+)\]/gi, postPattern: /\[{1,2}nw(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'NW', requiredConsistency: false },
-    { type: 'armorName', shortTag: 'na', prePattern: /\\(NA)\[(\d+)\]/gi, postPattern: /\[{1,2}na(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'NA', requiredConsistency: false },
-    { type: 'skillName', shortTag: 'ns', prePattern: /\\(NS)\[(\d+)\]/gi, postPattern: /\[{1,2}ns(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'NS', requiredConsistency: false },
-    { type: 'stateName', shortTag: 'nt', prePattern: /\\(NT)\[(\d+)\]/gi, postPattern: /\[{1,2}nt(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'NT', requiredConsistency: false },
+    { type: 'className', shortTag: 'ncn', prePattern: /\\(NC)\[(\d+)\]/gi, postPattern: /\[b=ncn(\d+)\]/gi, hasParam: true, defaultCase: 'NC', requiredConsistency: false },
+    { type: 'itemName', shortTag: 'ni', prePattern: /\\(NI)\[(\d+)\]/gi, postPattern: /\[b=ni(\d+)\]/gi, hasParam: true, defaultCase: 'NI', requiredConsistency: false },
+    { type: 'weaponName', shortTag: 'nw', prePattern: /\\(NW)\[(\d+)\]/gi, postPattern: /\[b=nw(\d+)\]/gi, hasParam: true, defaultCase: 'NW', requiredConsistency: false },
+    { type: 'armorName', shortTag: 'na', prePattern: /\\(NA)\[(\d+)\]/gi, postPattern: /\[b=na(\d+)\]/gi, hasParam: true, defaultCase: 'NA', requiredConsistency: false },
+    { type: 'skillName', shortTag: 'ns', prePattern: /\\(NS)\[(\d+)\]/gi, postPattern: /\[b=ns(\d+)\]/gi, hasParam: true, defaultCase: 'NS', requiredConsistency: false },
+    { type: 'stateName', shortTag: 'nt', prePattern: /\\(NT)\[(\d+)\]/gi, postPattern: /\[b=nt(\d+)\]/gi, hasParam: true, defaultCase: 'NT', requiredConsistency: false },
     // Icon Names
-    { type: 'itemNameIcon', shortTag: 'ii', prePattern: /\\(II)\[(\d+)\]/gi, postPattern: /\[{1,2}ii(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'II', requiredConsistency: false },
-    { type: 'weaponNameIcon', shortTag: 'iw', prePattern: /\\(IW)\[(\d+)\]/gi, postPattern: /\[{1,2}iw(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'IW', requiredConsistency: false },
-    { type: 'armorNameIcon', shortTag: 'ia', prePattern: /\\(IA)\[(\d+)\]/gi, postPattern: /\[{1,2}ia(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'IA', requiredConsistency: false },
-    { type: 'skillNameIcon', shortTag: 'is', prePattern: /\\(IS)\[(\d+)\]/gi, postPattern: /\[{1,2}is(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'IS', requiredConsistency: false },
-    { type: 'stateNameIcon', shortTag: 'it', prePattern: /\\(IT)\[(\d+)\]/gi, postPattern: /\[{1,2}it(\d+)\]{1,2}/gi, hasParam: true, defaultCase: 'IT', requiredConsistency: false }
+    { type: 'itemNameIcon', shortTag: 'ii', prePattern: /\\(II)\[(\d+)\]/gi, postPattern: /\[b=ii(\d+)\]/gi, hasParam: true, defaultCase: 'II', requiredConsistency: false },
+    { type: 'weaponNameIcon', shortTag: 'iw', prePattern: /\\(IW)\[(\d+)\]/gi, postPattern: /\[b=iw(\d+)\]/gi, hasParam: true, defaultCase: 'IW', requiredConsistency: false },
+    { type: 'armorNameIcon', shortTag: 'ia', prePattern: /\\(IA)\[(\d+)\]/gi, postPattern: /\[b=ia(\d+)\]/gi, hasParam: true, defaultCase: 'IA', requiredConsistency: false },
+    { type: 'skillNameIcon', shortTag: 'is', prePattern: /\\(IS)\[(\d+)\]/gi, postPattern: /\[b=is(\d+)\]/gi, hasParam: true, defaultCase: 'IS', requiredConsistency: false },
+    { type: 'stateNameIcon', shortTag: 'it', prePattern: /\\(IT)\[(\d+)\]/gi, postPattern: /\[b=it(\d+)\]/gi, hasParam: true, defaultCase: 'IT', requiredConsistency: false }
 ];
 
-const DEFAULT_SYSTEM_PROMPT = 'You are translating scripts that contain [[tags]]. Altering contents or order of any such tags, removing or adding tags will break the script. DO NOT REMOVE OR ADD ANY TAGS. DO NOT CHANGE ORDER OF THE TAGS. EVER. PRESENT TAGS EXACTLY AS THEY ARE. Only translate the text. Return only flat one-line JSON with exact same keys. No markdown, no comments, no code blocks, no pretty formatting.';
+const DEFAULT_SYSTEM_PROMPT = 'You are translating scripts that contain [b=tags] in the form [b=shortcode]. Altering contents or order of any such tags, removing or adding tags will break the script. DO NOT MODIFY TAGS OF THE FORM [b=...]. DO NOT CHANGE ORDER OF THE TAGS. EVER. PRESENT TAGS EXACTLY AS THEY ARE IN THE INPUT. Only translate the text between tags. Return only flat one-line JSON with exact same keys. No markdown, no comments, no code blocks, no pretty formatting.';
 
 const typeToTag = { text: 'm', speaker: 'm', choice: 'm' };
 
@@ -822,7 +822,6 @@ export default class AIEngine extends BaseTranslationEngine {
                            outlined
                            dense
                            hide-details
-                           :disabled="!enabled"
                            @keydown.stop
                            @change="onChangeAiSystemPrompt"
                            class="mb-2"
@@ -1022,13 +1021,13 @@ export default class AIEngine extends BaseTranslationEngine {
             if (config.hasParam) {
                 result = result.replace(config.prePattern, (match, letter, num) => {
                     caseMap.push({ type: config.type, num, case: letter });
-                    return `[[${config.shortTag}${num}]]`;
+                    return `[b=${config.shortTag}${num}]`;
                 });
             } else {
                 result = result.replace(config.prePattern, (match, letter) => {
                     // For patterns that don't capture a letter (e.g., literal newlines), letter will be undefined
                     caseMap.push({ type: config.type, case: letter });
-                    return `[[${config.shortTag}]]`;
+                    return `[b=${config.shortTag}]`;
                 });
             }
         }
@@ -1121,8 +1120,8 @@ export default class AIEngine extends BaseTranslationEngine {
     }
 
     validateUnknownTags(rawText, originalPreprocessed) {
-        // Extract all double square bracket tags from response
-        const tagMatches = rawText.match(/\[{1,2}([^\]]+)\]{1,2}/gi) || [];
+        // Extract all [b=...] tags from response (only these are protected control tags)
+        const tagMatches = rawText.match(/\[b=([^\]]+)\]/gi) || [];
 
         for (const tagMatch of tagMatches) {
             // Check if this tag matches any known postPattern

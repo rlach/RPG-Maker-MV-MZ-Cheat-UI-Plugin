@@ -17,8 +17,19 @@ export default {
     </v-card-title>
 
     <v-card-text class="pt-0 pb-1">
-        <div class="caption grey--text text--lighten-1">
-            Active language pair: {{sourceLang}} -> {{targetLang}}
+        <div class="d-flex align-center justify-space-between">
+            <div class="caption grey--text text--lighten-1">
+                Active language pair: {{sourceLang}} -> {{targetLang}}
+            </div>
+            <v-btn
+                small
+                text
+                color="primary"
+                :loading="isTranslatingEmptyStrings"
+                :disabled="isTranslatingEmptyStrings"
+                @click="translateEmptyStrings">
+                Translate empty strings
+            </v-btn>
         </div>
     </v-card-text>
 
@@ -75,20 +86,37 @@ export default {
         </template>
 
         <template v-slot:item.actionsSort="{ item }">
-            <v-tooltip bottom>
-                <span>Copy original text</span>
-                <template v-slot:activator="{ on, attrs }">
-                    <v-btn
-                        icon
-                        x-small
-                        color="primary"
-                        v-bind="attrs"
-                        v-on="on"
-                        @click="copyOriginal(item)">
-                        <v-icon small>mdi-content-copy</v-icon>
-                    </v-btn>
-                </template>
-            </v-tooltip>
+            <div class="d-flex align-center justify-center">
+                <v-tooltip bottom>
+                    <span>Copy original text</span>
+                    <template v-slot:activator="{ on, attrs }">
+                        <v-btn
+                            icon
+                            x-small
+                            color="primary"
+                            v-bind="attrs"
+                            v-on="on"
+                            @click="copyOriginal(item)">
+                            <v-icon small>mdi-content-copy</v-icon>
+                        </v-btn>
+                    </template>
+                </v-tooltip>
+
+                <v-tooltip bottom>
+                    <span>Remove translation</span>
+                    <template v-slot:activator="{ on, attrs }">
+                        <v-btn
+                            icon
+                            x-small
+                            color="error"
+                            v-bind="attrs"
+                            v-on="on"
+                            @click="clearTranslation(item)">
+                            <v-icon small>mdi-close</v-icon>
+                        </v-btn>
+                    </template>
+                </v-tooltip>
+            </div>
         </template>
     </v-data-table>
 </v-card>
@@ -108,6 +136,7 @@ export default {
             draftByKey: {},
             refreshTimer: null,
             searchDebounceTimer: null,
+            isTranslatingEmptyStrings: false,
             tableHeaders: [
                 {
                     text: 'Seen',
@@ -132,7 +161,7 @@ export default {
                 {
                     text: 'Actions',
                     value: 'actionsSort',
-                    width: 64
+                    width: 92
                 }
             ]
         }
@@ -461,6 +490,138 @@ export default {
         onTranslationInput (item, value) {
             const normalized = this.normalizeCacheValue(value)
             this.$set(this.draftByKey, item.key, normalized)
+        },
+
+        clearTranslation (item) {
+            if (!item || !item.key) {
+                return
+            }
+
+            this.onTranslationInput(item, '')
+        },
+
+        async translateEmptyStrings () {
+            if (this.isTranslatingEmptyStrings) {
+                return
+            }
+
+            this.flushPendingCacheEdits('cache-manager-pre-translate-empty')
+
+            const panel = window.__TranslateOnTheFlyPanel
+            if (!panel || !panel.engine || typeof panel.engine.batchTranslate !== 'function') {
+                console.warn('[TranslateCacheManagerPanel] TranslateOnTheFly panel is not ready')
+                return
+            }
+
+            const items = []
+            let idCounter = 0
+            for (const [cacheKey, value] of this.translationCache.entries()) {
+                const parsed = parseCacheKeyForLangPair(cacheKey, this.sourceLang, this.targetLang)
+                if (!parsed) {
+                    continue
+                }
+
+                if (this.normalizeCacheValue(value) !== '') {
+                    continue
+                }
+
+                const original = this.normalizeCacheValue(parsed.original)
+                if (original.trim() === '') {
+                    continue
+                }
+
+                items.push({
+                    type: parsed.type,
+                    id: `empty_${idCounter++}`,
+                    value: original,
+                    cacheKey
+                })
+            }
+
+            if (!items.length) {
+                if (window.Alert && typeof window.Alert.info === 'function') {
+                    window.Alert.info('No empty translations for current language pair.')
+                }
+                return
+            }
+
+            const maxItems = Number(panel.batchItemsLimit) > 0 ? Number(panel.batchItemsLimit) : 20
+            const maxChars = Number(panel.charLimit) > 0 ? Number(panel.charLimit) : 1000
+
+            let successCount = 0
+            let failureCount = 0
+            this.isTranslatingEmptyStrings = true
+
+            if (typeof panel.showSpinner === 'function') {
+                panel.showSpinner()
+            }
+
+            try {
+                let cursor = 0
+                while (cursor < items.length) {
+                    const batch = []
+                    let chars = 0
+
+                    while (cursor < items.length) {
+                        const candidate = items[cursor]
+                        const candidateLen = (candidate.value || '').length
+
+                        if (batch.length >= maxItems) {
+                            break
+                        }
+
+                        if (batch.length > 0 && (chars + candidateLen) > maxChars) {
+                            break
+                        }
+
+                        batch.push(candidate)
+                        chars += candidateLen
+                        cursor += 1
+                    }
+
+                    if (!batch.length) {
+                        batch.push(items[cursor])
+                        cursor += 1
+                    }
+
+                    const result = await panel.engine.batchTranslate(batch, { backgroundJob: false })
+
+                    for (const success of result.successes || []) {
+                        panel.setCacheValue(success.cacheKey, success.translated)
+                        successCount += 1
+                    }
+
+                    for (const failure of result.failures || []) {
+                        if (panel.failedTranslations && failure.cacheKey) {
+                            panel.failedTranslations.set(failure.cacheKey, Date.now())
+                        }
+
+                        const hasUsable = typeof panel.hasUsableCacheValue === 'function'
+                            ? panel.hasUsableCacheValue(failure.cacheKey)
+                            : false
+                        if (failure.cacheKey && !hasUsable) {
+                            panel.setCacheValue(failure.cacheKey, '')
+                        }
+
+                        failureCount += 1
+                    }
+                }
+
+                if (window.Alert && typeof window.Alert.success === 'function') {
+                    window.Alert.success(`Translate empty strings finished: ${successCount} successes, ${failureCount} failures`)
+                }
+            } catch (error) {
+                console.error('[TranslateCacheManagerPanel] Translate empty strings failed', error)
+                if (window.Alert && typeof window.Alert.error === 'function') {
+                    window.Alert.error('Translate empty strings failed: ' + (error && error.message ? error.message : error))
+                }
+            } finally {
+                if (typeof panel.hideSpinner === 'function') {
+                    panel.hideSpinner()
+                }
+                this.isTranslatingEmptyStrings = false
+                this.refreshEntries()
+            }
         },
 
         async copyOriginal (item) {
