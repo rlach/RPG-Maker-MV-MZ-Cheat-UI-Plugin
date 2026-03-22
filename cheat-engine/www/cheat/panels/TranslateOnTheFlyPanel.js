@@ -556,7 +556,8 @@ export default {
                 { id: 'weapons', label: 'weapons', kind: 'data', getContainer: () => window.$dataWeapons, fields: ['name', 'description'], cachePrefix: 'weapon' },
                 { id: 'maps', label: 'maps', kind: 'data', getContainer: () => window.$dataMapInfos, fields: ['name'], cachePrefix: 'map' },
                 { id: 'actors', label: 'actors', kind: 'data', getContainer: () => window.$dataActors, fields: ['name', 'nickname', 'profile'], cachePrefix: 'actor' },
-                { id: 'systemMessages', label: 'system messages', kind: 'systemMessages' }
+                { id: 'systemMessages', label: 'system messages', kind: 'systemMessages' },
+                { id: 'systemCommands', label: 'system commands', kind: 'systemCommands' }
             ];
         },
 
@@ -565,6 +566,11 @@ export default {
             return defs.map(def => {
                 if (def.kind === 'systemMessages') {
                     const stats = this.countSystemMessagesStats();
+                    return { ...def, ...stats };
+                }
+
+                if (def.kind === 'systemCommands') {
+                    const stats = this.countSystemCommandsStats();
                     return { ...def, ...stats };
                 }
 
@@ -615,6 +621,26 @@ export default {
 
                 return { ...def, total, left, totalStrings, leftStrings };
             });
+        },
+
+        countSystemCommandsStats() {
+            if (!window.$dataSystem || !$dataSystem.terms || !Array.isArray($dataSystem.terms.commands)) {
+                return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
+            }
+
+            const source = $dataSystem.terms.commandsOriginal || $dataSystem.terms.commands;
+            let total = 0;
+            let left = 0;
+            for (const val of source) {
+                if (!val || typeof val !== 'string' || val.trim() === '') continue;
+                total++;
+                const cacheKey = this.getCacheKey(val, 'command');
+                if (!this.hasUsableCacheValue(cacheKey)) {
+                    left++;
+                }
+            }
+
+            return { total, left, totalStrings: total, leftStrings: left };
         },
 
         countSystemMessagesStats() {
@@ -1055,6 +1081,15 @@ export default {
                         continue;
                     }
 
+                    if (def.kind === 'systemCommands') {
+                        const batchResult = await this.translateSystemCommandsBatch(true);
+                        this.objectTranslationJob.currentDone = stat.left;
+                        this.objectTranslationJob.totalDone += batchResult.successes;
+                        this.objectTranslationJob.runErrors += batchResult.failures;
+                        this.updateObjectTranslationProgress();
+                        continue;
+                    }
+
                     const container = def.getContainer && def.getContainer();
                     if (!Array.isArray(container)) {
                         continue;
@@ -1089,6 +1124,75 @@ export default {
                 this.objectTranslationJob.active = false;
                 this.hideProgressBox();
             }
+        },
+
+        async translateSystemCommandsBatch(backgroundJob = false) {
+            if (!(window.$dataSystem && $dataSystem.terms && Array.isArray($dataSystem.terms.commands))) {
+                return { successes: 0, failures: 0 };
+            }
+
+            const hasCommandsOriginal = !!$dataSystem.terms.commandsOriginal;
+            const sourceCommands = hasCommandsOriginal ? $dataSystem.terms.commandsOriginal : $dataSystem.terms.commands;
+            if (!hasCommandsOriginal) {
+                $dataSystem.terms.commandsOriginal = [...$dataSystem.terms.commands];
+            }
+
+            const pending = [];
+            for (let i = 0; i < sourceCommands.length; i++) {
+                const val = sourceCommands[i];
+                if (!val || typeof val !== 'string' || val.trim() === '') continue;
+                const cacheKey = this.getCacheKey(val, 'command');
+                if (!this.hasUsableCacheValue(cacheKey)) {
+                    pending.push({ type: 'system_command', id: `cmd_${i}`, value: val, cacheKey, index: i });
+                }
+            }
+
+            if (!pending.length) {
+                return { successes: 0, failures: 0 };
+            }
+
+            let successes = 0;
+            let failures = 0;
+            const batches = [];
+            let cur = [];
+            let curChars = 0;
+            for (const item of pending) {
+                const len = (item.value || '').length;
+                if (cur.length >= (this.batchItemsLimit || 20) || (curChars + len) > (this.charLimit || 1000)) {
+                    if (cur.length) batches.push(cur);
+                    cur = [];
+                    curChars = 0;
+                }
+                cur.push(item);
+                curChars += len;
+            }
+            if (cur.length) batches.push(cur);
+
+            for (const batch of batches) {
+                this.showSpinner();
+                const batchItems = batch.map(x => ({ type: x.type, id: x.id, value: x.value, cacheKey: x.cacheKey }));
+                const res = backgroundJob
+                    ? await this.batchTranslateWithBackgroundRetry(batchItems, 'system commands')
+                    : await this.engine.batchTranslate(batchItems, { backgroundJob: false });
+                this.hideSpinner();
+
+                for (const s of res.successes) {
+                    if (s.cacheKey) {
+                        this.setCacheValue(s.cacheKey, s.translated);
+                        const orig = batch.find(x => x.cacheKey === s.cacheKey);
+                        if (orig !== undefined && $dataSystem.terms.commands[orig.index] !== undefined) {
+                            $dataSystem.terms.commands[orig.index] = s.translated;
+                        }
+                    }
+                }
+
+                this.markBatchFailuresAsUntranslated(res.failures, true);
+
+                successes += res.successes.length;
+                failures += res.failures.length;
+            }
+
+            return { successes, failures };
         },
 
         async translateSystemMessagesBatch(backgroundJob = false) {
@@ -4042,7 +4146,7 @@ export default {
             try {
                 // Use provided mapData or fall back to $dataMap
                 const dataMap = mapData || $dataMap;
-                console.log('[TranslateOnTheFly] translateMapEvents called for map:', mapNumber, dataMap);
+                console.log('[TranslateOnTheFly] translateMapEvents called for map:', mapNumber);
 
                 // Check if map is loaded
                 if (!dataMap) {

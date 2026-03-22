@@ -952,8 +952,23 @@
    * Observe a list of Array items.
    */
   Observer.prototype.observeArray = function observeArray (items) {
-    for (var i = 0, l = items.length; i < l; i++) {
-      observe(items[i]);
+    var l = items.length;
+
+    // Some games create extremely sparse arrays with huge length values.
+    // Scanning 0..length is catastrophic there, so only walk existing indices.
+    if (l > 100000) {
+      for (var key in items) {
+        if (hasOwn(items, key) && isValidArrayIndex(key)) {
+          observe(items[key]);
+        }
+      }
+      return
+    }
+
+    for (var i = 0; i < l; i++) {
+      if (i in items) {
+        observe(items[i]);
+      }
     }
   };
 

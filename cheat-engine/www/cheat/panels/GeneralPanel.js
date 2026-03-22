@@ -9,6 +9,10 @@ export default {
     class="ma-0 pa-0"
     flat>
     <v-card-subtitle class="pb-0 font-weight-bold">Edit</v-card-subtitle>
+
+    <v-card-text class="py-0 caption grey--text text--lighten-1">
+        Cheat version: {{cheatVersion}}, RPG maker: {{rpgMakerName}}, nwjs: {{nwjsNodeWebkitVersion}} {{nwjsFlavor}}
+    </v-card-text>
     
     <v-card-text 
         class="py-0">
@@ -182,7 +186,12 @@ export default {
             maxGameSpeed: 10,
             stepGameSpeed: 0.1,
             applyAllForGameSpeed: false,
-            applyBattleForGameSpeed: false
+            applyBattleForGameSpeed: false,
+
+            cheatVersion: 'unknown',
+            rpgMakerName: 'unknown',
+            nwjsNodeWebkitVersion: 'unknown',
+            nwjsFlavor: 'unknown'
         }
     },
 
@@ -198,6 +207,7 @@ export default {
             SceneCheat: root.SceneCheat || SceneCheat
         }
 
+        this.refreshRuntimeInfo()
         this.initializeVariables()
     },
 
@@ -208,6 +218,33 @@ export default {
                 return root
             }
             return window
+        },
+
+        refreshRuntimeInfo () {
+            const root = this.getRootWindow()
+
+            this.rpgMakerName = root && root.Utils && root.Utils.RPGMAKER_NAME
+                ? root.Utils.RPGMAKER_NAME
+                : 'unknown'
+
+            const versions = root && root.process && root.process.versions
+                ? root.process.versions
+                : null
+            this.nwjsNodeWebkitVersion = versions && versions['node-webkit']
+                ? versions['node-webkit']
+                : 'unknown'
+            this.nwjsFlavor = versions && versions['nw-flavor']
+                ? versions['nw-flavor']
+                : 'unknown'
+
+            const mainComponent = this.rootMainComponent || root.__CHEAT_MAIN_COMPONENT__
+            if (mainComponent && typeof mainComponent.getCurrentCheatVersion === 'function') {
+                const version = mainComponent.getCurrentCheatVersion()
+                this.cheatVersion = version || 'unknown'
+                return
+            }
+
+            this.cheatVersion = 'unknown'
         },
 
         initializeVariables () {
@@ -230,6 +267,8 @@ export default {
             const options = gameSpeedCheat && gameSpeedCheat.sceneOptions ? gameSpeedCheat.sceneOptions() : { all: null, battle: null }
             this.applyAllForGameSpeed = gameSpeedSceneOption === options.all
             this.applyBattleForGameSpeed = gameSpeedSceneOption === options.battle
+
+            this.refreshRuntimeInfo()
         },
 
         onNoClipChange () {
