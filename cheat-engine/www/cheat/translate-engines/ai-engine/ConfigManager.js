@@ -5,16 +5,16 @@
  */
 
 export class ConfigManager {
-    constructor(aiEngine) {
-        this.aiEngine = aiEngine;
-    }
+  constructor(aiEngine) {
+    this.aiEngine = aiEngine;
+  }
 
-    /**
-     * Get Vue template for configuration UI
-     * @returns {string}
-     */
-    getTemplate() {
-        return `
+  /**
+   * Get Vue template for configuration UI
+   * @returns {string}
+   */
+  getTemplate() {
+    return `
            <div v-if="translationEngine === 'openApi' || translationEngine === 'gpt4all'" class="mt-3">
                        <v-select
                            v-model="aiProvider"
@@ -138,144 +138,162 @@ export class ConfigManager {
                            class="mb-2"
                        ></v-textarea>
         `;
+  }
+
+  /**
+   * Get configuration data object for panel binding
+   * @returns {Object}
+   */
+  getData() {
+    return {
+      aiProvider: this.aiEngine.provider,
+      aiProviderOptions: [
+        { text: "OpenAPI compatible", value: "openApi" },
+        { text: "Open WebUI", value: "openwebui" },
+      ],
+      aiHost: this.aiEngine.host,
+      aiApiKey: this.aiEngine.apiKey,
+      aiSelectedModel: this.aiEngine.selectedModel,
+      aiModels: this.aiEngine.models,
+      aiLoadingModels: this.aiEngine.loadingModels,
+      aiModelsError: this.aiEngine.modelsError,
+      aiAllowNewlineMismatch: this.aiEngine.allowNewlineMismatch,
+      aiAskIfTextTranslated: this.aiEngine.askAiIfTextTranslated,
+      aiInvalidJsonHandlingStrategy: this.aiEngine.invalidJsonHandlingStrategy,
+      aiInvalidJsonHandlingStrategyOptions: [
+        { text: "Resend first half of items", value: "resendFirstHalf" },
+        { text: "Ask AI to fix JSON", value: "askAIToFix" },
+        { text: "Use JSON fixer API", value: "useJsonFixer" },
+        { text: "None (fail)", value: "none" },
+      ],
+      aiSystemPrompt: this.aiEngine.systemPrompt,
+      aiFixRecursionMaxDepth: this.aiEngine._aiFixRecursionMaxDepth,
+      useJsonFixer: this.aiEngine.useJsonFixer,
+    };
+  }
+
+  /**
+   * Get configuration methods (handlers)
+   * @returns {Object}
+   */
+  getMethods() {
+    return {
+      fetchAiModels: () => this._fetchAiModels(),
+      onChangeAiProvider: (v) => this._onChangeAiProvider(v),
+      onChangeAiHost: (v) => {
+        this.aiEngine.host = v;
+      },
+      onChangeAiApiKey: (v) => {
+        this.aiEngine.apiKey = v;
+      },
+      onChangeAiModel: (v) => {
+        this.aiEngine.selectedModel = v;
+      },
+      onChangeAiAllowNewlineMismatch: (v) => {
+        this.aiEngine.allowNewlineMismatch = v;
+      },
+      onChangeAiAskIfTextTranslated: (v) => {
+        this.aiEngine.askAiIfTextTranslated = v;
+      },
+      onChangeAiInvalidJsonHandlingStrategy: (v) => {
+        this.aiEngine.invalidJsonHandlingStrategy = v;
+      },
+      onChangeAiSystemPrompt: (v) => {
+        this.aiEngine.systemPrompt = v;
+      },
+      onChangeAiFixRecursionMaxDepth: (v) => {
+        this.aiEngine._aiFixRecursionMaxDepth = v;
+      },
+      onChangeUseJsonFixer: (v) => {
+        this.aiEngine.useJsonFixer = v;
+      },
+    };
+  }
+
+  /**
+   * Check if engine is fully configured
+   * @returns {boolean}
+   */
+  isReady() {
+    return !!this.aiEngine.selectedModel;
+  }
+
+  /**
+   * Fetch available models from API
+   * @returns {Promise<void>}
+   */
+  async _fetchAiModels() {
+    this.aiEngine.loadingModels = true;
+    this.aiEngine.modelsError = "";
+
+    try {
+      const endpoint = this._getModelsUrl();
+      const headers = this._getAuthHeaders();
+      const response = await fetch(endpoint, { headers });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      let models = [];
+
+      if (this.aiEngine.provider === "openwebui") {
+        models = data.data?.map((m) => m.id) || [];
+      } else {
+        models = data.data?.map((m) => m.id) || [];
+      }
+
+      this.aiEngine.models = models;
+      console.log("[ConfigManager] Fetched models:", models);
+    } catch (error) {
+      this.aiEngine.modelsError = error.message;
+      console.error("[ConfigManager] Failed to fetch models:", error.message);
+    } finally {
+      this.aiEngine.loadingModels = false;
     }
+  }
 
-    /**
-     * Get configuration data object for panel binding
-     * @returns {Object}
-     */
-    getData() {
-        return {
-            aiProvider: this.aiEngine.provider,
-            aiProviderOptions: [
-                { text: 'OpenAPI compatible', value: 'openApi' },
-                { text: 'Open WebUI', value: 'openwebui' }
-            ],
-            aiHost: this.aiEngine.host,
-            aiApiKey: this.aiEngine.apiKey,
-            aiSelectedModel: this.aiEngine.selectedModel,
-            aiModels: this.aiEngine.models,
-            aiLoadingModels: this.aiEngine.loadingModels,
-            aiModelsError: this.aiEngine.modelsError,
-            aiAllowNewlineMismatch: this.aiEngine.allowNewlineMismatch,
-            aiAskIfTextTranslated: this.aiEngine.askAiIfTextTranslated,
-            aiInvalidJsonHandlingStrategy: this.aiEngine.invalidJsonHandlingStrategy,
-            aiInvalidJsonHandlingStrategyOptions: [
-                { text: 'Resend first half of items', value: 'resendFirstHalf' },
-                { text: 'Ask AI to fix JSON', value: 'askAIToFix' },
-                { text: 'Use JSON fixer API', value: 'useJsonFixer' },
-                { text: 'None (fail)', value: 'none' }
-            ],
-            aiSystemPrompt: this.aiEngine.systemPrompt,
-            aiFixRecursionMaxDepth: this.aiEngine._aiFixRecursionMaxDepth,
-            useJsonFixer: this.aiEngine.useJsonFixer
-        };
+  /**
+   * Handle provider change
+   * @private
+   */
+  _onChangeAiProvider(provider) {
+    this.aiEngine.provider = provider === "gpt4all" ? "openApi" : provider;
+
+    // Reset models and selected model
+    this.aiEngine.models = [];
+    this.aiEngine.selectedModel = "";
+
+    // Adjust default host
+    if (provider === "openwebui") {
+      this.aiEngine.host = "http://localhost:8080";
+    } else {
+      this.aiEngine.host = "http://localhost:4891";
     }
+  }
 
-    /**
-     * Get configuration methods (handlers)
-     * @returns {Object}
-     */
-    getMethods() {
-        return {
-            fetchAiModels: () => this._fetchAiModels(),
-            onChangeAiProvider: (v) => this._onChangeAiProvider(v),
-            onChangeAiHost: (v) => { this.aiEngine.host = v; },
-            onChangeAiApiKey: (v) => { this.aiEngine.apiKey = v; },
-            onChangeAiModel: (v) => { this.aiEngine.selectedModel = v; },
-            onChangeAiAllowNewlineMismatch: (v) => { this.aiEngine.allowNewlineMismatch = v; },
-            onChangeAiAskIfTextTranslated: (v) => { this.aiEngine.askAiIfTextTranslated = v; },
-            onChangeAiInvalidJsonHandlingStrategy: (v) => { this.aiEngine.invalidJsonHandlingStrategy = v; },
-            onChangeAiSystemPrompt: (v) => { this.aiEngine.systemPrompt = v; },
-            onChangeAiFixRecursionMaxDepth: (v) => { this.aiEngine._aiFixRecursionMaxDepth = v; },
-            onChangeUseJsonFixer: (v) => { this.aiEngine.useJsonFixer = v; }
-        };
+  /**
+   * Get models endpoint
+   * @private
+   */
+  _getModelsUrl() {
+    const host = this.aiEngine.host || "http://localhost:4891";
+    if (this.aiEngine.provider === "openwebui") {
+      return `${host}/api/models`;
     }
+    return `${host}/v1/models`;
+  }
 
-    /**
-     * Check if engine is fully configured
-     * @returns {boolean}
-     */
-    isReady() {
-        return !!this.aiEngine.selectedModel;
+  /**
+   * Get auth headers
+   * @private
+   */
+  _getAuthHeaders() {
+    const headers = { "Content-Type": "application/json" };
+    if (this.aiEngine.provider === "openwebui" && this.aiEngine.apiKey) {
+      headers["Authorization"] = `Bearer ${this.aiEngine.apiKey}`;
     }
-
-    /**
-     * Fetch available models from API
-     * @returns {Promise<void>}
-     */
-    async _fetchAiModels() {
-        this.aiEngine.loadingModels = true;
-        this.aiEngine.modelsError = '';
-
-        try {
-            const endpoint = this._getModelsUrl();
-            const headers = this._getAuthHeaders();
-            const response = await fetch(endpoint, { headers });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-
-            const data = await response.json();
-            let models = [];
-
-            if (this.aiEngine.provider === 'openwebui') {
-                models = data.data?.map(m => m.id) || [];
-            } else {
-                models = data.data?.map(m => m.id) || [];
-            }
-
-            this.aiEngine.models = models;
-            console.log('[ConfigManager] Fetched models:', models);
-        } catch (error) {
-            this.aiEngine.modelsError = error.message;
-            console.error('[ConfigManager] Failed to fetch models:', error.message);
-        } finally {
-            this.aiEngine.loadingModels = false;
-        }
-    }
-
-    /**
-     * Handle provider change
-     * @private
-     */
-    _onChangeAiProvider(provider) {
-        this.aiEngine.provider = provider === 'gpt4all' ? 'openApi' : provider;
-
-        // Reset models and selected model
-        this.aiEngine.models = [];
-        this.aiEngine.selectedModel = '';
-
-        // Adjust default host
-        if (provider === 'openwebui') {
-            this.aiEngine.host = 'http://localhost:8080';
-        } else {
-            this.aiEngine.host = 'http://localhost:4891';
-        }
-    }
-
-    /**
-     * Get models endpoint
-     * @private
-     */
-    _getModelsUrl() {
-        const host = this.aiEngine.host || 'http://localhost:4891';
-        if (this.aiEngine.provider === 'openwebui') {
-            return `${host}/api/models`;
-        }
-        return `${host}/v1/models`;
-    }
-
-    /**
-     * Get auth headers
-     * @private
-     */
-    _getAuthHeaders() {
-        const headers = { 'Content-Type': 'application/json' };
-        if (this.aiEngine.provider === 'openwebui' && this.aiEngine.apiKey) {
-            headers['Authorization'] = `Bearer ${this.aiEngine.apiKey}`;
-        }
-        return headers;
-    }
+    return headers;
+  }
 }

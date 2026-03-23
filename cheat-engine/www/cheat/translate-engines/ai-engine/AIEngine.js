@@ -43,6 +43,7 @@ class AIEngine extends BaseTranslationEngine {
     // State tracking
     this._activeAbortController = null;
     this._activeRequestMeta = null;
+    this._requestQueueTail = Promise.resolve();
 
     // Initialize services
     this.tagManager = new TagManager(panel);
@@ -306,6 +307,17 @@ class AIEngine extends BaseTranslationEngine {
     return map[code] || code;
   }
 
+  parseTranslatedMapFromText(text, expectedKeys = []) {
+    const merged = StreamJsonParser.mergeTopLevelObjects(text);
+    if (merged && typeof merged === "object") {
+      return merged;
+    }
+
+    return StreamJsonParser.parseObjectStrict(
+      StreamJsonParser.extractBestJsonLike(text, expectedKeys),
+    );
+  }
+
   /**
    * Main translation orchestrator
    * Coordinates: preprocessing → request → stream monitoring → validation → postprocessing
@@ -330,9 +342,11 @@ class AIEngine extends BaseTranslationEngine {
       const itemData = items.map((item, i) => {
         const { preprocessedText, tagCounts, caseMap } =
           this.tagManager.preprocessTags(item.value || "");
+        const shortTag = TYPE_TO_TAG[item.type] || item.type;
         return {
           ...item,
           index: i,
+          jsonKey: `${shortTag}${i}`,
           preprocessed: preprocessedText,
           tagCounts,
           caseMap,
@@ -341,9 +355,7 @@ class AIEngine extends BaseTranslationEngine {
 
       const jsonMap = {};
       itemData.forEach((item) => {
-        const shortTag = TYPE_TO_TAG[item.type] || item.type;
-        const key = `${shortTag}${item.index}`;
-        jsonMap[key] = item.preprocessed;
+        jsonMap[item.jsonKey] = item.preprocessed;
       });
 
       const allTextForHints = itemData
@@ -398,37 +410,49 @@ class AIEngine extends BaseTranslationEngine {
 
       if (!streamResult.text && !streamResult.bestMap) {
         console.warn("[AIEngine] Batch returned no content");
+        const cancelReason = streamResult.cancelReason || null;
+        const preempted =
+          cancelReason === REQUEST_CANCEL_REASON.BACKGROUND_PREEMPTED;
         return {
           successes: [],
           failures: items.map((item) => ({
             ...item,
-            rejectReason: "No content",
+            rejectReason: cancelReason || "No content",
+            cancelReason,
+            preempted,
           })),
         };
       }
 
       let rawTranslated = streamResult.text || "";
       let translatedMap = null;
+      let usedStreamFallback = false;
 
       // 4. PARSE JSON
       const streamPartialMatchedKeys = StreamGuardrails.countMatchedKeys(
         streamResult.bestMap,
         expectedKeys,
       );
-      if (streamPartialMatchedKeys > 0) {
+      const streamBestMapComplete = StreamGuardrails.isMapComplete(
+        streamResult.bestMap,
+        expectedKeys,
+      );
+      if (streamBestMapComplete) {
         translatedMap = streamResult.bestMap;
+        usedStreamFallback = true;
       }
 
       const guardrailPartialMap = !!(
         streamResult.cancelledByGuardrail &&
-        translatedMap &&
-        !StreamGuardrails.isMapComplete(translatedMap, expectedKeys)
+        streamResult.bestMap &&
+        !streamBestMapComplete
       );
 
       try {
         if (!translatedMap) {
-          translatedMap = StreamJsonParser.parseObjectStrict(
-            StreamJsonParser.extractJsonLike(rawTranslated),
+          translatedMap = this.parseTranslatedMapFromText(
+            rawTranslated,
+            expectedKeys,
           );
         }
       } catch (parseError) {
@@ -438,9 +462,10 @@ class AIEngine extends BaseTranslationEngine {
         );
 
         // Try stream guardrail partial
-        if (streamResult.cancelledByGuardrail && streamPartialMatchedKeys > 0) {
+        if (streamPartialMatchedKeys > 0) {
           translatedMap = streamResult.bestMap;
           rawTranslated = JSON.stringify(streamResult.bestMap);
+          usedStreamFallback = true;
         } else {
           // Retry error handling
           const retryResult = await this.retryHandler.handleJsonError({
@@ -458,6 +483,10 @@ class AIEngine extends BaseTranslationEngine {
                 ...item,
                 rejectReason:
                   streamResult.cancelReason || "Invalid JSON response",
+                cancelReason: streamResult.cancelReason || null,
+                preempted:
+                  streamResult.cancelReason ===
+                  REQUEST_CANCEL_REASON.BACKGROUND_PREEMPTED,
               })),
             };
           }
@@ -468,10 +497,9 @@ class AIEngine extends BaseTranslationEngine {
 
           // Try to parse retry response
           try {
-            translatedMap = StreamJsonParser.parseObjectStrict(
-              StreamJsonParser.extractJsonLike(
-                retryResult.response || retryResult.repaired,
-              ),
+            translatedMap = this.parseTranslatedMapFromText(
+              retryResult.response || retryResult.repaired,
+              expectedKeys,
             );
             rawTranslated =
               retryResult.response || JSON.stringify(retryResult.repaired);
@@ -480,33 +508,72 @@ class AIEngine extends BaseTranslationEngine {
               "[AIEngine] Retry parse failed:",
               retryParseError.message,
             );
-            return {
-              successes: [],
-              failures: items.map((item) => ({
-                ...item,
-                rejectReason: "Invalid JSON after retry",
-              })),
-            };
+            if (streamPartialMatchedKeys > 0) {
+              translatedMap = streamResult.bestMap;
+              rawTranslated = JSON.stringify(streamResult.bestMap);
+              usedStreamFallback = true;
+            } else {
+              return {
+                successes: [],
+                failures: items.map((item) => ({
+                  ...item,
+                  rejectReason: "Invalid JSON after retry",
+                })),
+              };
+            }
           }
         }
       }
 
       // 5. VALIDATION
-      const shapeCheck = this.validationService.validateTranslatedMapShape(
+      let shapeCheck = this.validationService.validateTranslatedMapShape(
         translatedMap,
         itemData,
       );
-      if (!shapeCheck.valid && !guardrailPartialMap) {
+      translatedMap = shapeCheck.normalizedMap || translatedMap;
+
+      if (
+        !shapeCheck.valid &&
+        !usedStreamFallback &&
+        streamPartialMatchedKeys
+      ) {
+        translatedMap = streamResult.bestMap;
+        rawTranslated = JSON.stringify(streamResult.bestMap);
+        usedStreamFallback = true;
+        shapeCheck = this.validationService.validateTranslatedMapShape(
+          translatedMap,
+          itemData,
+        );
+        translatedMap = shapeCheck.normalizedMap || translatedMap;
+      }
+
+      if (!shapeCheck.valid && !guardrailPartialMap && !usedStreamFallback) {
         console.warn(
           "[AIEngine] Response JSON has invalid shape:",
           shapeCheck.errors,
         );
+        const missingKeySet = new Set(shapeCheck.missingKeys || []);
+        const nonStringKeySet = new Set(shapeCheck.nonStringKeys || []);
         return {
           successes: [],
-          failures: items.map((item) => ({
-            ...item,
-            rejectReason: `Invalid response shape: ${shapeCheck.errors[0]}`,
-          })),
+          failures: items.map((item, idx) => {
+            const mappedItem = itemData[idx] || item;
+            const key =
+              mappedItem.jsonKey ||
+              `${TYPE_TO_TAG[mappedItem.type] || mappedItem.type}${mappedItem.index || 0}`;
+
+            let reason = shapeCheck.errors[0] || "Invalid response shape";
+            if (missingKeySet.has(key)) {
+              reason = `Missing key: ${key}`;
+            } else if (nonStringKeySet.has(key)) {
+              reason = `Key \"${key}\" is not a string`;
+            }
+
+            return {
+              ...item,
+              rejectReason: `Invalid response shape: ${reason}`,
+            };
+          }),
         };
       }
 
@@ -542,8 +609,9 @@ class AIEngine extends BaseTranslationEngine {
       const failures = [];
 
       for (const itemD of itemData) {
-        const shortTag = TYPE_TO_TAG[itemD.type] || itemD.type;
-        const key = `${shortTag}${itemD.index}`;
+        const key =
+          itemD.jsonKey ||
+          `${TYPE_TO_TAG[itemD.type] || itemD.type}${itemD.index}`;
         const rawSlice = translatedMap[key];
 
         if (rawSlice === undefined || rawSlice === null) {
@@ -628,6 +696,7 @@ class AIEngine extends BaseTranslationEngine {
    * Request chat completion with streaming and guardrails
    */
   async requestChatCompletion(payload, options = {}) {
+    return this.enqueueRequest(async () => {
     const expectedKeys = options.expectedKeys || [];
     const isBackgroundJob = !!options.isBackgroundJob;
 
@@ -650,9 +719,29 @@ class AIEngine extends BaseTranslationEngine {
         throw new Error(`HTTP ${response.status}`);
       }
 
+      const contentType = (
+        response.headers.get("content-type") || ""
+      ).toLowerCase();
+      const isEventStream = contentType.includes("text/event-stream");
+
+      if (!isEventStream) {
+        const rawBodyText = await response.text();
+        const assistantText =
+          this.extractAssistantTextFromApiResponse(rawBodyText);
+        const { text: cleanedText } = stripThinkBlocks(assistantText);
+
+        return {
+          text: cleanedText,
+          bestMap: null,
+          cancelledByGuardrail: false,
+          cancelReason: null,
+        };
+      }
+
       // Parse streaming response
       const monitorState = StreamGuardrails.createMonitorState(expectedKeys);
-      let rawText = "";
+      let contentText = ""; // accumulated assistant content only
+      let sseBuffer = ""; // buffer for partial SSE lines
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -662,12 +751,33 @@ class AIEngine extends BaseTranslationEngine {
         if (done) break;
 
         const chunk = decoder.decode(value, { stream: true });
-        rawText += chunk;
+        sseBuffer += chunk;
 
-        // Check guardrails periodically
+        // Process complete SSE lines
+        const lines = sseBuffer.split("\n");
+        sseBuffer = lines.pop(); // last element may be incomplete
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed === "data: [DONE]") continue;
+          if (!trimmed.startsWith("data:")) continue;
+          try {
+            const dataPayload = trimmed.slice(5).trim();
+            if (!dataPayload || dataPayload === "[DONE]") continue;
+            const json = JSON.parse(dataPayload);
+            const delta = json?.choices?.[0]?.delta?.content;
+            if (typeof delta === "string") {
+              contentText += delta;
+            }
+          } catch (e) {
+            // skip malformed SSE line
+          }
+        }
+
+        // Check guardrails on accumulated content
         const guardrailResult = StreamGuardrails.checkGuardrails(
           monitorState,
-          rawText,
+          contentText,
           false,
         );
         if (guardrailResult.shouldCancel) {
@@ -681,7 +791,7 @@ class AIEngine extends BaseTranslationEngine {
       }
 
       // Strip think blocks if present
-      const { text: cleanedText } = stripThinkBlocks(rawText);
+      const { text: cleanedText } = stripThinkBlocks(contentText);
 
       return {
         text: cleanedText,
@@ -691,11 +801,20 @@ class AIEngine extends BaseTranslationEngine {
       };
     } catch (error) {
       if (error.name === "AbortError") {
+        const externalCancelReason =
+          this._activeRequestMeta && this._activeRequestMeta.externalCancelReason
+            ? this._activeRequestMeta.externalCancelReason
+            : null;
+        const cancelReason =
+          externalCancelReason ||
+          (isBackgroundJob
+            ? REQUEST_CANCEL_REASON.BACKGROUND_PREEMPTED
+            : REQUEST_CANCEL_REASON.REQUEST_ABORTED);
         return {
           text: "",
           bestMap: null,
           cancelledByGuardrail: true,
-          cancelReason: REQUEST_CANCEL_REASON.BACKGROUND_PREEMPTED,
+          cancelReason,
         };
       }
       throw error;
@@ -703,6 +822,13 @@ class AIEngine extends BaseTranslationEngine {
       this._activeAbortController = null;
       this._activeRequestMeta = null;
     }
+    });
+  }
+
+  enqueueRequest(task) {
+    const run = this._requestQueueTail.then(task, task);
+    this._requestQueueTail = run.catch(() => {});
+    return run;
   }
 
   getChatUrl() {
@@ -715,6 +841,62 @@ class AIEngine extends BaseTranslationEngine {
     return this.provider === "openwebui"
       ? `${host}/api/chat/completions`
       : `${host}/v1/chat/completions`;
+  }
+
+  extractAssistantTextFromApiResponse(rawBodyText) {
+    if (typeof rawBodyText !== "string" || rawBodyText.trim() === "") {
+      return "";
+    }
+
+    try {
+      const parsed = JSON.parse(rawBodyText);
+
+      if (typeof parsed === "string") {
+        return parsed;
+      }
+
+      if (!parsed || typeof parsed !== "object") {
+        return rawBodyText;
+      }
+
+      if (parsed.message && typeof parsed.message.content === "string") {
+        return parsed.message.content;
+      }
+
+      if (typeof parsed.response === "string") {
+        return parsed.response;
+      }
+
+      if (typeof parsed.content === "string") {
+        return parsed.content;
+      }
+
+      if (typeof parsed.output_text === "string") {
+        return parsed.output_text;
+      }
+
+      const firstChoice =
+        parsed && Array.isArray(parsed.choices) ? parsed.choices[0] : null;
+      if (firstChoice) {
+        const messageContent =
+          firstChoice.message && typeof firstChoice.message.content === "string"
+            ? firstChoice.message.content
+            : null;
+        if (messageContent !== null) {
+          return messageContent;
+        }
+
+        const textContent =
+          typeof firstChoice.text === "string" ? firstChoice.text : null;
+        if (textContent !== null) {
+          return textContent;
+        }
+      }
+    } catch (e) {
+      // Not a JSON envelope, treat body as direct text response.
+    }
+
+    return rawBodyText;
   }
 
   getRequestHeaders() {
@@ -739,6 +921,21 @@ class AIEngine extends BaseTranslationEngine {
       }
     }
     return false;
+  }
+
+  hasActiveBackgroundRequest() {
+    return !!(
+      this._activeAbortController &&
+      this._activeRequestMeta &&
+      this._activeRequestMeta.isBackgroundJob
+    );
+  }
+
+  cancelActiveBackgroundRequest() {
+    if (!this.hasActiveBackgroundRequest()) {
+      return false;
+    }
+    return this.cancelActiveRequest(REQUEST_CANCEL_REASON.BACKGROUND_PREEMPTED);
   }
 }
 
