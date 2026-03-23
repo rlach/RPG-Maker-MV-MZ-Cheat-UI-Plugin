@@ -1,3 +1,5 @@
+import { BatchSummaryReporter } from "./BatchSummaryReporter.js";
+
 export class BatchProgressTracker {
   constructor(panel) {
     this.panel = panel;
@@ -66,36 +68,21 @@ export class BatchProgressTracker {
     const title = this.paused
       ? `batch paused by OTF - ${this.currentStepLabel}`
       : this.currentStepLabel;
-    const progress = `${this.currentProcessed}/${this.currentTotal}`;
-    const percent =
-      this.currentTotal > 0
-        ? Math.round((this.currentProcessed / this.currentTotal) * 100)
-        : 100;
-
-    let messageLine = `${progress} (${percent}%)`;
-    if (this.currentStepErrors > 0 && this.currentStepProcessed > 0) {
-      const currentStepErrorPercent = Math.round(
-        (this.currentStepErrors / this.currentStepProcessed) * 100,
-      );
-      messageLine += ` | errors: ${this.currentStepErrors}/${this.currentStepProcessed} (${currentStepErrorPercent}%)`;
-    }
-
-    let totalErrorsLine = null;
-    if (this.totalErrors > 0) {
-      const processedForTotalErrors = Math.max(0, this.currentProcessed);
-      const totalErrorPercent =
-        processedForTotalErrors > 0
-          ? Math.round((this.totalErrors / processedForTotalErrors) * 100)
-          : 0;
-      totalErrorsLine = `total errors: ${this.totalErrors}/${processedForTotalErrors} (${totalErrorPercent}%)`;
-    }
+    const progress = BatchSummaryReporter.buildProgress({
+      title,
+      processed: this.currentProcessed,
+      total: this.currentTotal,
+      currentStepErrors: this.currentStepErrors,
+      currentStepProcessed: this.currentStepProcessed,
+      totalErrors: this.totalErrors,
+    });
 
     this.panel.updateProgressBox(
-      title,
-      messageLine,
+      progress.title,
+      progress.message,
       null,
       null,
-      totalErrorsLine,
+      progress.totalErrorsLine,
     );
   }
 }

@@ -11,6 +11,7 @@ import {
   createEngine,
   getAvailableEngines,
 } from "../translate-engines/index.js";
+import { BatchSummaryReporter } from "../translate-engines/batch-manager/BatchSummaryReporter.js";
 import { TranslationBatchManager } from "../translate-engines/batch-manager/TranslationBatchManager.js";
 import { translateOnTheFlyFlowMethods } from "./translate-on-the-fly/TranslateOnTheFlyFlowMethods.js";
 import { translateOnTheFlyRuntimeMethods } from "./translate-on-the-fly/TranslateOnTheFlyRuntimeMethods.js";
@@ -758,7 +759,9 @@ export default {
 
           if (cmd.code === 101) {
             const speaker = (cmd.parameters && cmd.parameters[4]) || "";
-            const speakerKey = speaker ? this.getCacheKey(speaker, "speaker") : null;
+            const speakerKey = speaker
+              ? this.getCacheKey(speaker, "speaker")
+              : null;
             if (speakerKey) {
               total++;
               if (!this.hasUsableCacheValue(speakerKey)) {
@@ -768,8 +771,14 @@ export default {
 
             let j = i + 1;
             const lines = [];
-            while (j < entry.list.length && entry.list[j] && entry.list[j].code === 401) {
-              lines.push(entry.list[j].parameters && entry.list[j].parameters[0]);
+            while (
+              j < entry.list.length &&
+              entry.list[j] &&
+              entry.list[j].code === 401
+            ) {
+              lines.push(
+                entry.list[j].parameters && entry.list[j].parameters[0],
+              );
               j += 1;
             }
 
@@ -789,11 +798,17 @@ export default {
             const choices = cmd.parameters && cmd.parameters[0];
             if (Array.isArray(choices)) {
               for (const choice of choices) {
-                if (!choice || typeof choice !== "string" || choice.trim() === "") {
+                if (
+                  !choice ||
+                  typeof choice !== "string" ||
+                  choice.trim() === ""
+                ) {
                   continue;
                 }
                 total++;
-                if (!this.hasUsableCacheValue(this.getCacheKey(choice, "choice"))) {
+                if (
+                  !this.hasUsableCacheValue(this.getCacheKey(choice, "choice"))
+                ) {
                   left++;
                 }
               }
@@ -1194,8 +1209,12 @@ export default {
 
       const stats = this.getObjectTranslationStats();
       const extraIds = new Set(["commonEvents", "mapEvents"]);
-      const commonEventsStats = stats.find((item) => item.id === "commonEvents") || this.countCommonEventsStats();
-      const mapEventsStats = stats.find((item) => item.id === "mapEvents") || this.countMapEventsStats();
+      const commonEventsStats =
+        stats.find((item) => item.id === "commonEvents") ||
+        this.countCommonEventsStats();
+      const mapEventsStats =
+        stats.find((item) => item.id === "mapEvents") ||
+        this.countMapEventsStats();
 
       this.objectTranslationModalStats = stats.filter(
         (item) => !extraIds.has(item.id),
@@ -2522,6 +2541,7 @@ export default {
 
     async translateAllMaps() {
       try {
+        const startedAt = Date.now();
         // Check if engine is configured
         if (!this.engine || !this.isEngineFullyConfigured()) {
           Alert.error("Translation engine not fully configured");
@@ -2550,6 +2570,9 @@ export default {
 
         let totalTranslated = 0;
         let totalFailed = 0;
+        let totalTarget = 0;
+        const aggregatedErrorStats =
+          BatchSummaryReporter.createErrorStatsAccumulator();
 
         console.log("[TranslateOnTheFly] Translating common events first");
         try {
@@ -2568,6 +2591,11 @@ export default {
           if (result) {
             totalTranslated += result.successCount || 0;
             totalFailed += result.failureCount || 0;
+            totalTarget += result.totalCount || 0;
+            BatchSummaryReporter.mergeErrorStats(
+              aggregatedErrorStats,
+              result.stats,
+            );
           }
         } catch (error) {
           console.error(
@@ -2600,6 +2628,11 @@ export default {
             if (result) {
               totalTranslated += result.successCount || 0;
               totalFailed += result.failureCount || 0;
+              totalTarget += result.totalCount || 0;
+              BatchSummaryReporter.mergeErrorStats(
+                aggregatedErrorStats,
+                result.stats,
+              );
             }
           } catch (error) {
             console.error(
@@ -2610,12 +2643,16 @@ export default {
         }
 
         this.hideProgressBox();
-        console.log(
-          `[TranslateOnTheFly] All maps translation completed: ${totalTranslated} successes, ${totalFailed} failures`,
-        );
-        Alert.success(
-          `All maps translated! ${totalTranslated} messages translated, ${totalFailed} failures`,
-        );
+        const summary = BatchSummaryReporter.buildSummary({
+          batchLabel: "all maps translation",
+          totalItems: totalTarget,
+          successes: totalTranslated,
+          failures: totalFailed,
+          errorStats: aggregatedErrorStats,
+          durationMs: Date.now() - startedAt,
+        });
+        BatchSummaryReporter.showAlert(summary);
+        BatchSummaryReporter.logSummary(summary);
       } catch (error) {
         this.hideProgressBox();
         console.error("[TranslateOnTheFly] translateAllMaps error:", error);

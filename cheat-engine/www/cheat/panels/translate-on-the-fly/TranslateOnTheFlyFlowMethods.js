@@ -1,4 +1,5 @@
 import { Alert } from "../../js/AlertHelper.js";
+import { BatchSummaryReporter } from "../../translate-engines/batch-manager/BatchSummaryReporter.js";
 import { TranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManager.js";
 
 export const translateOnTheFlyFlowMethods = {
@@ -274,17 +275,23 @@ export const translateOnTheFlyFlowMethods = {
 
   updateObjectTranslationProgress() {
     const job = this.objectTranslationJob;
-    const successPercent =
-      job.totalTarget > 0
-        ? Math.round((job.totalDone / job.totalTarget) * 100)
-        : 100;
-    const errorPercent =
-      job.totalTarget > 0
-        ? Math.round((job.runErrors / job.totalTarget) * 100)
-        : 0;
-    const currentLine = `${job.currentDone}/${job.currentTotal} ${job.currentTypeLabel} translated`;
-    const totalLine = `${job.totalDone}/${job.totalTarget} translated (${successPercent}%) | total errors: ${job.runErrors}/${job.totalTarget} (${errorPercent}%)`;
-    this.updateProgressBox(currentLine, totalLine);
+    const progress = BatchSummaryReporter.buildProgress({
+      title: job.currentTypeLabel
+        ? `translating ${job.currentTypeLabel}`
+        : "translating object translation",
+      processed: job.currentDone,
+      total: job.currentTotal,
+      currentStepErrors: job.currentErrors,
+      currentStepProcessed: job.currentDone,
+      totalErrors: job.runErrors,
+    });
+    this.updateProgressBox(
+      progress.title,
+      progress.message,
+      null,
+      null,
+      progress.totalErrorsLine,
+    );
   },
 
   async runObjectTranslationJob(selectedTypeIds) {
@@ -321,24 +328,17 @@ export const translateOnTheFlyFlowMethods = {
       currentTypeLabel: "",
       currentDone: 0,
       currentTotal: 0,
+      currentErrors: 0,
       totalDone: 0,
       totalTarget,
       runErrors: 0,
     };
 
-    const aggregatedErrorTypes = {};
-    let recoveredErrors = 0;
+    const startedAt = Date.now();
+    const aggregatedErrorStats =
+      BatchSummaryReporter.createErrorStatsAccumulator();
     const mergeStats = (stats) => {
-      if (!stats || typeof stats !== "object") {
-        return;
-      }
-
-      recoveredErrors += Number(stats.recoveredErrors || 0);
-      const byType = stats.byType || {};
-      for (const key of Object.keys(byType)) {
-        aggregatedErrorTypes[key] =
-          (aggregatedErrorTypes[key] || 0) + Number(byType[key] || 0);
-      }
+      BatchSummaryReporter.mergeErrorStats(aggregatedErrorStats, stats);
     };
 
     try {
@@ -353,13 +353,15 @@ export const translateOnTheFlyFlowMethods = {
         this.objectTranslationJob.currentTypeLabel = stat.label;
         this.objectTranslationJob.currentDone = 0;
         this.objectTranslationJob.currentTotal = stat.left;
-        if (def.kind !== "mapEvents") {
+        this.objectTranslationJob.currentErrors = 0;
+        if (def.kind !== "mapEvents" && def.kind !== "gameArrays") {
           this.updateObjectTranslationProgress();
         }
 
         if (def.kind === "systemMessages") {
           const batchResult = await this.translateSystemMessagesBatch(true);
           this.objectTranslationJob.currentDone = stat.left;
+          this.objectTranslationJob.currentErrors = batchResult.failures;
           this.objectTranslationJob.totalDone += batchResult.successes;
           this.objectTranslationJob.runErrors += batchResult.failures;
           mergeStats(batchResult.stats);
@@ -370,6 +372,7 @@ export const translateOnTheFlyFlowMethods = {
         if (def.kind === "systemCommands") {
           const batchResult = await this.translateSystemCommandsBatch(true);
           this.objectTranslationJob.currentDone = stat.left;
+          this.objectTranslationJob.currentErrors = batchResult.failures;
           this.objectTranslationJob.totalDone += batchResult.successes;
           this.objectTranslationJob.runErrors += batchResult.failures;
           mergeStats(batchResult.stats);
@@ -378,11 +381,14 @@ export const translateOnTheFlyFlowMethods = {
         }
 
         if (def.kind === "gameArrays") {
-          await this.translateGameArrays();
-          const doneCount = stat.leftStrings || stat.left;
-          this.objectTranslationJob.currentDone = doneCount;
-          this.objectTranslationJob.totalDone += doneCount;
-          this.updateObjectTranslationProgress();
+          const batchResult = await this.translateGameArrays({
+            backgroundJob: true,
+            progressLabel: `translating ${stat.label}`,
+            showSummary: false,
+          });
+          this.objectTranslationJob.totalDone += batchResult.successCount || 0;
+          this.objectTranslationJob.runErrors += batchResult.failureCount || 0;
+          mergeStats(batchResult.stats);
           continue;
         }
 
@@ -400,6 +406,8 @@ export const translateOnTheFlyFlowMethods = {
             "translating common events",
           );
           this.objectTranslationJob.currentDone = stat.leftStrings || stat.left;
+          this.objectTranslationJob.currentErrors =
+            batchResult.failureCount || 0;
           this.objectTranslationJob.totalDone += batchResult.successCount || 0;
           this.objectTranslationJob.runErrors += batchResult.failureCount || 0;
           mergeStats(batchResult.stats);
@@ -420,9 +428,12 @@ export const translateOnTheFlyFlowMethods = {
               validMaps.length,
               `translating map ${mapNumber}/${validMaps.length}`,
             );
-            this.objectTranslationJob.totalDone += batchResult.successCount || 0;
-            this.objectTranslationJob.totalTarget += batchResult.totalCount || 0;
-            this.objectTranslationJob.runErrors += batchResult.failureCount || 0;
+            this.objectTranslationJob.totalDone +=
+              batchResult.successCount || 0;
+            this.objectTranslationJob.totalTarget +=
+              batchResult.totalCount || 0;
+            this.objectTranslationJob.runErrors +=
+              batchResult.failureCount || 0;
             mergeStats(batchResult.stats);
           }
 
@@ -458,6 +469,7 @@ export const translateOnTheFlyFlowMethods = {
             { backgroundJob: true },
           );
           this.objectTranslationJob.currentDone += batch.length;
+          this.objectTranslationJob.currentErrors += batchResult.failures;
           this.objectTranslationJob.totalDone += batchResult.successes;
           this.objectTranslationJob.runErrors += batchResult.failures;
           mergeStats(batchResult.stats);
@@ -465,36 +477,16 @@ export const translateOnTheFlyFlowMethods = {
         }
       }
 
-      const successPercent =
-        this.objectTranslationJob.totalTarget > 0
-          ? Math.round(
-              (this.objectTranslationJob.totalDone /
-                this.objectTranslationJob.totalTarget) *
-                100,
-            )
-          : 100;
-      const errorPercent =
-        this.objectTranslationJob.totalTarget > 0
-          ? Math.round(
-              (this.objectTranslationJob.runErrors /
-                this.objectTranslationJob.totalTarget) *
-                100,
-            )
-          : 0;
-      const typeParts = Object.keys(aggregatedErrorTypes).map(
-        (key) => `${key}: ${aggregatedErrorTypes[key]}`,
-      );
-      const breakdown =
-        typeParts.length > 0 ? `\nerror types: ${typeParts.join(", ")}` : "";
-
-      Alert.success(
-        `Object translation finished. ${this.objectTranslationJob.totalDone}/${this.objectTranslationJob.totalTarget} translated (${successPercent}%). total errors: ${this.objectTranslationJob.runErrors}/${this.objectTranslationJob.totalTarget} (${errorPercent}%). recovered errors using strategy: ${recoveredErrors}.${breakdown}`,
-        null,
-        5000,
-      );
-      console.log(
-        `[BatchSummary]\nobject translation finished\nsuccess: ${this.objectTranslationJob.totalDone}/${this.objectTranslationJob.totalTarget} (${successPercent}%)\ntotal errors: ${this.objectTranslationJob.runErrors}/${this.objectTranslationJob.totalTarget} (${errorPercent}%)\nrecovered errors using strategy: ${recoveredErrors}${breakdown ? `\n${breakdown}` : ""}`,
-      );
+      const summary = BatchSummaryReporter.buildSummary({
+        batchLabel: "object translation",
+        totalItems: this.objectTranslationJob.totalTarget,
+        successes: this.objectTranslationJob.totalDone,
+        failures: this.objectTranslationJob.runErrors,
+        errorStats: aggregatedErrorStats,
+        durationMs: Date.now() - startedAt,
+      });
+      BatchSummaryReporter.showAlert(summary);
+      BatchSummaryReporter.logSummary(summary);
     } catch (error) {
       console.error(
         "[TranslateOnTheFly] Object translation job failed:",
@@ -1094,10 +1086,6 @@ export const translateOnTheFlyFlowMethods = {
 
         this.replaceChoiceText(translatedChoices);
       }
-
-      console.log(
-        `[TranslateOnTheFly] Batch complete: ${result.successes.length} successes, ${result.failures.length} failures`,
-      );
     } catch (error) {
       console.error("[TranslateOnTheFly] Ahead translation error:", error);
       if (pendingKeys) {

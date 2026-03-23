@@ -68,11 +68,7 @@ export class TranslationBatchManager {
     try {
       for (let i = 0; i < batches.length; i++) {
         const batch = batches[i];
-        this.progressTracker.updateStep(
-          stepLabel,
-          processed,
-          safeItems.length,
-        );
+        this.progressTracker.updateStep(stepLabel, processed, safeItems.length);
 
         let successes = [];
         let failures = [];
@@ -147,11 +143,7 @@ export class TranslationBatchManager {
         }
 
         processed += batch.length;
-        this.progressTracker.updateStep(
-          stepLabel,
-          processed,
-          safeItems.length,
-        );
+        this.progressTracker.updateStep(stepLabel, processed, safeItems.length);
         this.progressTracker.updateCurrentStepErrors(
           failures.length,
           batch.length,

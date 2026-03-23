@@ -1,16 +1,17 @@
-import { KeyValueStorage } from '../js/KeyValueStorage.js'
-import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js'
+import { KeyValueStorage } from "../js/KeyValueStorage.js";
+import { getRowsPerPage, setRowsPerPage } from "../js/TableSettings.js";
+import { BatchSummaryReporter } from "../translate-engines/batch-manager/BatchSummaryReporter.js";
 import {
-    ensureTranslateCacheRuntime,
-    notifyTranslateCacheRuntimeChanged,
-    onTranslateCacheRuntimeChanged,
-    parseCacheKeyForLangPair
-} from '../js/TranslateCacheRuntime.js'
+  ensureTranslateCacheRuntime,
+  notifyTranslateCacheRuntimeChanged,
+  onTranslateCacheRuntimeChanged,
+  parseCacheKeyForLangPair,
+} from "../js/TranslateCacheRuntime.js";
 
 export default {
-    name: 'TranslateCacheManagerPanel',
+  name: "TranslateCacheManagerPanel",
 
-    template: `
+  template: `
 <v-card flat class="ma-0 pa-0">
     <v-card-title class="subtitle-1 font-weight-bold pb-1">
         Translation Cache Manager
@@ -122,531 +123,593 @@ export default {
 </v-card>
     `,
 
-    data () {
-        return {
-            searchInput: '',
-            search: '',
-            page: 1,
-            rowsPerPage: getRowsPerPage(),
-            sortBy: 'seenSort',
-            sortDesc: true,
-            sourceLang: 'ja',
-            targetLang: 'en',
-            entries: [],
-            draftByKey: {},
-            refreshTimer: null,
-            searchDebounceTimer: null,
-            isTranslatingEmptyStrings: false,
-            tableHeaders: [
-                {
-                    text: 'Seen',
-                    value: 'seenSort',
-                    width: 88
-                },
-                {
-                    text: 'Type',
-                    value: 'type',
-                    width: 100
-                },
-                {
-                    text: 'Original',
-                    value: 'original',
-                    width: '40%'
-                },
-                {
-                    text: 'Translation',
-                    value: 'translation',
-                    width: '40%'
-                },
-                {
-                    text: 'Actions',
-                    value: 'actionsSort',
-                    width: 92
-                }
-            ]
-        }
-    },
-
-    created () {
-        this.settingsStorage = new KeyValueStorage('./www/cheat-settings/translate-on-the-fly.json')
-        this.cacheStorage = new KeyValueStorage('./www/cheat-settings/translate-cache.json')
-
-        const runtime = ensureTranslateCacheRuntime()
-        this.translationCache = runtime.cache
-        this.lastSeenByCacheKey = runtime.lastSeenByCacheKey
-
-        this.unsubscribeRuntime = onTranslateCacheRuntimeChanged(() => {
-            this.scheduleRefresh()
-        })
-
-        this.loadTableState()
-        this.refreshEntries()
-    },
-
-    activated () {
-        this.refreshEntries()
-    },
-
-    deactivated () {
-        this.flushPendingCacheEdits('panel-deactivated')
-    },
-
-    beforeDestroy () {
-        this.flushPendingCacheEdits('panel-before-destroy')
-
-        if (this.unsubscribeRuntime) {
-            this.unsubscribeRuntime()
-            this.unsubscribeRuntime = null
-        }
-
-        if (this.refreshTimer) {
-            clearTimeout(this.refreshTimer)
-            this.refreshTimer = null
-        }
-
-        if (this.searchDebounceTimer) {
-            clearTimeout(this.searchDebounceTimer)
-            this.searchDebounceTimer = null
-        }
-    },
-
-    watch: {
-        rowsPerPage (val) {
-            const parsed = Number(val)
-            if (!Number.isFinite(parsed) || parsed <= 0) {
-                return
-            }
-
-            if (parsed !== val) {
-                this.rowsPerPage = parsed
-                return
-            }
-
-            setRowsPerPage(parsed)
-            this.saveTableState()
-            this.flushPendingCacheEdits('rows-per-page')
+  data() {
+    return {
+      searchInput: "",
+      search: "",
+      page: 1,
+      rowsPerPage: getRowsPerPage(),
+      sortBy: "seenSort",
+      sortDesc: true,
+      sourceLang: "ja",
+      targetLang: "en",
+      entries: [],
+      draftByKey: {},
+      refreshTimer: null,
+      searchDebounceTimer: null,
+      isTranslatingEmptyStrings: false,
+      tableHeaders: [
+        {
+          text: "Seen",
+          value: "seenSort",
+          width: 88,
         },
-
-        page () {
-            this.saveTableState()
-            this.flushPendingCacheEdits('page')
+        {
+          text: "Type",
+          value: "type",
+          width: 100,
         },
-
-        sortBy () {
-            this.saveTableState()
-            this.flushPendingCacheEdits('sort')
+        {
+          text: "Original",
+          value: "original",
+          width: "40%",
         },
-
-        sortDesc () {
-            this.saveTableState()
-            this.flushPendingCacheEdits('sort')
+        {
+          text: "Translation",
+          value: "translation",
+          width: "40%",
         },
-
-        searchInput (value) {
-            this.scheduleSearchDebounce(value)
+        {
+          text: "Actions",
+          value: "actionsSort",
+          width: 92,
         },
-
-        search () {
-            this.saveTableState()
-        }
-    },
-
-    methods: {
-        scheduleSearchDebounce (value) {
-            if (this.searchDebounceTimer) {
-                clearTimeout(this.searchDebounceTimer)
-            }
-
-            this.searchDebounceTimer = setTimeout(() => {
-                this.searchDebounceTimer = null
-                this.search = this.normalizeCacheValue(value)
-            }, 220)
-        },
-
-        scheduleRefresh () {
-            if (this.refreshTimer) {
-                clearTimeout(this.refreshTimer)
-            }
-
-            this.refreshTimer = setTimeout(() => {
-                this.refreshTimer = null
-                this.refreshEntries()
-            }, 80)
-        },
-
-        getActiveLanguagePair () {
-            const panel = window.__TranslateOnTheFlyPanel
-            if (panel && panel.sourceLang && panel.targetLang) {
-                return {
-                    sourceLang: panel.sourceLang,
-                    targetLang: panel.targetLang
-                }
-            }
-
-            try {
-                const json = this.settingsStorage.getItem('data')
-                if (!json) {
-                    return {
-                        sourceLang: 'ja',
-                        targetLang: 'en'
-                    }
-                }
-
-                const data = JSON.parse(json)
-                return {
-                    sourceLang: data.sourceLang || 'ja',
-                    targetLang: data.targetLang || 'en'
-                }
-            } catch (error) {
-                return {
-                    sourceLang: 'ja',
-                    targetLang: 'en'
-                }
-            }
-        },
-
-        isSeenTrackableType (type) {
-            return type === 'text' || type === 'choice'
-        },
-
-        normalizeCacheValue (value) {
-            if (typeof value === 'string') {
-                return value
-            }
-
-            if (value === null || value === undefined) {
-                return ''
-            }
-
-            return String(value)
-        },
-
-        formatSeenTimestamp (timestamp) {
-            if (!Number.isFinite(timestamp) || timestamp <= 0) {
-                return ''
-            }
-
-            const date = new Date(timestamp)
-            const hh = String(date.getHours()).padStart(2, '0')
-            const mm = String(date.getMinutes()).padStart(2, '0')
-            const ss = String(date.getSeconds()).padStart(2, '0')
-            return `${hh}:${mm}:${ss}`
-        },
-
-        countVisualLines (text) {
-            const value = this.normalizeCacheValue(text)
-            if (!value) {
-                return 1
-            }
-
-            const hardLines = value.split(/\r?\n/)
-            let total = 0
-            for (const line of hardLines) {
-                const normalizedLineLength = line.length || 1
-                total += Math.max(1, Math.ceil(normalizedLineLength / 64))
-            }
-
-            return Math.max(1, total)
-        },
-
-        getRowLineCount (item, draftValue = null) {
-            const originalLines = this.countVisualLines(item.original)
-            const translationLines = this.countVisualLines(draftValue === null ? item.translation : draftValue)
-            return Math.max(2, originalLines, translationLines)
-        },
-
-        getDraftValue (item) {
-            if (!item || !item.key) {
-                return ''
-            }
-
-            if (Object.prototype.hasOwnProperty.call(this.draftByKey, item.key)) {
-                return this.normalizeCacheValue(this.draftByKey[item.key])
-            }
-
-            return this.normalizeCacheValue(item.translation)
-        },
-
-        loadTableState () {
-            try {
-                const raw = localStorage.getItem('cheat.translateCacheManager.tableState')
-                if (!raw) {
-                    return
-                }
-
-                const parsed = JSON.parse(raw)
-                if (typeof parsed.sortBy === 'string' && parsed.sortBy.trim() !== '') {
-                    this.sortBy = parsed.sortBy
-                }
-                if (typeof parsed.sortDesc === 'boolean') {
-                    this.sortDesc = parsed.sortDesc
-                }
-                if (Number.isFinite(Number(parsed.page)) && Number(parsed.page) > 0) {
-                    this.page = Number(parsed.page)
-                }
-                if (typeof parsed.searchInput === 'string') {
-                    this.searchInput = parsed.searchInput
-                    this.search = parsed.searchInput
-                }
-            } catch (error) {
-                // Ignore malformed state and keep defaults.
-            }
-        },
-
-        saveTableState () {
-            try {
-                const payload = {
-                    sortBy: this.sortBy,
-                    sortDesc: !!this.sortDesc,
-                    page: this.page,
-                    searchInput: this.searchInput
-                }
-                localStorage.setItem('cheat.translateCacheManager.tableState', JSON.stringify(payload))
-            } catch (error) {
-                // Ignore persistence failures.
-            }
-        },
-
-        flushPendingCacheEdits (reason = 'unknown') {
-            const draftEntries = Object.entries(this.draftByKey || {})
-            if (!draftEntries.length) {
-                return
-            }
-
-            const changedKeys = []
-            for (const [cacheKey, draftValue] of draftEntries) {
-                const normalizedDraft = this.normalizeCacheValue(draftValue)
-                const currentValue = this.normalizeCacheValue(this.translationCache.get(cacheKey))
-
-                if (normalizedDraft === currentValue) {
-                    delete this.draftByKey[cacheKey]
-                    continue
-                }
-
-                this.translationCache.set(cacheKey, normalizedDraft)
-                changedKeys.push(cacheKey)
-                delete this.draftByKey[cacheKey]
-            }
-
-            if (!changedKeys.length) {
-                return
-            }
-
-            const panel = window.__TranslateOnTheFlyPanel
-            if (panel && typeof panel.persistCache === 'function') {
-                panel.persistCache()
-                if (typeof panel.notifyCacheRuntime === 'function') {
-                    panel.notifyCacheRuntime(reason)
-                }
-            } else {
-                this.cacheStorage.setItem('data', JSON.stringify(Array.from(this.translationCache.entries())))
-                notifyTranslateCacheRuntimeChanged(reason)
-            }
-
-            this.refreshEntries()
-        },
-
-        refreshEntries () {
-            const pair = this.getActiveLanguagePair()
-            this.sourceLang = pair.sourceLang
-            this.targetLang = pair.targetLang
-
-            const items = []
-            for (const [cacheKey, value] of this.translationCache.entries()) {
-                const parsed = parseCacheKeyForLangPair(cacheKey, this.sourceLang, this.targetLang)
-                if (!parsed) {
-                    continue
-                }
-
-                const seenTs = this.isSeenTrackableType(parsed.type)
-                    ? (this.lastSeenByCacheKey.get(cacheKey) || null)
-                    : null
-
-                const translation = this.normalizeCacheValue(value)
-
-                items.push({
-                    key: cacheKey,
-                    seenSort: Number.isFinite(seenTs) ? seenTs : 0,
-                    seenDisplay: this.formatSeenTimestamp(seenTs),
-                    type: parsed.type,
-                    original: parsed.original,
-                    translation,
-                    actionsSort: parsed.original
-                })
-            }
-
-            this.entries = items
-        },
-
-        tableItemFilter (value, search, item) {
-            if (search === null || search.trim() === '') {
-                return true
-            }
-
-            const term = search.toLowerCase()
-            return (item.original || '').toLowerCase().includes(term) || (item.translation || '').toLowerCase().includes(term)
-        },
-
-        onTranslationInput (item, value) {
-            const normalized = this.normalizeCacheValue(value)
-            this.$set(this.draftByKey, item.key, normalized)
-        },
-
-        clearTranslation (item) {
-            if (!item || !item.key) {
-                return
-            }
-
-            this.onTranslationInput(item, '')
-        },
-
-        async translateEmptyStrings () {
-            if (this.isTranslatingEmptyStrings) {
-                return
-            }
-
-            this.flushPendingCacheEdits('cache-manager-pre-translate-empty')
-
-            const panel = window.__TranslateOnTheFlyPanel
-            if (!panel || !panel.engine || typeof panel.engine.batchTranslate !== 'function') {
-                console.warn('[TranslateCacheManagerPanel] TranslateOnTheFly panel is not ready')
-                return
-            }
-
-            const items = []
-            let idCounter = 0
-            for (const [cacheKey, value] of this.translationCache.entries()) {
-                const parsed = parseCacheKeyForLangPair(cacheKey, this.sourceLang, this.targetLang)
-                if (!parsed) {
-                    continue
-                }
-
-                if (this.normalizeCacheValue(value) !== '') {
-                    continue
-                }
-
-                const original = this.normalizeCacheValue(parsed.original)
-                if (original.trim() === '') {
-                    continue
-                }
-
-                items.push({
-                    type: parsed.type,
-                    id: `empty_${idCounter++}`,
-                    value: original,
-                    cacheKey
-                })
-            }
-
-            if (!items.length) {
-                if (window.Alert && typeof window.Alert.info === 'function') {
-                    window.Alert.info('No empty translations for current language pair.')
-                }
-                return
-            }
-
-            const maxItems = Number(panel.batchItemsLimit) > 0 ? Number(panel.batchItemsLimit) : 20
-            const maxChars = Number(panel.charLimit) > 0 ? Number(panel.charLimit) : 1000
-
-            let successCount = 0
-            let failureCount = 0
-            this.isTranslatingEmptyStrings = true
-
-            if (typeof panel.showSpinner === 'function') {
-                panel.showSpinner()
-            }
-
-            try {
-                let cursor = 0
-                while (cursor < items.length) {
-                    const batch = []
-                    let chars = 0
-
-                    while (cursor < items.length) {
-                        const candidate = items[cursor]
-                        const candidateLen = (candidate.value || '').length
-
-                        if (batch.length >= maxItems) {
-                            break
-                        }
-
-                        if (batch.length > 0 && (chars + candidateLen) > maxChars) {
-                            break
-                        }
-
-                        batch.push(candidate)
-                        chars += candidateLen
-                        cursor += 1
-                    }
-
-                    if (!batch.length) {
-                        batch.push(items[cursor])
-                        cursor += 1
-                    }
-
-                    const result = await panel.engine.batchTranslate(batch, { backgroundJob: false })
-
-                    for (const success of result.successes || []) {
-                        panel.setCacheValue(success.cacheKey, success.translated)
-                        successCount += 1
-                    }
-
-                    for (const failure of result.failures || []) {
-                        if (panel.failedTranslations && failure.cacheKey) {
-                            panel.failedTranslations.set(failure.cacheKey, Date.now())
-                        }
-
-                        const hasUsable = typeof panel.hasUsableCacheValue === 'function'
-                            ? panel.hasUsableCacheValue(failure.cacheKey)
-                            : false
-                        if (failure.cacheKey && !hasUsable) {
-                            panel.setCacheValue(failure.cacheKey, '')
-                        }
-
-                        failureCount += 1
-                    }
-                }
-
-                if (window.Alert && typeof window.Alert.success === 'function') {
-                    window.Alert.success(`Translate empty strings finished: ${successCount} successes, ${failureCount} failures`)
-                }
-            } catch (error) {
-                console.error('[TranslateCacheManagerPanel] Translate empty strings failed', error)
-                if (window.Alert && typeof window.Alert.error === 'function') {
-                    window.Alert.error('Translate empty strings failed: ' + (error && error.message ? error.message : error))
-                }
-            } finally {
-                if (typeof panel.hideSpinner === 'function') {
-                    panel.hideSpinner()
-                }
-                this.isTranslatingEmptyStrings = false
-                this.refreshEntries()
-            }
-        },
-
-        async copyOriginal (item) {
-            const text = item && item.original ? String(item.original) : ''
-            if (!text) {
-                return
-            }
-
-            try {
-                if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
-                    await navigator.clipboard.writeText(text)
-                } else {
-                    const textarea = document.createElement('textarea')
-                    textarea.value = text
-                    textarea.style.position = 'fixed'
-                    textarea.style.top = '-1000px'
-                    document.body.appendChild(textarea)
-                    textarea.focus()
-                    textarea.select()
-                    document.execCommand('copy')
-                    document.body.removeChild(textarea)
-                }
-            } catch (error) {
-                console.warn('[TranslateCacheManagerPanel] Failed to copy original text', error)
-            }
-        }
+      ],
+    };
+  },
+
+  created() {
+    this.settingsStorage = new KeyValueStorage(
+      "./www/cheat-settings/translate-on-the-fly.json",
+    );
+    this.cacheStorage = new KeyValueStorage(
+      "./www/cheat-settings/translate-cache.json",
+    );
+
+    const runtime = ensureTranslateCacheRuntime();
+    this.translationCache = runtime.cache;
+    this.lastSeenByCacheKey = runtime.lastSeenByCacheKey;
+
+    this.unsubscribeRuntime = onTranslateCacheRuntimeChanged(() => {
+      this.scheduleRefresh();
+    });
+
+    this.loadTableState();
+    this.refreshEntries();
+  },
+
+  activated() {
+    this.refreshEntries();
+  },
+
+  deactivated() {
+    this.flushPendingCacheEdits("panel-deactivated");
+  },
+
+  beforeDestroy() {
+    this.flushPendingCacheEdits("panel-before-destroy");
+
+    if (this.unsubscribeRuntime) {
+      this.unsubscribeRuntime();
+      this.unsubscribeRuntime = null;
     }
-}
+
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+
+    if (this.searchDebounceTimer) {
+      clearTimeout(this.searchDebounceTimer);
+      this.searchDebounceTimer = null;
+    }
+  },
+
+  watch: {
+    rowsPerPage(val) {
+      const parsed = Number(val);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        return;
+      }
+
+      if (parsed !== val) {
+        this.rowsPerPage = parsed;
+        return;
+      }
+
+      setRowsPerPage(parsed);
+      this.saveTableState();
+      this.flushPendingCacheEdits("rows-per-page");
+    },
+
+    page() {
+      this.saveTableState();
+      this.flushPendingCacheEdits("page");
+    },
+
+    sortBy() {
+      this.saveTableState();
+      this.flushPendingCacheEdits("sort");
+    },
+
+    sortDesc() {
+      this.saveTableState();
+      this.flushPendingCacheEdits("sort");
+    },
+
+    searchInput(value) {
+      this.scheduleSearchDebounce(value);
+    },
+
+    search() {
+      this.saveTableState();
+    },
+  },
+
+  methods: {
+    scheduleSearchDebounce(value) {
+      if (this.searchDebounceTimer) {
+        clearTimeout(this.searchDebounceTimer);
+      }
+
+      this.searchDebounceTimer = setTimeout(() => {
+        this.searchDebounceTimer = null;
+        this.search = this.normalizeCacheValue(value);
+      }, 220);
+    },
+
+    scheduleRefresh() {
+      if (this.refreshTimer) {
+        clearTimeout(this.refreshTimer);
+      }
+
+      this.refreshTimer = setTimeout(() => {
+        this.refreshTimer = null;
+        this.refreshEntries();
+      }, 80);
+    },
+
+    getActiveLanguagePair() {
+      const panel = window.__TranslateOnTheFlyPanel;
+      if (panel && panel.sourceLang && panel.targetLang) {
+        return {
+          sourceLang: panel.sourceLang,
+          targetLang: panel.targetLang,
+        };
+      }
+
+      try {
+        const json = this.settingsStorage.getItem("data");
+        if (!json) {
+          return {
+            sourceLang: "ja",
+            targetLang: "en",
+          };
+        }
+
+        const data = JSON.parse(json);
+        return {
+          sourceLang: data.sourceLang || "ja",
+          targetLang: data.targetLang || "en",
+        };
+      } catch (error) {
+        return {
+          sourceLang: "ja",
+          targetLang: "en",
+        };
+      }
+    },
+
+    isSeenTrackableType(type) {
+      return type === "text" || type === "choice";
+    },
+
+    normalizeCacheValue(value) {
+      if (typeof value === "string") {
+        return value;
+      }
+
+      if (value === null || value === undefined) {
+        return "";
+      }
+
+      return String(value);
+    },
+
+    formatSeenTimestamp(timestamp) {
+      if (!Number.isFinite(timestamp) || timestamp <= 0) {
+        return "";
+      }
+
+      const date = new Date(timestamp);
+      const hh = String(date.getHours()).padStart(2, "0");
+      const mm = String(date.getMinutes()).padStart(2, "0");
+      const ss = String(date.getSeconds()).padStart(2, "0");
+      return `${hh}:${mm}:${ss}`;
+    },
+
+    countVisualLines(text) {
+      const value = this.normalizeCacheValue(text);
+      if (!value) {
+        return 1;
+      }
+
+      const hardLines = value.split(/\r?\n/);
+      let total = 0;
+      for (const line of hardLines) {
+        const normalizedLineLength = line.length || 1;
+        total += Math.max(1, Math.ceil(normalizedLineLength / 64));
+      }
+
+      return Math.max(1, total);
+    },
+
+    getRowLineCount(item, draftValue = null) {
+      const originalLines = this.countVisualLines(item.original);
+      const translationLines = this.countVisualLines(
+        draftValue === null ? item.translation : draftValue,
+      );
+      return Math.max(2, originalLines, translationLines);
+    },
+
+    getDraftValue(item) {
+      if (!item || !item.key) {
+        return "";
+      }
+
+      if (Object.prototype.hasOwnProperty.call(this.draftByKey, item.key)) {
+        return this.normalizeCacheValue(this.draftByKey[item.key]);
+      }
+
+      return this.normalizeCacheValue(item.translation);
+    },
+
+    loadTableState() {
+      try {
+        const raw = localStorage.getItem(
+          "cheat.translateCacheManager.tableState",
+        );
+        if (!raw) {
+          return;
+        }
+
+        const parsed = JSON.parse(raw);
+        if (typeof parsed.sortBy === "string" && parsed.sortBy.trim() !== "") {
+          this.sortBy = parsed.sortBy;
+        }
+        if (typeof parsed.sortDesc === "boolean") {
+          this.sortDesc = parsed.sortDesc;
+        }
+        if (Number.isFinite(Number(parsed.page)) && Number(parsed.page) > 0) {
+          this.page = Number(parsed.page);
+        }
+        if (typeof parsed.searchInput === "string") {
+          this.searchInput = parsed.searchInput;
+          this.search = parsed.searchInput;
+        }
+      } catch (error) {
+        // Ignore malformed state and keep defaults.
+      }
+    },
+
+    saveTableState() {
+      try {
+        const payload = {
+          sortBy: this.sortBy,
+          sortDesc: !!this.sortDesc,
+          page: this.page,
+          searchInput: this.searchInput,
+        };
+        localStorage.setItem(
+          "cheat.translateCacheManager.tableState",
+          JSON.stringify(payload),
+        );
+      } catch (error) {
+        // Ignore persistence failures.
+      }
+    },
+
+    flushPendingCacheEdits(reason = "unknown") {
+      const draftEntries = Object.entries(this.draftByKey || {});
+      if (!draftEntries.length) {
+        return;
+      }
+
+      const changedKeys = [];
+      for (const [cacheKey, draftValue] of draftEntries) {
+        const normalizedDraft = this.normalizeCacheValue(draftValue);
+        const currentValue = this.normalizeCacheValue(
+          this.translationCache.get(cacheKey),
+        );
+
+        if (normalizedDraft === currentValue) {
+          delete this.draftByKey[cacheKey];
+          continue;
+        }
+
+        this.translationCache.set(cacheKey, normalizedDraft);
+        changedKeys.push(cacheKey);
+        delete this.draftByKey[cacheKey];
+      }
+
+      if (!changedKeys.length) {
+        return;
+      }
+
+      const panel = window.__TranslateOnTheFlyPanel;
+      if (panel && typeof panel.persistCache === "function") {
+        panel.persistCache();
+        if (typeof panel.notifyCacheRuntime === "function") {
+          panel.notifyCacheRuntime(reason);
+        }
+      } else {
+        this.cacheStorage.setItem(
+          "data",
+          JSON.stringify(Array.from(this.translationCache.entries())),
+        );
+        notifyTranslateCacheRuntimeChanged(reason);
+      }
+
+      this.refreshEntries();
+    },
+
+    refreshEntries() {
+      const pair = this.getActiveLanguagePair();
+      this.sourceLang = pair.sourceLang;
+      this.targetLang = pair.targetLang;
+
+      const items = [];
+      for (const [cacheKey, value] of this.translationCache.entries()) {
+        const parsed = parseCacheKeyForLangPair(
+          cacheKey,
+          this.sourceLang,
+          this.targetLang,
+        );
+        if (!parsed) {
+          continue;
+        }
+
+        const seenTs = this.isSeenTrackableType(parsed.type)
+          ? this.lastSeenByCacheKey.get(cacheKey) || null
+          : null;
+
+        const translation = this.normalizeCacheValue(value);
+
+        items.push({
+          key: cacheKey,
+          seenSort: Number.isFinite(seenTs) ? seenTs : 0,
+          seenDisplay: this.formatSeenTimestamp(seenTs),
+          type: parsed.type,
+          original: parsed.original,
+          translation,
+          actionsSort: parsed.original,
+        });
+      }
+
+      this.entries = items;
+    },
+
+    tableItemFilter(value, search, item) {
+      if (search === null || search.trim() === "") {
+        return true;
+      }
+
+      const term = search.toLowerCase();
+      return (
+        (item.original || "").toLowerCase().includes(term) ||
+        (item.translation || "").toLowerCase().includes(term)
+      );
+    },
+
+    onTranslationInput(item, value) {
+      const normalized = this.normalizeCacheValue(value);
+      this.$set(this.draftByKey, item.key, normalized);
+    },
+
+    clearTranslation(item) {
+      if (!item || !item.key) {
+        return;
+      }
+
+      this.onTranslationInput(item, "");
+    },
+
+    async translateEmptyStrings() {
+      if (this.isTranslatingEmptyStrings) {
+        return;
+      }
+
+      this.flushPendingCacheEdits("cache-manager-pre-translate-empty");
+
+      const panel = window.__TranslateOnTheFlyPanel;
+      if (
+        !panel ||
+        !panel.engine ||
+        typeof panel.engine.batchTranslate !== "function"
+      ) {
+        console.warn(
+          "[TranslateCacheManagerPanel] TranslateOnTheFly panel is not ready",
+        );
+        return;
+      }
+
+      const items = [];
+      let idCounter = 0;
+      for (const [cacheKey, value] of this.translationCache.entries()) {
+        const parsed = parseCacheKeyForLangPair(
+          cacheKey,
+          this.sourceLang,
+          this.targetLang,
+        );
+        if (!parsed) {
+          continue;
+        }
+
+        if (this.normalizeCacheValue(value) !== "") {
+          continue;
+        }
+
+        const original = this.normalizeCacheValue(parsed.original);
+        if (original.trim() === "") {
+          continue;
+        }
+
+        items.push({
+          type: parsed.type,
+          id: `empty_${idCounter++}`,
+          value: original,
+          cacheKey,
+        });
+      }
+
+      if (!items.length) {
+        if (window.Alert && typeof window.Alert.info === "function") {
+          window.Alert.info("No empty translations for current language pair.");
+        }
+        return;
+      }
+
+      const maxItems =
+        Number(panel.batchItemsLimit) > 0 ? Number(panel.batchItemsLimit) : 20;
+      const maxChars =
+        Number(panel.charLimit) > 0 ? Number(panel.charLimit) : 1000;
+
+      let successCount = 0;
+      let failureCount = 0;
+      const errorStats = BatchSummaryReporter.createErrorStatsAccumulator();
+      this.isTranslatingEmptyStrings = true;
+
+      if (typeof panel.showSpinner === "function") {
+        panel.showSpinner();
+      }
+
+      try {
+        let cursor = 0;
+        while (cursor < items.length) {
+          const batch = [];
+          let chars = 0;
+
+          while (cursor < items.length) {
+            const candidate = items[cursor];
+            const candidateLen = (candidate.value || "").length;
+
+            if (batch.length >= maxItems) {
+              break;
+            }
+
+            if (batch.length > 0 && chars + candidateLen > maxChars) {
+              break;
+            }
+
+            batch.push(candidate);
+            chars += candidateLen;
+            cursor += 1;
+          }
+
+          if (!batch.length) {
+            batch.push(items[cursor]);
+            cursor += 1;
+          }
+
+          const result = await panel.engine.batchTranslate(batch, {
+            backgroundJob: false,
+          });
+
+          for (const success of result.successes || []) {
+            panel.setCacheValue(success.cacheKey, success.translated);
+            successCount += 1;
+          }
+
+          for (const failure of result.failures || []) {
+            if (panel.failedTranslations && failure.cacheKey) {
+              panel.failedTranslations.set(failure.cacheKey, Date.now());
+            }
+
+            const reason =
+              failure && failure.rejectReason
+                ? String(failure.rejectReason)
+                : "unknown";
+            errorStats.totalErrors += 1;
+            errorStats.byType[reason] = (errorStats.byType[reason] || 0) + 1;
+
+            const hasUsable =
+              typeof panel.hasUsableCacheValue === "function"
+                ? panel.hasUsableCacheValue(failure.cacheKey)
+                : false;
+            if (failure.cacheKey && !hasUsable) {
+              panel.setCacheValue(failure.cacheKey, "");
+            }
+
+            failureCount += 1;
+          }
+        }
+
+        const summary = BatchSummaryReporter.buildSummary({
+          batchLabel: "translate empty strings",
+          totalItems: items.length,
+          successes: successCount,
+          failures: failureCount,
+          errorStats,
+          durationMs: 0,
+        });
+        BatchSummaryReporter.showAlert(summary);
+        BatchSummaryReporter.logSummary(summary);
+      } catch (error) {
+        console.error(
+          "[TranslateCacheManagerPanel] Translate empty strings failed",
+          error,
+        );
+        if (window.Alert && typeof window.Alert.error === "function") {
+          window.Alert.error(
+            "Translate empty strings failed: " +
+              (error && error.message ? error.message : error),
+          );
+        }
+      } finally {
+        if (typeof panel.hideSpinner === "function") {
+          panel.hideSpinner();
+        }
+        this.isTranslatingEmptyStrings = false;
+        this.refreshEntries();
+      }
+    },
+
+    async copyOriginal(item) {
+      const text = item && item.original ? String(item.original) : "";
+      if (!text) {
+        return;
+      }
+
+      try {
+        if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const textarea = document.createElement("textarea");
+          textarea.value = text;
+          textarea.style.position = "fixed";
+          textarea.style.top = "-1000px";
+          document.body.appendChild(textarea);
+          textarea.focus();
+          textarea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textarea);
+        }
+      } catch (error) {
+        console.warn(
+          "[TranslateCacheManagerPanel] Failed to copy original text",
+          error,
+        );
+      }
+    },
+  },
+};

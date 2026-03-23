@@ -676,9 +676,6 @@ class AIEngine extends BaseTranslationEngine {
         });
       }
 
-      console.log(
-        `[AIEngine] Batch complete: ${successes.length} successes, ${failures.length} failures`,
-      );
       return { successes, failures };
     } catch (error) {
       console.error("[AIEngine] Batch translate error:", error.message);
@@ -697,131 +694,132 @@ class AIEngine extends BaseTranslationEngine {
    */
   async requestChatCompletion(payload, options = {}) {
     return this.enqueueRequest(async () => {
-    const expectedKeys = options.expectedKeys || [];
-    const isBackgroundJob = !!options.isBackgroundJob;
+      const expectedKeys = options.expectedKeys || [];
+      const isBackgroundJob = !!options.isBackgroundJob;
 
-    const controller = new AbortController();
-    this._activeAbortController = controller;
-    this._activeRequestMeta = { isBackgroundJob, startedAt: Date.now() };
+      const controller = new AbortController();
+      this._activeAbortController = controller;
+      this._activeRequestMeta = { isBackgroundJob, startedAt: Date.now() };
 
-    try {
-      // Preprocess payload
-      const processedPayload = preprocessPayloadForLlm(payload);
+      try {
+        // Preprocess payload
+        const processedPayload = preprocessPayloadForLlm(payload);
 
-      const response = await fetch(this.getChatUrl(), {
-        method: "POST",
-        headers: this.getRequestHeaders(),
-        body: JSON.stringify(processedPayload),
-        signal: controller.signal,
-      });
+        const response = await fetch(this.getChatUrl(), {
+          method: "POST",
+          headers: this.getRequestHeaders(),
+          body: JSON.stringify(processedPayload),
+          signal: controller.signal,
+        });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
 
-      const contentType = (
-        response.headers.get("content-type") || ""
-      ).toLowerCase();
-      const isEventStream = contentType.includes("text/event-stream");
+        const contentType = (
+          response.headers.get("content-type") || ""
+        ).toLowerCase();
+        const isEventStream = contentType.includes("text/event-stream");
 
-      if (!isEventStream) {
-        const rawBodyText = await response.text();
-        const assistantText =
-          this.extractAssistantTextFromApiResponse(rawBodyText);
-        const { text: cleanedText } = stripThinkBlocks(assistantText);
+        if (!isEventStream) {
+          const rawBodyText = await response.text();
+          const assistantText =
+            this.extractAssistantTextFromApiResponse(rawBodyText);
+          const { text: cleanedText } = stripThinkBlocks(assistantText);
 
-        return {
-          text: cleanedText,
-          bestMap: null,
-          cancelledByGuardrail: false,
-          cancelReason: null,
-        };
-      }
+          return {
+            text: cleanedText,
+            bestMap: null,
+            cancelledByGuardrail: false,
+            cancelReason: null,
+          };
+        }
 
-      // Parse streaming response
-      const monitorState = StreamGuardrails.createMonitorState(expectedKeys);
-      let contentText = ""; // accumulated assistant content only
-      let sseBuffer = ""; // buffer for partial SSE lines
+        // Parse streaming response
+        const monitorState = StreamGuardrails.createMonitorState(expectedKeys);
+        let contentText = ""; // accumulated assistant content only
+        let sseBuffer = ""; // buffer for partial SSE lines
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        sseBuffer += chunk;
+          const chunk = decoder.decode(value, { stream: true });
+          sseBuffer += chunk;
 
-        // Process complete SSE lines
-        const lines = sseBuffer.split("\n");
-        sseBuffer = lines.pop(); // last element may be incomplete
+          // Process complete SSE lines
+          const lines = sseBuffer.split("\n");
+          sseBuffer = lines.pop(); // last element may be incomplete
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed === "data: [DONE]") continue;
-          if (!trimmed.startsWith("data:")) continue;
-          try {
-            const dataPayload = trimmed.slice(5).trim();
-            if (!dataPayload || dataPayload === "[DONE]") continue;
-            const json = JSON.parse(dataPayload);
-            const delta = json?.choices?.[0]?.delta?.content;
-            if (typeof delta === "string") {
-              contentText += delta;
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed === "data: [DONE]") continue;
+            if (!trimmed.startsWith("data:")) continue;
+            try {
+              const dataPayload = trimmed.slice(5).trim();
+              if (!dataPayload || dataPayload === "[DONE]") continue;
+              const json = JSON.parse(dataPayload);
+              const delta = json?.choices?.[0]?.delta?.content;
+              if (typeof delta === "string") {
+                contentText += delta;
+              }
+            } catch (e) {
+              // skip malformed SSE line
             }
-          } catch (e) {
-            // skip malformed SSE line
+          }
+
+          // Check guardrails on accumulated content
+          const guardrailResult = StreamGuardrails.checkGuardrails(
+            monitorState,
+            contentText,
+            false,
+          );
+          if (guardrailResult.shouldCancel) {
+            console.warn(
+              "[AIEngine] Stream guardrail triggered:",
+              guardrailResult.cancelReason,
+            );
+            controller.abort();
+            break;
           }
         }
 
-        // Check guardrails on accumulated content
-        const guardrailResult = StreamGuardrails.checkGuardrails(
-          monitorState,
-          contentText,
-          false,
-        );
-        if (guardrailResult.shouldCancel) {
-          console.warn(
-            "[AIEngine] Stream guardrail triggered:",
-            guardrailResult.cancelReason,
-          );
-          controller.abort();
-          break;
-        }
-      }
+        // Strip think blocks if present
+        const { text: cleanedText } = stripThinkBlocks(contentText);
 
-      // Strip think blocks if present
-      const { text: cleanedText } = stripThinkBlocks(contentText);
-
-      return {
-        text: cleanedText,
-        bestMap: monitorState.bestMap,
-        cancelledByGuardrail: !!monitorState.cancelReason,
-        cancelReason: monitorState.cancelReason,
-      };
-    } catch (error) {
-      if (error.name === "AbortError") {
-        const externalCancelReason =
-          this._activeRequestMeta && this._activeRequestMeta.externalCancelReason
-            ? this._activeRequestMeta.externalCancelReason
-            : null;
-        const cancelReason =
-          externalCancelReason ||
-          (isBackgroundJob
-            ? REQUEST_CANCEL_REASON.BACKGROUND_PREEMPTED
-            : REQUEST_CANCEL_REASON.REQUEST_ABORTED);
         return {
-          text: "",
-          bestMap: null,
-          cancelledByGuardrail: true,
-          cancelReason,
+          text: cleanedText,
+          bestMap: monitorState.bestMap,
+          cancelledByGuardrail: !!monitorState.cancelReason,
+          cancelReason: monitorState.cancelReason,
         };
+      } catch (error) {
+        if (error.name === "AbortError") {
+          const externalCancelReason =
+            this._activeRequestMeta &&
+            this._activeRequestMeta.externalCancelReason
+              ? this._activeRequestMeta.externalCancelReason
+              : null;
+          const cancelReason =
+            externalCancelReason ||
+            (isBackgroundJob
+              ? REQUEST_CANCEL_REASON.BACKGROUND_PREEMPTED
+              : REQUEST_CANCEL_REASON.REQUEST_ABORTED);
+          return {
+            text: "",
+            bestMap: null,
+            cancelledByGuardrail: true,
+            cancelReason,
+          };
+        }
+        throw error;
+      } finally {
+        this._activeAbortController = null;
+        this._activeRequestMeta = null;
       }
-      throw error;
-    } finally {
-      this._activeAbortController = null;
-      this._activeRequestMeta = null;
-    }
     });
   }
 

@@ -1,3 +1,5 @@
+import { TranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManager.js";
+
 export const translateOnTheFlyRuntimeMethods = {
   setupTranslationHook() {
     const self = this;
@@ -769,13 +771,25 @@ export const translateOnTheFlyRuntimeMethods = {
 
   async translateGameArrays(options = {}) {
     const isBackgroundJob = !!options.backgroundJob;
+    const progressLabel = options.progressLabel || "translating game arrays";
+    const showSummary = options.showSummary !== false;
     console.log("[TranslateOnTheFly] Starting translation of game data arrays");
+
+    if (!this.batchManager) {
+      this.batchManager = new TranslationBatchManager(this);
+    }
 
     if (!this.isEngineFullyConfigured()) {
       console.log(
         "[TranslateOnTheFly] Engine not fully configured, skipping game arrays",
       );
-      return;
+      return {
+        successCount: 0,
+        failureCount: 0,
+        totalCount: 0,
+        stats: null,
+        summary: null,
+      };
     }
 
     // Use shared array definition.
@@ -822,7 +836,13 @@ export const translateOnTheFlyRuntimeMethods = {
       console.log(
         "[TranslateOnTheFly] No candidate strings found in game arrays",
       );
-      return;
+      return {
+        successCount: 0,
+        failureCount: 0,
+        totalCount: 0,
+        stats: null,
+        summary: null,
+      };
     }
 
     // Remove values already in cache
@@ -840,8 +860,27 @@ export const translateOnTheFlyRuntimeMethods = {
 
     if (pendingValues.length === 0) {
       console.log("[TranslateOnTheFly] All array strings already cached");
+      const translated = await this.batchManager.runBatchedTranslation([], {
+        stepLabel: progressLabel,
+        backgroundJob: isBackgroundJob,
+        itemLimit: this.batchItemsLimit || 20,
+        charLimit: this.charLimit || 1000,
+        showSummary,
+      });
+
+      this.persistCache();
+      console.log(
+        "[TranslateOnTheFly] Completed translation of game data arrays",
+      );
+      return {
+        successCount: translated.successes.length,
+        failureCount: translated.failures.length,
+        totalCount: 0,
+        stats: translated.stats,
+        summary: translated.summary,
+      };
     } else {
-      // Build translation items and batch them respecting batchItemsLimit and charLimit
+      // Build translation items and delegate chunking/progress to the shared batch manager.
       const items = [];
       let idCounter = 0;
       for (const pv of pendingValues) {
@@ -876,141 +915,130 @@ export const translateOnTheFlyRuntimeMethods = {
         `[TranslateOnTheFly] Translating ${items.length} unique strings in ${batches.length} batches`,
       );
 
-      for (const batch of batches) {
-        try {
-          this.showSpinner();
-          const batchItems = batch.map((b) => ({
-            type: b.type,
-            id: b.id,
-            value: b.value,
-            cacheKey: b.cacheKey,
-          }));
-          const result = isBackgroundJob
-            ? await this.batchTranslateWithBackgroundRetry(
-                batchItems,
-                "game arrays",
-              )
-            : await this.engine.batchTranslate(batchItems, {
-                backgroundJob: false,
-              });
-          this.hideSpinner();
+      const translated = await this.batchManager.runBatchedTranslation(
+        items.map((item) => ({
+          type: item.type,
+          id: item.id,
+          value: item.value,
+          cacheKey: item.cacheKey,
+        })),
+        {
+          stepLabel: progressLabel,
+          backgroundJob: isBackgroundJob,
+          itemLimit: this.batchItemsLimit || 20,
+          charLimit: this.charLimit || 1000,
+          showSummary,
+        },
+      );
 
-          // For each success, store translation under all associated types (create keys per type)
-          for (const success of result.successes) {
-            const originalValue =
-              success.value ||
-              (batch.find((b) => b.cacheKey === success.cacheKey) || {}).value;
-            // find original meta
-            const meta =
-              batch.find((b) => b.cacheKey === success.cacheKey) &&
-              batch.find((b) => b.cacheKey === success.cacheKey).meta;
-            const types = meta ? meta.types : [success.type];
-            for (const t of types) {
-              const keyForType = this.getCacheKey(
-                success.value ? success.value : originalValue,
-                t,
-              );
-              // Note: `success.translated` contains translated text
-              this.setCacheValue(
-                this.getCacheKey(originalValue, t),
-                success.translated,
-              );
-            }
-          }
+      const itemMetaByCacheKey = new Map(
+        items.map((item) => [item.cacheKey, item.meta]),
+      );
 
-          for (const failure of result.failures) {
-            console.warn(
-              "[TranslateOnTheFly] Failed to translate array value:",
-              failure.value,
-              "->",
-              failure.rejectReason,
-            );
-          }
-          this.markBatchFailuresAsUntranslated(result.failures, true);
-        } catch (error) {
-          this.hideSpinner();
-          console.error(
-            "[TranslateOnTheFly] Error translating game arrays batch:",
-            error,
+      for (const success of translated.successes) {
+        const originalValue = success && success.value;
+        const meta = success ? itemMetaByCacheKey.get(success.cacheKey) : null;
+        const types = meta && Array.isArray(meta.types) ? meta.types : [];
+        for (const type of types) {
+          this.setCacheValue(
+            this.getCacheKey(originalValue, type),
+            success.translated,
           );
-          this.markBatchItemsAsUntranslated(batch, true);
         }
       }
-    }
 
-    // Finally, for each array make Original copy and apply cached translations (if any)
-    for (const entry of arrays) {
-      const parentObj = entry.parent();
-      if (!parentObj || !Array.isArray(parentObj[entry.prop])) continue;
-
-      try {
-        const liveArr = parentObj[entry.prop];
-        // If Original doesn't exist yet, create it from current live array
-        const hasOriginal = Array.isArray(parentObj[`${entry.prop}Original`]);
-        const originalCopy = hasOriginal
-          ? parentObj[`${entry.prop}Original`]
-          : Array.isArray(liveArr)
-            ? liveArr.slice()
-            : [];
-        if (!hasOriginal) {
-          parentObj[`${entry.prop}Original`] = originalCopy.slice();
-        }
-
-        // Overwrite main array entries with cached translations when available
-        for (let i = 0; i < originalCopy.length; i++) {
-          const v = originalCopy[i];
-          if (v == null) {
-            parentObj[entry.prop][i] = v;
-            continue;
-          }
-          if (typeof v !== "string") {
-            parentObj[entry.prop][i] = v;
-            continue;
-          }
-          const trimmed = v.trim();
-          if (!trimmed) {
-            parentObj[entry.prop][i] = v;
-            continue;
-          }
-
-          // Try all possible types for this value; prefer the entry.type first
-          const candidateTypes = [entry.type];
-          const cacheKeyPrimary = this.getCacheKey(trimmed, entry.type);
-          if (this.hasUsableCacheValue(cacheKeyPrimary)) {
-            parentObj[entry.prop][i] =
-              this.translationCache.get(cacheKeyPrimary);
-            continue;
-          }
-
-          // If not found under primary type, attempt to find under any other type (fallback)
-          let applied = false;
-          for (const e of arrays) {
-            const fallbackKey = this.getCacheKey(trimmed, e.type);
-            if (this.hasUsableCacheValue(fallbackKey)) {
-              parentObj[entry.prop][i] = this.translationCache.get(fallbackKey);
-              applied = true;
-              break;
-            }
-          }
-
-          if (!applied) {
-            // keep original
-            parentObj[entry.prop][i] = v;
-          }
-        }
-      } catch (error) {
-        console.error(
-          "[TranslateOnTheFly] Failed applying translations to array",
-          entry.prop,
-          error,
+      for (const failure of translated.failures) {
+        console.warn(
+          "[TranslateOnTheFly] Failed to translate array value:",
+          failure.value,
+          "->",
+          failure.rejectReason,
         );
       }
-    }
+      this.markBatchFailuresAsUntranslated(translated.failures, true);
 
-    // Persist cache after modifications
-    this.persistCache();
-    console.log(
-      "[TranslateOnTheFly] Completed translation of game data arrays",
-    );
+      // Finally, for each array make Original copy and apply cached translations (if any)
+      for (const entry of arrays) {
+        const parentObj = entry.parent();
+        if (!parentObj || !Array.isArray(parentObj[entry.prop])) continue;
+
+        try {
+          const liveArr = parentObj[entry.prop];
+          // If Original doesn't exist yet, create it from current live array
+          const hasOriginal = Array.isArray(parentObj[`${entry.prop}Original`]);
+          const originalCopy = hasOriginal
+            ? parentObj[`${entry.prop}Original`]
+            : Array.isArray(liveArr)
+              ? liveArr.slice()
+              : [];
+          if (!hasOriginal) {
+            parentObj[`${entry.prop}Original`] = originalCopy.slice();
+          }
+
+          // Overwrite main array entries with cached translations when available
+          for (let i = 0; i < originalCopy.length; i++) {
+            const v = originalCopy[i];
+            if (v == null) {
+              parentObj[entry.prop][i] = v;
+              continue;
+            }
+            if (typeof v !== "string") {
+              parentObj[entry.prop][i] = v;
+              continue;
+            }
+            const trimmed = v.trim();
+            if (!trimmed) {
+              parentObj[entry.prop][i] = v;
+              continue;
+            }
+
+            // Try all possible types for this value; prefer the entry.type first
+            const candidateTypes = [entry.type];
+            const cacheKeyPrimary = this.getCacheKey(trimmed, entry.type);
+            if (this.hasUsableCacheValue(cacheKeyPrimary)) {
+              parentObj[entry.prop][i] =
+                this.translationCache.get(cacheKeyPrimary);
+              continue;
+            }
+
+            // If not found under primary type, attempt to find under any other type (fallback)
+            let applied = false;
+            for (const e of arrays) {
+              const fallbackKey = this.getCacheKey(trimmed, e.type);
+              if (this.hasUsableCacheValue(fallbackKey)) {
+                parentObj[entry.prop][i] =
+                  this.translationCache.get(fallbackKey);
+                applied = true;
+                break;
+              }
+            }
+
+            if (!applied) {
+              // keep original
+              parentObj[entry.prop][i] = v;
+            }
+          }
+        } catch (error) {
+          console.error(
+            "[TranslateOnTheFly] Failed applying translations to array",
+            entry.prop,
+            error,
+          );
+        }
+      }
+
+      // Persist cache after modifications
+      this.persistCache();
+      console.log(
+        "[TranslateOnTheFly] Completed translation of game data arrays",
+      );
+      return {
+        successCount: translated.successes.length,
+        failureCount: translated.failures.length,
+        totalCount: items.length,
+        stats: translated.stats,
+        summary: translated.summary,
+      };
+    }
   },
 };
