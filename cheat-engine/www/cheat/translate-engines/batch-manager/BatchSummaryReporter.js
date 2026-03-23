@@ -1,6 +1,11 @@
 import { Alert } from "../../js/AlertHelper.js";
 
 export class BatchSummaryReporter {
+  static toSafeNumber(value, fallback = 0) {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : fallback;
+  }
+
   static createErrorStatsAccumulator() {
     return {
       totalErrors: 0,
@@ -13,20 +18,20 @@ export class BatchSummaryReporter {
     const normalized = this.createErrorStatsAccumulator();
     normalized.totalErrors = Math.max(
       0,
-      Number(errorStats && errorStats.totalErrors),
+      this.toSafeNumber(errorStats && errorStats.totalErrors, 0),
     );
     normalized.recoveredErrors = Math.max(
       0,
-      Number(errorStats && errorStats.recoveredErrors),
+      this.toSafeNumber(errorStats && errorStats.recoveredErrors, 0),
     );
 
     const byType = (errorStats && errorStats.byType) || {};
     for (const key of Object.keys(byType)) {
-      normalized.byType[key] = Math.max(0, Number(byType[key]) || 0);
+      normalized.byType[key] = Math.max(0, this.toSafeNumber(byType[key], 0));
     }
 
     if (normalized.totalErrors <= 0) {
-      normalized.totalErrors = Math.max(0, Number(fallbackFailures) || 0);
+      normalized.totalErrors = Math.max(0, this.toSafeNumber(fallbackFailures));
     }
 
     return normalized;
@@ -104,9 +109,9 @@ export class BatchSummaryReporter {
     errorStats,
     durationMs,
   }) {
-    const safeTotal = Math.max(0, Number(totalItems) || 0);
-    const safeSuccess = Math.max(0, Number(successes) || 0);
-    const safeFailures = Math.max(0, Number(failures) || 0);
+    const safeTotal = Math.max(0, this.toSafeNumber(totalItems, 0));
+    const safeSuccess = Math.max(0, this.toSafeNumber(successes, 0));
+    const safeFailures = Math.max(0, this.toSafeNumber(failures, 0));
     const normalizedErrorStats = this.normalizeErrorStats(
       errorStats,
       safeFailures,

@@ -1,6 +1,6 @@
 import { KeyValueStorage } from "../js/KeyValueStorage.js";
 import { getRowsPerPage, setRowsPerPage } from "../js/TableSettings.js";
-import { BatchSummaryReporter } from "../translate-engines/batch-manager/BatchSummaryReporter.js";
+import { TranslationBatchManager } from "../translate-engines/batch-manager/TranslationBatchManager.js";
 import {
   ensureTranslateCacheRuntime,
   notifyTranslateCacheRuntimeChanged,
@@ -584,86 +584,38 @@ export default {
       const maxChars =
         Number(panel.charLimit) > 0 ? Number(panel.charLimit) : 1000;
 
-      let successCount = 0;
-      let failureCount = 0;
-      const errorStats = BatchSummaryReporter.createErrorStatsAccumulator();
       this.isTranslatingEmptyStrings = true;
 
-      if (typeof panel.showSpinner === "function") {
-        panel.showSpinner();
-      }
-
       try {
-        let cursor = 0;
-        while (cursor < items.length) {
-          const batch = [];
-          let chars = 0;
-
-          while (cursor < items.length) {
-            const candidate = items[cursor];
-            const candidateLen = (candidate.value || "").length;
-
-            if (batch.length >= maxItems) {
-              break;
-            }
-
-            if (batch.length > 0 && chars + candidateLen > maxChars) {
-              break;
-            }
-
-            batch.push(candidate);
-            chars += candidateLen;
-            cursor += 1;
-          }
-
-          if (!batch.length) {
-            batch.push(items[cursor]);
-            cursor += 1;
-          }
-
-          const result = await panel.engine.batchTranslate(batch, {
-            backgroundJob: false,
-          });
-
-          for (const success of result.successes || []) {
-            panel.setCacheValue(success.cacheKey, success.translated);
-            successCount += 1;
-          }
-
-          for (const failure of result.failures || []) {
-            if (panel.failedTranslations && failure.cacheKey) {
-              panel.failedTranslations.set(failure.cacheKey, Date.now());
-            }
-
-            const reason =
-              failure && failure.rejectReason
-                ? String(failure.rejectReason)
-                : "unknown";
-            errorStats.totalErrors += 1;
-            errorStats.byType[reason] = (errorStats.byType[reason] || 0) + 1;
-
-            const hasUsable =
-              typeof panel.hasUsableCacheValue === "function"
-                ? panel.hasUsableCacheValue(failure.cacheKey)
-                : false;
-            if (failure.cacheKey && !hasUsable) {
-              panel.setCacheValue(failure.cacheKey, "");
-            }
-
-            failureCount += 1;
-          }
+        if (!panel.batchManager) {
+          panel.batchManager = new TranslationBatchManager(panel);
         }
 
-        const summary = BatchSummaryReporter.buildSummary({
-          batchLabel: "translate empty strings",
-          totalItems: items.length,
-          successes: successCount,
-          failures: failureCount,
-          errorStats,
-          durationMs: 0,
+        const result = await panel.batchManager.runBatchedTranslation(items, {
+          stepLabel: "translate empty strings",
+          backgroundJob: false,
+          itemLimit: maxItems,
+          charLimit: maxChars,
+          showSummary: true,
         });
-        BatchSummaryReporter.showAlert(summary);
-        BatchSummaryReporter.logSummary(summary);
+
+        for (const success of result.successes || []) {
+          panel.setCacheValue(success.cacheKey, success.translated);
+        }
+
+        for (const failure of result.failures || []) {
+          if (panel.failedTranslations && failure.cacheKey) {
+            panel.failedTranslations.set(failure.cacheKey, Date.now());
+          }
+
+          const hasUsable =
+            typeof panel.hasUsableCacheValue === "function"
+              ? panel.hasUsableCacheValue(failure.cacheKey)
+              : false;
+          if (failure.cacheKey && !hasUsable) {
+            panel.setCacheValue(failure.cacheKey, "");
+          }
+        }
       } catch (error) {
         console.error(
           "[TranslateCacheManagerPanel] Translate empty strings failed",
@@ -676,9 +628,6 @@ export default {
           );
         }
       } finally {
-        if (typeof panel.hideSpinner === "function") {
-          panel.hideSpinner();
-        }
         this.isTranslatingEmptyStrings = false;
         this.refreshEntries();
       }

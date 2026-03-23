@@ -939,7 +939,9 @@ export default {
           const speaker = (cmd.parameters && cmd.parameters[4]) || "";
           if (speaker && speaker.trim()) {
             totalStrings += 1;
-            if (!this.hasUsableCacheValue(this.getCacheKey(speaker, "speaker"))) {
+            if (
+              !this.hasUsableCacheValue(this.getCacheKey(speaker, "speaker"))
+            ) {
               leftStrings += 1;
             }
           }
@@ -1018,15 +1020,21 @@ export default {
     },
 
     getSelectedObjectTranslationMapIds(validMaps = null) {
-      const safeMaps = Array.isArray(validMaps) ? validMaps : this.getValidMapInfos();
-      const validIds = safeMaps.map((mapInfo) => Number(mapInfo.id)).filter(Boolean);
+      const safeMaps = Array.isArray(validMaps)
+        ? validMaps
+        : this.getValidMapInfos();
+      const validIds = safeMaps
+        .map((mapInfo) => Number(mapInfo.id))
+        .filter(Boolean);
 
       if (!Array.isArray(this.objectTranslationSelectedMapIds)) {
         this.objectTranslationSelectedMapIds = validIds.slice();
       }
 
       const selectedSet = new Set(
-        (this.objectTranslationSelectedMapIds || []).map((id) => Number(id)).filter(Boolean),
+        (this.objectTranslationSelectedMapIds || [])
+          .map((id) => Number(id))
+          .filter(Boolean),
       );
       const sanitizedIds = validIds.filter((id) => selectedSet.has(id));
       this.objectTranslationSelectedMapIds = sanitizedIds;
@@ -1046,7 +1054,9 @@ export default {
 
     async getTranslatedMapNames(validMaps) {
       const safeMaps = Array.isArray(validMaps) ? validMaps : [];
-      const rawNames = safeMaps.map((mapInfo) => mapInfo.name || `Map ${mapInfo.id}`);
+      const rawNames = safeMaps.map(
+        (mapInfo) => mapInfo.name || `Map ${mapInfo.id}`,
+      );
       let displayNames = rawNames.slice();
 
       if (TRANSLATE_SETTINGS.isMapTranslateEnabled()) {
@@ -1074,7 +1084,9 @@ export default {
 
     async buildObjectTranslationMapEventDetails() {
       const validMaps = this.getValidMapInfos();
-      const selectedMapIds = new Set(this.getSelectedObjectTranslationMapIds(validMaps));
+      const selectedMapIds = new Set(
+        this.getSelectedObjectTranslationMapIds(validMaps),
+      );
       const mapNames = await this.getTranslatedMapNames(validMaps);
       const details = [];
 
@@ -1093,7 +1105,8 @@ export default {
 
         details.push({
           id: mapInfo.id,
-          label: mapNames.get(mapInfo.id) || mapInfo.name || `Map ${mapInfo.id}`,
+          label:
+            mapNames.get(mapInfo.id) || mapInfo.name || `Map ${mapInfo.id}`,
           total: 1,
           left: stats.left,
           totalStrings: stats.totalStrings,
@@ -1321,31 +1334,76 @@ export default {
       ];
     },
 
+    collectGameArrayCandidates() {
+      if (!window.$dataSystem) {
+        return { uniqueValues: [], pendingValues: [] };
+      }
+
+      const arrays = this.getGameArrayDefs();
+      const uniqueValuesMap = new Map();
+
+      for (const entry of arrays) {
+        const parentObj = entry.parent();
+        if (!parentObj) {
+          continue;
+        }
+
+        const sourceArr = Array.isArray(parentObj[`${entry.prop}Original`])
+          ? parentObj[`${entry.prop}Original`]
+          : parentObj[entry.prop];
+        if (!Array.isArray(sourceArr)) {
+          continue;
+        }
+
+        for (const value of sourceArr) {
+          if (!value || typeof value !== "string") {
+            continue;
+          }
+
+          const trimmed = value.trim();
+          if (!trimmed) {
+            continue;
+          }
+
+          if (!uniqueValuesMap.has(trimmed)) {
+            uniqueValuesMap.set(trimmed, {
+              value: trimmed,
+              types: new Set(),
+              cacheKeys: new Set(),
+            });
+          }
+
+          const candidate = uniqueValuesMap.get(trimmed);
+          candidate.types.add(entry.type);
+          candidate.cacheKeys.add(this.getCacheKey(trimmed, entry.type));
+        }
+      }
+
+      const uniqueValues = Array.from(uniqueValuesMap.values()).map(
+        (candidate) => ({
+          value: candidate.value,
+          types: Array.from(candidate.types),
+          cacheKeys: Array.from(candidate.cacheKeys),
+        }),
+      );
+
+      const pendingValues = uniqueValues.filter((candidate) => {
+        return !candidate.cacheKeys.some((cacheKey) =>
+          this.hasUsableCacheValue(cacheKey),
+        );
+      });
+
+      return { uniqueValues, pendingValues };
+    },
+
     countGameArraysStats() {
       if (!window.$dataSystem) {
         return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
       }
 
-      const arrays = this.getGameArrayDefs();
-
-      let total = 0;
-      let left = 0;
-      for (const entry of arrays) {
-        const parentObj = entry.parent();
-        if (!parentObj) continue;
-        const sourceArr = Array.isArray(parentObj[`${entry.prop}Original`])
-          ? parentObj[`${entry.prop}Original`]
-          : parentObj[entry.prop];
-        if (!Array.isArray(sourceArr)) continue;
-        for (const v of sourceArr) {
-          if (!v || typeof v !== "string" || !v.trim()) continue;
-          total++;
-          const cacheKey = this.getCacheKey(v.trim(), entry.type);
-          if (!this.hasUsableCacheValue(cacheKey)) {
-            left++;
-          }
-        }
-      }
+      const candidates = this.collectGameArrayCandidates();
+      const total = candidates.uniqueValues.length;
+      const left = candidates.pendingValues.length;
 
       return { total, left, totalStrings: total, leftStrings: left };
     },

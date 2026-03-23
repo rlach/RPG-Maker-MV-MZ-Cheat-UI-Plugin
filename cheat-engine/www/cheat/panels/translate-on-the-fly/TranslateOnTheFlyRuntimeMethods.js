@@ -792,47 +792,13 @@ export const translateOnTheFlyRuntimeMethods = {
       };
     }
 
-    // Use shared array definition.
     const arrays = this.getGameArrayDefs();
+    const candidates =
+      typeof this.collectGameArrayCandidates === "function"
+        ? this.collectGameArrayCandidates()
+        : { uniqueValues: [], pendingValues: [] };
 
-    // Collect unique non-empty strings from all arrays
-    const uniqueValues = new Map(); // value -> { value, types: Set }
-
-    for (const entry of arrays) {
-      const parentObj = entry.parent();
-      if (!parentObj) {
-        continue;
-      }
-
-      // If an Original copy exists, use it for collecting keys (avoid collecting already translated values)
-      const sourceArr = Array.isArray(parentObj[`${entry.prop}Original`])
-        ? parentObj[`${entry.prop}Original`]
-        : parentObj[entry.prop];
-      if (!Array.isArray(sourceArr)) {
-        continue;
-      }
-
-      const arr = sourceArr;
-      for (let i = 0; i < arr.length; i++) {
-        const v = arr[i];
-        if (v == null) continue;
-        if (typeof v !== "string") continue;
-        const trimmed = v.trim();
-        if (!trimmed) continue;
-
-        // Use original string as key in map to keep ordering irrelevant and dedupe
-        if (!uniqueValues.has(trimmed)) {
-          uniqueValues.set(trimmed, {
-            value: trimmed,
-            types: new Set([entry.type]),
-          });
-        } else {
-          uniqueValues.get(trimmed).types.add(entry.type);
-        }
-      }
-    }
-
-    if (uniqueValues.size === 0) {
+    if (candidates.uniqueValues.length === 0) {
       console.log(
         "[TranslateOnTheFly] No candidate strings found in game arrays",
       );
@@ -845,18 +811,7 @@ export const translateOnTheFlyRuntimeMethods = {
       };
     }
 
-    // Remove values already in cache
-    const pendingValues = [];
-    for (const { value, types } of uniqueValues.values()) {
-      // choose first type to build cacheKey (cache is per-type); if multiple types exist, we will translate once per distinct type later
-      // But to avoid duplicate API calls for same text across types, we will translate the text once and store translated value under each relevant cache key.
-      // Build a representative cacheKey using the first type
-      const firstType = Array.from(types)[0];
-      const cacheKey = this.getCacheKey(value, firstType);
-      if (!this.hasUsableCacheValue(cacheKey)) {
-        pendingValues.push({ value, types: Array.from(types) });
-      }
-    }
+    const pendingValues = candidates.pendingValues;
 
     if (pendingValues.length === 0) {
       console.log("[TranslateOnTheFly] All array strings already cached");
@@ -893,26 +848,8 @@ export const translateOnTheFlyRuntimeMethods = {
         });
       }
 
-      const batches = [];
-      let current = [];
-      let currentChars = 0;
-      for (const it of items) {
-        const itemLen = (it.value || "").length;
-        if (
-          current.length >= (this.batchItemsLimit || 20) ||
-          currentChars + itemLen > (this.charLimit || 1000)
-        ) {
-          if (current.length) batches.push(current);
-          current = [];
-          currentChars = 0;
-        }
-        current.push(it);
-        currentChars += itemLen;
-      }
-      if (current.length) batches.push(current);
-
       console.log(
-        `[TranslateOnTheFly] Translating ${items.length} unique strings in ${batches.length} batches`,
+        `[TranslateOnTheFly] Translating ${items.length} unique strings`,
       );
 
       const translated = await this.batchManager.runBatchedTranslation(
