@@ -548,7 +548,7 @@ export const translateOnTheFlyRuntimeMethods = {
         "[TranslateOnTheFly] Extracted save contents, applying cached translations if any",
       );
 
-      window.__TranslateOnTheFlyPanel.applyCachedActorClassEnemyTranslations();
+      self.applyCachedActorClassEnemyTranslations();
       console.log(
         "[TranslateOnTheFly] Applied cached translations to $dataActors, $dataClasses, $dataEnemies and their game objects",
       );
@@ -563,7 +563,7 @@ export const translateOnTheFlyRuntimeMethods = {
       console.log(
         "[TranslateOnTheFly] Created game objects, applying cached translations if any",
       );
-      window.__TranslateOnTheFlyPanel.applyCachedActorClassEnemyTranslations();
+      self.applyCachedActorClassEnemyTranslations();
       console.log(
         "[TranslateOnTheFly] Applied cached translations to $dataActors, $dataClasses, $dataEnemies and their game objects",
       );

@@ -7,6 +7,7 @@ import {
   onTranslateCacheRuntimeChanged,
   parseCacheKeyForLangPair,
 } from "../js/TranslateCacheRuntime.js";
+import { ensureTranslationRuntime } from "./translate-on-the-fly/TranslationRuntime.js";
 
 export default {
   name: "TranslateCacheManagerPanel",
@@ -280,11 +281,11 @@ export default {
     },
 
     getActiveLanguagePair() {
-      const panel = window.__TranslateOnTheFlyPanel;
-      if (panel && panel.sourceLang && panel.targetLang) {
+      const runtime = ensureTranslationRuntime();
+      if (runtime && runtime.sourceLang && runtime.targetLang) {
         return {
-          sourceLang: panel.sourceLang,
-          targetLang: panel.targetLang,
+          sourceLang: runtime.sourceLang,
+          targetLang: runtime.targetLang,
         };
       }
 
@@ -446,11 +447,11 @@ export default {
         return;
       }
 
-      const panel = window.__TranslateOnTheFlyPanel;
-      if (panel && typeof panel.persistCache === "function") {
-        panel.persistCache();
-        if (typeof panel.notifyCacheRuntime === "function") {
-          panel.notifyCacheRuntime(reason);
+      const runtime = ensureTranslationRuntime();
+      if (runtime && typeof runtime.persistCache === "function") {
+        runtime.persistCache();
+        if (typeof runtime.notifyCacheRuntime === "function") {
+          runtime.notifyCacheRuntime(reason);
         }
       } else {
         this.cacheStorage.setItem(
@@ -531,14 +532,14 @@ export default {
 
       this.flushPendingCacheEdits("cache-manager-pre-translate-empty");
 
-      const panel = window.__TranslateOnTheFlyPanel;
+      const runtime = ensureTranslationRuntime();
       if (
-        !panel ||
-        !panel.engine ||
-        typeof panel.engine.batchTranslate !== "function"
+        !runtime ||
+        !runtime.engine ||
+        typeof runtime.engine.batchTranslate !== "function"
       ) {
         console.warn(
-          "[TranslateCacheManagerPanel] TranslateOnTheFly panel is not ready",
+          "[TranslateCacheManagerPanel] Translation runtime is not ready",
         );
         return;
       }
@@ -580,18 +581,20 @@ export default {
       }
 
       const maxItems =
-        Number(panel.batchItemsLimit) > 0 ? Number(panel.batchItemsLimit) : 20;
+        Number(runtime.batchItemsLimit) > 0
+          ? Number(runtime.batchItemsLimit)
+          : 20;
       const maxChars =
-        Number(panel.charLimit) > 0 ? Number(panel.charLimit) : 1000;
+        Number(runtime.charLimit) > 0 ? Number(runtime.charLimit) : 1000;
 
       this.isTranslatingEmptyStrings = true;
 
       try {
-        if (!panel.batchManager) {
-          panel.batchManager = new TranslationBatchManager(panel);
+        if (!runtime.batchManager) {
+          runtime.batchManager = new TranslationBatchManager(runtime);
         }
 
-        const result = await panel.batchManager.runBatchedTranslation(items, {
+        const result = await runtime.batchManager.runBatchedTranslation(items, {
           stepLabel: "translate empty strings",
           backgroundJob: false,
           itemLimit: maxItems,
@@ -600,20 +603,20 @@ export default {
         });
 
         for (const success of result.successes || []) {
-          panel.setCacheValue(success.cacheKey, success.translated);
+          runtime.setCacheValue(success.cacheKey, success.translated);
         }
 
         for (const failure of result.failures || []) {
-          if (panel.failedTranslations && failure.cacheKey) {
-            panel.failedTranslations.set(failure.cacheKey, Date.now());
+          if (runtime.failedTranslations && failure.cacheKey) {
+            runtime.failedTranslations.set(failure.cacheKey, Date.now());
           }
 
           const hasUsable =
-            typeof panel.hasUsableCacheValue === "function"
-              ? panel.hasUsableCacheValue(failure.cacheKey)
+            typeof runtime.hasUsableCacheValue === "function"
+              ? runtime.hasUsableCacheValue(failure.cacheKey)
               : false;
           if (failure.cacheKey && !hasUsable) {
-            panel.setCacheValue(failure.cacheKey, "");
+            runtime.setCacheValue(failure.cacheKey, "");
           }
         }
       } catch (error) {

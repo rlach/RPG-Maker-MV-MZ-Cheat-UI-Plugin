@@ -1,7 +1,9 @@
-export default {
-    name: 'TranslateNamesPanel',
+import { ensureTranslationRuntime } from "./translate-on-the-fly/TranslationRuntime.js";
 
-    template: `
+export default {
+  name: "TranslateNamesPanel",
+
+  template: `
 <v-card flat class="ma-0 pa-0">
     <v-tabs v-model="activeTab" dark background-color="grey darken-3">
         <v-tab>Cached Names</v-tab>
@@ -131,168 +133,182 @@ export default {
 </v-card>
     `,
 
-    data() {
-        return {
-            activeTab: 0,
-            loading: false,
-            filter: '',
-            dbFilter: '',
-            entries: [],
-            databaseNames: []
-        };
+  data() {
+    return {
+      activeTab: 0,
+      loading: false,
+      filter: "",
+      dbFilter: "",
+      entries: [],
+      databaseNames: [],
+    };
+  },
+
+  created() {
+    this.refresh();
+    this.loadDatabaseNames();
+  },
+
+  computed: {
+    filteredEntries() {
+      console.log("filtering entries with term:", this.entries);
+      const term = (this.filter || "").toLowerCase();
+      if (!term) {
+        return this.entries;
+      }
+
+      return this.entries.filter((entry) => {
+        return (
+          entry.key.toLowerCase().includes(term) ||
+          entry.originalName.toLowerCase().includes(term) ||
+          (entry.value && entry.value.toLowerCase().includes(term))
+        );
+      });
     },
 
-    created() {
-        this.refresh();
-        this.loadDatabaseNames();
+    filteredDatabaseNames() {
+      const term = (this.dbFilter || "").toLowerCase();
+      if (!term) {
+        return this.databaseNames;
+      }
+
+      return this.databaseNames.filter((actor) => {
+        return (
+          actor.id.toString().includes(term) ||
+          actor.originalName.toLowerCase().includes(term) ||
+          (actor.name && actor.name.toLowerCase().includes(term))
+        );
+      });
+    },
+  },
+
+  methods: {
+    refresh() {
+      this.loading = true;
+      try {
+        const cache = window.__TranslateOnTheFlyCache;
+        this.entries = this.buildNameEntries(cache);
+      } catch (err) {
+        console.warn("[TranslateNamesPanel] Failed to load cache", err);
+        this.entries = [];
+      } finally {
+        this.loading = false;
+      }
     },
 
-    computed: {
-        filteredEntries() {
-            console.log('filtering entries with term:', this.entries);
-            const term = (this.filter || '').toLowerCase();
-            if (!term) {
-                return this.entries;
+    loadDatabaseNames() {
+      try {
+        this.databaseNames = [];
+        const dataActors = window.$dataActors;
+
+        if (typeof dataActors !== "undefined" && Array.isArray(dataActors)) {
+          const cache = window.__TranslateOnTheFlyCache;
+          for (let i = 1; i < dataActors.length; i++) {
+            const actor = dataActors[i];
+            if (actor && actor.name) {
+              const originalName = actor._translateOriginal
+                ? actor._translateOriginal.name
+                : actor.name;
+              // Try to get cached name translation
+              const cacheKey = `actor_name:ja-en-${originalName}`;
+              const cachedName = cache ? cache.get(cacheKey) : null;
+
+              this.databaseNames.push({
+                id: i,
+                originalName: originalName,
+                name: cachedName || actor.name,
+                cacheKey: cacheKey,
+                _actor: actor,
+              });
             }
-
-            return this.entries.filter(entry => {
-                return (
-                    entry.key.toLowerCase().includes(term) ||
-                    entry.originalName.toLowerCase().includes(term) ||
-                    (entry.value && entry.value.toLowerCase().includes(term))
-                );
-            });
-        },
-
-        filteredDatabaseNames() {
-            const term = (this.dbFilter || '').toLowerCase();
-            if (!term) {
-                return this.databaseNames;
-            }
-
-            return this.databaseNames.filter(actor => {
-                return (
-                    actor.id.toString().includes(term) ||
-                    actor.originalName.toLowerCase().includes(term) ||
-                    (actor.name && actor.name.toLowerCase().includes(term))
-                );
-            });
+          }
         }
+      } catch (err) {
+        console.warn(
+          "[TranslateNamesPanel] Failed to load database names",
+          err,
+        );
+        this.databaseNames = [];
+      }
     },
 
-    methods: {
-        refresh() {
-            this.loading = true;
-            try {
-                const cache = window.__TranslateOnTheFlyCache;
-                this.entries = this.buildNameEntries(cache);
-            } catch (err) {
-                console.warn('[TranslateNamesPanel] Failed to load cache', err);
-                this.entries = [];
-            } finally {
-                this.loading = false;
-            }
-        },
+    buildNameEntries(map) {
+      const result = [];
+      if (!map || typeof map.entries !== "function") {
+        return result;
+      }
+      for (const [key, value] of map.entries()) {
+        if (!this.isSpeakerNameKey(key)) {
+          continue;
+        }
+        result.push({
+          key,
+          value,
+          originalName: this.extractOriginalName(key),
+          saving: false,
+        });
+      }
+      return result;
+    },
 
-        loadDatabaseNames() {
-            try {
-                this.databaseNames = [];
-                const dataActors = window.$dataActors;
+    isSpeakerNameKey(key) {
+      return (
+        typeof key === "string" &&
+        key.startsWith("speaker:") &&
+        key.includes("name_")
+      );
+    },
 
-                if (typeof dataActors !== 'undefined' && Array.isArray(dataActors)) {
-                    const cache = window.__TranslateOnTheFlyCache;
-                    for (let i = 1; i < dataActors.length; i++) {
-                        const actor = dataActors[i];
-                        if (actor && actor.name) {
-                            const originalName = actor._translateOriginal ? actor._translateOriginal.name : actor.name;
-                            // Try to get cached name translation
-                            const cacheKey =  `actor_name:ja-en-${originalName}`;
-                            const cachedName = cache ? cache.get(cacheKey) : null;
-                            
-                            this.databaseNames.push({
-                                id: i,
-                                originalName: originalName,
-                                name: cachedName || actor.name,
-                                cacheKey: cacheKey,
-                                _actor: actor
-                            });
-                        }
-                    }
-                }
-            } catch (err) {
-                console.warn('[TranslateNamesPanel] Failed to load database names', err);
-                this.databaseNames = [];
-            }
-        },
+    extractOriginalName(key) {
+      if (typeof key !== "string") {
+        return "";
+      }
 
-        buildNameEntries(map) {
-            const result = [];
-            if (!map || typeof map.entries !== 'function') {
-                return result;
-            }
-            for (const [key, value] of map.entries()) {
-                if (!this.isSpeakerNameKey(key)) {
-                    continue;
-                }
-                result.push({
-                    key,
-                    value,
-                    originalName: this.extractOriginalName(key),
-                    saving: false
-                });
-            }
-            return result;
-        },
+      return key.replace(/.*name_/, "");
+    },
 
-        isSpeakerNameKey(key) {
-            return typeof key === 'string' && key.startsWith('speaker:') && key.includes('name_');
-        },
+    onEntryChange(entry) {
+      entry.dirty = true;
+    },
 
-        extractOriginalName(key) {
-            if (typeof key !== 'string') {
-                return '';
-            }
+    onDatabaseNameChange(actor) {
+      const runtime = ensureTranslationRuntime();
 
-            return key.replace(/.*name_/, '');
-        },
+      // Update the database actor directly
+      if (actor._actor) {
+        actor._actor.name = actor.name;
+      }
 
-        onEntryChange(entry) {
-            entry.dirty = true;
-        },
+      // Update game actor instance if it exists
+      if (
+        window.$gameActors &&
+        typeof window.$gameActors.actor === "function"
+      ) {
+        const gameActor = window.$gameActors.actor(actor.id);
+        if (gameActor) {
+          gameActor._name = actor.name;
+        }
+      }
 
-        onDatabaseNameChange(actor) {
-            // Update the database actor directly
-            if (actor._actor) {
-                actor._actor.name = actor.name;
-            }
-            
-            // Update game actor instance if it exists
-            if (window.$gameActors && typeof window.$gameActors.actor === 'function') {
-                const gameActor = window.$gameActors.actor(actor.id);
-                if (gameActor) {
-                    gameActor._name = actor.name;
-                }
-            }
-            
-            // Save to cache
-            if (actor.cacheKey) {
-                window.__TranslateOnTheFlyPanel.setCacheValue(actor.cacheKey, actor.name);
-            }
-        },
+      // Save to cache
+      if (runtime && actor.cacheKey) {
+        runtime.setCacheValue(actor.cacheKey, actor.name);
+      }
+    },
 
-        saveEntry(entry) {
-            if (!entry || !entry.key) {
-                return;
-            }
+    saveEntry(entry) {
+      if (!entry || !entry.key) {
+        return;
+      }
 
-            entry.saving = true;
-            const valueToSave = entry.value || '';
+      const runtime = ensureTranslationRuntime();
+      entry.saving = true;
+      const valueToSave = entry.value || "";
 
-            // Save to cache through the panel
-            window.__TranslateOnTheFlyPanel.setCacheValue(entry.key, valueToSave);
+      runtime.setCacheValue(entry.key, valueToSave);
 
-            entry.saving = false;
-            entry.dirty = false;
-        },
-    }
+      entry.saving = false;
+      entry.dirty = false;
+    },
+  },
 };

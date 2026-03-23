@@ -1,880 +1,874 @@
-import {Alert} from './AlertHelper.js'
-import {KeyValueStorage} from './KeyValueStorage.js'
-import {TranslateOnTheFlyState} from './TranslateOnTheFlyState.js'
-import {MESSAGE_LOG} from './MessageLogStore.js'
+import { Alert } from "./AlertHelper.js";
+import { KeyValueStorage } from "./KeyValueStorage.js";
+import { TranslateOnTheFlyState } from "./TranslateOnTheFlyState.js";
+import { MESSAGE_LOG } from "./MessageLogStore.js";
+import { OBJECT_TRANSLATION_SERVICE } from "../panels/translate-on-the-fly/ObjectTranslationService.js";
+import { ensureTranslationRuntime } from "../panels/translate-on-the-fly/TranslationRuntime.js";
 
 export class GeneralCheat {
-    // static saveCheatSettings () {
-    //     const saveData = {
-    //         godMode: {
-    //             actorIds: this.getGodModeOnActorIds()
-    //         },
-    //     }
-    //
-    //     localStorage.setItem('cheat.settings.general', JSON.stringify(saveData))
-    // }
-    //
-    // static initializeCheatSettings () {
-    //     if (this.initialized) {
-    //         return
-    //     }
-    //
-    //     // load save data from localStorage
-    //     let saveData = localStorage.getItem('cheat.settings.general')
-    //
-    //     if (!saveData) {
-    //         this.initialized = true
-    //         return
-    //     }
-    //
-    //     saveData = JSON.parse(saveData)
-    //     console.log(saveData)
-    //
-    //     // godMode
-    //     if (saveData.godMode) {
-    //         const godModeData = saveData.godMode
-    //         // actors
-    //         if (godModeData.actorIds) {
-    //             for (const actorId of godModeData.actorIds) {
-    //                 console.log('god mode on', actorId, $gameActors.actor(actorId))
-    //                 this.godModeOn($gameActors.actor(actorId))
-    //             }
-    //         }
-    //     }
-    //
-    //     this.initialized = true
-    // }
+  // static saveCheatSettings () {
+  //     const saveData = {
+  //         godMode: {
+  //             actorIds: this.getGodModeOnActorIds()
+  //         },
+  //     }
+  //
+  //     localStorage.setItem('cheat.settings.general', JSON.stringify(saveData))
+  // }
+  //
+  // static initializeCheatSettings () {
+  //     if (this.initialized) {
+  //         return
+  //     }
+  //
+  //     // load save data from localStorage
+  //     let saveData = localStorage.getItem('cheat.settings.general')
+  //
+  //     if (!saveData) {
+  //         this.initialized = true
+  //         return
+  //     }
+  //
+  //     saveData = JSON.parse(saveData)
+  //     console.log(saveData)
+  //
+  //     // godMode
+  //     if (saveData.godMode) {
+  //         const godModeData = saveData.godMode
+  //         // actors
+  //         if (godModeData.actorIds) {
+  //             for (const actorId of godModeData.actorIds) {
+  //                 console.log('god mode on', actorId, $gameActors.actor(actorId))
+  //                 this.godModeOn($gameActors.actor(actorId))
+  //             }
+  //         }
+  //     }
+  //
+  //     this.initialized = true
+  // }
 
-    // will be replaced from main component
-    static toggleCheatModal (componentName = null) {
+  // will be replaced from main component
+  static toggleCheatModal(componentName = null) {}
 
+  static openCheatModal(componentName = null) {}
+
+  static toggleNoClip(notify = false) {
+    $gamePlayer._through = !$gamePlayer._through;
+
+    if (notify) {
+      Alert.success(`No clip toggled: ${$gamePlayer._through}`);
+    }
+  }
+
+  static getGodModeOnActorIds() {
+    if (!this.godModeMap) {
+      return [];
     }
 
-    static openCheatModal (componentName = null) {
+    const ret = [];
 
+    for (const actor of this.godModeMap.keys()) {
+      const data = this.godModeMap.get(actor);
+
+      if (data.godMode) {
+        ret.push(actor._actorId);
+      }
     }
 
-    static toggleNoClip (notify = false) {
-        $gamePlayer._through = !$gamePlayer._through
+    return ret;
+  }
 
-        if (notify) {
-            Alert.success(`No clip toggled: ${$gamePlayer._through}`)
-        }
+  static getGodModeData(actor) {
+    if (!this.godModeMap) {
+      this.godModeMap = new Map();
     }
 
-    static getGodModeOnActorIds () {
-        if (!this.godModeMap) {
-            return []
-        }
-
-        const ret = []
-
-        for (const actor of this.godModeMap.keys()) {
-            const data = this.godModeMap.get(actor)
-
-            if (data.godMode) {
-                ret.push(actor._actorId)
-            }
-        }
-
-        return ret
+    if (this.godModeMap.has(actor)) {
+      return this.godModeMap.get(actor);
     }
 
-    static getGodModeData (actor) {
-        if (!this.godModeMap) {
-            this.godModeMap = new Map()
-        }
+    const defaultData = {
+      godMode: false,
+      gainHp: null,
+      setHp: null,
+      gainMp: null,
+      setMp: null,
+      gainTp: null,
+      setTp: null,
+      paySkillCost: null,
+      godModeInterval: null,
+    };
 
-        if (this.godModeMap.has(actor)) {
-            return this.godModeMap.get(actor)
-        }
+    this.godModeMap.set(actor, defaultData);
 
-        const defaultData = {
-            godMode: false,
-            gainHp: null,
-            setHp: null,
-            gainMp: null,
-            setMp: null,
-            gainTp: null,
-            setTp: null,
-            paySkillCost: null,
-            godModeInterval: null
-        }
+    return defaultData;
+  }
 
-        this.godModeMap.set(actor, defaultData)
+  static godModeOn(actor) {
+    if (actor instanceof Game_Actor && !this.isGodMode(actor)) {
+      const godModeData = this.getGodModeData(actor);
+      godModeData.godMode = true;
 
-        return defaultData
+      actor.gainHP_bkup = actor.gainHp;
+      actor.gainHp = function (value) {
+        value = actor.mhp;
+        actor.gainHP_bkup(value);
+      };
+
+      actor.setHp_bkup = actor.setHp;
+      actor.setHp = function (hp) {
+        hp = actor.mhp;
+        actor.setHp_bkup(hp);
+      };
+
+      actor.gainMp_bkup = actor.gainMp;
+      actor.gainMp = function (value) {
+        value = actor.mmp;
+        actor.gainMp_bkup(value);
+      };
+
+      actor.setMp_bkup = actor.setMp;
+      actor.setMp = function (mp) {
+        mp = actor.mmp;
+        actor.setMp_bkup(mp);
+      };
+
+      actor.gainTp_bkup = actor.gainTp;
+      actor.gainTp = function (value) {
+        value = actor.maxTp();
+        actor.gainTp_bkup(value);
+      };
+
+      actor.setTp_bkup = actor.setTp;
+      actor.setTp = function (tp) {
+        tp = actor.maxTp();
+        actor.setTp_bkup(tp);
+      };
+
+      actor.paySkillCost_bkup = actor.paySkillCost;
+      actor.paySkillCost = function (skill) {
+        // do nothing
+      };
+
+      godModeData.godModeInterval = setInterval(function () {
+        actor.gainHp(actor.mhp);
+        actor.gainMp(actor.mmp);
+        actor.gainTp(actor.maxTp());
+      }, 1000);
+
+      this.saveCheatSettings();
     }
+  }
 
-    static godModeOn (actor) {
-        if (actor instanceof Game_Actor && !this.isGodMode(actor)) {
-            const godModeData = this.getGodModeData(actor)
-            godModeData.godMode = true
+  static godModeOff(actor) {
+    if (actor instanceof Game_Actor && this.isGodMode(actor)) {
+      const godModeData = this.getGodModeData(actor);
+      godModeData.godMode = false;
 
-            actor.gainHP_bkup = actor.gainHp
-            actor.gainHp = function(value) {
-                value = actor.mhp
-                actor.gainHP_bkup(value)
-            }
+      clearInterval(godModeData.godModeInterval);
+      godModeData.godModeInterval = null;
 
-            actor.setHp_bkup = actor.setHp
-            actor.setHp = function(hp) {
-                hp = actor.mhp
-                actor.setHp_bkup(hp)
-            }
+      // actor.godMode field remains in save file, but backup methods aren't
+      //
+      if (actor.gainHP_bkup) {
+        actor.gainHp = actor.gainHP_bkup;
+        actor.setHp = actor.setHp_bkup;
+        actor.gainMp = actor.gainMp_bkup;
+        actor.setMp = actor.setMp_bkup;
+        actor.gainTp = actor.gainTp_bkup;
+        actor.setTp = actor.setTp_bkup;
+        actor.paySkillCost = actor.paySkillCost_bkup;
+      }
 
-            actor.gainMp_bkup = actor.gainMp
-            actor.gainMp = function (value) {
-                value = actor.mmp
-                actor.gainMp_bkup(value)
-            }
-
-            actor.setMp_bkup = actor.setMp
-            actor.setMp = function(mp) {
-                mp = actor.mmp
-                actor.setMp_bkup(mp)
-            }
-
-            actor.gainTp_bkup = actor.gainTp
-            actor.gainTp = function (value) {
-                value = actor.maxTp()
-                actor.gainTp_bkup(value)
-            }
-
-            actor.setTp_bkup = actor.setTp
-            actor.setTp = function(tp) {
-                tp = actor.maxTp()
-                actor.setTp_bkup(tp)
-            }
-
-            actor.paySkillCost_bkup = actor.paySkillCost
-            actor.paySkillCost = function (skill) {
-                // do nothing
-            }
-
-            godModeData.godModeInterval = setInterval(function() {
-                actor.gainHp(actor.mhp)
-                actor.gainMp(actor.mmp)
-                actor.gainTp(actor.maxTp())
-            }, 1000)
-
-            this.saveCheatSettings()
-        }
+      this.saveCheatSettings();
     }
+  }
 
-    static godModeOff (actor) {
-        if (actor instanceof Game_Actor && this.isGodMode(actor)) {
-            const godModeData = this.getGodModeData(actor)
-            godModeData.godMode = false
-
-            clearInterval(godModeData.godModeInterval)
-            godModeData.godModeInterval = null
-
-            // actor.godMode field remains in save file, but backup methods aren't
-            //
-            if (actor.gainHP_bkup) {
-                actor.gainHp = actor.gainHP_bkup
-                actor.setHp = actor.setHp_bkup
-                actor.gainMp = actor.gainMp_bkup
-                actor.setMp = actor.setMp_bkup
-                actor.gainTp = actor.gainTp_bkup
-                actor.setTp = actor.setTp_bkup
-                actor.paySkillCost = actor.paySkillCost_bkup
-            }
-
-            this.saveCheatSettings()
-        }
+  static toggleGodMode(actor) {
+    if (this.isGodMode(actor)) {
+      this.godModeOff(actor);
+    } else {
+      this.godModeOn(actor);
     }
+  }
 
-    static toggleGodMode (actor) {
-        if (this.isGodMode(actor)) {
-            this.godModeOff(actor)
-        } else {
-            this.godModeOn(actor)
-        }
-    }
-
-    static isGodMode (actor) {
-        return this.getGodModeData(actor).godMode
-    }
+  static isGodMode(actor) {
+    return this.getGodModeData(actor).godMode;
+  }
 }
 
 export class GameSpeedCheat {
-    static sceneOptions () {
-        if (!this._sceneOptions) {
-            this._sceneOptions = {
-                all () {
-                    return true
-                },
+  static sceneOptions() {
+    if (!this._sceneOptions) {
+      this._sceneOptions = {
+        all() {
+          return true;
+        },
 
-                battle () {
-                    return SceneManager._scene instanceof Scene_Battle
-                }
-            }
-        }
-
-        return this._sceneOptions
+        battle() {
+          return SceneManager._scene instanceof Scene_Battle;
+        },
+      };
     }
 
-    static getRate () {
-        if (this.rate) {
-            return this.rate
-        }
+    return this._sceneOptions;
+  }
 
-        return 1
+  static getRate() {
+    if (this.rate) {
+      return this.rate;
     }
 
-    static getSceneOption () {
-        if (this.sceneOption) {
-            return this.sceneOption
-        }
+    return 1;
+  }
 
-        return this.sceneOptions().all
+  static getSceneOption() {
+    if (this.sceneOption) {
+      return this.sceneOption;
     }
 
-    static removeApplied () {
-        if (this.isApplied) {
-            SceneManager.updateScene = this.origin_SceneManager_updateScene
-            Scene_Map.prototype.update = this.origin_Scene_Map_update
-            Spriteset_Base.prototype.update = this.origin_Spriteset_Base_update
-            this.isApplied = false
-        }
+    return this.sceneOptions().all;
+  }
+
+  static removeApplied() {
+    if (this.isApplied) {
+      SceneManager.updateScene = this.origin_SceneManager_updateScene;
+      Scene_Map.prototype.update = this.origin_Scene_Map_update;
+      Spriteset_Base.prototype.update = this.origin_Spriteset_Base_update;
+      this.isApplied = false;
+    }
+  }
+
+  static setGameSpeed(rate, sceneOption) {
+    // backup original functions
+    if (!this.origin_SceneManager_updateScene) {
+      this.origin_SceneManager_updateScene = SceneManager.updateScene;
     }
 
-    static setGameSpeed (rate, sceneOption) {
-        // backup original functions
-        if (!this.origin_SceneManager_updateScene) {
-            this.origin_SceneManager_updateScene = SceneManager.updateScene
-        }
-
-        if (!this.origin_Scene_Map_update) {
-            this.origin_Scene_Map_update = Scene_Map.prototype.update
-        }
-
-        if (!this.origin_Spriteset_Base_update) {
-            this.origin_Spriteset_Base_update = Spriteset_Base.prototype.update
-        }
-
-        if (!sceneOption) {
-            sceneOption = GameSpeedCheat.sceneOptions().all
-        }
-
-        this.rate = rate
-        this.sceneOption = sceneOption
-
-        // remove previously modified functions
-        this.removeApplied()
-
-        // if rate is 1, do not modify functions
-        if (Math.abs(rate - 1.0) < Number.EPSILON) {
-            return
-        }
-
-        // updateScene triggers event such as key inpuy, mouse input ...
-        // It occurs double click.
-        const SceneManager_updateScene = this.origin_SceneManager_updateScene
-        let currentUpdateSceneRate = 0
-        SceneManager.updateScene = function () {
-            if (!sceneOption()) {
-                SceneManager_updateScene.call(this)
-                return
-            }
-
-            currentUpdateSceneRate += rate
-            const currStep = Math.floor(currentUpdateSceneRate)
-            currentUpdateSceneRate -= currStep
-
-            if (currStep > 0) {
-                // update original frame
-                SceneManager_updateScene.call(this)
-
-                // update duplicated frames
-                for (let i = 0; i < currStep - 1; ++i) {
-                    SceneManager.updateInputData()
-                    SceneManager.changeScene()
-                    SceneManager_updateScene.call(this)
-                }
-            }
-        }
-
-        this.isApplied = true
+    if (!this.origin_Scene_Map_update) {
+      this.origin_Scene_Map_update = Scene_Map.prototype.update;
     }
 
-    static __writeSettings (rate, sceneOption) {
-        const options = GameSpeedCheat.sceneOptions()
-        const sceneOptionKey = Object.keys(GameSpeedCheat.sceneOptions()).find(key => options[key] === sceneOption)
-
-        const storage = new KeyValueStorage('./www/cheat-settings/gameSpeed.json')
-
-        storage.setItem('data', JSON.stringify({ rate: rate, sceneOption: sceneOptionKey }))
+    if (!this.origin_Spriteset_Base_update) {
+      this.origin_Spriteset_Base_update = Spriteset_Base.prototype.update;
     }
 
-    static __readSettings () {
-        const storage = new KeyValueStorage('./www/cheat-settings/gameSpeed.json')
+    if (!sceneOption) {
+      sceneOption = GameSpeedCheat.sceneOptions().all;
+    }
 
-        const json = storage.getItem('data')
+    this.rate = rate;
+    this.sceneOption = sceneOption;
 
-        if (!json) {
-            return
+    // remove previously modified functions
+    this.removeApplied();
+
+    // if rate is 1, do not modify functions
+    if (Math.abs(rate - 1.0) < Number.EPSILON) {
+      return;
+    }
+
+    // updateScene triggers event such as key inpuy, mouse input ...
+    // It occurs double click.
+    const SceneManager_updateScene = this.origin_SceneManager_updateScene;
+    let currentUpdateSceneRate = 0;
+    SceneManager.updateScene = function () {
+      if (!sceneOption()) {
+        SceneManager_updateScene.call(this);
+        return;
+      }
+
+      currentUpdateSceneRate += rate;
+      const currStep = Math.floor(currentUpdateSceneRate);
+      currentUpdateSceneRate -= currStep;
+
+      if (currStep > 0) {
+        // update original frame
+        SceneManager_updateScene.call(this);
+
+        // update duplicated frames
+        for (let i = 0; i < currStep - 1; ++i) {
+          SceneManager.updateInputData();
+          SceneManager.changeScene();
+          SceneManager_updateScene.call(this);
         }
+      }
+    };
 
-        const data = JSON.parse(json)
+    this.isApplied = true;
+  }
 
-        GameSpeedCheat.setGameSpeed(data.rate, GameSpeedCheat.sceneOptions()[data.sceneOption])
+  static __writeSettings(rate, sceneOption) {
+    const options = GameSpeedCheat.sceneOptions();
+    const sceneOptionKey = Object.keys(GameSpeedCheat.sceneOptions()).find(
+      (key) => options[key] === sceneOption,
+    );
+
+    const storage = new KeyValueStorage("./www/cheat-settings/gameSpeed.json");
+
+    storage.setItem(
+      "data",
+      JSON.stringify({ rate: rate, sceneOption: sceneOptionKey }),
+    );
+  }
+
+  static __readSettings() {
+    const storage = new KeyValueStorage("./www/cheat-settings/gameSpeed.json");
+
+    const json = storage.getItem("data");
+
+    if (!json) {
+      return;
     }
+
+    const data = JSON.parse(json);
+
+    GameSpeedCheat.setGameSpeed(
+      data.rate,
+      GameSpeedCheat.sceneOptions()[data.sceneOption],
+    );
+  }
 }
 
 export class SpeedCheat {
-    // static fixed = null // WARN: declaring static variable occurs error in nw.js (why?)
+  // static fixed = null // WARN: declaring static variable occurs error in nw.js (why?)
 
-    static isFixed () {
-        return !!SpeedCheat.fixed
+  static isFixed() {
+    return !!SpeedCheat.fixed;
+  }
+
+  static setFixSpeedInterval(speed) {
+    if (SpeedCheat.isFixed()) {
+      SpeedCheat.removeFixSpeedInterval();
     }
 
-    static setFixSpeedInterval (speed) {
-        if (SpeedCheat.isFixed()) {
-            SpeedCheat.removeFixSpeedInterval()
-        }
+    SpeedCheat.fixed = setInterval(() => {
+      SpeedCheat.__setSpeed(speed, false);
+    }, 1000);
+  }
 
-        SpeedCheat.fixed = setInterval(() => {
-            SpeedCheat.__setSpeed(speed, false)
-        }, 1000)
+  static removeFixSpeedInterval() {
+    if (SpeedCheat.isFixed()) {
+      clearInterval(SpeedCheat.fixed);
+      SpeedCheat.fixed = undefined;
+    }
+  }
+
+  static __setSpeed(speed) {
+    $gamePlayer.setMoveSpeed(speed);
+  }
+
+  static setSpeed(speed, fixed = false) {
+    SpeedCheat.__setSpeed(speed);
+
+    if (fixed) {
+      SpeedCheat.setFixSpeedInterval(speed);
+    } else {
+      SpeedCheat.removeFixSpeedInterval();
+    }
+  }
+
+  static __writeSettings(speed, fixed) {
+    const storage = new KeyValueStorage("./www/cheat-settings/speed.json");
+
+    storage.setItem("data", JSON.stringify({ speed: speed, fixed: fixed }));
+  }
+
+  static __readSettings() {
+    const storage = new KeyValueStorage("./www/cheat-settings/speed.json");
+
+    const json = storage.getItem("data");
+
+    if (!json) {
+      return;
     }
 
-    static removeFixSpeedInterval () {
-        if (SpeedCheat.isFixed()) {
-            clearInterval(SpeedCheat.fixed)
-            SpeedCheat.fixed = undefined
-        }
+    const data = JSON.parse(json);
+
+    if (data.fixed) {
+      SpeedCheat.setSpeed(data.speed, data.fixed);
     }
-
-    static __setSpeed(speed) {
-        $gamePlayer.setMoveSpeed(speed)
-    }
-
-    static setSpeed (speed, fixed = false) {
-        SpeedCheat.__setSpeed(speed)
-
-        if (fixed) {
-            SpeedCheat.setFixSpeedInterval(speed)
-        } else {
-            SpeedCheat.removeFixSpeedInterval()
-        }
-    }
-
-    static __writeSettings (speed, fixed) {
-        const storage = new KeyValueStorage('./www/cheat-settings/speed.json')
-
-        storage.setItem('data', JSON.stringify({ speed: speed, fixed: fixed }))
-    }
-
-    static __readSettings () {
-        const storage = new KeyValueStorage('./www/cheat-settings/speed.json')
-
-        const json = storage.getItem('data')
-
-        if (!json) {
-            return
-        }
-
-        const data = JSON.parse(json)
-
-        if (data.fixed) {
-            SpeedCheat.setSpeed(data.speed, data.fixed)
-        }
-    }
+  }
 }
 
 export class SceneCheat {
-    static gotoTitle () {
-        SceneManager.goto(Scene_Title)
+  static gotoTitle() {
+    SceneManager.goto(Scene_Title);
+  }
+
+  static toggleSaveScene() {
+    if (SceneManager._scene.constructor === Scene_Save) {
+      SceneManager.pop();
+    } else if (SceneManager._scene.constructor === Scene_Load) {
+      SceneManager.goto(Scene_Save);
+    } else {
+      SceneManager.push(Scene_Save);
     }
+  }
 
-    static toggleSaveScene () {
-        if (SceneManager._scene.constructor === Scene_Save) {
-            SceneManager.pop()
-        } else if (SceneManager._scene.constructor === Scene_Load) {
-            SceneManager.goto(Scene_Save)
-        } else {
-            SceneManager.push(Scene_Save)
-        }
+  static toggleLoadScene() {
+    if (SceneManager._scene.constructor === Scene_Load) {
+      SceneManager.pop();
+    } else if (SceneManager._scene.constructor === Scene_Save) {
+      SceneManager.goto(Scene_Load);
+    } else {
+      SceneManager.push(Scene_Load);
     }
+  }
 
-    static toggleLoadScene () {
-        if (SceneManager._scene.constructor === Scene_Load) {
-            SceneManager.pop()
-        } else if (SceneManager._scene.constructor === Scene_Save) {
-            SceneManager.goto(Scene_Load)
-        } else {
-            SceneManager.push(Scene_Load)
-        }
-    }
+  static quickSave(slot = 1) {
+    $gameSystem.onBeforeSave();
+    DataManager.saveGame(slot);
 
-    static quickSave (slot = 1) {
-        $gameSystem.onBeforeSave()
-        DataManager.saveGame(slot)
+    Alert.success(`Game saved to slot ${slot}`);
+  }
 
-        Alert.success(`Game saved to slot ${slot}`)
-    }
+  static quickLoad(slot = 1) {
+    DataManager.loadGame(slot);
+    SceneManager.goto(Scene_Map);
 
-    static quickLoad (slot = 1) {
-        DataManager.loadGame(slot)
-        SceneManager.goto(Scene_Map)
-
-        Alert.success(`Game loaded from slot ${slot}`)
-    }
+    Alert.success(`Game loaded from slot ${slot}`);
+  }
 }
 
 export class BattleCheat {
-    static recover (member) {
-        member.setHp(member.mhp)
-        member.setMp(member.mmp)
-        member.setTp(member.maxTp())
+  static recover(member) {
+    member.setHp(member.mhp);
+    member.setMp(member.mmp);
+    member.setTp(member.maxTp());
+  }
+
+  static recoverAllEnemy() {
+    for (const member of $gameTroop.members()) {
+      this.recover(member);
     }
 
-    static recoverAllEnemy () {
-        for (const member of $gameTroop.members()) {
-            this.recover(member)
-        }
+    Alert.success("Recovery all enemies");
+  }
 
-        Alert.success('Recovery all enemies')
+  static recoverAllParty() {
+    for (const member of $gameParty.members()) {
+      this.recover(member);
     }
 
-    static recoverAllParty () {
-        for (const member of $gameParty.members()) {
-            this.recover(member)
-        }
+    Alert.success("Recovery all party members");
+  }
 
-        Alert.success('Recovery all party members')
+  static fillTpAllEnemy() {
+    for (const member of $gameTroop.members()) {
+      member.setTp(member.maxTp());
     }
 
-    static fillTpAllEnemy () {
-        for (const member of $gameTroop.members()) {
-            member.setTp(member.maxTp())
-        }
+    Alert.success("Fill TP all enemies");
+  }
 
-        Alert.success('Fill TP all enemies')
+  static fillTpAllParty() {
+    for (const member of $gameParty.members()) {
+      member.setTp(member.maxTp());
     }
 
-    static fillTpAllParty () {
-        for (const member of $gameParty.members()) {
-            member.setTp(member.maxTp())
-        }
+    Alert.success("Fill TP all party members");
+  }
 
-        Alert.success('Fill TP all party members')
+  static changeAllEnemyHealth(newHp) {
+    for (const member of $gameTroop.members()) {
+      member.setHp(newHp);
     }
 
-    static changeAllEnemyHealth (newHp) {
-        for (const member of $gameTroop.members()) {
-            member.setHp(newHp)
-        }
+    Alert.success(`HP ${newHp} for all enemies`);
+  }
 
-        Alert.success(`HP ${newHp} for all enemies`)
+  static changeAllPartyHealth(newHp) {
+    for (const member of $gameParty.members()) {
+      member.setHp(newHp);
     }
 
-    static changeAllPartyHealth (newHp) {
-        for (const member of $gameParty.members()) {
-            member.setHp(newHp)
-        }
+    Alert.success(`HP ${newHp} for all party members`);
+  }
 
-        Alert.success(`HP ${newHp} for all party members`)
+  static canExecuteBattleEndProcess() {
+    return (
+      SceneManager._scene &&
+      SceneManager._scene.constructor === Scene_Battle &&
+      BattleManager._phase !== "battleEnd"
+    );
+  }
+
+  static encounterBattle() {
+    $gamePlayer._encounterCount = 0;
+  }
+
+  static victory() {
+    if (this.canExecuteBattleEndProcess()) {
+      $gameTroop.members().forEach((enemy) => {
+        enemy.addNewState(enemy.deathStateId());
+      });
+      BattleManager.processVictory();
+      Alert.success("Forced victory from battle!");
+      return true;
+    }
+    return false;
+  }
+
+  static defeat() {
+    if (this.canExecuteBattleEndProcess()) {
+      $gameParty.members().forEach((actor) => {
+        actor.addNewState(actor.deathStateId());
+      });
+      BattleManager.processDefeat();
+      Alert.success("Forced defeat from battle...");
+      return true;
+    }
+    return false;
+  }
+
+  static escape() {
+    if (this.canExecuteBattleEndProcess()) {
+      $gameParty.performEscape();
+      SoundManager.playEscape();
+      BattleManager._escaped = true;
+      BattleManager.processEscape();
+      Alert.success("Forced escape from battle");
+      return true;
+    }
+    return false;
+  }
+
+  static abort() {
+    if (this.canExecuteBattleEndProcess()) {
+      $gameParty.performEscape();
+      SoundManager.playEscape();
+      BattleManager._escaped = true;
+      BattleManager.processAbort();
+      Alert.success("Forced abort battle");
+      return true;
+    }
+    return false;
+  }
+
+  static toggleDisableRandomEncounter() {
+    // change $gamePlayer.canEncounter function
+    // if canEncounter is false, $gamePlayer.updateEncounterCount() do not decreases $gamePlayer._encounterCount
+    if (this.isDisableRandomEncounter()) {
+      if (this.canEncounter_bkup) {
+        $gamePlayer.canEncounter = this.canEncounter_bkup;
+      }
+    } else {
+      this.canEncounter_bkup = $gamePlayer.canEncounter;
+
+      $gamePlayer.canEncounter = function () {
+        return false;
+      };
     }
 
-    static canExecuteBattleEndProcess () {
-        return SceneManager._scene && SceneManager._scene.constructor === Scene_Battle && BattleManager._phase !== 'battleEnd'
-    }
+    this.disableRandomEncounter = !this.isDisableRandomEncounter();
+  }
 
-    static encounterBattle () {
-        $gamePlayer._encounterCount = 0
-    }
-
-    static victory () {
-        if (this.canExecuteBattleEndProcess()) {
-            $gameTroop.members().forEach(enemy => {
-                enemy.addNewState(enemy.deathStateId())
-            })
-            BattleManager.processVictory()
-            Alert.success('Forced victory from battle!')
-            return true
-        }
-        return false
-    }
-
-    static defeat () {
-        if (this.canExecuteBattleEndProcess()) {
-            $gameParty.members().forEach(actor => {
-                actor.addNewState(actor.deathStateId())
-            })
-            BattleManager.processDefeat()
-            Alert.success('Forced defeat from battle...')
-            return true
-        }
-        return false
-    }
-
-    static escape () {
-        if (this.canExecuteBattleEndProcess()) {
-            $gameParty.performEscape()
-            SoundManager.playEscape()
-            BattleManager._escaped = true
-            BattleManager.processEscape()
-            Alert.success('Forced escape from battle')
-            return true
-        }
-        return false
-    }
-
-    static abort () {
-        if (this.canExecuteBattleEndProcess()) {
-            $gameParty.performEscape()
-            SoundManager.playEscape()
-            BattleManager._escaped = true
-            BattleManager.processAbort()
-            Alert.success('Forced abort battle')
-            return true
-        }
-        return false
-    }
-
-    static toggleDisableRandomEncounter () {
-        // change $gamePlayer.canEncounter function
-        // if canEncounter is false, $gamePlayer.updateEncounterCount() do not decreases $gamePlayer._encounterCount
-        if (this.isDisableRandomEncounter()) {
-            if (this.canEncounter_bkup) {
-                $gamePlayer.canEncounter = this.canEncounter_bkup
-            }
-
-        } else {
-            this.canEncounter_bkup = $gamePlayer.canEncounter
-
-            $gamePlayer.canEncounter = function () {
-                return false
-            }
-        }
-
-        this.disableRandomEncounter = !this.isDisableRandomEncounter()
-    }
-
-    static isDisableRandomEncounter () {
-        return !!this.disableRandomEncounter && this.disableRandomEncounter
-    }
+  static isDisableRandomEncounter() {
+    return !!this.disableRandomEncounter && this.disableRandomEncounter;
+  }
 }
 
 export class MessageCheat {
-    static initialize () {
-        this.skip = false
+  static initialize() {
+    this.skip = false;
 
-        // Skip message display animation
-        // It seems to be executed whenever each character is output in the message window
-        const _Window_Message_updateShowFast = Window_Message.prototype.updateShowFast;
-        Window_Message.prototype.updateShowFast = function () {
-            _Window_Message_updateShowFast.call(this);
-            // 여기에 skip 키 입력 체크
-            if (MessageCheat.skip) {
-                this._showFast = true;
-                this._pauseSkip = true;
-            }
-        };
+    // Skip message display animation
+    // It seems to be executed whenever each character is output in the message window
+    const _Window_Message_updateShowFast =
+      Window_Message.prototype.updateShowFast;
+    Window_Message.prototype.updateShowFast = function () {
+      _Window_Message_updateShowFast.call(this);
+      // 여기에 skip 키 입력 체크
+      if (MessageCheat.skip) {
+        this._showFast = true;
+        this._pauseSkip = true;
+      }
+    };
 
-        // Skip waiting for input after displaying text
-        // It seems to always run every few ms
-        const _Window_Message_updateInput = Window_Message.prototype.updateInput;
-        Window_Message.prototype.updateInput = function () {
-            const ret = _Window_Message_updateInput.call(this);
+    // Skip waiting for input after displaying text
+    // It seems to always run every few ms
+    const _Window_Message_updateInput = Window_Message.prototype.updateInput;
+    Window_Message.prototype.updateInput = function () {
+      const ret = _Window_Message_updateInput.call(this);
 
-            if(this.pause && MessageCheat.skip){
-                this.pause = false;
+      if (this.pause && MessageCheat.skip) {
+        this.pause = false;
 
-                if (!this._textState) {
-                    this.terminateMessage();
-                }
-                return true;
-            }
+        if (!this._textState) {
+          this.terminateMessage();
+        }
+        return true;
+      }
 
-            return ret;
-        };
+      return ret;
+    };
 
-        // Accelerates the scrolling message speed
-        const Window_ScrollText_scrollSpeed = Window_ScrollText.prototype.scrollSpeed;
-        Window_ScrollText.prototype.scrollSpeed = function () {
-            let ret = Window_ScrollText_scrollSpeed.call(this);
+    // Accelerates the scrolling message speed
+    const Window_ScrollText_scrollSpeed =
+      Window_ScrollText.prototype.scrollSpeed;
+    Window_ScrollText.prototype.scrollSpeed = function () {
+      let ret = Window_ScrollText_scrollSpeed.call(this);
 
-            if (MessageCheat.skip){ // 여기에서 skip 키 입력 체크
-                ret *= 100;
-            }
+      if (MessageCheat.skip) {
+        // 여기에서 skip 키 입력 체크
+        ret *= 100;
+      }
 
-            return ret;
-        };
+      return ret;
+    };
 
+    // Log every message that reaches the window
+    const _Window_Message_startMessage = Window_Message.prototype.startMessage;
+    Window_Message.prototype.startMessage = function () {
+      MessageCheat.logCurrentMessage();
+      _Window_Message_startMessage.call(this);
+    };
 
-        // Log every message that reaches the window
-        const _Window_Message_startMessage = Window_Message.prototype.startMessage;
-        Window_Message.prototype.startMessage = function () {
-            MessageCheat.logCurrentMessage();
-            _Window_Message_startMessage.call(this);
-        };
+    // --------------------------- 배틀 로그 관련
+    // Accelerates the battle log output speed
+    const _Window_BattleLog_messageSpeed =
+      Window_BattleLog.prototype.messageSpeed;
+    Window_BattleLog.prototype.messageSpeed = function () {
+      let ret = _Window_BattleLog_messageSpeed.call(this);
 
+      if (MessageCheat.skip) {
+        // 여기에서 skip 키 입력 체크
+        ret = 1;
+      }
 
-        // --------------------------- 배틀 로그 관련
-        // Accelerates the battle log output speed
-        const _Window_BattleLog_messageSpeed = Window_BattleLog.prototype.messageSpeed;
-        Window_BattleLog.prototype.messageSpeed = function () {
-            let ret = _Window_BattleLog_messageSpeed.call(this);
+      return ret;
+    };
+  }
 
-            if (MessageCheat.skip){ // 여기에서 skip 키 입력 체크
-                ret = 1;
-            }
+  static toggleRealtimeTranslation(notify = true) {
+    const enabled = TranslateOnTheFlyState.toggleEnabled();
+    const runtime = ensureTranslationRuntime();
 
-            return ret;
-        };
+    if (runtime && typeof runtime.applyExternalToggle === "function") {
+      runtime.applyExternalToggle(enabled, false);
     }
 
-    static toggleRealtimeTranslation (notify = true) {
-        const enabled = TranslateOnTheFlyState.toggleEnabled()
-
-        if (window.__TranslateOnTheFlyPanel && typeof window.__TranslateOnTheFlyPanel.applyExternalToggle === 'function') {
-            window.__TranslateOnTheFlyPanel.applyExternalToggle(enabled, false)
-        }
-
-        if (notify) {
-            Alert.success(`Real-time translation: ${enabled ? 'enabled' : 'disabled'}`)
-        }
-
-        return enabled
+    if (notify) {
+      Alert.success(
+        `Real-time translation: ${enabled ? "enabled" : "disabled"}`,
+      );
     }
 
-    static translateCurrentMessage () {
-        try {
-            // Check if panel is available
-            console.log('[MessageCheat] translateCurrentMessage called', window.__TranslateOnTheFlyPanel);
-            if (!window.__TranslateOnTheFlyPanel || typeof window.__TranslateOnTheFlyPanel.translateAndApplyCurrentMessage !== 'function') {
-                console.warn('[MessageCheat] TranslateOnTheFlyPanel not available')
-                Alert.error('Translation panel not initialized')
-                return
-            }
+    return enabled;
+  }
 
-            // Use tracked $gameMessage from panel instead of global one
-            const gameMessage = window.__TranslateOnTheFlyPanel.currentGameMessage || $gameMessage;
-            
-            if (!gameMessage || typeof gameMessage.allText !== 'function') {
-                console.warn('[MessageCheat] No gameMessage available')
-                Alert.warn('No message to translate')
-                return
-            }
+  static translateCurrentMessage() {
+    try {
+      const runtime = ensureTranslationRuntime();
+      console.log("[MessageCheat] translateCurrentMessage called", runtime);
+      if (
+        !runtime ||
+        typeof runtime.translateAndApplyCurrentMessage !== "function"
+      ) {
+        console.warn("[MessageCheat] Translation runtime not available");
+        Alert.error("Translation runtime not initialized");
+        return;
+      }
 
-            const text = gameMessage.allText()
-            const choices = gameMessage.choices ? gameMessage.choices() : []
-            const hasChoices = Array.isArray(choices) && choices.length > 0
-            
-            if ((!text || text.trim().length === 0) && !hasChoices) {
-                console.warn('[MessageCheat] Message text is empty and no choices')
-                Alert.warn('No message to translate')
-                return
-            }
+      const gameMessage = runtime.currentGameMessage || $gameMessage;
 
-            console.log('[MessageCheat] Translating current message:', text.substring(0, 50) + '...', hasChoices ? `with ${choices.length} choices` : '')
-            window.__TranslateOnTheFlyPanel.translateAndApplyCurrentMessage()
-        } catch (err) {
-            console.error('[MessageCheat] Failed to translate current message', err)
-            Alert.error('Failed to translate message: ' + err.message)
-        }
+      if (!gameMessage || typeof gameMessage.allText !== "function") {
+        console.warn("[MessageCheat] No gameMessage available");
+        Alert.warn("No message to translate");
+        return;
+      }
+
+      const text = gameMessage.allText();
+      const choices = gameMessage.choices ? gameMessage.choices() : [];
+      const hasChoices = Array.isArray(choices) && choices.length > 0;
+
+      if ((!text || text.trim().length === 0) && !hasChoices) {
+        console.warn("[MessageCheat] Message text is empty and no choices");
+        Alert.warn("No message to translate");
+        return;
+      }
+
+      console.log(
+        "[MessageCheat] Translating current message:",
+        text.substring(0, 50) + "...",
+        hasChoices ? `with ${choices.length} choices` : "",
+      );
+      runtime.translateAndApplyCurrentMessage();
+    } catch (err) {
+      console.error("[MessageCheat] Failed to translate current message", err);
+      Alert.error("Failed to translate message: " + err.message);
+    }
+  }
+
+  static translateCurrentMap() {
+    try {
+      const runtime = ensureTranslationRuntime();
+      if (!runtime || typeof runtime.translateMapEvents !== "function") {
+        console.warn("[MessageCheat] Translation runtime not available");
+        Alert.error("Translation runtime not initialized");
+        return;
+      }
+
+      // Check if map is loaded
+      if (!$dataMap) {
+        console.warn("[MessageCheat] No map loaded");
+        Alert.warn("No map to translate");
+        return;
+      }
+
+      console.log(
+        "[MessageCheat] Translating current map:",
+        $dataMap.displayName || "(unknown)",
+      );
+      runtime.translateMapEvents();
+    } catch (err) {
+      console.error("[MessageCheat] Failed to translate map", err);
+      Alert.error("Failed to translate map: " + err.message);
+    }
+  }
+
+  static translateAllMaps() {
+    try {
+      const runtime = ensureTranslationRuntime();
+      if (!runtime || typeof runtime.translateAllMaps !== "function") {
+        console.warn("[MessageCheat] Translation runtime not available");
+        Alert.error("Translation runtime not initialized");
+        return;
+      }
+
+      console.log("[MessageCheat] Translating all maps");
+      runtime.translateAllMaps();
+    } catch (err) {
+      console.error("[MessageCheat] Failed to translate all maps", err);
+      Alert.error("Failed to translate all maps: " + err.message);
+    }
+  }
+
+  static openObjectTranslationModal() {
+    try {
+      OBJECT_TRANSLATION_SERVICE.openModal();
+    } catch (err) {
+      console.error(
+        "[MessageCheat] Failed to open object translation modal",
+        err,
+      );
+      Alert.error("Failed to open object translation modal: " + err.message);
+    }
+  }
+
+  static logCurrentMessage() {
+    try {
+      if (!$gameMessage || typeof $gameMessage.allText !== "function") {
+        return;
+      }
+
+      const text = $gameMessage.allText() || "";
+      const choices = $gameMessage.choices ? $gameMessage.choices() : [];
+      const speakerName = ($gameMessage._speakerName || "").trim();
+      let combined = text;
+
+      if (Array.isArray(choices) && choices.length > 0) {
+        const lines = choices.map(
+          (choice, index) => `[${index + 1}] ${choice}`,
+        );
+        combined = combined
+          ? `${combined}\n${lines.join("\n")}`
+          : lines.join("\n");
+      }
+
+      if (!combined || combined.trim().length === 0) {
+        return;
+      }
+
+      console.log("[MessageCheat] Logging message:", combined);
+
+      MESSAGE_LOG.addEntry(combined, {
+        translated: !!TranslateOnTheFlyState.isEnabled() && !MessageCheat.skip,
+        skipped: !!MessageCheat.skip,
+        speakerName: speakerName || null,
+      });
+    } catch (err) {
+      console.warn("[MessageCheat] Failed to log message", err);
+    }
+  }
+
+  static startSkip(gameSpeed) {
+    if (gameSpeed === 1) {
+      this.gameSpeedBackup = null;
+    } else {
+      this.gameSpeedBackup = {
+        rate: GameSpeedCheat.getRate(),
+        sceneOption: GameSpeedCheat.getSceneOption(),
+      };
+
+      GameSpeedCheat.setGameSpeed(gameSpeed, GameSpeedCheat.sceneOptions().all);
     }
 
-    static translateCurrentMap () {
-        try {
-            // Check if panel is available
-            if (!window.__TranslateOnTheFlyPanel || typeof window.__TranslateOnTheFlyPanel.translateMapEvents !== 'function') {
-                console.warn('[MessageCheat] TranslateOnTheFlyPanel not available')
-                Alert.error('Translation panel not initialized')
-                return
-            }
+    this.skip = true;
+  }
 
-            // Check if map is loaded
-            if (!$dataMap) {
-                console.warn('[MessageCheat] No map loaded')
-                Alert.warn('No map to translate')
-                return
-            }
-
-            console.log('[MessageCheat] Translating current map:', $dataMap.displayName || '(unknown)')
-            window.__TranslateOnTheFlyPanel.translateMapEvents()
-        } catch (err) {
-            console.error('[MessageCheat] Failed to translate map', err)
-            Alert.error('Failed to translate map: ' + err.message)
-        }
+  static stopSkip() {
+    if (this.gameSpeedBackup) {
+      // restore game speed
+      GameSpeedCheat.setGameSpeed(
+        this.gameSpeedBackup.rate,
+        this.gameSpeedBackup.sceneOption,
+      );
+      this.gameSpeedBackup = null;
     }
 
-    static translateAllMaps () {
-        try {
-            // Check if panel is available
-            if (!window.__TranslateOnTheFlyPanel || typeof window.__TranslateOnTheFlyPanel.translateAllMaps !== 'function') {
-                console.warn('[MessageCheat] TranslateOnTheFlyPanel not available')
-                Alert.error('Translation panel not initialized')
-                return
-            }
-
-            console.log('[MessageCheat] Translating all maps')
-            window.__TranslateOnTheFlyPanel.translateAllMaps()
-        } catch (err) {
-            console.error('[MessageCheat] Failed to translate all maps', err)
-            Alert.error('Failed to translate all maps: ' + err.message)
-        }
-    }
-
-    static openObjectTranslationModal () {
-        try {
-            console.log('[TOF-DEBUG][MessageCheat] openObjectTranslationModal invoked', {
-                hasPanel: !!window.__TranslateOnTheFlyPanel,
-                hasOpenFn: !!(window.__TranslateOnTheFlyPanel && typeof window.__TranslateOnTheFlyPanel.openObjectTranslationModal === 'function')
-            })
-            const panel = window.__TranslateOnTheFlyPanel
-            if (panel && typeof panel.openObjectTranslationModal === 'function') {
-                console.log('[TOF-DEBUG][MessageCheat] panel exists -> opening modal directly')
-                panel.openObjectTranslationModal()
-                return
-            }
-
-            window.__TOF_OPEN_OBJECT_TRANSLATION_MODAL__ = true
-            console.log('[TOF-DEBUG][MessageCheat] panel missing -> setting deferred flag and opening cheat modal tab')
-
-            // Panel component is lazily mounted; open cheat modal on Translate On The Fly tab first
-            if (typeof GeneralCheat.openCheatModal === 'function') {
-                GeneralCheat.openCheatModal('translate-on-the-fly-panel')
-            }
-
-            const startedAt = Date.now()
-            const retryTimer = setInterval(() => {
-                const nextPanel = window.__TranslateOnTheFlyPanel
-                console.log('[TOF-DEBUG][MessageCheat] waiting for panel mount', {
-                    elapsedMs: Date.now() - startedAt,
-                    hasPanel: !!nextPanel,
-                    hasOpenFn: !!(nextPanel && typeof nextPanel.openObjectTranslationModal === 'function')
-                })
-                if (nextPanel && typeof nextPanel.openObjectTranslationModal === 'function') {
-                    clearInterval(retryTimer)
-                    window.__TOF_OPEN_OBJECT_TRANSLATION_MODAL__ = false
-                    console.log('[TOF-DEBUG][MessageCheat] panel mounted -> opening modal now')
-                    nextPanel.openObjectTranslationModal()
-                    return
-                }
-
-                if (Date.now() - startedAt > 4000) {
-                    clearInterval(retryTimer)
-                    console.warn('[MessageCheat] TranslateOnTheFlyPanel not available after opening modal')
-                    console.warn('[TOF-DEBUG][MessageCheat] timeout waiting for panel mount')
-                    Alert.error('Translation panel not initialized')
-                }
-            }, 100)
-        } catch (err) {
-            console.error('[MessageCheat] Failed to open object translation modal', err)
-            Alert.error('Failed to open object translation modal: ' + err.message)
-        }
-    }
-
-    static logCurrentMessage () {
-        try {
-            if (!$gameMessage || typeof $gameMessage.allText !== 'function') {
-                return
-            }
-
-            const text = $gameMessage.allText() || ''
-            const choices = $gameMessage.choices ? $gameMessage.choices() : []
-            const speakerName = ($gameMessage._speakerName || '').trim()
-            let combined = text
-
-            if (Array.isArray(choices) && choices.length > 0) {
-                const lines = choices.map((choice, index) => `[${index + 1}] ${choice}`)
-                combined = combined ? `${combined}\n${lines.join('\n')}` : lines.join('\n')
-            }
-
-            if (!combined || combined.trim().length === 0) {
-                return
-            }
-
-            console.log('[MessageCheat] Logging message:', combined)
-
-            MESSAGE_LOG.addEntry(combined, {
-                translated: !!TranslateOnTheFlyState.isEnabled() && !MessageCheat.skip,
-                skipped: !!MessageCheat.skip,
-                speakerName: speakerName || null
-            })
-        } catch (err) {
-            console.warn('[MessageCheat] Failed to log message', err)
-        }
-    }
-
-    static startSkip (gameSpeed) {
-        if (gameSpeed === 1) {
-            this.gameSpeedBackup = null
-        } else {
-            this.gameSpeedBackup = {
-                rate: GameSpeedCheat.getRate(),
-                sceneOption: GameSpeedCheat.getSceneOption()
-            }
-
-            GameSpeedCheat.setGameSpeed(gameSpeed, GameSpeedCheat.sceneOptions().all)
-        }
-
-        this.skip = true
-    }
-
-    static stopSkip () {
-        if (this.gameSpeedBackup) {
-            // restore game speed
-            GameSpeedCheat.setGameSpeed(this.gameSpeedBackup.rate, this.gameSpeedBackup.sceneOption)
-            this.gameSpeedBackup = null
-        }
-
-        this.skip = false
-    }
+    this.skip = false;
+  }
 }
 
 // Expose cheat helpers on the window so external cheat windows can reuse the same instances
 try {
-    window.GeneralCheat = GeneralCheat
-    window.GameSpeedCheat = GameSpeedCheat
-    window.SpeedCheat = SpeedCheat
-    window.SceneCheat = SceneCheat
-    window.MessageCheat = MessageCheat
+  window.GeneralCheat = GeneralCheat;
+  window.GameSpeedCheat = GameSpeedCheat;
+  window.SpeedCheat = SpeedCheat;
+  window.SceneCheat = SceneCheat;
+  window.MessageCheat = MessageCheat;
 } catch (err) {
-    // Non-fatal: best-effort exposure only
+  // Non-fatal: best-effort exposure only
 }
 
+async function multiRetryAction(action, intervalTimeout, maxTryCount) {
+  let finished = false;
+  let tryCount = 0;
 
-async function multiRetryAction (action, intervalTimeout, maxTryCount) {
-    let finished = false
-    let tryCount = 0
+  const interval = setInterval(() => {
+    try {
+      ++tryCount;
+      action();
+      finished = true;
+    } catch (e) {
+      console.log(e);
+      if (tryCount < maxTryCount) {
+        // try again
+        return;
+      }
+    }
 
-    const interval = setInterval(() => {
-        try {
-            ++tryCount
-            action()
-            finished = true
-        } catch (e) {
-            console.log(e)
-            if (tryCount < maxTryCount) {
-                // try again
-                return
-            }
-        }
-
-        clearInterval(interval)
-    }, intervalTimeout)
+    clearInterval(interval);
+  }, intervalTimeout);
 }
 
-function initialize () {
-    const intervalTimeout = 500
-    const maxTryCount = 100
+function initialize() {
+  const intervalTimeout = 500;
+  const maxTryCount = 100;
 
-    const initializeActions = [
-        SpeedCheat.__readSettings,
-        GameSpeedCheat.__readSettings
-    ]
+  const initializeActions = [
+    SpeedCheat.__readSettings,
+    GameSpeedCheat.__readSettings,
+  ];
 
-    const intervals = initializeActions.forEach(action => multiRetryAction(action, intervalTimeout, maxTryCount))
+  const intervals = initializeActions.forEach((action) =>
+    multiRetryAction(action, intervalTimeout, maxTryCount),
+  );
 }
 
 // Don't initialize in external cheat window - no game engine there
 if (!window.opener) {
-    initialize()
+  initialize();
 }
