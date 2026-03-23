@@ -2,6 +2,7 @@ import { Alert } from "../js/AlertHelper.js";
 import { MessageCheat, GeneralCheat } from "../js/CheatHelper.js";
 import { KeyValueStorage } from "../js/KeyValueStorage.js";
 import { TranslateOnTheFlyState } from "../js/TranslateOnTheFlyState.js";
+import { TRANSLATE_SETTINGS, TRANSLATOR } from "../js/TranslateHelper.js";
 import {
   ensureTranslateCacheRuntime,
   notifyTranslateCacheRuntimeChanged,
@@ -279,7 +280,19 @@ export default {
                       dense
                       class="ma-0 pa-0"
                     ></v-checkbox>
-                    <span class="caption grey--text text--lighten-1">{{item.metaText}}</span>
+                      <div class="d-flex align-center">
+                        <span class="caption grey--text text--lighten-1 mr-2">{{item.metaText}}</span>
+                        <v-btn
+                        v-if="item.id === 'mapEvents'"
+                        icon
+                        x-small
+                        color="grey lighten-1"
+                        :disabled="item.total <= 0"
+                        @click.stop="openMapEventsSelectionModal"
+                        >
+                        <v-icon small>mdi-cog</v-icon>
+                        </v-btn>
+                      </div>
                   </div>
             </v-card-text>
             <v-card-actions>
@@ -289,6 +302,58 @@ export default {
             </v-card-actions>
         </v-card>
     </v-dialog>
+
+              <v-dialog v-model="objectTranslationMapEventsDialogVisible" max-width="760">
+                <v-card dark>
+                  <v-card-title class="subtitle-1 font-weight-bold">Map events selection</v-card-title>
+                  <v-card-text class="caption pb-1">Choose which maps should be included in object translation.</v-card-text>
+                  <v-card-text class="pt-1">
+                    <v-text-field
+                      v-model="objectTranslationMapEventsSearch"
+                      label="Search maps"
+                      solo
+                      dense
+                      hide-details
+                      background-color="grey darken-3"
+                      class="mb-2"
+                      @keydown.self.stop
+                      @focus="$event.target.select()"
+                    ></v-text-field>
+
+                    <div class="d-flex justify-end mb-2">
+                      <v-btn text small color="primary" @click="selectAllMapEventsForObjectTranslation">Select all</v-btn>
+                      <v-btn text small color="grey lighten-1" @click="deselectAllMapEventsForObjectTranslation">Deselect all</v-btn>
+                    </div>
+
+                    <div v-if="objectTranslationMapEventsLoading" class="caption grey--text text--lighten-1 py-4 text-center">
+                      Loading map statistics...
+                    </div>
+
+                    <div v-else style="max-height: 420px; overflow-y: auto;">
+                      <div
+                        v-for="item in filteredObjectTranslationMapEventDetails"
+                        :key="item.id"
+                        class="d-flex align-center justify-space-between py-1"
+                      >
+                        <v-checkbox
+                          v-model="objectTranslationMapEventDraftSelection[item.id]"
+                          :label="item.label"
+                          :disabled="item.totalStrings <= 0"
+                          hide-details
+                          dense
+                          class="ma-0 pa-0"
+                        ></v-checkbox>
+                        <span class="caption grey--text text--lighten-1">left {{item.leftStrings}} of {{item.totalStrings}}</span>
+                      </div>
+                    </div>
+                  </v-card-text>
+                  <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn text color="grey" @click="closeMapEventsSelectionModal">Cancel</v-btn>
+                    <v-btn text color="primary" :disabled="objectTranslationMapEventsLoading" @click="saveMapEventsSelection">Save</v-btn>
+                  </v-card-actions>
+                </v-card>
+              </v-dialog>
 </v-card>
     `,
 
@@ -364,6 +429,12 @@ export default {
       objectTranslationModalStats: [],
       objectTranslationModalExtraStats: [],
       objectTranslationSelection: {},
+      objectTranslationSelectedMapIds: null,
+      objectTranslationMapEventsDialogVisible: false,
+      objectTranslationMapEventsLoading: false,
+      objectTranslationMapEventsSearch: "",
+      objectTranslationMapEventDetails: [],
+      objectTranslationMapEventDraftSelection: {},
       objectTranslationJob: {
         active: false,
         currentTypeLabel: "",
@@ -506,6 +577,25 @@ export default {
   computed: {
     cachedCount() {
       return this.translationCache ? this.translationCache.size : 0;
+    },
+
+    filteredObjectTranslationMapEventDetails() {
+      const items = Array.isArray(this.objectTranslationMapEventDetails)
+        ? this.objectTranslationMapEventDetails
+        : [];
+      const search = (this.objectTranslationMapEventsSearch || "")
+        .trim()
+        .toLowerCase();
+
+      if (!search) {
+        return items;
+      }
+
+      return items.filter((item) => {
+        const label = String(item.label || "").toLowerCase();
+        const id = String(item.id || "").toLowerCase();
+        return label.includes(search) || id.includes(search);
+      });
     },
   },
 
@@ -829,6 +919,190 @@ export default {
         totalStrings: 0,
         leftStrings: 0,
       };
+    },
+
+    countEventCommandListStats(list = []) {
+      if (!Array.isArray(list)) {
+        return { totalStrings: 0, leftStrings: 0 };
+      }
+
+      let totalStrings = 0;
+      let leftStrings = 0;
+
+      for (let i = 0; i < list.length; i++) {
+        const cmd = list[i];
+        if (!cmd || typeof cmd.code !== "number") {
+          continue;
+        }
+
+        if (cmd.code === 101) {
+          const speaker = (cmd.parameters && cmd.parameters[4]) || "";
+          if (speaker && speaker.trim()) {
+            totalStrings += 1;
+            if (!this.hasUsableCacheValue(this.getCacheKey(speaker, "speaker"))) {
+              leftStrings += 1;
+            }
+          }
+
+          let j = i + 1;
+          const lines = [];
+          while (j < list.length && list[j] && list[j].code === 401) {
+            lines.push(list[j].parameters && list[j].parameters[0]);
+            j += 1;
+          }
+
+          const text = lines.join("\n");
+          if (text && text.trim()) {
+            totalStrings += 1;
+            if (!this.hasUsableCacheValue(this.getCacheKey(text, "text"))) {
+              leftStrings += 1;
+            }
+          }
+
+          i = j - 1;
+          continue;
+        }
+
+        if (cmd.code === 102) {
+          const choices = cmd.parameters && cmd.parameters[0];
+          if (!Array.isArray(choices)) {
+            continue;
+          }
+
+          for (const choice of choices) {
+            if (!choice || typeof choice !== "string" || choice.trim() === "") {
+              continue;
+            }
+
+            totalStrings += 1;
+            if (!this.hasUsableCacheValue(this.getCacheKey(choice, "choice"))) {
+              leftStrings += 1;
+            }
+          }
+        }
+      }
+
+      return { totalStrings, leftStrings };
+    },
+
+    countMapEventStatsForData(mapData) {
+      if (!mapData || !Array.isArray(mapData.events)) {
+        return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
+      }
+
+      let totalStrings = 0;
+      let leftStrings = 0;
+
+      for (const event of mapData.events) {
+        if (!event || !Array.isArray(event.pages)) {
+          continue;
+        }
+
+        for (const page of event.pages) {
+          if (!page || !Array.isArray(page.list)) {
+            continue;
+          }
+
+          const stats = this.countEventCommandListStats(page.list);
+          totalStrings += stats.totalStrings;
+          leftStrings += stats.leftStrings;
+        }
+      }
+
+      return {
+        total: totalStrings > 0 ? 1 : 0,
+        left: leftStrings > 0 ? 1 : 0,
+        totalStrings,
+        leftStrings,
+      };
+    },
+
+    getSelectedObjectTranslationMapIds(validMaps = null) {
+      const safeMaps = Array.isArray(validMaps) ? validMaps : this.getValidMapInfos();
+      const validIds = safeMaps.map((mapInfo) => Number(mapInfo.id)).filter(Boolean);
+
+      if (!Array.isArray(this.objectTranslationSelectedMapIds)) {
+        this.objectTranslationSelectedMapIds = validIds.slice();
+      }
+
+      const selectedSet = new Set(
+        (this.objectTranslationSelectedMapIds || []).map((id) => Number(id)).filter(Boolean),
+      );
+      const sanitizedIds = validIds.filter((id) => selectedSet.has(id));
+      this.objectTranslationSelectedMapIds = sanitizedIds;
+      return sanitizedIds.slice();
+    },
+
+    getObjectTranslationMapEventsMetaText(totalMaps, selectedMapCount) {
+      const safeTotal = Math.max(0, Number(totalMaps) || 0);
+      const safeSelected = Math.max(0, Number(selectedMapCount) || 0);
+
+      if (safeSelected > 0 && safeSelected < safeTotal) {
+        return `${safeSelected} of ${safeTotal} maps`;
+      }
+
+      return `${safeTotal} maps`;
+    },
+
+    async getTranslatedMapNames(validMaps) {
+      const safeMaps = Array.isArray(validMaps) ? validMaps : [];
+      const rawNames = safeMaps.map((mapInfo) => mapInfo.name || `Map ${mapInfo.id}`);
+      let displayNames = rawNames.slice();
+
+      if (TRANSLATE_SETTINGS.isMapTranslateEnabled()) {
+        try {
+          displayNames = await TRANSLATOR.translateBulk(rawNames);
+        } catch (error) {
+          console.warn(
+            "[TranslateOnTheFly] Failed to translate map names for object modal:",
+            error,
+          );
+        }
+      }
+
+      const lookup = new Map();
+      for (let i = 0; i < safeMaps.length; i++) {
+        const mapInfo = safeMaps[i];
+        lookup.set(
+          mapInfo.id,
+          displayNames[i] || mapInfo.name || `Map ${mapInfo.id}`,
+        );
+      }
+
+      return lookup;
+    },
+
+    async buildObjectTranslationMapEventDetails() {
+      const validMaps = this.getValidMapInfos();
+      const selectedMapIds = new Set(this.getSelectedObjectTranslationMapIds(validMaps));
+      const mapNames = await this.getTranslatedMapNames(validMaps);
+      const details = [];
+
+      for (const mapInfo of validMaps) {
+        let stats = { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
+
+        try {
+          const mapData = await this.loadMapDataById(mapInfo.id);
+          stats = this.countMapEventStatsForData(mapData);
+        } catch (error) {
+          console.error(
+            `[TranslateOnTheFly] Failed to build map event stats for map ${mapInfo.id}:`,
+            error,
+          );
+        }
+
+        details.push({
+          id: mapInfo.id,
+          label: mapNames.get(mapInfo.id) || mapInfo.name || `Map ${mapInfo.id}`,
+          total: 1,
+          left: stats.left,
+          totalStrings: stats.totalStrings,
+          leftStrings: stats.leftStrings,
+          selected: selectedMapIds.has(mapInfo.id),
+        });
+      }
+
+      return details;
     },
 
     loadMapDataById(mapId) {
@@ -1215,6 +1489,7 @@ export default {
       const mapEventsStats =
         stats.find((item) => item.id === "mapEvents") ||
         this.countMapEventsStats();
+      const selectedMapIds = this.getSelectedObjectTranslationMapIds();
 
       this.objectTranslationModalStats = stats.filter(
         (item) => !extraIds.has(item.id),
@@ -1229,7 +1504,10 @@ export default {
         {
           id: "mapEvents",
           label: "Map events",
-          metaText: `${mapEventsStats.total} maps`,
+          metaText: this.getObjectTranslationMapEventsMetaText(
+            mapEventsStats.total,
+            selectedMapIds.length,
+          ),
           total: mapEventsStats.total,
         },
       ];
@@ -1248,6 +1526,76 @@ export default {
 
     closeObjectTranslationModal() {
       this.objectTranslationDialogVisible = false;
+    },
+
+    async openMapEventsSelectionModal() {
+      this.objectTranslationMapEventsDialogVisible = true;
+      this.objectTranslationMapEventsLoading = true;
+      this.objectTranslationMapEventsSearch = "";
+
+      try {
+        const details = await this.buildObjectTranslationMapEventDetails();
+        this.objectTranslationMapEventDetails = details;
+
+        const draftSelection = {};
+        for (const item of details) {
+          draftSelection[item.id] = !!item.selected;
+        }
+        this.objectTranslationMapEventDraftSelection = draftSelection;
+      } finally {
+        this.objectTranslationMapEventsLoading = false;
+      }
+    },
+
+    closeMapEventsSelectionModal() {
+      this.objectTranslationMapEventsDialogVisible = false;
+    },
+
+    selectAllMapEventsForObjectTranslation() {
+      const nextSelection = { ...this.objectTranslationMapEventDraftSelection };
+      for (const item of this.objectTranslationMapEventDetails) {
+        if (item.totalStrings > 0) {
+          nextSelection[item.id] = true;
+        }
+      }
+      this.objectTranslationMapEventDraftSelection = nextSelection;
+    },
+
+    deselectAllMapEventsForObjectTranslation() {
+      const nextSelection = { ...this.objectTranslationMapEventDraftSelection };
+      for (const item of this.objectTranslationMapEventDetails) {
+        nextSelection[item.id] = false;
+      }
+      this.objectTranslationMapEventDraftSelection = nextSelection;
+    },
+
+    saveMapEventsSelection() {
+      const selectedMapIds = this.objectTranslationMapEventDetails
+        .filter(
+          (item) =>
+            item.totalStrings > 0 &&
+            !!this.objectTranslationMapEventDraftSelection[item.id],
+        )
+        .map((item) => item.id);
+
+      this.objectTranslationSelectedMapIds = selectedMapIds;
+      this.$set(
+        this.objectTranslationSelection,
+        "mapEvents",
+        selectedMapIds.length > 0,
+      );
+
+      const mapEventsItem = (this.objectTranslationModalExtraStats || []).find(
+        (item) => item.id === "mapEvents",
+      );
+      if (mapEventsItem) {
+        mapEventsItem.metaText = this.getObjectTranslationMapEventsMetaText(
+          mapEventsItem.total,
+          selectedMapIds.length,
+        );
+      }
+
+      this.closeMapEventsSelectionModal();
     },
 
     async startObjectTranslationFromModal() {

@@ -417,16 +417,20 @@ export const translateOnTheFlyFlowMethods = {
 
         if (def.kind === "mapEvents") {
           const validMaps = this.getValidMapInfos();
+          const selectedMapIds = new Set(this.getSelectedObjectTranslationMapIds(validMaps));
+          const mapsToTranslate = validMaps.filter((mapInfo) =>
+            selectedMapIds.has(mapInfo.id),
+          );
 
-          for (let mapIndex = 0; mapIndex < validMaps.length; mapIndex++) {
-            const mapInfo = validMaps[mapIndex];
+          for (let mapIndex = 0; mapIndex < mapsToTranslate.length; mapIndex++) {
+            const mapInfo = mapsToTranslate[mapIndex];
             const mapNumber = mapIndex + 1;
             const mapData = await this.loadMapDataById(mapInfo.id);
             const batchResult = await this.translateMapEvents(
               mapData,
               mapNumber,
-              validMaps.length,
-              `translating map ${mapNumber}/${validMaps.length}`,
+              mapsToTranslate.length,
+              `translating map ${mapNumber}/${mapsToTranslate.length}`,
             );
             this.objectTranslationJob.totalDone +=
               batchResult.successCount || 0;
