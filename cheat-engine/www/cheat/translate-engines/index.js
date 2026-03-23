@@ -2,7 +2,7 @@
 import MyMemoryEngine from './MyMemoryEngine.js';
 import DatpmtEngine from './DatpmtEngine.js';
 import LibreTranslateEngine from './LibreTranslateEngine.js';
-import AIEngine from './AIEngine.js';
+import AIEngine from './ai-engine/index.js';
 import DummyEngine from './DummyEngine.js';
 
 export {

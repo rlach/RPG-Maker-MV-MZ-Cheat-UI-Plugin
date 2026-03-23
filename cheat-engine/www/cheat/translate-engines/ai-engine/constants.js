@@ -1,0 +1,106 @@
+/**
+ * Constants for AIEngine module family
+ * Central configuration and enum definitions
+ */
+
+// Tag configuration for preprocessing and postprocessing
+export const TAG_CONFIGS = [
+    // Tags with numeric parameter
+    { type: 'variable', shortTag: 'v', prePattern: /\\(V)\[(\d+)\]/gi, postPattern: /\[b=v(\d+)\]/gi, hasParam: true, defaultCase: 'V', requiredConsistency: true },
+    { type: 'actor', shortTag: 'an', prePattern: /\\(N)\[(\d+)\]/gi, postPattern: /\[b=an(\d+)\]/gi, hasParam: true, defaultCase: 'N', requiredConsistency: true },
+    { type: 'partyMember', shortTag: 'p', prePattern: /\\(P)\[(\d+)\]/gi, postPattern: /\[b=p(\d+)\]/gi, hasParam: true, defaultCase: 'P', requiredConsistency: true },
+    { type: 'color', shortTag: 'c', prePattern: /\\(C)\[(\d+)\]/gi, postPattern: /\[b=c(\d+)\]/gi, hasParam: true, defaultCase: 'C', requiredConsistency: false },
+    { type: 'icon', shortTag: 'i', prePattern: /\\(I)\[(\d+)\]/gi, postPattern: /\[b=i(\d+)\]/gi, hasParam: true, defaultCase: 'I', requiredConsistency: false },
+    // Tags without parameter
+    { type: 'gold', shortTag: 'gold', prePattern: /\\(\$)/gi, postPattern: /\[b=gold\]/gi, hasParam: false, defaultCase: '$', requiredConsistency: true },
+    { type: 'sizeInc', shortTag: 'si', prePattern: /\\(\{)/gi, postPattern: /\[b=si\]/gi, hasParam: false, defaultCase: '{', requiredConsistency: false },
+    { type: 'sizeDec', shortTag: 'sd', prePattern: /\\(\})/gi, postPattern: /\[b=sd\]/gi, hasParam: false, defaultCase: '}', requiredConsistency: false },
+    { type: 'backslash', shortTag: 'bs', prePattern: /\\(\\)/gi, postPattern: /\[b=bs\]/gi, hasParam: false, defaultCase: '\\', requiredConsistency: false },
+    { type: 'waitQuarter', shortTag: 'wq', prePattern: /\\(\.)/gi, postPattern: /\[b=wq\]/gi, hasParam: false, defaultCase: '.', requiredConsistency: false },
+    { type: 'waitSecond', shortTag: 'ws', prePattern: /\\(\|)/gi, postPattern: /\[b=ws\]/gi, hasParam: false, defaultCase: '|', requiredConsistency: false },
+    { type: 'waitInput', shortTag: 'wi', prePattern: /\\(!)/gi, postPattern: /\[b=wi\]/gi, hasParam: false, defaultCase: '!', requiredConsistency: false },
+    { type: 'displayAll', shortTag: 'da', prePattern: /\\(>)/gi, postPattern: /\[b=da\]/gi, hasParam: false, defaultCase: '>', requiredConsistency: false },
+    { type: 'cancelDisplayAll', shortTag: 'cda', prePattern: /\\(<)/gi, postPattern: /\[b=cda\]/gi, hasParam: false, defaultCase: '<', requiredConsistency: false },
+    { type: 'noWaitInput', shortTag: 'nwi', prePattern: /\\(\^)/gi, postPattern: /\[b=nwi\]/gi, hasParam: false, defaultCase: '^', requiredConsistency: false },
+    // Message core plugin parameters
+    // Wait
+    { type: 'wait', shortTag: 'w', prePattern: /\\(W)\[(\d+)\]/gi, postPattern: /\[b=w(\d+)\]/gi, hasParam: true, defaultCase: 'W', requiredConsistency: false },
+    // NameWindow
+    { type: 'nameWindowLeft', shortTag: 'nwl', prePattern: /\\(N)<([^>]+)>/gi, postPattern: /\[b=nwl([^\]]+)\]/gi, hasParam: true, defaultCase: 'N', requiredConsistency: false },
+    { type: 'nameWindowCenter', shortTag: 'nwc', prePattern: /\\(NC)<([^>]+)>/gi, postPattern: /\[b=nwc([^\]]+)\]/gi, hasParam: true, defaultCase: 'NC', requiredConsistency: false },
+    { type: 'nameWindowRight', shortTag: 'nwr', prePattern: /\\(NR)<([^>]+)>/gi, postPattern: /\[b=nwr([^\]]+)\]/gi, hasParam: true, defaultCase: 'NR', requiredConsistency: false },
+    // Line Break
+    { type: 'lineBreak', shortTag: 'br', prePattern: /<(br)>/gi, postPattern: /\[b=br\]/gi, hasParam: false, defaultCase: 'br', requiredConsistency: false },
+    // Position
+    { type: 'posX', shortTag: 'px', prePattern: /\\(PX)\[(\d+)\]/gi, postPattern: /\[b=px(\d+)\]/gi, hasParam: true, defaultCase: 'PX', requiredConsistency: false },
+    { type: 'posY', shortTag: 'py', prePattern: /\\(PY)\[(\d+)\]/gi, postPattern: /\[b=py(\d+)\]/gi, hasParam: true, defaultCase: 'PY', requiredConsistency: false },
+    // Outline
+    { type: 'outlineColor', shortTag: 'oc', prePattern: /\\(OC)\[(\d+)\]/gi, postPattern: /\[b=oc(\d+)\]/gi, hasParam: true, defaultCase: 'OC', requiredConsistency: false },
+    { type: 'outlineWidth', shortTag: 'ow', prePattern: /\\(OW)\[(\d+)\]/gi, postPattern: /\[b=ow(\d+)\]/gi, hasParam: true, defaultCase: 'OW', requiredConsistency: false },
+    // Font
+    { type: 'fontReset', shortTag: 'fr', prePattern: /\\(FR)/gi, postPattern: /\[b=fr\]/gi, hasParam: false, defaultCase: 'FR', requiredConsistency: false, addSpace: true },
+    { type: 'fontSize', shortTag: 'fs', prePattern: /\\(FS)\[(\d+)\]/gi, postPattern: /\[b=fs(\d+)\]/gi, hasParam: true, defaultCase: 'FS', requiredConsistency: false },
+    { type: 'fontName', shortTag: 'fn', prePattern: /\\(FN)<([^>]+)>/gi, postPattern: /\[b=fn([^\]]+)\]/gi, hasParam: true, defaultCase: 'FN', requiredConsistency: false },
+    { type: 'fontBold', shortTag: 'fb', prePattern: /\\(FB)/gi, postPattern: /\[b=fb\]/gi, hasParam: false, defaultCase: 'FB', requiredConsistency: false, addSpace: true },
+    { type: 'fontItalic', shortTag: 'fi', prePattern: /\\(FI)/gi, postPattern: /\[b=fi\]/gi, hasParam: false, defaultCase: 'FI', requiredConsistency: false, addSpace: true },
+    // Actor
+    { type: 'actorFace', shortTag: 'af', prePattern: /\\(AF)\[(\d+)\]/gi, postPattern: /\[b=af(\d+)\]/gi, hasParam: true, defaultCase: 'AF', requiredConsistency: false },
+    { type: 'actorClass', shortTag: 'acl', prePattern: /\\(AC)\[(\d+)\]/gi, postPattern: /\[b=acl(\d+)\]/gi, hasParam: true, defaultCase: 'AC', requiredConsistency: false },
+    { type: 'actorNickname', shortTag: 'anck', prePattern: /\\(AN)\[(\d+)\]/gi, postPattern: /\[b=anck(\d+)\]/gi, hasParam: true, defaultCase: 'AN', requiredConsistency: false },
+    { type: 'justAC', shortTag: 'ac', prePattern: /\\(AC)/gi, postPattern: /\[b=ac\]/gi, hasParam: false, defaultCase: 'AC', requiredConsistency: false, addSpace: true },
+    // Party
+    { type: 'partyFace', shortTag: 'pf', prePattern: /\\(PF)\[(\d+)\]/gi, postPattern: /\[b=pf(\d+)\]/gi, hasParam: true, defaultCase: 'PF', requiredConsistency: false },
+    { type: 'partyClass', shortTag: 'pcl', prePattern: /\\(PC)\[(\d+)\]/gi, postPattern: /\[b=pcl(\d+)\]/gi, hasParam: true, defaultCase: 'PC', requiredConsistency: false },
+    { type: 'partyNickname', shortTag: 'pnck', prePattern: /\\(PN)\[(\d+)\]/gi, postPattern: /\[b=pnck(\d+)\]/gi, hasParam: true, defaultCase: 'PN', requiredConsistency: false },
+    // Names
+    { type: 'className', shortTag: 'ncn', prePattern: /\\(NC)\[(\d+)\]/gi, postPattern: /\[b=ncn(\d+)\]/gi, hasParam: true, defaultCase: 'NC', requiredConsistency: false },
+    { type: 'itemName', shortTag: 'ni', prePattern: /\\(NI)\[(\d+)\]/gi, postPattern: /\[b=ni(\d+)\]/gi, hasParam: true, defaultCase: 'NI', requiredConsistency: false },
+    { type: 'weaponName', shortTag: 'nw', prePattern: /\\(NW)\[(\d+)\]/gi, postPattern: /\[b=nw(\d+)\]/gi, hasParam: true, defaultCase: 'NW', requiredConsistency: false },
+    { type: 'armorName', shortTag: 'na', prePattern: /\\(NA)\[(\d+)\]/gi, postPattern: /\[b=na(\d+)\]/gi, hasParam: true, defaultCase: 'NA', requiredConsistency: false },
+    { type: 'skillName', shortTag: 'ns', prePattern: /\\(NS)\[(\d+)\]/gi, postPattern: /\[b=ns(\d+)\]/gi, hasParam: true, defaultCase: 'NS', requiredConsistency: false },
+    { type: 'stateName', shortTag: 'nt', prePattern: /\\(NT)\[(\d+)\]/gi, postPattern: /\[b=nt(\d+)\]/gi, hasParam: true, defaultCase: 'NT', requiredConsistency: false },
+    // Icon Names
+    { type: 'itemNameIcon', shortTag: 'ii', prePattern: /\\(II)\[(\d+)\]/gi, postPattern: /\[b=ii(\d+)\]/gi, hasParam: true, defaultCase: 'II', requiredConsistency: false },
+    { type: 'weaponNameIcon', shortTag: 'iw', prePattern: /\\(IW)\[(\d+)\]/gi, postPattern: /\[b=iw(\d+)\]/gi, hasParam: true, defaultCase: 'IW', requiredConsistency: false },
+    { type: 'armorNameIcon', shortTag: 'ia', prePattern: /\\(IA)\[(\d+)\]/gi, postPattern: /\[b=ia(\d+)\]/gi, hasParam: true, defaultCase: 'IA', requiredConsistency: false },
+    { type: 'skillNameIcon', shortTag: 'is', prePattern: /\\(IS)\[(\d+)\]/gi, postPattern: /\[b=is(\d+)\]/gi, hasParam: true, defaultCase: 'IS', requiredConsistency: false },
+    { type: 'stateNameIcon', shortTag: 'it', prePattern: /\\(IT)\[(\d+)\]/gi, postPattern: /\[b=it(\d+)\]/gi, hasParam: true, defaultCase: 'IT', requiredConsistency: false }
+];
+
+export const DEFAULT_SYSTEM_PROMPT = 'You are translating scripts that contain [b=tags] in the form [b=shortcode]. Altering contents or order of any such tags, removing or adding tags will break the script. DO NOT MODIFY TAGS OF THE FORM [b=...]. DO NOT CHANGE ORDER OF THE TAGS. EVER. PRESENT TAGS EXACTLY AS THEY ARE IN THE INPUT. Only translate the text between tags. Return only flat one-line JSON with exact same keys. No markdown, no comments, no code blocks, no pretty formatting.';
+
+export const TYPE_TO_TAG = { text: 'm', speaker: 'm', choice: 'm' };
+
+export const REQUEST_SETTINGS = {
+    temperature: 0.7,
+    repetition_penalty: 1.0,
+    presence_penalty: 1.5,
+    top_p: 0.8,
+    top_k: 20,
+    response_format: { type: 'json_object' },
+};
+
+export const buildRequestSettingsForContent = (content) => ({
+    ...REQUEST_SETTINGS,
+    max_tokens: Math.max(1, ((typeof content === 'string' ? content.length : 0) * 5))
+});
+
+// Stream monitoring constants
+export const STREAM_MONITOR_CHECK_INTERVAL = 64;
+export const STREAM_OPEN_BRACE_MAX_CHARS = 100;
+export const STREAM_JSON_TRIM_MAX_CHARS = 400;
+export const STREAM_JSONL_TRIM_MAX_CHARS = 400;
+export const LLM_MAX_CONSECUTIVE_IDENTICAL_CHARS = 5;
+
+export const STREAM_CANCEL_REASON = Object.freeze({
+    NO_OPENING_BRACE: 'no_opening_brace',
+    INVALID_JSON_PROGRESS: 'invalid_json_progress',
+    UNKNOWN_KEY: 'unknown_key',
+    DUPLICATE_KEY: 'duplicate_key',
+    TRIM_TOO_LONG: 'trim_too_long',
+    COMPLETE_JSON_CONTINUED: 'complete_json_continued'
+});
+
+export const REQUEST_CANCEL_REASON = Object.freeze({
+    BACKGROUND_PREEMPTED: 'background_preempted'
+});
