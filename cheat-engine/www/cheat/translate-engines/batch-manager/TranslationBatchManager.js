@@ -68,9 +68,8 @@ export class TranslationBatchManager {
     try {
       for (let i = 0; i < batches.length; i++) {
         const batch = batches[i];
-        const batchStepLabel = `${stepLabel} (${i + 1}/${batches.length})`;
         this.progressTracker.updateStep(
-          batchStepLabel,
+          stepLabel,
           processed,
           safeItems.length,
         );
@@ -149,7 +148,7 @@ export class TranslationBatchManager {
 
         processed += batch.length;
         this.progressTracker.updateStep(
-          batchStepLabel,
+          stepLabel,
           processed,
           safeItems.length,
         );
@@ -435,7 +434,12 @@ export class TranslationBatchManager {
     };
   }
 
-  async translateMapEvents(mapData = null, mapNumber = null, totalMaps = null) {
+  async translateMapEvents(
+    mapData = null,
+    mapNumber = null,
+    totalMaps = null,
+    progressLabel = null,
+  ) {
     const dataMap = mapData || window.$dataMap;
     if (!dataMap) {
       return { successCount: 0, failureCount: 0 };
@@ -550,9 +554,10 @@ export class TranslationBatchManager {
       new Map(itemsToTranslate.map((item) => [item.cacheKey, item])).values(),
     );
     const stepLabel =
-      mapNumber !== null && totalMaps !== null
-        ? `translating map${mapNumber}`
-        : "translating map";
+      progressLabel ||
+      (mapNumber !== null && totalMaps !== null
+        ? `translating map ${mapNumber}/${totalMaps}`
+        : "translating map");
 
     const translated = await this.runBatchedTranslation(
       uniqueItems.map((item) => ({
@@ -581,6 +586,7 @@ export class TranslationBatchManager {
     return {
       successCount: translated.successes.length,
       failureCount: translated.failures.length,
+      totalCount: uniqueItems.length,
       stats: translated.stats,
     };
   }

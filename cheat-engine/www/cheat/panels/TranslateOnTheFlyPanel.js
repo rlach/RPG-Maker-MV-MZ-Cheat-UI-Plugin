@@ -221,6 +221,16 @@ export default {
     </v-card-text>
     
     <v-card-text class="py-2">
+      <v-btn
+        small
+        outlined
+        color="primary"
+        class="mr-2"
+        @click="openObjectTranslationModal">
+        <v-icon small left>mdi-translate</v-icon>
+        Translate items
+      </v-btn>
+
         <v-btn
             small
             outlined
@@ -252,6 +262,24 @@ export default {
                     ></v-checkbox>
                     <span class="caption grey--text text--lighten-1">left {{item.left}} of {{item.total}}</span>
                 </div>
+
+                  <v-divider class="my-3"></v-divider>
+
+                  <div
+                    v-for="item in objectTranslationModalExtraStats"
+                    :key="item.id"
+                    class="d-flex align-center justify-space-between py-1"
+                  >
+                    <v-checkbox
+                      v-model="objectTranslationSelection[item.id]"
+                      :label="item.label"
+                      :disabled="item.total <= 0"
+                      hide-details
+                      dense
+                      class="ma-0 pa-0"
+                    ></v-checkbox>
+                    <span class="caption grey--text text--lighten-1">{{item.metaText}}</span>
+                  </div>
             </v-card-text>
             <v-card-actions>
                 <v-spacer></v-spacer>
@@ -333,6 +361,7 @@ export default {
       aiFixRecursionMaxDepth: 0,
       objectTranslationDialogVisible: false,
       objectTranslationModalStats: [],
+      objectTranslationModalExtraStats: [],
       objectTranslationSelection: {},
       objectTranslationJob: {
         active: false,
@@ -676,12 +705,151 @@ export default {
           label: "game arrays (terms, types, elements)",
           kind: "gameArrays",
         },
+        {
+          id: "commonEvents",
+          label: "CommonEvents",
+          kind: "commonEvents",
+        },
+        {
+          id: "mapEvents",
+          label: "Map events",
+          kind: "mapEvents",
+        },
       ];
+    },
+
+    getValidMapInfos() {
+      if (!window.$dataMapInfos || !Array.isArray($dataMapInfos)) {
+        return [];
+      }
+
+      const validMaps = [];
+      for (let i = 0; i < $dataMapInfos.length; i++) {
+        const mapInfo = $dataMapInfos[i];
+        if (mapInfo && mapInfo.id) {
+          validMaps.push({
+            id: mapInfo.id,
+            name: mapInfo.name || `Map ${mapInfo.id}`,
+          });
+        }
+      }
+
+      return validMaps;
+    },
+
+    countCommonEventsStats() {
+      if (!Array.isArray(window.$dataCommonEvents)) {
+        return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
+      }
+
+      let total = 0;
+      let left = 0;
+
+      for (const entry of $dataCommonEvents) {
+        if (!entry || !Array.isArray(entry.list)) {
+          continue;
+        }
+
+        for (let i = 0; i < entry.list.length; i++) {
+          const cmd = entry.list[i];
+          if (!cmd || typeof cmd.code !== "number") {
+            continue;
+          }
+
+          if (cmd.code === 101) {
+            const speaker = (cmd.parameters && cmd.parameters[4]) || "";
+            const speakerKey = speaker ? this.getCacheKey(speaker, "speaker") : null;
+            if (speakerKey) {
+              total++;
+              if (!this.hasUsableCacheValue(speakerKey)) {
+                left++;
+              }
+            }
+
+            let j = i + 1;
+            const lines = [];
+            while (j < entry.list.length && entry.list[j] && entry.list[j].code === 401) {
+              lines.push(entry.list[j].parameters && entry.list[j].parameters[0]);
+              j += 1;
+            }
+
+            const joined = lines.join("\n");
+            if (joined && joined.trim()) {
+              total++;
+              if (!this.hasUsableCacheValue(this.getCacheKey(joined, "text"))) {
+                left++;
+              }
+            }
+
+            i = j - 1;
+            continue;
+          }
+
+          if (cmd.code === 102) {
+            const choices = cmd.parameters && cmd.parameters[0];
+            if (Array.isArray(choices)) {
+              for (const choice of choices) {
+                if (!choice || typeof choice !== "string" || choice.trim() === "") {
+                  continue;
+                }
+                total++;
+                if (!this.hasUsableCacheValue(this.getCacheKey(choice, "choice"))) {
+                  left++;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      return { total, left, totalStrings: total, leftStrings: left };
+    },
+
+    countMapEventsStats() {
+      const validMaps = this.getValidMapInfos();
+      const totalMaps = validMaps.length;
+      return {
+        total: totalMaps,
+        left: totalMaps,
+        totalStrings: 0,
+        leftStrings: 0,
+      };
+    },
+
+    loadMapDataById(mapId) {
+      return new Promise((resolve, reject) => {
+        const filename = "Map%1.json".format(mapId.padZero(3));
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", `data/${filename}`, true);
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch (e) {
+              reject(new Error(`Failed to parse JSON: ${e.message}`));
+            }
+          } else {
+            reject(new Error(`Failed to load file: ${xhr.status}`));
+          }
+        };
+        xhr.onerror = () => reject(new Error("Network error"));
+        xhr.send();
+      });
     },
 
     getObjectTranslationStats() {
       const defs = this.getObjectTranslationTypeDefs();
       return defs.map((def) => {
+        if (def.kind === "commonEvents") {
+          const stats = this.countCommonEventsStats();
+          return { ...def, ...stats };
+        }
+
+        if (def.kind === "mapEvents") {
+          const stats = this.countMapEventsStats();
+          return { ...def, ...stats };
+        }
+
         if (def.kind === "systemMessages") {
           const stats = this.countSystemMessagesStats();
           return { ...def, ...stats };
@@ -1025,10 +1193,35 @@ export default {
       }
 
       const stats = this.getObjectTranslationStats();
-      this.objectTranslationModalStats = stats;
-      for (const item of stats) {
+      const extraIds = new Set(["commonEvents", "mapEvents"]);
+      const commonEventsStats = stats.find((item) => item.id === "commonEvents") || this.countCommonEventsStats();
+      const mapEventsStats = stats.find((item) => item.id === "mapEvents") || this.countMapEventsStats();
+
+      this.objectTranslationModalStats = stats.filter(
+        (item) => !extraIds.has(item.id),
+      );
+      this.objectTranslationModalExtraStats = [
+        {
+          id: "commonEvents",
+          label: "CommonEvents",
+          metaText: `${commonEventsStats.leftStrings} of ${commonEventsStats.totalStrings}`,
+          total: commonEventsStats.totalStrings,
+        },
+        {
+          id: "mapEvents",
+          label: "Map events",
+          metaText: `${mapEventsStats.total} maps`,
+          total: mapEventsStats.total,
+        },
+      ];
+      for (const item of this.objectTranslationModalStats) {
         if (this.objectTranslationSelection[item.id] === undefined) {
           this.$set(this.objectTranslationSelection, item.id, item.left > 0);
+        }
+      }
+      for (const item of this.objectTranslationModalExtraStats) {
+        if (this.objectTranslationSelection[item.id] === undefined) {
+          this.$set(this.objectTranslationSelection, item.id, item.total > 0);
         }
       }
       this.objectTranslationDialogVisible = true;
@@ -1040,7 +1233,10 @@ export default {
 
     async startObjectTranslationFromModal() {
       const selected = [];
-      const stats = this.objectTranslationModalStats || [];
+      const stats = [
+        ...(this.objectTranslationModalStats || []),
+        ...(this.objectTranslationModalExtraStats || []),
+      ];
       for (const item of stats) {
         const isChecked = !!this.objectTranslationSelection[item.id];
         if (isChecked) {
@@ -2341,16 +2537,7 @@ export default {
         console.log("[TranslateOnTheFly] Starting translation of all maps");
 
         // Collect all valid map IDs
-        const validMaps = [];
-        for (let i = 0; i < $dataMapInfos.length; i++) {
-          const mapInfo = $dataMapInfos[i];
-          if (mapInfo && mapInfo.id) {
-            validMaps.push({
-              id: mapInfo.id,
-              name: mapInfo.name || `Map ${mapInfo.id}`,
-            });
-          }
-        }
+        const validMaps = this.getValidMapInfos();
 
         if (validMaps.length === 0) {
           Alert.warn("No valid maps found");
@@ -2373,10 +2560,10 @@ export default {
                   pages: $dataCommonEvents,
                 },
               ],
-              displayName: "Common Events",
             },
             -1,
             null,
+            "translating common events",
           );
           if (result) {
             totalTranslated += result.successCount || 0;
@@ -2393,39 +2580,22 @@ export default {
         for (let i = 0; i < validMaps.length; i++) {
           const mapInfo = validMaps[i];
           const mapId = mapInfo.id;
-          const mapName = mapInfo.name;
           const mapNumber = i + 1;
 
           console.log(
-            `[TranslateOnTheFly] Processing map ${mapNumber}/${validMaps.length}: ${mapName} (ID: ${mapId})`,
+            `[TranslateOnTheFly] Processing map ${mapNumber}/${validMaps.length}: ${mapInfo.name} (ID: ${mapId})`,
           );
 
           try {
             // Load map data
-            const filename = "Map%1.json".format(mapId.padZero(3));
-            const mapData = await new Promise((resolve, reject) => {
-              const xhr = new XMLHttpRequest();
-              xhr.open("GET", `data/${filename}`, true);
-              xhr.onload = () => {
-                if (xhr.status === 200) {
-                  try {
-                    resolve(JSON.parse(xhr.responseText));
-                  } catch (e) {
-                    reject(new Error(`Failed to parse JSON: ${e.message}`));
-                  }
-                } else {
-                  reject(new Error(`Failed to load file: ${xhr.status}`));
-                }
-              };
-              xhr.onerror = () => reject(new Error("Network error"));
-              xhr.send();
-            });
+            const mapData = await this.loadMapDataById(mapId);
 
             // Translate map events with progress info
             const result = await this.translateMapEvents(
               mapData,
               mapNumber,
               validMaps.length,
+              `translating map ${mapNumber}/${validMaps.length}`,
             );
             if (result) {
               totalTranslated += result.successCount || 0;
@@ -2457,6 +2627,7 @@ export default {
       mapData = null,
       mapNumber = null,
       totalMaps = null,
+      progressLabel = null,
     ) {
       if (!this.batchManager) {
         this.batchManager = new TranslationBatchManager(this);
@@ -2466,6 +2637,7 @@ export default {
         mapData,
         mapNumber,
         totalMaps,
+        progressLabel,
       );
     },
   },

@@ -353,7 +353,9 @@ export const translateOnTheFlyFlowMethods = {
         this.objectTranslationJob.currentTypeLabel = stat.label;
         this.objectTranslationJob.currentDone = 0;
         this.objectTranslationJob.currentTotal = stat.left;
-        this.updateObjectTranslationProgress();
+        if (def.kind !== "mapEvents") {
+          this.updateObjectTranslationProgress();
+        }
 
         if (def.kind === "systemMessages") {
           const batchResult = await this.translateSystemMessagesBatch(true);
@@ -381,6 +383,49 @@ export const translateOnTheFlyFlowMethods = {
           this.objectTranslationJob.currentDone = doneCount;
           this.objectTranslationJob.totalDone += doneCount;
           this.updateObjectTranslationProgress();
+          continue;
+        }
+
+        if (def.kind === "commonEvents") {
+          const batchResult = await this.translateMapEvents(
+            {
+              events: [
+                {
+                  pages: $dataCommonEvents,
+                },
+              ],
+            },
+            -1,
+            null,
+            "translating common events",
+          );
+          this.objectTranslationJob.currentDone = stat.leftStrings || stat.left;
+          this.objectTranslationJob.totalDone += batchResult.successCount || 0;
+          this.objectTranslationJob.runErrors += batchResult.failureCount || 0;
+          mergeStats(batchResult.stats);
+          this.updateObjectTranslationProgress();
+          continue;
+        }
+
+        if (def.kind === "mapEvents") {
+          const validMaps = this.getValidMapInfos();
+
+          for (let mapIndex = 0; mapIndex < validMaps.length; mapIndex++) {
+            const mapInfo = validMaps[mapIndex];
+            const mapNumber = mapIndex + 1;
+            const mapData = await this.loadMapDataById(mapInfo.id);
+            const batchResult = await this.translateMapEvents(
+              mapData,
+              mapNumber,
+              validMaps.length,
+              `translating map ${mapNumber}/${validMaps.length}`,
+            );
+            this.objectTranslationJob.totalDone += batchResult.successCount || 0;
+            this.objectTranslationJob.totalTarget += batchResult.totalCount || 0;
+            this.objectTranslationJob.runErrors += batchResult.failureCount || 0;
+            mergeStats(batchResult.stats);
+          }
+
           continue;
         }
 
