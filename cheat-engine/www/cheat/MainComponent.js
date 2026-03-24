@@ -142,21 +142,9 @@ export default {
     },
 
     onGlobalKeyDown(e) {
-      console.log("[TOF-DEBUG][MainComponent] keydown", {
-        keyCode: e.keyCode,
-        ctrl: !!e.ctrlKey,
-        alt: !!e.altKey,
-        shift: !!e.shiftKey,
-        meta: !!e.metaKey,
-        targetTag: e && e.target && e.target.tagName ? e.target.tagName : null,
-      });
-
       this.resetStuckPrimaryWhenModifierPressed(e.keyCode);
 
       if (this.shouldIgnoreGlobalShortcut(e)) {
-        console.log(
-          "[TOF-DEBUG][MainComponent] keydown ignored due to focused input/contenteditable",
-        );
         return;
       }
 
@@ -173,25 +161,11 @@ export default {
           GLOBAL_SHORTCUT && typeof GLOBAL_SHORTCUT.getShortcut === "function"
             ? GLOBAL_SHORTCUT.getShortcut("openObjectTranslationModal")
             : null;
-        console.log(
-          "[TOF-DEBUG][MainComponent] currentKey vs configured modal shortcut",
-          {
-            currentKey:
-              currentKey && currentKey.asString ? currentKey.asString() : null,
-            modalShortcut:
-              modalShortcut && modalShortcut.asString
-                ? modalShortcut.asString()
-                : null,
-          },
-        );
         if (
           modalShortcut &&
           typeof modalShortcut.equals === "function" &&
           currentKey.equals(modalShortcut)
         ) {
-          console.log(
-            "[TOF-DEBUG][MainComponent] fallback shortcut matched -> MessageCheat.openObjectTranslationModal()",
-          );
           MessageCheat.openObjectTranslationModal();
           e.preventDefault();
           e.stopImmediatePropagation();
