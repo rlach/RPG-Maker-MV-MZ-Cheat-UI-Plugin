@@ -10,6 +10,8 @@ export class BatchProgressTracker {
     this.currentStepProcessed = 0;
     this.totalErrors = 0;
     this.paused = false;
+    this.pauseReason = "";
+    this.prePauseSnapshot = null;
   }
 
   start(stepLabel, currentTotal = 0) {
@@ -85,13 +87,33 @@ export class BatchProgressTracker {
   }
 
   pause(reason = "paused by OTF") {
+    if (!this.paused) {
+      this.prePauseSnapshot = {
+        currentStepLabel: this.currentStepLabel,
+        currentProcessed: this.currentProcessed,
+        currentTotal: this.currentTotal,
+        currentStepErrors: this.currentStepErrors,
+        currentStepProcessed: this.currentStepProcessed,
+        totalErrors: this.totalErrors,
+      };
+    }
     this.paused = true;
-    this.currentStepLabel = reason;
+    this.pauseReason = reason || "paused by OTF";
     this._render();
   }
 
   resume(stepLabel) {
     this.paused = false;
+    this.pauseReason = "";
+    if (this.prePauseSnapshot) {
+      this.currentStepLabel = this.prePauseSnapshot.currentStepLabel;
+      this.currentProcessed = this.prePauseSnapshot.currentProcessed;
+      this.currentTotal = this.prePauseSnapshot.currentTotal;
+      this.currentStepErrors = this.prePauseSnapshot.currentStepErrors;
+      this.currentStepProcessed = this.prePauseSnapshot.currentStepProcessed;
+      this.totalErrors = this.prePauseSnapshot.totalErrors;
+      this.prePauseSnapshot = null;
+    }
     if (stepLabel) {
       this.currentStepLabel = stepLabel;
     }
@@ -105,7 +127,7 @@ export class BatchProgressTracker {
 
   _render() {
     const title = this.paused
-      ? `batch paused by OTF - ${this.currentStepLabel}`
+      ? `batch paused by OTF - ${this.pauseReason || "translating event"}`
       : this.currentStepLabel;
     const progress = BatchSummaryReporter.buildProgress({
       title,

@@ -361,7 +361,7 @@ export const translateOnTheFlyFlowMethods = {
         if (def.kind === "gameArrays") {
           const batchResult = await this.translateGameArrays({
             backgroundJob: true,
-            progressLabel: `translating ${stat.label}`,
+            progressLabel: "translating arrays",
             isPhase: true,
             showSummary: false,
           });
