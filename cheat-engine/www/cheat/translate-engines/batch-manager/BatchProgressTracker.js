@@ -141,8 +141,7 @@ export class BatchProgressTracker {
     this.panel.updateProgressBox(
       progress.title,
       progress.message,
-      null,
-      null,
+      progress.currentErrorsLine,
       progress.totalErrorsLine,
     );
   }
