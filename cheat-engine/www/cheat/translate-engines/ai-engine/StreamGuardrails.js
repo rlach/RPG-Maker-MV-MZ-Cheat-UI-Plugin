@@ -86,15 +86,28 @@ export class StreamGuardrails {
       );
       analysis.partialObjectKeyCount = keyParsing.keys.length;
 
+      // Weak repair: only checks whether stream is still structurally recoverable.
       const repairResult = StreamJsonParser.tryRepairPartialObject(
         scan.partialObjectText,
       );
-      if (repairResult.ok && repairResult.map) {
-        const partialKeyParsing = StreamJsonParser.parseTopLevelKeys(
-          repairResult.repairedText,
-        );
-        if (partialKeyParsing.duplicateKeys.length === 0) {
-          candidateMap = repairResult.map;
+
+      if (repairResult.ok) {
+        const strictBestMapResult =
+          StreamJsonParser.tryRepairPartialObjectKeepingCompleteEntries(
+            scan.partialObjectText,
+          );
+        if (strictBestMapResult.ok && strictBestMapResult.map) {
+          const partialKeyParsing = StreamJsonParser.parseTopLevelKeys(
+            strictBestMapResult.repairedText,
+          );
+          if (
+            partialKeyParsing.duplicateKeys.length === 0 &&
+            (!candidateMap ||
+              countMatched(strictBestMapResult.map) >=
+                countMatched(candidateMap))
+          ) {
+            candidateMap = strictBestMapResult.map;
+          }
         }
       }
     }

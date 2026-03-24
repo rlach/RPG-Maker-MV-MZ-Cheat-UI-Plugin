@@ -437,10 +437,6 @@ class AIEngine extends BaseTranslationEngine {
         streamResult.bestMap,
         expectedKeys,
       );
-      if (streamBestMapComplete) {
-        translatedMap = streamResult.bestMap;
-        usedStreamFallback = true;
-      }
 
       const guardrailPartialMap = !!(
         streamResult.cancelledByGuardrail &&
@@ -449,77 +445,82 @@ class AIEngine extends BaseTranslationEngine {
       );
 
       try {
-        if (!translatedMap) {
-          translatedMap = this.parseTranslatedMapFromText(
-            rawTranslated,
-            expectedKeys,
-          );
-        }
+        // Final stream text has priority over any guardrail snapshot.
+        translatedMap = this.parseTranslatedMapFromText(
+          rawTranslated,
+          expectedKeys,
+        );
       } catch (parseError) {
         console.error(
           "[AIEngine] Failed to parse JSON response:",
           parseError.message,
         );
 
-        // Try stream guardrail partial
-        if (streamPartialMatchedKeys > 0) {
+        if (streamBestMapComplete && streamResult.bestMap) {
           translatedMap = streamResult.bestMap;
           rawTranslated = JSON.stringify(streamResult.bestMap);
           usedStreamFallback = true;
         } else {
-          // Retry error handling
-          const retryResult = await this.retryHandler.handleJsonError({
-            strategy: this.invalidJsonHandlingStrategy,
-            originalPayload: payload,
-            previousResponse: rawTranslated,
-            itemData,
-            isBackgroundJob,
-          });
+          // Try stream guardrail partial
+          if (streamPartialMatchedKeys > 0) {
+            translatedMap = streamResult.bestMap;
+            rawTranslated = JSON.stringify(streamResult.bestMap);
+            usedStreamFallback = true;
+          } else {
+            // Retry error handling
+            const retryResult = await this.retryHandler.handleJsonError({
+              strategy: this.invalidJsonHandlingStrategy,
+              originalPayload: payload,
+              previousResponse: rawTranslated,
+              itemData,
+              isBackgroundJob,
+            });
 
-          if (!retryResult.ok) {
-            return {
-              successes: [],
-              failures: items.map((item) => ({
-                ...item,
-                rejectReason:
-                  streamResult.cancelReason || "Invalid JSON response",
-                cancelReason: streamResult.cancelReason || null,
-                preempted:
-                  streamResult.cancelReason ===
-                  REQUEST_CANCEL_REASON.BACKGROUND_PREEMPTED,
-              })),
-            };
-          }
-
-          if (retryResult.merged) {
-            return retryResult.merged;
-          }
-
-          // Try to parse retry response
-          try {
-            translatedMap = this.parseTranslatedMapFromText(
-              retryResult.response || retryResult.repaired,
-              expectedKeys,
-            );
-            rawTranslated =
-              retryResult.response || JSON.stringify(retryResult.repaired);
-          } catch (retryParseError) {
-            console.error(
-              "[AIEngine] Retry parse failed:",
-              retryParseError.message,
-            );
-            if (streamPartialMatchedKeys > 0) {
-              translatedMap = streamResult.bestMap;
-              rawTranslated = JSON.stringify(streamResult.bestMap);
-              usedStreamFallback = true;
-            } else {
+            if (!retryResult.ok) {
               return {
                 successes: [],
                 failures: items.map((item) => ({
                   ...item,
-                  rejectReason: "Invalid JSON after retry",
+                  rejectReason:
+                    streamResult.cancelReason || "Invalid JSON response",
+                  cancelReason: streamResult.cancelReason || null,
+                  preempted:
+                    streamResult.cancelReason ===
+                    REQUEST_CANCEL_REASON.BACKGROUND_PREEMPTED,
                 })),
               };
+            }
+
+            if (retryResult.merged) {
+              return retryResult.merged;
+            }
+
+            // Try to parse retry response
+            try {
+              translatedMap = this.parseTranslatedMapFromText(
+                retryResult.response || retryResult.repaired,
+                expectedKeys,
+              );
+              rawTranslated =
+                retryResult.response || JSON.stringify(retryResult.repaired);
+            } catch (retryParseError) {
+              console.error(
+                "[AIEngine] Retry parse failed:",
+                retryParseError.message,
+              );
+              if (streamPartialMatchedKeys > 0) {
+                translatedMap = streamResult.bestMap;
+                rawTranslated = JSON.stringify(streamResult.bestMap);
+                usedStreamFallback = true;
+              } else {
+                return {
+                  successes: [],
+                  failures: items.map((item) => ({
+                    ...item,
+                    rejectReason: "Invalid JSON after retry",
+                  })),
+                };
+              }
             }
           }
         }

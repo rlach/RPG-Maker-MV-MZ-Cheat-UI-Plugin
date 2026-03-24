@@ -684,13 +684,16 @@ export const translateOnTheFlyRuntimeMethods = {
               self.batchManager = new TranslationBatchManager(self);
             }
 
-            const result = await self.batchManager.runBatchedTranslation(items, {
-              stepLabel: "translating menu options",
-              backgroundJob: false,
-              itemLimit: self.batchItemsLimit || 20,
-              charLimit: self.charLimit || 1000,
-              showSummary: false,
-            });
+            const result = await self.batchManager.runBatchedTranslation(
+              items,
+              {
+                stepLabel: "translating menu options",
+                backgroundJob: false,
+                itemLimit: self.batchItemsLimit || 20,
+                charLimit: self.charLimit || 1000,
+                showSummary: false,
+              },
+            );
 
             // Cache successes
             for (const success of result.successes) {

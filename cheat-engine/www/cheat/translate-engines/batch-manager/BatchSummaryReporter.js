@@ -130,7 +130,10 @@ export class BatchSummaryReporter {
     );
     const safeTotalCumulativeErrors = Math.max(
       0,
-      this.toSafeNumber(totalCumulativeErrors, normalizedErrorStats.totalErrors),
+      this.toSafeNumber(
+        totalCumulativeErrors,
+        normalizedErrorStats.totalErrors,
+      ),
     );
     const percent =
       safeTotal > 0 ? Math.round((safeSuccess / safeTotal) * 100) : 100;
@@ -152,7 +155,9 @@ export class BatchSummaryReporter {
       const totalErrorPercent =
         safeSuccess + safeTotalCumulativeErrors > 0
           ? Math.round(
-              (safeTotalCumulativeErrors / (safeSuccess + safeTotalCumulativeErrors)) * 100,
+              (safeTotalCumulativeErrors /
+                (safeSuccess + safeTotalCumulativeErrors)) *
+                100,
             )
           : 0;
       lines.push(

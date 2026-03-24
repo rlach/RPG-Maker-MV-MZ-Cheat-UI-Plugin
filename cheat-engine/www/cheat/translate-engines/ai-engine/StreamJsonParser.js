@@ -575,4 +575,95 @@ export class StreamJsonParser {
       };
     }
   }
+
+  /**
+   * Attempt to repair partial JSON object while keeping only fully complete key-value pairs.
+   * Unlike tryRepairPartialObject(), this variant never keeps a key whose value must be
+   * synthetically closed as an unterminated string.
+   * @param {string} partialText - Incomplete JSON text
+   * @param {number} trimLimit - Maximum chars to trim
+   * @returns {Object} {ok, map?, reason?, trimmedChars?, repairedText?}
+   */
+  static tryRepairPartialObjectKeepingCompleteEntries(
+    partialText,
+    trimLimit = STREAM_JSON_TRIM_MAX_CHARS,
+  ) {
+    if (typeof partialText !== "string" || !partialText.trim()) {
+      return {
+        ok: false,
+        reason: STREAM_CANCEL_REASON.INVALID_JSON_PROGRESS,
+        trimmedChars: 0,
+      };
+    }
+
+    const closureState = this.getJsonClosureState(partialText);
+    const candidates = [];
+
+    // If we are not inside a string, we can try brace-only closure first.
+    if (!closureState.isInsideString()) {
+      candidates.push({
+        text: this.autoCloseJsonObjectText(partialText),
+        trimmedChars: 0,
+      });
+    }
+
+    // Then progressively trim the currently in-flight pair (and if needed more)
+    // by removing content after the last top-level comma.
+    let cursor = partialText;
+    while (true) {
+      const lastComma = this.findLastTopLevelComma(cursor);
+      if (lastComma < 0) {
+        break;
+      }
+
+      const trimmedChars = partialText.length - (lastComma + 1);
+      if (trimmedChars > trimLimit) {
+        return {
+          ok: false,
+          reason: STREAM_CANCEL_REASON.TRIM_TOO_LONG,
+          trimmedChars,
+        };
+      }
+
+      candidates.push({
+        text: `${cursor.slice(0, lastComma)}}`,
+        trimmedChars,
+      });
+
+      cursor = cursor.slice(0, lastComma);
+    }
+
+    candidates.push({
+      text: "{}",
+      trimmedChars: Math.max(0, partialText.length - 1),
+    });
+
+    const seen = new Set();
+    for (const candidate of candidates) {
+      if (!candidate || typeof candidate.text !== "string") {
+        continue;
+      }
+      if (seen.has(candidate.text)) {
+        continue;
+      }
+      seen.add(candidate.text);
+
+      try {
+        return {
+          ok: true,
+          map: this.parseObjectStrict(candidate.text),
+          trimmedChars: candidate.trimmedChars,
+          repairedText: candidate.text,
+        };
+      } catch (e) {
+        // Try next stricter candidate.
+      }
+    }
+
+    return {
+      ok: false,
+      reason: STREAM_CANCEL_REASON.INVALID_JSON_PROGRESS,
+      trimmedChars: 0,
+    };
+  }
 }

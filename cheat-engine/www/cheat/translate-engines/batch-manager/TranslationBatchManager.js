@@ -172,7 +172,10 @@ export class TranslationBatchManager {
     return { successes: allSuccesses, failures: allFailures, summary, stats };
   }
 
-  async translateSystemCommandsBatch(backgroundJob = false, showSummary = false) {
+  async translateSystemCommandsBatch(
+    backgroundJob = false,
+    showSummary = false,
+  ) {
     if (
       !(
         window.$dataSystem &&
@@ -248,7 +251,10 @@ export class TranslationBatchManager {
     };
   }
 
-  async translateSystemMessagesBatch(backgroundJob = false, showSummary = false) {
+  async translateSystemMessagesBatch(
+    backgroundJob = false,
+    showSummary = false,
+  ) {
     if (
       !(
         window.$dataSystem &&
