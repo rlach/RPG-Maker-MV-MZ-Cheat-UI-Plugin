@@ -215,16 +215,7 @@ export default class LibreTranslateEngine extends BaseTranslationEngine {
         continue;
       }
 
-      // Clean and wrap text/choice types
-      let finalTranslated = translated;
-      if (item.type === "text" || item.type === "choice") {
-        finalTranslated = this.wrapText(
-          this.cleanTranslatedText(translated),
-          this.panel.maxLineWidth,
-        );
-      } else if (item.type === "speaker") {
-        finalTranslated = this.normalizeSpeakerNameCase(translated);
-      }
+      const finalTranslated = this.postprocessTranslatedItem(item, translated);
 
       successes.push({
         type: item.type,

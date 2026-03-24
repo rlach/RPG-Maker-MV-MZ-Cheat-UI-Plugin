@@ -648,25 +648,10 @@ class AIEngine extends BaseTranslationEngine {
           continue;
         }
 
-        let finalTranslated = postprocessResult.text;
-        const isDescriptionType =
-          typeof itemD.type === "string" && itemD.type.endsWith("_description");
-
-        if (
-          itemD.type === "text" ||
-          itemD.type === "choice" ||
-          isDescriptionType
-        ) {
-          const maxWidth = isDescriptionType
-            ? this.panel.descriptionMaxLineWidth || this.panel.maxLineWidth
-            : this.panel.maxLineWidth;
-          finalTranslated = this.wrapText(
-            this.cleanTranslatedText(finalTranslated),
-            maxWidth,
-          );
-        } else if (itemD.type === "speaker") {
-          finalTranslated = this.normalizeSpeakerNameCase(finalTranslated);
-        }
+        const finalTranslated = this.postprocessTranslatedItem(
+          itemD,
+          postprocessResult.text,
+        );
 
         successes.push({
           type: itemD.type,

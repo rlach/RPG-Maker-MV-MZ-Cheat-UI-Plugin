@@ -14,7 +14,11 @@ import { translateOnTheFlyFlowMethods } from "./TranslateOnTheFlyFlowMethods.js"
 import { translateOnTheFlyRuntimeMethods } from "./TranslateOnTheFlyRuntimeMethods.js";
 import { objectTranslationRuntimeMethods } from "./ObjectTranslationModalMethods.js";
 import { translateOnTheFlyCoreMethods } from "./TranslateOnTheFlyCoreMethods.js";
-import { createTranslationRuntimeStateDefaults } from "./TranslationRuntimeDefaults.js";
+import {
+  createTranslationRuntimeStateDefaults,
+  UI_SYNC_STATE_KEYS,
+  UI_SYNC_TO_ONLY_STATE_KEYS,
+} from "./TranslationRuntimeDefaults.js";
 
 function getHostWindow() {
   if (
@@ -157,44 +161,7 @@ class TranslationRuntime {
             target[key] = value;
           };
 
-    const snapshotKeys = [
-      "enabled",
-      "sourceLang",
-      "targetLang",
-      "translationCount",
-      "enableTextWrapping",
-      "maxLineWidth",
-      "descriptionMaxLineWidth",
-      "translationEngine",
-      "translateCacheWhenDisabled",
-      "tryTranslateAhead",
-      "translateGameObjects",
-      "cancelBackgroundForOnTheFly",
-      "charLimit",
-      "batchItemsLimit",
-      "translationEngineOptions",
-      "languageOptions",
-      "libreTranslateHost",
-      "libreTranslateApiKey",
-      "aiProvider",
-      "aiProviderOptions",
-      "aiHost",
-      "aiApiKey",
-      "aiSelectedModel",
-      "aiModels",
-      "aiLoadingModels",
-      "aiModelsError",
-      "aiAllowNewlineMismatch",
-      "aiAskIfTextTranslated",
-      "aiInvalidJsonHandlingStrategy",
-      "aiInvalidJsonHandlingStrategyOptions",
-      "aiSystemPrompt",
-      "currentMessageWindow",
-      "currentGameMessage",
-      "useJsonFixer",
-      "aiFixRecursionMaxDepth",
-      "objectTranslationSelectedMapIds",
-    ];
+    const snapshotKeys = [...UI_SYNC_STATE_KEYS, ...UI_SYNC_TO_ONLY_STATE_KEYS];
 
     snapshotKeys.forEach((key) => {
       setter(key, this[key]);
@@ -208,40 +175,7 @@ class TranslationRuntime {
       return;
     }
 
-    const snapshotKeys = [
-      "enabled",
-      "sourceLang",
-      "targetLang",
-      "translationCount",
-      "enableTextWrapping",
-      "maxLineWidth",
-      "descriptionMaxLineWidth",
-      "translationEngine",
-      "translateCacheWhenDisabled",
-      "tryTranslateAhead",
-      "translateGameObjects",
-      "cancelBackgroundForOnTheFly",
-      "charLimit",
-      "batchItemsLimit",
-      "libreTranslateHost",
-      "libreTranslateApiKey",
-      "aiProvider",
-      "aiHost",
-      "aiApiKey",
-      "aiSelectedModel",
-      "aiModels",
-      "aiLoadingModels",
-      "aiModelsError",
-      "aiAllowNewlineMismatch",
-      "aiAskIfTextTranslated",
-      "aiInvalidJsonHandlingStrategy",
-      "aiSystemPrompt",
-      "currentMessageWindow",
-      "currentGameMessage",
-      "useJsonFixer",
-      "aiFixRecursionMaxDepth",
-      "objectTranslationSelectedMapIds",
-    ];
+    const snapshotKeys = UI_SYNC_STATE_KEYS;
 
     snapshotKeys.forEach((key) => {
       if (Object.prototype.hasOwnProperty.call(target, key)) {

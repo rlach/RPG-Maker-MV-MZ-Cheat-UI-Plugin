@@ -1,53 +1,31 @@
 import { TranslateOnTheFlyState } from "../../js/TranslateOnTheFlyState.js";
 import { createEngine } from "../../translate-engines/index.js";
+import {
+  createPersistedTranslationSettingsDefaults,
+  normalizePersistedTranslationSettings,
+  serializePersistedTranslationSettings,
+} from "./TranslationRuntimeDefaults.js";
 
 export const translateOnTheFlySettingsMethods = {
   loadSettings() {
     const json = this.kvStorage.getItem("data");
 
+    let normalized;
     if (!json) {
-      // Use defaults
-      this.enabled = false;
-      this.sourceLang = "ja";
-      this.enableTextWrapping = true;
-      this.maxLineWidth = 60;
-      this.translateCacheWhenDisabled = false;
-      this.tryTranslateAhead = false;
-      TranslateOnTheFlyState.setEnabled(this.enabled, { notify: false });
-      return;
+      normalized = createPersistedTranslationSettingsDefaults();
+    } else {
+      try {
+        normalized = normalizePersistedTranslationSettings(JSON.parse(json));
+      } catch (error) {
+        console.warn(
+          "[TranslateOnTheFly] Failed to parse settings JSON, using defaults:",
+          error,
+        );
+        normalized = createPersistedTranslationSettingsDefaults();
+      }
     }
 
-    const data = JSON.parse(json);
-    this.enabled = data.enabled || false;
-    this.sourceLang = data.sourceLang || "ja";
-    this.targetLang = data.targetLang || "en";
-    this.translationCount = data.translationCount || 0;
-    this.enableTextWrapping =
-      data.enableTextWrapping !== undefined ? data.enableTextWrapping : true;
-    this.maxLineWidth = data.maxLineWidth || 60;
-    this.descriptionMaxLineWidth = data.descriptionMaxLineWidth || 59;
-    this.charLimit = data.charLimit || 1000;
-    this.batchItemsLimit = data.batchItemsLimit || 20;
-    const savedEngine = data.translationEngine || "mymemory";
-    this.translationEngine =
-      savedEngine === "gpt4all" ? "openApi" : savedEngine;
-    this.translateCacheWhenDisabled = data.translateCacheWhenDisabled || false;
-    this.tryTranslateAhead = data.tryTranslateAhead || false;
-    this.translateGameObjects =
-      data.translateGameObjects !== undefined
-        ? data.translateGameObjects
-        : true;
-    this.cancelBackgroundForOnTheFly =
-      data.cancelBackgroundForOnTheFly !== undefined
-        ? data.cancelBackgroundForOnTheFly
-        : false;
-
-    // Load engine-specific settings
-    this.engineSettings = data.engineSettings || {};
-    if (this.engineSettings.gpt4all && !this.engineSettings.openApi) {
-      this.engineSettings.openApi = this.engineSettings.gpt4all;
-      delete this.engineSettings.gpt4all;
-    }
+    Object.assign(this, normalized);
 
     TranslateOnTheFlyState.setEnabled(this.enabled, { notify: false });
   },
@@ -62,23 +40,11 @@ export const translateOnTheFlySettingsMethods = {
       this.engineSettings[this.translationEngine] = engineConfig;
     }
 
-    const data = {
+    const data = serializePersistedTranslationSettings({
+      ...this,
       enabled: TranslateOnTheFlyState.isEnabled(),
-      sourceLang: this.sourceLang,
-      targetLang: this.targetLang,
-      translationCount: this.translationCount,
-      enableTextWrapping: this.enableTextWrapping,
-      maxLineWidth: this.maxLineWidth,
-      descriptionMaxLineWidth: this.descriptionMaxLineWidth,
-      charLimit: this.charLimit,
-      batchItemsLimit: this.batchItemsLimit,
-      translationEngine: this.translationEngine,
-      translateCacheWhenDisabled: this.translateCacheWhenDisabled,
-      tryTranslateAhead: this.tryTranslateAhead,
-      translateGameObjects: this.translateGameObjects,
-      cancelBackgroundForOnTheFly: this.cancelBackgroundForOnTheFly,
       engineSettings: this.engineSettings || {},
-    };
+    });
     this.kvStorage.setItem("data", JSON.stringify(data));
   },
 

@@ -1,10 +1,16 @@
-import { GeneralCheat, GameSpeedCheat, SpeedCheat, SceneCheat } from '../js/CheatHelper.js'
-import { CHEAT_WINDOW_MANAGER } from '../js/CheatWindowManager.js'
+import {
+  GeneralCheat,
+  GameSpeedCheat,
+  SpeedCheat,
+  SceneCheat,
+} from "../js/CheatHelper.js";
+import { CHEAT_WINDOW_MANAGER } from "../js/CheatWindowManager.js";
+import { getRpgMakerName } from "../js/RpgMakerRuntime.js";
 
 export default {
-    name: 'GeneralPanel',
+  name: "GeneralPanel",
 
-    template: `
+  template: `
 <v-card 
     class="ma-0 pa-0"
     flat>
@@ -156,258 +162,298 @@ export default {
 </v-card>
     `,
 
-    data () {
-        return {
-            godMode: false,
-            noClip: false,
-            gold: 0,
-            speed: 0,
-            fixSpeed: false,
+  data() {
+    return {
+      godMode: false,
+      noClip: false,
+      gold: 0,
+      speed: 0,
+      fixSpeed: false,
 
-            rootWindow: null,
-            rootWindowManager: null,
-            rootMainComponent: null,
+      rootWindow: null,
+      rootWindowManager: null,
+      rootMainComponent: null,
 
-            cheatApi: {
-                GeneralCheat,
-                GameSpeedCheat,
-                SpeedCheat,
-                SceneCheat
-            },
+      cheatApi: {
+        GeneralCheat,
+        GameSpeedCheat,
+        SpeedCheat,
+        SceneCheat,
+      },
 
-            openInSeparateWindow: CHEAT_WINDOW_MANAGER.isSeparateWindowEnabled(),
+      openInSeparateWindow: CHEAT_WINDOW_MANAGER.isSeparateWindowEnabled(),
 
-            minSpeed: 1,
-            maxSpeed: 10,
-            stepSpeed: 0.5,
+      minSpeed: 1,
+      maxSpeed: 10,
+      stepSpeed: 0.5,
 
-            gameSpeed: 1,
-            minGameSpeed: 0.1,
-            maxGameSpeed: 10,
-            stepGameSpeed: 0.1,
-            applyAllForGameSpeed: false,
-            applyBattleForGameSpeed: false,
+      gameSpeed: 1,
+      minGameSpeed: 0.1,
+      maxGameSpeed: 10,
+      stepGameSpeed: 0.1,
+      applyAllForGameSpeed: false,
+      applyBattleForGameSpeed: false,
 
-            cheatVersion: 'unknown',
-            rpgMakerName: 'unknown',
-            nwjsNodeWebkitVersion: 'unknown',
-            nwjsFlavor: 'unknown'
-        }
+      cheatVersion: "unknown",
+      rpgMakerName: "unknown",
+      nwjsNodeWebkitVersion: "unknown",
+      nwjsFlavor: "unknown",
+    };
+  },
+
+  created() {
+    const root =
+      window.__CHEAT_EXTERNAL_WINDOW__ && window.opener && !window.opener.closed
+        ? window.opener
+        : window;
+    this.rootWindow = root;
+    this.rootWindowManager =
+      root.__CHEAT_WINDOW_MANAGER__ || CHEAT_WINDOW_MANAGER;
+    this.rootMainComponent = root.__CHEAT_MAIN_COMPONENT__ || null;
+    this.cheatApi = {
+      GeneralCheat: root.GeneralCheat || GeneralCheat,
+      GameSpeedCheat: root.GameSpeedCheat || GameSpeedCheat,
+      SpeedCheat: root.SpeedCheat || SpeedCheat,
+      SceneCheat: root.SceneCheat || SceneCheat,
+    };
+
+    this.refreshRuntimeInfo();
+    this.initializeVariables();
+  },
+
+  methods: {
+    getRootWindow() {
+      const root = this.rootWindow;
+      if (root && root.closed !== true) {
+        return root;
+      }
+      return window;
     },
 
-    created () {
-        const root = (window.__CHEAT_EXTERNAL_WINDOW__ && window.opener && !window.opener.closed) ? window.opener : window
-        this.rootWindow = root
-        this.rootWindowManager = root.__CHEAT_WINDOW_MANAGER__ || CHEAT_WINDOW_MANAGER
-        this.rootMainComponent = root.__CHEAT_MAIN_COMPONENT__ || null
-        this.cheatApi = {
-            GeneralCheat: root.GeneralCheat || GeneralCheat,
-            GameSpeedCheat: root.GameSpeedCheat || GameSpeedCheat,
-            SpeedCheat: root.SpeedCheat || SpeedCheat,
-            SceneCheat: root.SceneCheat || SceneCheat
-        }
+    refreshRuntimeInfo() {
+      const root = this.getRootWindow();
 
-        this.refreshRuntimeInfo()
-        this.initializeVariables()
+      this.rpgMakerName = getRpgMakerName() || "unknown";
+
+      const versions =
+        root && root.process && root.process.versions
+          ? root.process.versions
+          : null;
+      this.nwjsNodeWebkitVersion =
+        versions && versions["node-webkit"]
+          ? versions["node-webkit"]
+          : "unknown";
+      this.nwjsFlavor =
+        versions && versions["nw-flavor"] ? versions["nw-flavor"] : "unknown";
+
+      const mainComponent =
+        this.rootMainComponent || root.__CHEAT_MAIN_COMPONENT__;
+      if (
+        mainComponent &&
+        typeof mainComponent.getCurrentCheatVersion === "function"
+      ) {
+        const version = mainComponent.getCurrentCheatVersion();
+        this.cheatVersion = version || "unknown";
+        return;
+      }
+
+      this.cheatVersion = "unknown";
     },
 
-    methods: {
-        getRootWindow () {
-            const root = this.rootWindow
-            if (root && root.closed !== true) {
-                return root
-            }
-            return window
-        },
+    initializeVariables() {
+      const root = this.getRootWindow();
+      const gamePlayer = root.$gamePlayer;
+      const gameParty = root.$gameParty;
+      const speedCheat = this.cheatApi.SpeedCheat;
+      const gameSpeedCheat = this.cheatApi.GameSpeedCheat || GameSpeedCheat;
 
-        refreshRuntimeInfo () {
-            const root = this.getRootWindow()
+      this.noClip = gamePlayer ? gamePlayer._through : false;
+      this.speed =
+        gamePlayer && typeof gamePlayer.moveSpeed === "function"
+          ? gamePlayer.moveSpeed()
+          : 0;
+      this.fixSpeed =
+        speedCheat && speedCheat.isFixed ? speedCheat.isFixed() : false;
+      this.gold = gameParty ? gameParty._gold : 0;
 
-            this.rpgMakerName = root && root.Utils && root.Utils.RPGMAKER_NAME
-                ? root.Utils.RPGMAKER_NAME
-                : 'unknown'
+      const manager = this.rootWindowManager || CHEAT_WINDOW_MANAGER;
+      this.openInSeparateWindow = manager.isSeparateWindowEnabled();
 
-            const versions = root && root.process && root.process.versions
-                ? root.process.versions
-                : null
-            this.nwjsNodeWebkitVersion = versions && versions['node-webkit']
-                ? versions['node-webkit']
-                : 'unknown'
-            this.nwjsFlavor = versions && versions['nw-flavor']
-                ? versions['nw-flavor']
-                : 'unknown'
+      this.gameSpeed =
+        gameSpeedCheat && gameSpeedCheat.getRate ? gameSpeedCheat.getRate() : 1;
+      const gameSpeedSceneOption =
+        gameSpeedCheat && gameSpeedCheat.getSceneOption
+          ? gameSpeedCheat.getSceneOption()
+          : null;
+      const options =
+        gameSpeedCheat && gameSpeedCheat.sceneOptions
+          ? gameSpeedCheat.sceneOptions()
+          : { all: null, battle: null };
+      this.applyAllForGameSpeed = gameSpeedSceneOption === options.all;
+      this.applyBattleForGameSpeed = gameSpeedSceneOption === options.battle;
 
-            const mainComponent = this.rootMainComponent || root.__CHEAT_MAIN_COMPONENT__
-            if (mainComponent && typeof mainComponent.getCurrentCheatVersion === 'function') {
-                const version = mainComponent.getCurrentCheatVersion()
-                this.cheatVersion = version || 'unknown'
-                return
-            }
+      this.refreshRuntimeInfo();
+    },
 
-            this.cheatVersion = 'unknown'
-        },
+    onNoClipChange() {
+      if (
+        this.cheatApi.GeneralCheat &&
+        this.cheatApi.GeneralCheat.toggleNoClip
+      ) {
+        this.cheatApi.GeneralCheat.toggleNoClip();
+      }
+      this.initializeVariables();
+    },
 
-        initializeVariables () {
-            const root = this.getRootWindow()
-            const gamePlayer = root.$gamePlayer
-            const gameParty = root.$gameParty
-            const speedCheat = this.cheatApi.SpeedCheat
-            const gameSpeedCheat = this.cheatApi.GameSpeedCheat || GameSpeedCheat
+    onOpenInSeparateWindowChange() {
+      const manager = this.rootWindowManager || CHEAT_WINDOW_MANAGER;
+      manager.setSeparateWindowEnabled(this.openInSeparateWindow);
 
-            this.noClip = gamePlayer ? gamePlayer._through : false
-            this.speed = gamePlayer && typeof gamePlayer.moveSpeed === 'function' ? gamePlayer.moveSpeed() : 0
-            this.fixSpeed = speedCheat && speedCheat.isFixed ? speedCheat.isFixed() : false
-            this.gold = gameParty ? gameParty._gold : 0
-
-            const manager = this.rootWindowManager || CHEAT_WINDOW_MANAGER
-            this.openInSeparateWindow = manager.isSeparateWindowEnabled()
-
-            this.gameSpeed = gameSpeedCheat && gameSpeedCheat.getRate ? gameSpeedCheat.getRate() : 1
-            const gameSpeedSceneOption = gameSpeedCheat && gameSpeedCheat.getSceneOption ? gameSpeedCheat.getSceneOption() : null
-            const options = gameSpeedCheat && gameSpeedCheat.sceneOptions ? gameSpeedCheat.sceneOptions() : { all: null, battle: null }
-            this.applyAllForGameSpeed = gameSpeedSceneOption === options.all
-            this.applyBattleForGameSpeed = gameSpeedSceneOption === options.battle
-
-            this.refreshRuntimeInfo()
-        },
-
-        onNoClipChange () {
-            if (this.cheatApi.GeneralCheat && this.cheatApi.GeneralCheat.toggleNoClip) {
-                this.cheatApi.GeneralCheat.toggleNoClip()
-            }
-            this.initializeVariables()
-        },
-
-        onOpenInSeparateWindowChange () {
-            const manager = this.rootWindowManager || CHEAT_WINDOW_MANAGER
-            manager.setSeparateWindowEnabled(this.openInSeparateWindow)
-
-            if (this.openInSeparateWindow) {
-                if (this.rootMainComponent) {
-                    this.rootMainComponent.show = false
-                } else {
-                    this.$root.show = false
-                }
-                setTimeout(() => {
-                    manager.openExternalWindow()
-                }, 0)
-            } else {
-                manager.closeExternalWindow()
-                setTimeout(() => {
-                    if (this.rootMainComponent) {
-                        this.rootMainComponent.show = true
-                    } else {
-                        this.$root.show = true
-                    }
-                }, 0)
-            }
-        },
-
-        onSpeedChange () {
-            const speedCheat = this.cheatApi.SpeedCheat
-            if (speedCheat && speedCheat.setSpeed) {
-                speedCheat.setSpeed(this.speed, this.fixSpeed)
-            }
-            if (speedCheat && speedCheat.__writeSettings) {
-                speedCheat.__writeSettings(this.speed, this.fixSpeed)
-            }
-            this.initializeVariables()
-        },
-
-        addSpeed (amount) {
-            this.speed = Math.min(Math.max(this.speed + amount, this.minSpeed), this.maxSpeed)
-            this.onSpeedChange()
-        },
-
-        onGoldChange () {
-            if (isNaN(this.gold) || !Number.isInteger(Number(this.gold)) || this.gold < 0) {
-                return
-            }
-
-            const root = this.getRootWindow()
-            const gameParty = root.$gameParty
-            if (!gameParty) {
-                return
-            }
-
-            const diff = this.gold - gameParty._gold
-
-            if (diff < 0) {
-                gameParty.loseGold(-diff)
-            } else if (diff > 0) {
-                gameParty.gainGold(diff)
-            }
-
-            this.gold = gameParty._gold
-            this.initializeVariables()
-        },
-
-        gotoTitle () {
-            if (this.cheatApi.SceneCheat && this.cheatApi.SceneCheat.gotoTitle) {
-                this.cheatApi.SceneCheat.gotoTitle()
-            }
-        },
-
-        toggleSaveScene () {
-            if (this.cheatApi.SceneCheat && this.cheatApi.SceneCheat.toggleSaveScene) {
-                this.cheatApi.SceneCheat.toggleSaveScene()
-            }
-        },
-
-        toggleLoadScene () {
-            if (this.cheatApi.SceneCheat && this.cheatApi.SceneCheat.toggleLoadScene) {
-                this.cheatApi.SceneCheat.toggleLoadScene()
-            }
-        },
-
-        onGameSpeedChange () {
-            const gameSpeedCheat = this.cheatApi.GameSpeedCheat || GameSpeedCheat
-            const options = gameSpeedCheat && gameSpeedCheat.sceneOptions ? gameSpeedCheat.sceneOptions() : { all: null, battle: null }
-
-            let sceneOption = null
-            if (this.applyAllForGameSpeed) {
-                sceneOption = options.all
-            } else if (this.applyBattleForGameSpeed) {
-                sceneOption = options.battle
-            }
-
-            if (gameSpeedCheat && gameSpeedCheat.setGameSpeed) {
-                gameSpeedCheat.setGameSpeed(this.gameSpeed, sceneOption)
-            }
-            if (gameSpeedCheat && gameSpeedCheat.__writeSettings) {
-                gameSpeedCheat.__writeSettings(this.gameSpeed, sceneOption)
-            }
-            this.initializeVariables()
-        },
-
-        addGameSpeed (amount) {
-            this.gameSpeed = Math.min(Math.max(this.gameSpeed + amount, this.minGameSpeed), this.maxGameSpeed)
-            this.onGameSpeedChange()
-        },
-
-        setGameSpeed () {
-            this.gameSpeed = 1
-            this.onGameSpeedChange()
-        },
-
-        onApplyAllForGameSpeedChange () {
-            if (this.applyAllForGameSpeed) {
-                this.applyBattleForGameSpeed = false
-            } else {
-                this.applyBattleForGameSpeed = true
-            }
-
-            this.onGameSpeedChange()
-        },
-
-        onApplyBattleForGameSpeedChange () {
-            if (this.applyBattleForGameSpeed) {
-                this.applyAllForGameSpeed = false
-            } else {
-                this.applyAllForGameSpeed = true
-            }
-
-            this.onGameSpeedChange()
+      if (this.openInSeparateWindow) {
+        if (this.rootMainComponent) {
+          this.rootMainComponent.show = false;
+        } else {
+          this.$root.show = false;
         }
-    }
-}
+        setTimeout(() => {
+          manager.openExternalWindow();
+        }, 0);
+      } else {
+        manager.closeExternalWindow();
+        setTimeout(() => {
+          if (this.rootMainComponent) {
+            this.rootMainComponent.show = true;
+          } else {
+            this.$root.show = true;
+          }
+        }, 0);
+      }
+    },
+
+    onSpeedChange() {
+      const speedCheat = this.cheatApi.SpeedCheat;
+      if (speedCheat && speedCheat.setSpeed) {
+        speedCheat.setSpeed(this.speed, this.fixSpeed);
+      }
+      if (speedCheat && speedCheat.__writeSettings) {
+        speedCheat.__writeSettings(this.speed, this.fixSpeed);
+      }
+      this.initializeVariables();
+    },
+
+    addSpeed(amount) {
+      this.speed = Math.min(
+        Math.max(this.speed + amount, this.minSpeed),
+        this.maxSpeed,
+      );
+      this.onSpeedChange();
+    },
+
+    onGoldChange() {
+      if (
+        isNaN(this.gold) ||
+        !Number.isInteger(Number(this.gold)) ||
+        this.gold < 0
+      ) {
+        return;
+      }
+
+      const root = this.getRootWindow();
+      const gameParty = root.$gameParty;
+      if (!gameParty) {
+        return;
+      }
+
+      const diff = this.gold - gameParty._gold;
+
+      if (diff < 0) {
+        gameParty.loseGold(-diff);
+      } else if (diff > 0) {
+        gameParty.gainGold(diff);
+      }
+
+      this.gold = gameParty._gold;
+      this.initializeVariables();
+    },
+
+    gotoTitle() {
+      if (this.cheatApi.SceneCheat && this.cheatApi.SceneCheat.gotoTitle) {
+        this.cheatApi.SceneCheat.gotoTitle();
+      }
+    },
+
+    toggleSaveScene() {
+      if (
+        this.cheatApi.SceneCheat &&
+        this.cheatApi.SceneCheat.toggleSaveScene
+      ) {
+        this.cheatApi.SceneCheat.toggleSaveScene();
+      }
+    },
+
+    toggleLoadScene() {
+      if (
+        this.cheatApi.SceneCheat &&
+        this.cheatApi.SceneCheat.toggleLoadScene
+      ) {
+        this.cheatApi.SceneCheat.toggleLoadScene();
+      }
+    },
+
+    onGameSpeedChange() {
+      const gameSpeedCheat = this.cheatApi.GameSpeedCheat || GameSpeedCheat;
+      const options =
+        gameSpeedCheat && gameSpeedCheat.sceneOptions
+          ? gameSpeedCheat.sceneOptions()
+          : { all: null, battle: null };
+
+      let sceneOption = null;
+      if (this.applyAllForGameSpeed) {
+        sceneOption = options.all;
+      } else if (this.applyBattleForGameSpeed) {
+        sceneOption = options.battle;
+      }
+
+      if (gameSpeedCheat && gameSpeedCheat.setGameSpeed) {
+        gameSpeedCheat.setGameSpeed(this.gameSpeed, sceneOption);
+      }
+      if (gameSpeedCheat && gameSpeedCheat.__writeSettings) {
+        gameSpeedCheat.__writeSettings(this.gameSpeed, sceneOption);
+      }
+      this.initializeVariables();
+    },
+
+    addGameSpeed(amount) {
+      this.gameSpeed = Math.min(
+        Math.max(this.gameSpeed + amount, this.minGameSpeed),
+        this.maxGameSpeed,
+      );
+      this.onGameSpeedChange();
+    },
+
+    setGameSpeed() {
+      this.gameSpeed = 1;
+      this.onGameSpeedChange();
+    },
+
+    onApplyAllForGameSpeedChange() {
+      if (this.applyAllForGameSpeed) {
+        this.applyBattleForGameSpeed = false;
+      } else {
+        this.applyBattleForGameSpeed = true;
+      }
+
+      this.onGameSpeedChange();
+    },
+
+    onApplyBattleForGameSpeedChange() {
+      if (this.applyBattleForGameSpeed) {
+        this.applyAllForGameSpeed = false;
+      } else {
+        this.applyAllForGameSpeed = true;
+      }
+
+      this.onGameSpeedChange();
+    },
+  },
+};

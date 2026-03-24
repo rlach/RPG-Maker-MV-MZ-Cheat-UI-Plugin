@@ -1,4 +1,5 @@
 import { DEFAULT_SYSTEM_PROMPT } from "../../translate-engines/ai-engine/constants.js";
+import { isRpgMakerMv } from "../../js/RpgMakerRuntime.js";
 
 export const LANGUAGE_OPTIONS = [
   { text: "English", value: "en" },
@@ -26,6 +27,16 @@ export const AI_INVALID_JSON_HANDLING_STRATEGY_OPTIONS = [
   { text: "Use JsonFixer", value: "useJsonFixer" },
   { text: "None", value: "none" },
 ];
+
+export const DEFAULT_DIALOG_MAX_LINE_WIDTH_MV = 52;
+export const DEFAULT_DIALOG_MAX_LINE_WIDTH_MZ = 60;
+export const DEFAULT_DESCRIPTION_MAX_LINE_WIDTH = 59;
+
+export function getDefaultDialogMaxLineWidth() {
+  return isRpgMakerMv()
+    ? DEFAULT_DIALOG_MAX_LINE_WIDTH_MV
+    : DEFAULT_DIALOG_MAX_LINE_WIDTH_MZ;
+}
 
 export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
   "enabled",
@@ -71,6 +82,66 @@ export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
   "nonOtfTranslationProcess",
 ]);
 
+export const PERSISTED_TRANSLATION_SETTINGS_KEYS = Object.freeze([
+  "enabled",
+  "sourceLang",
+  "targetLang",
+  "translationCount",
+  "enableTextWrapping",
+  "maxLineWidth",
+  "descriptionMaxLineWidth",
+  "charLimit",
+  "batchItemsLimit",
+  "translationEngine",
+  "translateCacheWhenDisabled",
+  "tryTranslateAhead",
+  "translateGameObjects",
+  "cancelBackgroundForOnTheFly",
+  "engineSettings",
+]);
+
+export const UI_SYNC_STATE_KEYS = Object.freeze([
+  "enabled",
+  "sourceLang",
+  "targetLang",
+  "translationCount",
+  "enableTextWrapping",
+  "maxLineWidth",
+  "descriptionMaxLineWidth",
+  "translationEngine",
+  "translateCacheWhenDisabled",
+  "tryTranslateAhead",
+  "translateGameObjects",
+  "cancelBackgroundForOnTheFly",
+  "charLimit",
+  "batchItemsLimit",
+  "libreTranslateHost",
+  "libreTranslateApiKey",
+  "aiProvider",
+  "aiHost",
+  "aiApiKey",
+  "aiSelectedModel",
+  "aiModels",
+  "aiLoadingModels",
+  "aiModelsError",
+  "aiAllowNewlineMismatch",
+  "aiAskIfTextTranslated",
+  "aiInvalidJsonHandlingStrategy",
+  "aiSystemPrompt",
+  "currentMessageWindow",
+  "currentGameMessage",
+  "useJsonFixer",
+  "aiFixRecursionMaxDepth",
+  "objectTranslationSelectedMapIds",
+]);
+
+export const UI_SYNC_TO_ONLY_STATE_KEYS = Object.freeze([
+  "translationEngineOptions",
+  "languageOptions",
+  "aiProviderOptions",
+  "aiInvalidJsonHandlingStrategyOptions",
+]);
+
 const cloneOptions = (items) =>
   Array.isArray(items)
     ? items.map((item) => {
@@ -88,8 +159,8 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
     targetLang: "en",
     translationCount: 0,
     enableTextWrapping: true,
-    maxLineWidth: 60,
-    descriptionMaxLineWidth: 59,
+    maxLineWidth: getDefaultDialogMaxLineWidth(),
+    descriptionMaxLineWidth: DEFAULT_DESCRIPTION_MAX_LINE_WIDTH,
     translationEngine: "mymemory",
     translateCacheWhenDisabled: false,
     tryTranslateAhead: true,
@@ -139,4 +210,47 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
       startedAt: 0,
     },
   };
+}
+
+export function createPersistedTranslationSettingsDefaults() {
+  const runtimeDefaults = createTranslationRuntimeStateDefaults([]);
+  const defaults = {};
+  PERSISTED_TRANSLATION_SETTINGS_KEYS.forEach((key) => {
+    defaults[key] = runtimeDefaults[key];
+  });
+  defaults.engineSettings = {};
+  return defaults;
+}
+
+export function normalizePersistedTranslationSettings(rawData = {}) {
+  const defaults = createPersistedTranslationSettingsDefaults();
+  const data = rawData && typeof rawData === "object" ? rawData : {};
+  const normalized = Object.assign({}, defaults, data);
+
+  const savedEngine =
+    normalized.translationEngine || defaults.translationEngine;
+  normalized.translationEngine =
+    savedEngine === "gpt4all" ? "openApi" : savedEngine;
+
+  if (
+    !normalized.engineSettings ||
+    typeof normalized.engineSettings !== "object"
+  ) {
+    normalized.engineSettings = {};
+  }
+  if (normalized.engineSettings.gpt4all && !normalized.engineSettings.openApi) {
+    normalized.engineSettings.openApi = normalized.engineSettings.gpt4all;
+    delete normalized.engineSettings.gpt4all;
+  }
+
+  return normalized;
+}
+
+export function serializePersistedTranslationSettings(state) {
+  const normalized = normalizePersistedTranslationSettings(state);
+  const serialized = {};
+  PERSISTED_TRANSLATION_SETTINGS_KEYS.forEach((key) => {
+    serialized[key] = normalized[key];
+  });
+  return serialized;
 }

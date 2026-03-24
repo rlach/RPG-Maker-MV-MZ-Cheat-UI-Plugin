@@ -110,9 +110,21 @@ export const translateOnTheFlyMessageMethods = {
     return cleaned;
   },
 
-  wrapText(text, maxWidth) {
+  wrapText(text, maxWidth, options = {}) {
     if (!this.enableTextWrapping || !maxWidth || maxWidth <= 0) {
       return text;
+    }
+
+    const flattenExistingNewlines = !!(
+      options && options.flattenExistingNewlines
+    );
+    let sourceText = text;
+    if (flattenExistingNewlines && typeof sourceText === "string") {
+      sourceText = sourceText
+        .replace(/\r\n/g, "\n")
+        .replace(/\n+/g, " ")
+        .replace(/[ \t]{2,}/g, " ")
+        .trim();
     }
 
     // Function to calculate visible length (excluding escape sequences)
@@ -125,7 +137,7 @@ export const translateOnTheFlyMessageMethods = {
       return withoutEscapes.length;
     };
 
-    const lines = text.split("\n");
+    const lines = sourceText.split("\n");
     const wrappedLines = [];
 
     for (const line of lines) {
