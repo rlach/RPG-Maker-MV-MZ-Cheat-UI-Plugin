@@ -877,6 +877,10 @@ export const translateOnTheFlyRuntimeMethods = {
         `[TranslateOnTheFly] Translating ${items.length} unique strings`,
       );
 
+      const itemMetaByCacheKey = new Map(
+        items.map((item) => [item.cacheKey, item.meta]),
+      );
+
       const translated = await this.batchManager.runBatchedTranslation(
         items.map((item) => ({
           type: item.type,
@@ -891,24 +895,25 @@ export const translateOnTheFlyRuntimeMethods = {
           charLimit: this.charLimit || 1000,
           isPhase,
           showSummary,
+          onBatchSettled: ({ successes, failures }) => {
+            for (const success of successes || []) {
+              const originalValue = success && success.value;
+              const meta = success
+                ? itemMetaByCacheKey.get(success.cacheKey)
+                : null;
+              const types = meta && Array.isArray(meta.types) ? meta.types : [];
+              for (const type of types) {
+                this.setCacheValue(
+                  this.getCacheKey(originalValue, type),
+                  success.translated,
+                );
+              }
+            }
+
+            this.markBatchFailuresAsUntranslated(failures || [], true);
+          },
         },
       );
-
-      const itemMetaByCacheKey = new Map(
-        items.map((item) => [item.cacheKey, item.meta]),
-      );
-
-      for (const success of translated.successes) {
-        const originalValue = success && success.value;
-        const meta = success ? itemMetaByCacheKey.get(success.cacheKey) : null;
-        const types = meta && Array.isArray(meta.types) ? meta.types : [];
-        for (const type of types) {
-          this.setCacheValue(
-            this.getCacheKey(originalValue, type),
-            success.translated,
-          );
-        }
-      }
 
       for (const failure of translated.failures) {
         console.warn(
@@ -918,7 +923,6 @@ export const translateOnTheFlyRuntimeMethods = {
           failure.rejectReason,
         );
       }
-      this.markBatchFailuresAsUntranslated(translated.failures, true);
 
       // Finally, for each array make Original copy and apply cached translations (if any)
       for (const entry of arrays) {
