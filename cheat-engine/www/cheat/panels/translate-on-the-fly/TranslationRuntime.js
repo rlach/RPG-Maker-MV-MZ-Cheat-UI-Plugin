@@ -14,6 +14,7 @@ import { translateOnTheFlyFlowMethods } from "./TranslateOnTheFlyFlowMethods.js"
 import { translateOnTheFlyRuntimeMethods } from "./TranslateOnTheFlyRuntimeMethods.js";
 import { objectTranslationRuntimeMethods } from "./ObjectTranslationModalMethods.js";
 import { translateOnTheFlyCoreMethods } from "./TranslateOnTheFlyCoreMethods.js";
+import { createTranslationRuntimeStateDefaults } from "./TranslationRuntimeDefaults.js";
 
 function getHostWindow() {
   if (
@@ -38,76 +39,7 @@ class TranslationRuntime {
     this._initialized = false;
     this._hookInitialized = false;
 
-    this.enabled = false;
-    this.sourceLang = "ja";
-    this.targetLang = "en";
-    this.translationCount = 0;
-    this.enableTextWrapping = true;
-    this.maxLineWidth = 60;
-    this.descriptionMaxLineWidth = 59;
-    this.translationEngine = "mymemory";
-    this.translateCacheWhenDisabled = false;
-    this.tryTranslateAhead = true;
-    this.translateGameObjects = true;
-    this.cancelBackgroundForOnTheFly = false;
-    this.charLimit = 1000;
-    this.batchItemsLimit = 20;
-    this.spinnerActiveCount = 0;
-    this.translationEngineOptions = engineOptions;
-    this.engineSettings = {};
-    this.engine = null;
-    this.languageOptions = [
-      { text: "English", value: "en" },
-      { text: "Japanese (日本語)", value: "ja" },
-      { text: "Spanish (Español)", value: "es" },
-      { text: "French (Français)", value: "fr" },
-      { text: "German (Deutsch)", value: "de" },
-      { text: "Italian (Italiano)", value: "it" },
-      { text: "Portuguese (Português)", value: "pt" },
-      { text: "Russian (Русский)", value: "ru" },
-      { text: "Korean (한국어)", value: "ko" },
-      { text: "Chinese Simplified (简体中文)", value: "zh-CN" },
-      { text: "Chinese Traditional (繁體中文)", value: "zh-TW" },
-      { text: "Polish (Polski)", value: "pl" },
-    ];
-    this.libreTranslateHost = "http://127.0.0.1:5000";
-    this.libreTranslateApiKey = "";
-    this.aiProvider = "openApi";
-    this.aiProviderOptions = [
-      { text: "OpenAPI compatible", value: "openApi" },
-      { text: "Open WebUI", value: "openwebui" },
-    ];
-    this.aiHost = "http://localhost:4891";
-    this.aiApiKey = "";
-    this.aiSelectedModel = "";
-    this.aiModels = [];
-    this.aiLoadingModels = false;
-    this.aiModelsError = "";
-    this.aiAllowNewlineMismatch = false;
-    this.aiAskIfTextTranslated = true;
-    this.aiInvalidJsonHandlingStrategy = "resendFirstHalf";
-    this.aiInvalidJsonHandlingStrategyOptions = [
-      { text: "Split into two half-batches", value: "resendFirstHalf" },
-      { text: "Ask AI to fix it", value: "askAIToFix" },
-      { text: "Use JsonFixer", value: "useJsonFixer" },
-      { text: "None", value: "none" },
-    ];
-    this.aiSystemPrompt =
-      "You are translating scripts that contain [[tags]]. Altering contents or order of any such tags, removing or adding tags will break the script. DO NOT REMOVE OR ADD ANY TAGS. Only translate the text, do not comment or add anything else. Do not bold, DO NOT FORMAT THE RESPONSE, RETURN IT ALL IN ONE LINE";
-    this.currentMessageWindow = null;
-    this.currentGameMessage = null;
-    this.useJsonFixer = true;
-    this.aiFixRecursionMaxDepth = 0;
-    this.objectTranslationSelectedMapIds = null;
-    this.objectTranslationJob = {
-      active: false,
-      currentTypeLabel: "",
-      currentDone: 0,
-      currentTotal: 0,
-      totalDone: 0,
-      totalTarget: 0,
-      runErrors: 0,
-    };
+    Object.assign(this, createTranslationRuntimeStateDefaults(engineOptions));
   }
 
   initialize() {

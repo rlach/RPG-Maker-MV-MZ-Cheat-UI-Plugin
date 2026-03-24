@@ -1,8 +1,26 @@
 import { Alert } from "../js/AlertHelper.js";
 import { MessageCheat, GeneralCheat } from "../js/CheatHelper.js";
 import { TranslateOnTheFlyState } from "../js/TranslateOnTheFlyState.js";
-import { AIEngine, getAvailableEngines } from "../translate-engines/index.js";
+import { AIEngine } from "../translate-engines/index.js";
 import { ensureTranslationRuntime } from "./translate-on-the-fly/TranslationRuntime.js";
+import { TRANSLATION_RUNTIME_STATE_KEYS } from "./translate-on-the-fly/TranslationRuntimeDefaults.js";
+
+const runtimeStateProxyComputed = TRANSLATION_RUNTIME_STATE_KEYS.reduce(
+  (acc, key) => {
+    acc[key] = {
+      get() {
+        return this.runtime ? this.runtime[key] : undefined;
+      },
+      set(value) {
+        if (this.runtime) {
+          this.runtime[key] = value;
+        }
+      },
+    };
+    return acc;
+  },
+  {},
+);
 
 export default {
   name: "TranslateOnTheFlyPanel",
@@ -234,92 +252,26 @@ export default {
     `,
 
   data() {
-    const engineOptions = getAvailableEngines();
     return {
-      enabled: false,
-      sourceLang: "ja",
-      targetLang: "en",
-      translationCount: 0,
-      enableTextWrapping: true,
-      maxLineWidth: 60,
-      descriptionMaxLineWidth: 59,
-      translationEngine: "mymemory",
-      translateCacheWhenDisabled: false,
-      tryTranslateAhead: true,
-      translateGameObjects: true,
-      cancelBackgroundForOnTheFly: false,
-      // Batching / performance
-      charLimit: 1000,
-      batchItemsLimit: 20,
-      spinnerActiveCount: 0,
-      translationEngineOptions: engineOptions,
-      engineSettings: {}, // Stores engine-specific configuration
-      engine: null, // Current engine instance
-      languageOptions: [
-        { text: "English", value: "en" },
-        { text: "Japanese (日本語)", value: "ja" },
-        { text: "Spanish (Español)", value: "es" },
-        { text: "French (Français)", value: "fr" },
-        { text: "German (Deutsch)", value: "de" },
-        { text: "Italian (Italiano)", value: "it" },
-        { text: "Portuguese (Português)", value: "pt" },
-        { text: "Russian (Русский)", value: "ru" },
-        { text: "Korean (한국어)", value: "ko" },
-        { text: "Chinese Simplified (简体中文)", value: "zh-CN" },
-        { text: "Chinese Traditional (繁體中文)", value: "zh-TW" },
-        { text: "Polish (Polski)", value: "pl" },
-      ],
-      // Engine-specific UI defaults to avoid runtime reactivity warnings
-      // LibreTranslate
-      libreTranslateHost: "http://127.0.0.1:5000",
-      libreTranslateApiKey: "",
-      // AI Engine (OpenAPI compatible / Open WebUI)
-      aiProvider: "openApi",
-      aiProviderOptions: [
-        { text: "OpenAPI compatible", value: "openApi" },
-        { text: "Open WebUI", value: "openwebui" },
-      ],
-      aiHost: "http://localhost:4891",
-      aiApiKey: "",
-      aiSelectedModel: "",
-      aiModels: [],
-      aiLoadingModels: false,
-      aiModelsError: "",
-      aiAllowNewlineMismatch: false,
-      aiAskIfTextTranslated: true,
-      aiInvalidJsonHandlingStrategy: "resendFirstHalf",
-      aiInvalidJsonHandlingStrategyOptions: [
-        { text: "Split into two half-batches", value: "resendFirstHalf" },
-        { text: "Ask AI to fix it", value: "askAIToFix" },
-        { text: "Use JsonFixer", value: "useJsonFixer" },
-        { text: "None", value: "none" },
-      ],
-      aiSystemPrompt:
-        "You are translating scripts that contain [[tags]]. Altering contents or order of any such tags, removing or adding tags will break the script. DO NOT REMOVE OR ADD ANY TAGS. Only translate the text, do not comment or add anything else. Do not bold, DO NOT FORMAT THE RESPONSE, RETURN IT ALL IN ONE LINE",
-      // Track the current message window and $gameMessage for live refresh
-      currentMessageWindow: null,
-      currentGameMessage: null,
-      useJsonFixer: true,
-      aiFixRecursionMaxDepth: 0,
-      objectTranslationSelectedMapIds: null,
-      objectTranslationJob: {
-        active: false,
-        currentTypeLabel: "",
-        currentDone: 0,
-        currentTotal: 0,
-        totalDone: 0,
-        totalTarget: 0,
-        runErrors: 0,
-      },
+      runtime: null,
+      translationCache: null,
+      lastSeenByCacheKey: null,
+      pendingTranslations: null,
+      failedTranslations: null,
+      batchManager: null,
+      engine: null,
     };
   },
 
   created() {
     this.runtime = ensureTranslationRuntime();
-    this.syncRuntimeToUi();
+    this.syncRuntimeRefs();
 
     this.stateUnsubscribe = TranslateOnTheFlyState.subscribe((enabled) => {
-      this.enabled = enabled;
+      if (this.runtime) {
+        this.runtime.enabled = enabled;
+      }
+      this.syncRuntimeRefs();
     });
   },
 
@@ -341,32 +293,25 @@ export default {
   },
 
   computed: {
+    ...runtimeStateProxyComputed,
+
     cachedCount() {
       return this.translationCache ? this.translationCache.size : 0;
     },
   },
 
   methods: {
-    syncRuntimeToUi() {
+    syncRuntimeRefs() {
       if (!this.runtime) {
         return;
       }
 
-      this.runtime.syncUiStateTo(this);
       this.translationCache = this.runtime.translationCache;
       this.lastSeenByCacheKey = this.runtime.lastSeenByCacheKey;
       this.pendingTranslations = this.runtime.pendingTranslations;
       this.failedTranslations = this.runtime.failedTranslations;
       this.batchManager = this.runtime.batchManager;
       this.engine = this.runtime.engine;
-    },
-
-    syncUiToRuntime() {
-      if (!this.runtime) {
-        return;
-      }
-
-      this.runtime.syncUiStateFrom(this);
     },
 
     callRuntime(methodName, ...args) {
@@ -377,17 +322,15 @@ export default {
       if (!this.runtime || typeof this.runtime[methodName] !== "function") {
         throw new Error(`Translation runtime method is missing: ${methodName}`);
       }
-
-      this.syncUiToRuntime();
       const result = this.runtime[methodName](...args);
 
       if (result && typeof result.then === "function") {
         return result.finally(() => {
-          this.syncRuntimeToUi();
+          this.syncRuntimeRefs();
         });
       }
 
-      this.syncRuntimeToUi();
+      this.syncRuntimeRefs();
       return result;
     },
 

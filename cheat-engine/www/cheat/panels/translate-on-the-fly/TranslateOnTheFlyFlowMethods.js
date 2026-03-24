@@ -311,6 +311,10 @@ export const translateOnTheFlyFlowMethods = {
       return;
     }
 
+    if (!this.beginNonOtfTranslationProcess("object translation")) {
+      return;
+    }
+
     const allStats = this.getObjectTranslationStats();
     const selectedStats = allStats.filter((stat) =>
       selectedTypeIds.includes(stat.id),
@@ -405,6 +409,7 @@ export const translateOnTheFlyFlowMethods = {
             -1,
             null,
             "translating common events",
+            { skipProcessLock: true },
           );
           this.objectTranslationJob.currentDone = stat.leftStrings || stat.left;
           this.objectTranslationJob.currentErrors =
@@ -438,6 +443,7 @@ export const translateOnTheFlyFlowMethods = {
               mapNumber,
               mapsToTranslate.length,
               `translating map ${mapNumber}/${mapsToTranslate.length}`,
+              { skipProcessLock: true },
             );
             this.objectTranslationJob.totalDone +=
               batchResult.successCount || 0;
@@ -509,16 +515,20 @@ export const translateOnTheFlyFlowMethods = {
     } finally {
       this.objectTranslationJob.active = false;
       this.hideProgressBox();
+      this.endNonOtfTranslationProcess();
     }
   },
 
-  async translateSystemCommandsBatch(backgroundJob = false) {
+  async translateSystemCommandsBatch(backgroundJob = false, showSummary = false) {
     if (!this.batchManager) {
       this.batchManager = new TranslationBatchManager(this);
     }
 
     const result =
-      await this.batchManager.translateSystemCommandsBatch(backgroundJob);
+      await this.batchManager.translateSystemCommandsBatch(
+        backgroundJob,
+        showSummary,
+      );
     return {
       successes: result.successes,
       failures: result.failures,
@@ -526,13 +536,16 @@ export const translateOnTheFlyFlowMethods = {
     };
   },
 
-  async translateSystemMessagesBatch(backgroundJob = false) {
+  async translateSystemMessagesBatch(backgroundJob = false, showSummary = false) {
     if (!this.batchManager) {
       this.batchManager = new TranslationBatchManager(this);
     }
 
     const result =
-      await this.batchManager.translateSystemMessagesBatch(backgroundJob);
+      await this.batchManager.translateSystemMessagesBatch(
+        backgroundJob,
+        showSummary,
+      );
     return {
       successes: result.successes,
       failures: result.failures,

@@ -530,6 +530,8 @@ export default {
         return;
       }
 
+      let processStarted = false;
+
       this.flushPendingCacheEdits("cache-manager-pre-translate-empty");
 
       const runtime = ensureTranslationRuntime();
@@ -579,6 +581,14 @@ export default {
         }
         return;
       }
+
+      if (
+        typeof runtime.beginNonOtfTranslationProcess === "function" &&
+        !runtime.beginNonOtfTranslationProcess("translate empty strings")
+      ) {
+        return;
+      }
+      processStarted = true;
 
       const maxItems =
         Number(runtime.batchItemsLimit) > 0
@@ -633,6 +643,13 @@ export default {
       } finally {
         this.isTranslatingEmptyStrings = false;
         this.refreshEntries();
+        if (
+          processStarted &&
+          runtime &&
+          typeof runtime.endNonOtfTranslationProcess === "function"
+        ) {
+          runtime.endNonOtfTranslationProcess();
+        }
       }
     },
 

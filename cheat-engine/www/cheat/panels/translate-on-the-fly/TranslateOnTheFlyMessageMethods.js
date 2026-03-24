@@ -1,4 +1,5 @@
 import { Alert } from "../../js/AlertHelper.js";
+import { TranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManager.js";
 
 export const translateOnTheFlyMessageMethods = {
   replaceMessageText(translatedText) {
@@ -204,16 +205,26 @@ export const translateOnTheFlyMessageMethods = {
         return commandName;
       }
 
-      this.showSpinner();
-      const result = await this.engine.batchTranslate([
+      if (!this.batchManager) {
+        this.batchManager = new TranslationBatchManager(this);
+      }
+      const result = await this.batchManager.runBatchedTranslation(
+        [
+          {
+            type: "command",
+            id: "cmd_0",
+            value: cleanName,
+            cacheKey: commandKey,
+          },
+        ],
         {
-          type: "command",
-          id: "cmd_0",
-          value: cleanName,
-          cacheKey: commandKey,
+          stepLabel: "translating menu options",
+          backgroundJob: false,
+          itemLimit: this.batchItemsLimit || 20,
+          charLimit: this.charLimit || 1000,
+          showSummary: false,
         },
-      ]);
-      this.hideSpinner();
+      );
 
       if (result.successes.length > 0) {
         const translated = result.successes[0].translated;
@@ -295,9 +306,16 @@ export const translateOnTheFlyMessageMethods = {
     }
 
     // Translate uncached choices
-    this.showSpinner();
-    const result = await this.engine.batchTranslate(items);
-    this.hideSpinner();
+    if (!this.batchManager) {
+      this.batchManager = new TranslationBatchManager(this);
+    }
+    const result = await this.batchManager.runBatchedTranslation(items, {
+      stepLabel: "translating choices",
+      backgroundJob: false,
+      itemLimit: this.batchItemsLimit || 20,
+      charLimit: this.charLimit || 1000,
+      showSummary: false,
+    });
 
     // Apply successes to cache
     for (const success of result.successes) {
@@ -486,9 +504,16 @@ export const translateOnTheFlyMessageMethods = {
       this.notifyCacheRuntime("cache-force-retranslate");
 
       // Translate using batch
-      this.showSpinner();
-      const result = await this.engine.batchTranslate(items);
-      this.hideSpinner();
+      if (!this.batchManager) {
+        this.batchManager = new TranslationBatchManager(this);
+      }
+      const result = await this.batchManager.runBatchedTranslation(items, {
+        stepLabel: "OTF - translating current message",
+        backgroundJob: false,
+        itemLimit: this.batchItemsLimit || 20,
+        charLimit: this.charLimit || 1000,
+        showSummary: false,
+      });
 
       console.log("[TranslateOnTheFly] Translation result:", {
         successes: result.successes.length,

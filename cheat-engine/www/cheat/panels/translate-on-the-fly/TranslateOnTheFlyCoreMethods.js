@@ -25,6 +25,45 @@ export const translateOnTheFlyCoreMethods = {
     return !!(MessageCheat && MessageCheat.skip);
   },
 
+  isNonOtfTranslationProcessActive() {
+    return !!(
+      this.nonOtfTranslationProcess && this.nonOtfTranslationProcess.active
+    );
+  },
+
+  getActiveNonOtfTranslationProcessLabel() {
+    if (!this.isNonOtfTranslationProcessActive()) {
+      return "";
+    }
+
+    return this.nonOtfTranslationProcess.label || "translation";
+  },
+
+  beginNonOtfTranslationProcess(label = "translation") {
+    if (this.isNonOtfTranslationProcessActive()) {
+      const activeLabel = this.getActiveNonOtfTranslationProcessLabel();
+      Alert.warn(
+        `Another translation is already in progress (${activeLabel}). Only On-The-Fly translation can run in parallel.`,
+      );
+      return false;
+    }
+
+    this.nonOtfTranslationProcess = {
+      active: true,
+      label,
+      startedAt: Date.now(),
+    };
+    return true;
+  },
+
+  endNonOtfTranslationProcess() {
+    this.nonOtfTranslationProcess = {
+      active: false,
+      label: "",
+      startedAt: 0,
+    };
+  },
+
   applyExternalToggle(enabled, notify = false) {
     TranslateOnTheFlyState.setEnabled(enabled);
     this.enabled = enabled;
@@ -277,6 +316,7 @@ export const translateOnTheFlyCoreMethods = {
   },
 
   async translateAllMaps() {
+    let processStarted = false;
     try {
       const startedAt = Date.now();
       if (!this.engine || !this.isEngineFullyConfigured()) {
@@ -288,6 +328,11 @@ export const translateOnTheFlyCoreMethods = {
         Alert.error("Map info not loaded");
         return;
       }
+
+      if (!this.beginNonOtfTranslationProcess("all maps translation")) {
+        return;
+      }
+      processStarted = true;
 
       console.log("[TranslateOnTheFly] Starting translation of all maps");
 
@@ -321,6 +366,7 @@ export const translateOnTheFlyCoreMethods = {
           -1,
           null,
           "translating common events",
+          { skipProcessLock: true },
         );
         if (result) {
           totalTranslated += result.successCount || 0;
@@ -354,6 +400,7 @@ export const translateOnTheFlyCoreMethods = {
             mapNumber,
             validMaps.length,
             `translating map ${mapNumber}/${validMaps.length}`,
+            { skipProcessLock: true },
           );
           if (result) {
             totalTranslated += result.successCount || 0;
@@ -387,6 +434,10 @@ export const translateOnTheFlyCoreMethods = {
       this.hideProgressBox();
       console.error("[TranslateOnTheFly] translateAllMaps error:", error);
       Alert.error("Failed to translate all maps: " + error.message);
+    } finally {
+      if (processStarted) {
+        this.endNonOtfTranslationProcess();
+      }
     }
   },
 
@@ -395,16 +446,38 @@ export const translateOnTheFlyCoreMethods = {
     mapNumber = null,
     totalMaps = null,
     progressLabel = null,
+    options = {},
   ) {
+    const skipProcessLock = !!(options && options.skipProcessLock);
+    let processStarted = false;
+
+    if (!skipProcessLock) {
+      if (!this.beginNonOtfTranslationProcess("map translation")) {
+        return {
+          successCount: 0,
+          failureCount: 0,
+          totalCount: 0,
+          stats: null,
+        };
+      }
+      processStarted = true;
+    }
+
     if (!this.batchManager) {
       this.batchManager = new TranslationBatchManager(this);
     }
 
-    return this.batchManager.translateMapEvents(
-      mapData,
-      mapNumber,
-      totalMaps,
-      progressLabel,
-    );
+    try {
+      return await this.batchManager.translateMapEvents(
+        mapData,
+        mapNumber,
+        totalMaps,
+        progressLabel,
+      );
+    } finally {
+      if (processStarted) {
+        this.endNonOtfTranslationProcess();
+      }
+    }
   },
 };

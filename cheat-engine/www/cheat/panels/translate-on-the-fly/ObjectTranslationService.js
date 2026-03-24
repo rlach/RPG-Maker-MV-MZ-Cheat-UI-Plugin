@@ -48,6 +48,20 @@ class ObjectTranslationService {
       return;
     }
 
+    if (
+      typeof runtime.isNonOtfTranslationProcessActive === "function" &&
+      runtime.isNonOtfTranslationProcessActive()
+    ) {
+      const activeLabel =
+        typeof runtime.getActiveNonOtfTranslationProcessLabel === "function"
+          ? runtime.getActiveNonOtfTranslationProcessLabel()
+          : "translation";
+      Alert.warn(
+        `Another translation is already in progress (${activeLabel}).`,
+      );
+      return;
+    }
+
     if (runtime.checkIfDataIsLoaded && runtime.checkIfDataIsLoaded()) {
       Alert.warn("Game data is not fully loaded yet");
       return;
@@ -196,6 +210,20 @@ class ObjectTranslationService {
     const runtime = this.ensureRuntime();
     if (!runtime || typeof runtime.runObjectTranslationJob !== "function") {
       Alert.error("Translation runtime not initialized");
+      return;
+    }
+
+    if (
+      typeof runtime.isNonOtfTranslationProcessActive === "function" &&
+      runtime.isNonOtfTranslationProcessActive()
+    ) {
+      const activeLabel =
+        typeof runtime.getActiveNonOtfTranslationProcessLabel === "function"
+          ? runtime.getActiveNonOtfTranslationProcessLabel()
+          : "translation";
+      Alert.warn(
+        `Another translation is already in progress (${activeLabel}).`,
+      );
       return;
     }
 

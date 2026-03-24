@@ -384,7 +384,7 @@ class AIEngine extends BaseTranslationEngine {
           },
           {
             role: "system",
-            content: `Translate video game text from ${sourceName} to ${targetName}. Return only flat one-line JSON object with exactly the same keys as input. No markdown, no comments, no extra keys, no missing keys, no duplicate keys, no arrays, no pretty formatting. Preserve every [[tag]] exactly and keep tag order unchanged. Character name hints: ${nameHints}`,
+            content: `Translate video game text from ${sourceName} to ${targetName}. Return only flat one-line JSON object with exactly the same keys as input. No markdown, no comments, no extra keys, no missing keys, no duplicate keys, no arrays, no pretty formatting. Preserve every [b=tag] exactly and keep tag order unchanged. Character name hints: ${nameHints}`,
           },
           {
             role: "user",

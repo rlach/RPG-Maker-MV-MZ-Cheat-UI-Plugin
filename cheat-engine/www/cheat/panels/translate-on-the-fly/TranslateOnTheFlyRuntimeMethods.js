@@ -653,13 +653,7 @@ export const translateOnTheFlyRuntimeMethods = {
         return !self.hasUsableCacheValue(commandKey);
       });
 
-      // Batch translate all uncached commands
-      // Note: we translate even if OTF is disabled but cache-when-disabled is enabled
-      if (commandsToTranslate.length > 0 && (translationEnabled || useCacheOnly)) {
-        console.log(
-          `[TranslateOnTheFly] Batch translating ${commandsToTranslate.length} commands`,
-        );
-
+      if (commandsToTranslate.length > 0) {
         const items = commandsToTranslate.map((cmd, i) => ({
           type: "command",
           id: `cmd_${i}`,
@@ -667,39 +661,65 @@ export const translateOnTheFlyRuntimeMethods = {
           cacheKey: self.getCacheKey(cmd.name, "command"),
         }));
 
-        try {
-          self.showSpinner();
-          const result = await self.engine.batchTranslate(items);
-          self.hideSpinner();
+        const harvestOnly =
+          useCacheOnly ||
+          (typeof self.isNonOtfTranslationProcessActive === "function" &&
+            self.isNonOtfTranslationProcessActive());
 
-          // Cache successes
-          for (const success of result.successes) {
-            self.setCacheValue(success.cacheKey, success.translated);
-            console.log(
-              `[TranslateOnTheFly] Cached command: "${items.find((i) => i.cacheKey === success.cacheKey).value}" → "${success.translated}"`,
-            );
+        // Cache-only mode means harvesting keys only. Do not translate on the fly.
+        if (harvestOnly) {
+          for (const item of items) {
+            self.setCacheValue(item.cacheKey, "");
           }
-
-          // Cache failures as empty strings (for harvesting untranslated strings)
-          for (const failure of result.failures) {
-            self.setCacheValue(failure.cacheKey, "");
-            console.warn(
-              `[TranslateOnTheFly] Failed to translate command (cached as empty):`,
-              failure.value,
-              "→",
-              failure.rejectReason,
-            );
-          }
-
-          // Mark failures
-          self.markBatchFailuresAsUntranslated(result.failures, true);
-        } catch (error) {
-          console.error(
-            "[TranslateOnTheFly] Batch command translation error:",
-            error,
+          console.log(
+            `[TranslateOnTheFly] Harvested ${items.length} menu options to cache without translation`,
           );
-          self.hideSpinner();
-          self.markBatchItemsAsUntranslated(items, true);
+        } else if (translationEnabled) {
+          console.log(
+            `[TranslateOnTheFly] Batch translating ${commandsToTranslate.length} commands`,
+          );
+
+          try {
+            if (!self.batchManager) {
+              self.batchManager = new TranslationBatchManager(self);
+            }
+
+            const result = await self.batchManager.runBatchedTranslation(items, {
+              stepLabel: "translating menu options",
+              backgroundJob: false,
+              itemLimit: self.batchItemsLimit || 20,
+              charLimit: self.charLimit || 1000,
+              showSummary: false,
+            });
+
+            // Cache successes
+            for (const success of result.successes) {
+              self.setCacheValue(success.cacheKey, success.translated);
+              console.log(
+                `[TranslateOnTheFly] Cached command: "${items.find((i) => i.cacheKey === success.cacheKey).value}" → "${success.translated}"`,
+              );
+            }
+
+            // Cache failures as empty strings (for harvesting untranslated strings)
+            for (const failure of result.failures) {
+              self.setCacheValue(failure.cacheKey, "");
+              console.warn(
+                `[TranslateOnTheFly] Failed to translate command (cached as empty):`,
+                failure.value,
+                "→",
+                failure.rejectReason,
+              );
+            }
+
+            // Mark failures
+            self.markBatchFailuresAsUntranslated(result.failures, true);
+          } catch (error) {
+            console.error(
+              "[TranslateOnTheFly] Batch command translation error:",
+              error,
+            );
+            self.markBatchItemsAsUntranslated(items, true);
+          }
         }
       }
       this._collectedCommands = this._collectedCommands.filter(
