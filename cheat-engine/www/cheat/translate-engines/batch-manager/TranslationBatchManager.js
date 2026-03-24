@@ -38,6 +38,10 @@ export class TranslationBatchManager {
     //   never shows a per-phase summary regardless of showSummary.
     const isPhase = !!options.isPhase;
     const showSummary = !isPhase && options.showSummary !== false;
+    const onBatchSettled =
+      typeof options.onBatchSettled === "function"
+        ? options.onBatchSettled
+        : null;
     const startedAt = Date.now();
 
     this.errorRecovery.reset(stepLabel);
@@ -120,6 +124,17 @@ export class TranslationBatchManager {
         for (const failure of failures) {
           allFailures.push(failure);
           this.errorRecovery.recordFailure(failure);
+        }
+
+        if (onBatchSettled) {
+          await onBatchSettled({
+            successes,
+            failures,
+            batchIndex: i,
+            batchSize: batch.length,
+            processed,
+            total: safeItems.length,
+          });
         }
 
         if (this.isAbortBatchResult(failures, batch.length)) {
@@ -239,22 +254,25 @@ export class TranslationBatchManager {
         charLimit: this.panel.charLimit || 1000,
         isPhase: !!options.isPhase,
         showSummary,
+        onBatchSettled: ({ successes, failures }) => {
+          for (const success of successes || []) {
+            if (!success || !success.cacheKey) {
+              continue;
+            }
+
+            this.panel.setCacheValue(success.cacheKey, success.translated);
+            const origin = pending.find(
+              (item) => item.cacheKey === success.cacheKey,
+            );
+            if (origin && $dataSystem.terms.commands[origin.index] !== undefined) {
+              $dataSystem.terms.commands[origin.index] = success.translated;
+            }
+          }
+
+          this.panel.markBatchFailuresAsUntranslated(failures || [], true);
+        },
       },
     );
-
-    for (const success of translated.successes) {
-      if (!success || !success.cacheKey) {
-        continue;
-      }
-
-      this.panel.setCacheValue(success.cacheKey, success.translated);
-      const origin = pending.find((item) => item.cacheKey === success.cacheKey);
-      if (origin && $dataSystem.terms.commands[origin.index] !== undefined) {
-        $dataSystem.terms.commands[origin.index] = success.translated;
-      }
-    }
-
-    this.panel.markBatchFailuresAsUntranslated(translated.failures, true);
 
     return {
       successes: translated.successes.length,
@@ -322,27 +340,28 @@ export class TranslationBatchManager {
         charLimit: this.panel.charLimit || 1000,
         isPhase: !!options.isPhase,
         showSummary,
+        onBatchSettled: ({ successes, failures }) => {
+          for (const success of successes || []) {
+            if (!success || !success.cacheKey) {
+              continue;
+            }
+
+            this.panel.setCacheValue(success.cacheKey, success.translated);
+            if (
+              $dataSystem.terms.messages &&
+              Object.prototype.hasOwnProperty.call(
+                $dataSystem.terms.messages,
+                success.cacheKey,
+              )
+            ) {
+              $dataSystem.terms.messages[success.cacheKey] = success.translated;
+            }
+          }
+
+          this.panel.markBatchFailuresAsUntranslated(failures || [], true);
+        },
       },
     );
-
-    for (const success of translated.successes) {
-      if (!success || !success.cacheKey) {
-        continue;
-      }
-
-      this.panel.setCacheValue(success.cacheKey, success.translated);
-      if (
-        $dataSystem.terms.messages &&
-        Object.prototype.hasOwnProperty.call(
-          $dataSystem.terms.messages,
-          success.cacheKey,
-        )
-      ) {
-        $dataSystem.terms.messages[success.cacheKey] = success.translated;
-      }
-    }
-
-    this.panel.markBatchFailuresAsUntranslated(translated.failures, true);
 
     return {
       successes: translated.successes.length,
@@ -411,16 +430,17 @@ export class TranslationBatchManager {
         charLimit: this.panel.charLimit || 1000,
         isPhase: !!options.isPhase,
         showSummary: false,
+        onBatchSettled: ({ successes, failures }) => {
+          for (const success of successes || []) {
+            if (success && success.cacheKey) {
+              this.panel.setCacheValue(success.cacheKey, success.translated);
+            }
+          }
+
+          this.panel.markBatchFailuresAsUntranslated(failures || [], true);
+        },
       },
     );
-
-    for (const success of translated.successes) {
-      if (success && success.cacheKey) {
-        this.panel.setCacheValue(success.cacheKey, success.translated);
-      }
-    }
-
-    this.panel.markBatchFailuresAsUntranslated(translated.failures, true);
 
     for (const dataObject of dataObjects) {
       if (!dataObject || !dataObject._translateOriginal) {
@@ -590,16 +610,17 @@ export class TranslationBatchManager {
         charLimit: this.panel.charLimit || 1000,
         isPhase: !!(options && options.isPhase),
         showSummary: !options.isPhase && mapNumber === null,
+        onBatchSettled: ({ successes, failures }) => {
+          for (const success of successes || []) {
+            if (success && success.cacheKey) {
+              this.panel.setCacheValue(success.cacheKey, success.translated);
+            }
+          }
+
+          this.panel.markBatchFailuresAsUntranslated(failures || [], true);
+        },
       },
     );
-
-    for (const success of translated.successes) {
-      if (success && success.cacheKey) {
-        this.panel.setCacheValue(success.cacheKey, success.translated);
-      }
-    }
-
-    this.panel.markBatchFailuresAsUntranslated(translated.failures, true);
 
     return {
       successCount: translated.successes.length,
