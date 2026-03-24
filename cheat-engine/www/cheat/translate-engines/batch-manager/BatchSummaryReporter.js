@@ -73,21 +73,26 @@ export class BatchSummaryReporter {
     const safeTotal = Math.max(0, Number(total) || 0);
     const safeCurrentErrors = Math.max(0, Number(currentStepErrors) || 0);
     const safeCurrentProcessed = Math.max(0, Number(currentStepProcessed) || 0);
-    const safeTotalErrors = Math.max(0, Number(totalErrors) || 0);
     const safeTotalCumulativeErrors = Math.max(
       0,
-      Number(totalCumulativeErrors) || 0,
+      Number(totalCumulativeErrors) || Number(totalErrors) || 0,
     );
     const percent =
       safeTotal > 0 ? Math.round((safeProcessed / safeTotal) * 100) : 100;
 
-    let message = `${safeProcessed}/${safeTotal} ${progressLabel} (${percent}%)`;
+    const message = `${safeProcessed}/${safeTotal} ${progressLabel} (${percent}%)`;
 
-    if (safeCurrentErrors > 0 && safeCurrentProcessed > 0) {
-      const currentErrorPercent = Math.round(
-        (safeCurrentErrors / safeCurrentProcessed) * 100,
+    let currentErrorsLine = null;
+    if (safeCurrentErrors > 0) {
+      const currentErrorsBase = Math.max(
+        0,
+        safeCurrentProcessed || safeProcessed,
       );
-      message += ` | current phase errors: ${safeCurrentErrors}/${safeCurrentProcessed} (${currentErrorPercent}%)`;
+      const currentErrorPercent =
+        currentErrorsBase > 0
+          ? Math.round((safeCurrentErrors / currentErrorsBase) * 100)
+          : 0;
+      currentErrorsLine = `current phase errors: ${safeCurrentErrors}/${currentErrorsBase} (${currentErrorPercent}%)`;
     }
 
     let totalErrorsLine = null;
@@ -103,6 +108,7 @@ export class BatchSummaryReporter {
     return {
       title: title || "translating",
       message,
+      currentErrorsLine,
       totalErrorsLine,
     };
   }

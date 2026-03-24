@@ -369,7 +369,10 @@ export const translateOnTheFlyFlowMethods = {
               phase.mapInfo.id === currentMapId,
           );
           if (currentMapPhaseIndex > 0) {
-            const [currentMapPhase] = phaseQueue.splice(currentMapPhaseIndex, 1);
+            const [currentMapPhase] = phaseQueue.splice(
+              currentMapPhaseIndex,
+              1,
+            );
             phaseQueue.unshift(currentMapPhase);
           }
         }

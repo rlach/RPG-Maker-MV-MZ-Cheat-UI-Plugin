@@ -264,7 +264,10 @@ export class TranslationBatchManager {
             const origin = pending.find(
               (item) => item.cacheKey === success.cacheKey,
             );
-            if (origin && $dataSystem.terms.commands[origin.index] !== undefined) {
+            if (
+              origin &&
+              $dataSystem.terms.commands[origin.index] !== undefined
+            ) {
               $dataSystem.terms.commands[origin.index] = success.translated;
             }
           }
