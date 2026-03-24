@@ -76,6 +76,7 @@ export class TranslationBatchManager {
     const allSuccesses = [];
     const allFailures = [];
     let processed = 0;
+    let phaseFailures = 0;
 
     try {
       for (let i = 0; i < batches.length; i++) {
@@ -126,6 +127,8 @@ export class TranslationBatchManager {
           this.errorRecovery.recordFailure(failure);
         }
 
+        phaseFailures += failures.length;
+
         if (onBatchSettled) {
           await onBatchSettled({
             successes,
@@ -139,6 +142,7 @@ export class TranslationBatchManager {
 
         if (this.isAbortBatchResult(failures, batch.length)) {
           const cancelReason = failures[0] && failures[0].cancelReason;
+          let skippedFailuresCount = 0;
           for (let r = i + 1; r < batches.length; r++) {
             for (const skippedItem of batches[r]) {
               const skippedFailure = {
@@ -148,8 +152,11 @@ export class TranslationBatchManager {
               };
               allFailures.push(skippedFailure);
               this.errorRecovery.recordFailure(skippedFailure);
+              skippedFailuresCount += 1;
             }
           }
+
+          phaseFailures += skippedFailuresCount;
 
           processed = safeItems.length;
           this.progressTracker.updateStep(
@@ -158,20 +165,22 @@ export class TranslationBatchManager {
             safeItems.length,
           );
           this.progressTracker.updateCurrentStepErrors(
-            failures.length,
-            batch.length,
+            phaseFailures,
+            processed,
           );
-          this.progressTracker.updateTotalErrors(allFailures.length);
+          this.progressTracker.addTotalErrors(
+            failures.length + skippedFailuresCount,
+          );
           break;
         }
 
         processed += batch.length;
         this.progressTracker.updateStep(stepLabel, processed, safeItems.length);
         this.progressTracker.updateCurrentStepErrors(
-          failures.length,
-          batch.length,
+          phaseFailures,
+          processed,
         );
-        this.progressTracker.updateTotalErrors(allFailures.length);
+        this.progressTracker.addTotalErrors(failures.length);
       }
     } finally {
       // Only a standalone (non-phase) call owns the spinner lifecycle.

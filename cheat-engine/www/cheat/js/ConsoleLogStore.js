@@ -19,37 +19,27 @@ class ConsoleLogStore {
         this.originalConsole.info = console.info;
         this.originalConsole.debug = console.debug;
 
+        this.installProxyMethod('log');
+        this.installProxyMethod('warn');
+        this.installProxyMethod('error');
+        this.installProxyMethod('info');
+        this.installProxyMethod('debug');
+    }
+
+    installProxyMethod(level) {
+        const original = this.originalConsole[level];
+        if (typeof original !== 'function') {
+            return;
+        }
+
         const self = this;
-
-        // Intercept console.log
-        console.log = function(...args) {
-            self.originalConsole.log.apply(console, args);
-            self.add('log', args);
-        };
-
-        // Intercept console.warn
-        console.warn = function(...args) {
-            self.originalConsole.warn.apply(console, args);
-            self.add('warn', args);
-        };
-
-        // Intercept console.error
-        console.error = function(...args) {
-            self.originalConsole.error.apply(console, args);
-            self.add('error', args);
-        };
-
-        // Intercept console.info
-        console.info = function(...args) {
-            self.originalConsole.info.apply(console, args);
-            self.add('info', args);
-        };
-
-        // Intercept console.debug
-        console.debug = function(...args) {
-            self.originalConsole.debug.apply(console, args);
-            self.add('debug', args);
-        };
+        console[level] = new Proxy(original, {
+            apply(target, thisArg, argArray) {
+                const args = Array.isArray(argArray) ? argArray : [];
+                self.add(level, args);
+                return Reflect.apply(target, console, args);
+            }
+        });
     }
 
     add(level, args) {

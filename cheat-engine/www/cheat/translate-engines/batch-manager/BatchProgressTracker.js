@@ -70,8 +70,6 @@ export class BatchProgressTracker {
     this.currentStepLabel = stepLabel || this.currentStepLabel;
     this.currentProcessed = Math.max(0, Number(currentProcessed) || 0);
     this.currentTotal = Math.max(0, Number(currentTotal) || this.currentTotal);
-    this.currentStepErrors = 0;
-    this.currentStepProcessed = 0;
     this._render();
   }
 
@@ -83,6 +81,11 @@ export class BatchProgressTracker {
 
   updateTotalErrors(totalErrors) {
     this.totalErrors = Math.max(0, Number(totalErrors) || 0);
+    this._render();
+  }
+
+  addTotalErrors(errorCountDelta) {
+    this.totalErrors += Math.max(0, Number(errorCountDelta) || 0);
     this._render();
   }
 
