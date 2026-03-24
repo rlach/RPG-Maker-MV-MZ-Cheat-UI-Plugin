@@ -25,6 +25,45 @@ export class BatchProgressTracker {
     this._render();
   }
 
+  /**
+   * Begin a multi-phase queue. Starts the spinner once for the whole job.
+   * Each phase within the queue calls beginPhase().
+   * The queue owner calls endQueue() when all phases are done.
+   */
+  beginQueue() {
+    this.currentStepLabel = "";
+    this.currentProcessed = 0;
+    this.currentTotal = 0;
+    this.currentStepErrors = 0;
+    this.currentStepProcessed = 0;
+    this.totalErrors = 0;
+    this.paused = false;
+    this.panel.showSpinner();
+    this._render();
+  }
+
+  /**
+   * Transition to the next phase within an active queue.
+   * Does NOT touch the spinner — the queue owns the spinner lifecycle.
+   */
+  beginPhase(phaseLabel, phaseTotal = 0) {
+    this.currentStepLabel = phaseLabel || "translating";
+    this.currentProcessed = 0;
+    this.currentTotal = Math.max(0, Number(phaseTotal) || 0);
+    this.currentStepErrors = 0;
+    this.currentStepProcessed = 0;
+    // totalErrors intentionally kept — accumulates across phases
+    this._render();
+  }
+
+  /**
+   * End the queue: hide spinner and progress box.
+   */
+  endQueue() {
+    this.panel.hideSpinner();
+    this.panel.hideProgressBox();
+  }
+
   updateStep(stepLabel, currentProcessed, currentTotal) {
     this.currentStepLabel = stepLabel || this.currentStepLabel;
     this.currentProcessed = Math.max(0, Number(currentProcessed) || 0);

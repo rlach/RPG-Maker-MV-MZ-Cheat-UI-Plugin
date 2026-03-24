@@ -334,6 +334,11 @@ export const translateOnTheFlyCoreMethods = {
       }
       processStarted = true;
 
+      if (!this.batchManager) {
+        this.batchManager = new TranslationBatchManager(this);
+      }
+      this.batchManager.progressTracker.beginQueue();
+
       console.log("[TranslateOnTheFly] Starting translation of all maps");
 
       const validMaps = this.getValidMapInfos();
@@ -366,7 +371,7 @@ export const translateOnTheFlyCoreMethods = {
           -1,
           null,
           "translating common events",
-          { skipProcessLock: true },
+          { skipProcessLock: true, isPhase: true },
         );
         if (result) {
           totalTranslated += result.successCount || 0;
@@ -400,7 +405,7 @@ export const translateOnTheFlyCoreMethods = {
             mapNumber,
             validMaps.length,
             `translating map ${mapNumber}/${validMaps.length}`,
-            { skipProcessLock: true },
+            { skipProcessLock: true, isPhase: true },
           );
           if (result) {
             totalTranslated += result.successCount || 0;
@@ -419,7 +424,7 @@ export const translateOnTheFlyCoreMethods = {
         }
       }
 
-      this.hideProgressBox();
+      this.batchManager.progressTracker.endQueue();
       const summary = BatchSummaryReporter.buildSummary({
         batchLabel: "all maps translation",
         totalItems: totalTarget,
@@ -431,7 +436,7 @@ export const translateOnTheFlyCoreMethods = {
       BatchSummaryReporter.showAlert(summary);
       BatchSummaryReporter.logSummary(summary);
     } catch (error) {
-      this.hideProgressBox();
+      if (this.batchManager) this.batchManager.progressTracker.endQueue();
       console.error("[TranslateOnTheFly] translateAllMaps error:", error);
       Alert.error("Failed to translate all maps: " + error.message);
     } finally {
@@ -473,6 +478,7 @@ export const translateOnTheFlyCoreMethods = {
         mapNumber,
         totalMaps,
         progressLabel,
+        options,
       );
     } finally {
       if (processStarted) {

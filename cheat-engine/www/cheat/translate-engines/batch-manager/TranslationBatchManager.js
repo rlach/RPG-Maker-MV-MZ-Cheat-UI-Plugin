@@ -33,7 +33,11 @@ export class TranslationBatchManager {
     const safeItems = Array.isArray(items) ? items : [];
     const stepLabel = options.stepLabel || "translating batch";
     const backgroundJob = !!options.backgroundJob;
-    const showSummary = options.showSummary !== false;
+    // isPhase: true  => called as a phase within an active queue;
+    //   uses beginPhase() instead of start(), skips complete() at the end,
+    //   never shows a per-phase summary regardless of showSummary.
+    const isPhase = !!options.isPhase;
+    const showSummary = !isPhase && options.showSummary !== false;
     const startedAt = Date.now();
 
     this.errorRecovery.reset(stepLabel);
@@ -59,7 +63,11 @@ export class TranslationBatchManager {
       charLimit: options.charLimit,
     });
 
-    this.progressTracker.start(stepLabel, safeItems.length);
+    if (isPhase) {
+      this.progressTracker.beginPhase(stepLabel, safeItems.length);
+    } else {
+      this.progressTracker.start(stepLabel, safeItems.length);
+    }
 
     const allSuccesses = [];
     const allFailures = [];
@@ -151,7 +159,10 @@ export class TranslationBatchManager {
         this.progressTracker.updateTotalErrors(allFailures.length);
       }
     } finally {
-      this.progressTracker.complete();
+      // Only a standalone (non-phase) call owns the spinner lifecycle.
+      if (!isPhase) {
+        this.progressTracker.complete();
+      }
     }
 
     const summary = BatchSummaryReporter.buildSummary({
@@ -175,6 +186,7 @@ export class TranslationBatchManager {
   async translateSystemCommandsBatch(
     backgroundJob = false,
     showSummary = false,
+    options = {},
   ) {
     if (
       !(
@@ -225,6 +237,7 @@ export class TranslationBatchManager {
         backgroundJob,
         itemLimit: this.panel.batchItemsLimit || 20,
         charLimit: this.panel.charLimit || 1000,
+        isPhase: !!options.isPhase,
         showSummary,
       },
     );
@@ -254,6 +267,7 @@ export class TranslationBatchManager {
   async translateSystemMessagesBatch(
     backgroundJob = false,
     showSummary = false,
+    options = {},
   ) {
     if (
       !(
@@ -306,6 +320,7 @@ export class TranslationBatchManager {
         backgroundJob,
         itemLimit: this.panel.batchItemsLimit || 20,
         charLimit: this.panel.charLimit || 1000,
+        isPhase: !!options.isPhase,
         showSummary,
       },
     );
@@ -394,6 +409,7 @@ export class TranslationBatchManager {
         backgroundJob: !!options.backgroundJob,
         itemLimit: this.panel.batchItemsLimit || 20,
         charLimit: this.panel.charLimit || 1000,
+        isPhase: !!options.isPhase,
         showSummary: false,
       },
     );
@@ -439,6 +455,7 @@ export class TranslationBatchManager {
     mapNumber = null,
     totalMaps = null,
     progressLabel = null,
+    options = {},
   ) {
     const dataMap = mapData || window.$dataMap;
     if (!dataMap) {
@@ -568,10 +585,11 @@ export class TranslationBatchManager {
       })),
       {
         stepLabel,
-        backgroundJob: false,
+        backgroundJob: !!(options && options.backgroundJob),
         itemLimit: this.panel.batchItemsLimit || 20,
         charLimit: this.panel.charLimit || 1000,
-        showSummary: mapNumber === null,
+        isPhase: !!(options && options.isPhase),
+        showSummary: !options.isPhase && mapNumber === null,
       },
     );
 
