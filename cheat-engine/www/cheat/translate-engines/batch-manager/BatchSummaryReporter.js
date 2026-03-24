@@ -66,6 +66,7 @@ export class BatchSummaryReporter {
     currentStepErrors = 0,
     currentStepProcessed = 0,
     totalErrors = 0,
+    totalCumulativeErrors = 0,
     progressLabel = "translated",
   }) {
     const safeProcessed = Math.max(0, Number(processed) || 0);
@@ -73,25 +74,30 @@ export class BatchSummaryReporter {
     const safeCurrentErrors = Math.max(0, Number(currentStepErrors) || 0);
     const safeCurrentProcessed = Math.max(0, Number(currentStepProcessed) || 0);
     const safeTotalErrors = Math.max(0, Number(totalErrors) || 0);
+    const safeTotalCumulativeErrors = Math.max(
+      0,
+      Number(totalCumulativeErrors) || 0,
+    );
     const percent =
       safeTotal > 0 ? Math.round((safeProcessed / safeTotal) * 100) : 100;
 
     let message = `${safeProcessed}/${safeTotal} ${progressLabel} (${percent}%)`;
+
     if (safeCurrentErrors > 0 && safeCurrentProcessed > 0) {
       const currentErrorPercent = Math.round(
         (safeCurrentErrors / safeCurrentProcessed) * 100,
       );
-      message += ` | errors: ${safeCurrentErrors}/${safeCurrentProcessed} (${currentErrorPercent}%)`;
+      message += ` | current phase errors: ${safeCurrentErrors}/${safeCurrentProcessed} (${currentErrorPercent}%)`;
     }
 
     let totalErrorsLine = null;
-    if (safeTotalErrors > 0) {
+    if (safeTotalCumulativeErrors > 0) {
       const totalErrorsBase = Math.max(0, safeProcessed);
       const totalErrorPercent =
         totalErrorsBase > 0
-          ? Math.round((safeTotalErrors / totalErrorsBase) * 100)
+          ? Math.round((safeTotalCumulativeErrors / totalErrorsBase) * 100)
           : 0;
-      totalErrorsLine = `total errors: ${safeTotalErrors}/${totalErrorsBase} (${totalErrorPercent}%)`;
+      totalErrorsLine = `total errors: ${safeTotalCumulativeErrors}/${totalErrorsBase} (${totalErrorPercent}%)`;
     }
 
     return {
@@ -108,6 +114,8 @@ export class BatchSummaryReporter {
     failures,
     errorStats,
     durationMs,
+    currentPhaseErrors = 0,
+    totalCumulativeErrors = 0,
   }) {
     const safeTotal = Math.max(0, this.toSafeNumber(totalItems, 0));
     const safeSuccess = Math.max(0, this.toSafeNumber(successes, 0));
@@ -116,19 +124,41 @@ export class BatchSummaryReporter {
       errorStats,
       safeFailures,
     );
+    const safeCurrentPhaseErrors = Math.max(
+      0,
+      this.toSafeNumber(currentPhaseErrors, 0),
+    );
+    const safeTotalCumulativeErrors = Math.max(
+      0,
+      this.toSafeNumber(totalCumulativeErrors, normalizedErrorStats.totalErrors),
+    );
     const percent =
       safeTotal > 0 ? Math.round((safeSuccess / safeTotal) * 100) : 100;
-    const errorPercent =
-      safeTotal > 0
-        ? Math.round((normalizedErrorStats.totalErrors / safeTotal) * 100)
-        : 0;
 
     const lines = [];
-    lines.push(`${batchLabel} finished`);
     lines.push(`success: ${safeSuccess}/${safeTotal} (${percent}%)`);
-    lines.push(
-      `total errors: ${normalizedErrorStats.totalErrors}/${safeTotal} (${errorPercent}%)`,
-    );
+
+    if (safeCurrentPhaseErrors > 0) {
+      const phaseErrorPercent =
+        safeTotal > 0
+          ? Math.round((safeCurrentPhaseErrors / safeTotal) * 100)
+          : 0;
+      lines.push(
+        `current phase errors: ${safeCurrentPhaseErrors}/${safeTotal} (${phaseErrorPercent}%)`,
+      );
+    }
+
+    if (safeTotalCumulativeErrors > 0) {
+      const totalErrorPercent =
+        safeSuccess + safeTotalCumulativeErrors > 0
+          ? Math.round(
+              (safeTotalCumulativeErrors / (safeSuccess + safeTotalCumulativeErrors)) * 100,
+            )
+          : 0;
+      lines.push(
+        `total errors: ${safeTotalCumulativeErrors}/${safeSuccess + safeTotalCumulativeErrors} (${totalErrorPercent}%)`,
+      );
+    }
 
     const byType = normalizedErrorStats.byType;
     const typeKeys = Object.keys(byType);
@@ -138,12 +168,14 @@ export class BatchSummaryReporter {
       );
     }
 
-    lines.push(
-      `recovered errors using strategy: ${normalizedErrorStats.recoveredErrors}`,
-    );
+    if (normalizedErrorStats.recoveredErrors > 0) {
+      lines.push(
+        `recovered errors using strategy: ${normalizedErrorStats.recoveredErrors}`,
+      );
+    }
 
     return {
-      title: batchLabel,
+      title: "[BatchSummary]",
       message: lines.join("\n"),
       successRate: percent,
     };
@@ -154,7 +186,8 @@ export class BatchSummaryReporter {
       return;
     }
 
-    Alert.success(summary.message, null, 5000);
+    const fullMessage = `${summary.title}\n${summary.message}`;
+    Alert.success(fullMessage, null, 5000);
   }
 
   static logSummary(summary) {
@@ -162,6 +195,7 @@ export class BatchSummaryReporter {
       return;
     }
 
-    console.log("[BatchSummary]\n" + summary.message);
+    const fullMessage = `${summary.title}\n${summary.message}`;
+    console.log(fullMessage);
   }
 }

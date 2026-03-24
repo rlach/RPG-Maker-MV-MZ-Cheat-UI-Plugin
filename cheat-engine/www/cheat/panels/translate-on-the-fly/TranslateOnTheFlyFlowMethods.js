@@ -284,6 +284,7 @@ export const translateOnTheFlyFlowMethods = {
       currentStepErrors: job.currentErrors,
       currentStepProcessed: job.currentDone,
       totalErrors: job.runErrors,
+      totalCumulativeErrors: job.runErrors,
     });
     this.updateProgressBox(
       progress.title,
@@ -359,7 +360,7 @@ export const translateOnTheFlyFlowMethods = {
         }
 
         if (def.kind === "systemMessages") {
-          const batchResult = await this.translateSystemMessagesBatch(true);
+          const batchResult = await this.translateSystemMessagesBatch(true, false);
           this.objectTranslationJob.currentDone = stat.left;
           this.objectTranslationJob.currentErrors = batchResult.failures;
           this.objectTranslationJob.totalDone += batchResult.successes;
@@ -370,7 +371,7 @@ export const translateOnTheFlyFlowMethods = {
         }
 
         if (def.kind === "systemCommands") {
-          const batchResult = await this.translateSystemCommandsBatch(true);
+          const batchResult = await this.translateSystemCommandsBatch(true, false);
           this.objectTranslationJob.currentDone = stat.left;
           this.objectTranslationJob.currentErrors = batchResult.failures;
           this.objectTranslationJob.totalDone += batchResult.successes;
@@ -494,6 +495,8 @@ export const translateOnTheFlyFlowMethods = {
         failures: this.objectTranslationJob.runErrors,
         errorStats: aggregatedErrorStats,
         durationMs: Date.now() - startedAt,
+        currentPhaseErrors: 0,
+        totalCumulativeErrors: this.objectTranslationJob.runErrors,
       });
       BatchSummaryReporter.showAlert(summary);
       BatchSummaryReporter.logSummary(summary);
@@ -1053,6 +1056,14 @@ export const translateOnTheFlyFlowMethods = {
           continue;
         }
         this.setCacheValue(success.cacheKey, success.translated);
+      }
+
+      // Cache failures as empty strings (for harvesting untranslated strings)
+      for (const failure of result.failures) {
+        if (!failure || !failure.cacheKey) {
+          continue;
+        }
+        this.setCacheValue(failure.cacheKey, "");
       }
 
       // Log failures

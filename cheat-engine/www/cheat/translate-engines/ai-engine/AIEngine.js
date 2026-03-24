@@ -552,26 +552,26 @@ class AIEngine extends BaseTranslationEngine {
           "[AIEngine] Response JSON has invalid shape:",
           shapeCheck.errors,
         );
-        const missingKeySet = new Set(shapeCheck.missingKeys || []);
-        const nonStringKeySet = new Set(shapeCheck.nonStringKeys || []);
         return {
           successes: [],
           failures: items.map((item, idx) => {
             const mappedItem = itemData[idx] || item;
+            const missingKeySet = new Set(shapeCheck.missingKeys || []);
+            const nonStringKeySet = new Set(shapeCheck.nonStringKeys || []);
             const key =
               mappedItem.jsonKey ||
               `${TYPE_TO_TAG[mappedItem.type] || mappedItem.type}${mappedItem.index || 0}`;
 
-            let reason = shapeCheck.errors[0] || "Invalid response shape";
+            let reason = "Invalid response shape";
             if (missingKeySet.has(key)) {
-              reason = `Missing key: ${key}`;
+              reason = "Missing key";
             } else if (nonStringKeySet.has(key)) {
-              reason = `Key \"${key}\" is not a string`;
+              reason = "Key is not a string";
             }
 
             return {
               ...item,
-              rejectReason: `Invalid response shape: ${reason}`,
+              rejectReason: reason,
             };
           }),
         };
@@ -620,7 +620,7 @@ class AIEngine extends BaseTranslationEngine {
             id: itemD.id,
             value: itemD.value,
             cacheKey: itemD.cacheKey,
-            rejectReason: `Missing key "${key}"`,
+            rejectReason: "Missing key",
           });
           continue;
         }

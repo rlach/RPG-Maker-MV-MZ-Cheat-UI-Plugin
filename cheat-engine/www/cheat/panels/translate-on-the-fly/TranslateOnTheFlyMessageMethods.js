@@ -500,6 +500,11 @@ export const translateOnTheFlyMessageMethods = {
         this.setCacheValue(success.cacheKey, success.translated);
       }
 
+      // Cache failures as empty strings (for harvesting untranslated strings)
+      for (const failure of result.failures) {
+        this.setCacheValue(failure.cacheKey, "");
+      }
+
       // Log failures
       for (const failure of result.failures) {
         console.warn(

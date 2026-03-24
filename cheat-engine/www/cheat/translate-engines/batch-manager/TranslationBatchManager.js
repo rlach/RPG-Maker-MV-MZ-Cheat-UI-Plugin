@@ -172,7 +172,7 @@ export class TranslationBatchManager {
     return { successes: allSuccesses, failures: allFailures, summary, stats };
   }
 
-  async translateSystemCommandsBatch(backgroundJob = false) {
+  async translateSystemCommandsBatch(backgroundJob = false, showSummary = false) {
     if (
       !(
         window.$dataSystem &&
@@ -180,7 +180,7 @@ export class TranslationBatchManager {
         Array.isArray($dataSystem.terms.commands)
       )
     ) {
-      return { successes: 0, failures: 0, summary: null };
+      return { successes: 0, failures: 0, summary: null, stats: null };
     }
 
     const hasCommandsOriginal = !!$dataSystem.terms.commandsOriginal;
@@ -222,6 +222,7 @@ export class TranslationBatchManager {
         backgroundJob,
         itemLimit: this.panel.batchItemsLimit || 20,
         charLimit: this.panel.charLimit || 1000,
+        showSummary,
       },
     );
 
@@ -247,7 +248,7 @@ export class TranslationBatchManager {
     };
   }
 
-  async translateSystemMessagesBatch(backgroundJob = false) {
+  async translateSystemMessagesBatch(backgroundJob = false, showSummary = false) {
     if (
       !(
         window.$dataSystem &&
@@ -256,7 +257,7 @@ export class TranslationBatchManager {
         typeof $dataSystem.terms.messages === "object"
       )
     ) {
-      return { successes: 0, failures: 0, summary: null };
+      return { successes: 0, failures: 0, summary: null, stats: null };
     }
 
     const hasMessagesOriginal = !!$dataSystem.terms.messagesOriginal;
@@ -299,6 +300,7 @@ export class TranslationBatchManager {
         backgroundJob,
         itemLimit: this.panel.batchItemsLimit || 20,
         charLimit: this.panel.charLimit || 1000,
+        showSummary,
       },
     );
 

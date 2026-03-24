@@ -654,11 +654,8 @@ export const translateOnTheFlyRuntimeMethods = {
       });
 
       // Batch translate all uncached commands
-      if (
-        commandsToTranslate.length > 0 &&
-        translationEnabled &&
-        !useCacheOnly
-      ) {
+      // Note: we translate even if OTF is disabled but cache-when-disabled is enabled
+      if (commandsToTranslate.length > 0 && (translationEnabled || useCacheOnly)) {
         console.log(
           `[TranslateOnTheFly] Batch translating ${commandsToTranslate.length} commands`,
         );
@@ -683,15 +680,18 @@ export const translateOnTheFlyRuntimeMethods = {
             );
           }
 
-          // Mark failures
+          // Cache failures as empty strings (for harvesting untranslated strings)
           for (const failure of result.failures) {
+            self.setCacheValue(failure.cacheKey, "");
             console.warn(
-              `[TranslateOnTheFly] Failed to translate command:`,
+              `[TranslateOnTheFly] Failed to translate command (cached as empty):`,
               failure.value,
               "→",
               failure.rejectReason,
             );
           }
+
+          // Mark failures
           self.markBatchFailuresAsUntranslated(result.failures, true);
         } catch (error) {
           console.error(
