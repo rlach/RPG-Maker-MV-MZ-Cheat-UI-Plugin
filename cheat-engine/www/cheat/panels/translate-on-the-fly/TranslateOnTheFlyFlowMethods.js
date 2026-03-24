@@ -120,6 +120,12 @@ export const translateOnTheFlyFlowMethods = {
     return { successes: [], failures: [] };
   },
 
+  getCurrentMapIdForPhasePriority() {
+    return window.$gameMap && typeof $gameMap.mapId === "function"
+      ? Number($gameMap.mapId()) || 0
+      : 0;
+  },
+
   buildForegroundOperationKey({ currentText, currentSpeakerName, maxDepth }) {
     const interpreter = this.findMessageInterpreter();
     const normalized = this.resolveOriginalMessageContext(
@@ -139,10 +145,7 @@ export const translateOnTheFlyFlowMethods = {
       ? choices.map((choice) => this.getCacheKey(choice, "choice")).join("|")
       : "";
 
-    const mapId =
-      window.$gameMap && typeof $gameMap.mapId === "function"
-        ? $gameMap.mapId()
-        : 0;
+    const mapId = this.getCurrentMapIdForPhasePriority();
     const eventId =
       interpreter && typeof interpreter._eventId === "number"
         ? interpreter._eventId
@@ -324,11 +327,76 @@ export const translateOnTheFlyFlowMethods = {
     try {
       this.applyCachedTranslationsToData();
 
+      const phaseQueue = [];
       for (const stat of selectedStats) {
         const def = defsById.get(stat.id);
         if (!def || stat.left <= 0) {
           continue;
         }
+
+        if (def.kind !== "mapEvents") {
+          phaseQueue.push({ kind: "stat", stat, def });
+          continue;
+        }
+
+        const validMaps = this.getValidMapInfos();
+        const selectedMapIds = new Set(
+          this.getSelectedObjectTranslationMapIds(validMaps),
+        );
+        const mapsToTranslate = validMaps.filter((mapInfo) =>
+          selectedMapIds.has(mapInfo.id),
+        );
+
+        for (let mapIndex = 0; mapIndex < mapsToTranslate.length; mapIndex++) {
+          const mapInfo = mapsToTranslate[mapIndex];
+          phaseQueue.push({
+            kind: "mapEvent",
+            mapInfo,
+            mapNumber: mapIndex + 1,
+            totalMaps: mapsToTranslate.length,
+          });
+        }
+      }
+
+      while (phaseQueue.length > 0) {
+        const currentMapId = this.getCurrentMapIdForPhasePriority();
+        if (currentMapId > 0) {
+          const currentMapPhaseIndex = phaseQueue.findIndex(
+            (phase) =>
+              phase &&
+              phase.kind === "mapEvent" &&
+              phase.mapInfo &&
+              phase.mapInfo.id === currentMapId,
+          );
+          if (currentMapPhaseIndex > 0) {
+            const [currentMapPhase] = phaseQueue.splice(currentMapPhaseIndex, 1);
+            phaseQueue.unshift(currentMapPhase);
+          }
+        }
+
+        const phase = phaseQueue.shift();
+        if (!phase) {
+          continue;
+        }
+
+        if (phase.kind === "mapEvent") {
+          const mapData = await this.loadMapDataById(phase.mapInfo.id);
+          const batchResult = await this.translateMapEvents(
+            mapData,
+            phase.mapNumber,
+            phase.totalMaps,
+            `translating map ${phase.mapNumber}/${phase.totalMaps}`,
+            { skipProcessLock: true, isPhase: true },
+          );
+          this.objectTranslationJob.totalDone += batchResult.successCount || 0;
+          this.objectTranslationJob.totalTarget +=
+            (batchResult.successCount || 0) + (batchResult.failureCount || 0);
+          this.objectTranslationJob.runErrors += batchResult.failureCount || 0;
+          mergeStats(batchResult.stats);
+          continue;
+        }
+
+        const { stat, def } = phase;
 
         if (def.kind === "systemMessages") {
           const batchResult = await this.translateSystemMessagesBatch(
@@ -386,42 +454,6 @@ export const translateOnTheFlyFlowMethods = {
             (batchResult.successCount || 0) + (batchResult.failureCount || 0);
           this.objectTranslationJob.runErrors += batchResult.failureCount || 0;
           mergeStats(batchResult.stats);
-          continue;
-        }
-
-        if (def.kind === "mapEvents") {
-          const validMaps = this.getValidMapInfos();
-          const selectedMapIds = new Set(
-            this.getSelectedObjectTranslationMapIds(validMaps),
-          );
-          const mapsToTranslate = validMaps.filter((mapInfo) =>
-            selectedMapIds.has(mapInfo.id),
-          );
-
-          for (
-            let mapIndex = 0;
-            mapIndex < mapsToTranslate.length;
-            mapIndex++
-          ) {
-            const mapInfo = mapsToTranslate[mapIndex];
-            const mapNumber = mapIndex + 1;
-            const mapData = await this.loadMapDataById(mapInfo.id);
-            const batchResult = await this.translateMapEvents(
-              mapData,
-              mapNumber,
-              mapsToTranslate.length,
-              `translating map ${mapNumber}/${mapsToTranslate.length}`,
-              { skipProcessLock: true, isPhase: true },
-            );
-            this.objectTranslationJob.totalDone +=
-              batchResult.successCount || 0;
-            this.objectTranslationJob.totalTarget +=
-              (batchResult.successCount || 0) + (batchResult.failureCount || 0);
-            this.objectTranslationJob.runErrors +=
-              batchResult.failureCount || 0;
-            mergeStats(batchResult.stats);
-          }
-
           continue;
         }
 
