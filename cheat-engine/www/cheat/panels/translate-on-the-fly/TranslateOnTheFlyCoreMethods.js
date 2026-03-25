@@ -399,7 +399,7 @@ export const translateOnTheFlyCoreMethods = {
           ...options,
           translationPhaseLabel: progressLabel || "translating map",
           backgroundJob: !!(options && options.backgroundJob),
-          showSummary: !options.isPhase && mapNumber === null,
+          showSummary: mapNumber === null,
         },
       );
 

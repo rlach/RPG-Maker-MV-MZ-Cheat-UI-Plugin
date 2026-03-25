@@ -6,12 +6,9 @@ export class GameArraysTranslationKindStrategy {
   async createEntries({ panel }) {
     return [
       {
-        execute: async () => {
-          const batchResult = await panel.translateGameArrays({
-            backgroundJob: true,
+        execute: async ({ runGameArrays }) => {
+          const batchResult = await runGameArrays({
             progressLabel: "translating arrays",
-            isPhase: true,
-            showSummary: false,
           });
           return {
             successes: Array(

@@ -9,22 +9,12 @@ export class BatchProgressTracker {
     this.currentStepErrors = 0;
     this.currentStepProcessed = 0;
     this.totalErrors = 0;
+    this.queueProcessed = 0;
+    this.queueTotal = 0;
+    this.phaseStartQueueProcessed = 0;
     this.paused = false;
     this.pauseReason = "";
     this.prePauseSnapshot = null;
-  }
-
-  start(stepLabel, currentTotal = 0) {
-    this.currentStepLabel = stepLabel || "translating";
-    this.currentProcessed = 0;
-    this.currentTotal = Math.max(0, Number(currentTotal) || 0);
-    this.currentStepErrors = 0;
-    this.currentStepProcessed = 0;
-    this.totalErrors = 0;
-    this.paused = false;
-
-    this.panel.showSpinner();
-    this._render();
   }
 
   /**
@@ -39,6 +29,9 @@ export class BatchProgressTracker {
     this.currentStepErrors = 0;
     this.currentStepProcessed = 0;
     this.totalErrors = 0;
+    this.queueProcessed = 0;
+    this.queueTotal = 0;
+    this.phaseStartQueueProcessed = 0;
     this.paused = false;
     this.panel.showSpinner();
     this._render();
@@ -54,6 +47,8 @@ export class BatchProgressTracker {
     this.currentTotal = Math.max(0, Number(phaseTotal) || 0);
     this.currentStepErrors = 0;
     this.currentStepProcessed = 0;
+    this.phaseStartQueueProcessed = this.queueProcessed;
+    this.queueTotal += this.currentTotal;
     // totalErrors intentionally kept — accumulates across phases
     this._render();
   }
@@ -70,6 +65,10 @@ export class BatchProgressTracker {
     this.currentStepLabel = stepLabel || this.currentStepLabel;
     this.currentProcessed = Math.max(0, Number(currentProcessed) || 0);
     this.currentTotal = Math.max(0, Number(currentTotal) || this.currentTotal);
+    this.queueProcessed = Math.max(
+      this.queueProcessed,
+      this.phaseStartQueueProcessed + this.currentProcessed,
+    );
     this._render();
   }
 
@@ -98,6 +97,9 @@ export class BatchProgressTracker {
         currentStepErrors: this.currentStepErrors,
         currentStepProcessed: this.currentStepProcessed,
         totalErrors: this.totalErrors,
+        queueProcessed: this.queueProcessed,
+        queueTotal: this.queueTotal,
+        phaseStartQueueProcessed: this.phaseStartQueueProcessed,
       };
     }
     this.paused = true;
@@ -115,17 +117,16 @@ export class BatchProgressTracker {
       this.currentStepErrors = this.prePauseSnapshot.currentStepErrors;
       this.currentStepProcessed = this.prePauseSnapshot.currentStepProcessed;
       this.totalErrors = this.prePauseSnapshot.totalErrors;
+      this.queueProcessed = this.prePauseSnapshot.queueProcessed;
+      this.queueTotal = this.prePauseSnapshot.queueTotal;
+      this.phaseStartQueueProcessed =
+        this.prePauseSnapshot.phaseStartQueueProcessed;
       this.prePauseSnapshot = null;
     }
     if (stepLabel) {
       this.currentStepLabel = stepLabel;
     }
     this._render();
-  }
-
-  complete() {
-    this.panel.hideSpinner();
-    this.panel.hideProgressBox();
   }
 
   _render() {
@@ -139,6 +140,8 @@ export class BatchProgressTracker {
       currentStepErrors: this.currentStepErrors,
       currentStepProcessed: this.currentStepProcessed,
       totalErrors: this.totalErrors,
+      totalProcessed: this.queueProcessed,
+      queueTotal: this.queueTotal,
     });
 
     this.panel.updateProgressBox(

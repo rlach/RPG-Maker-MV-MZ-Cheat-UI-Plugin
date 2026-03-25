@@ -21,7 +21,6 @@ export class SystemCommandsTranslationPhaseStrategy extends BaseTranslationPhase
     return [
       {
         strategy: this,
-        options: { backgroundJob: true, isPhase: true, showSummary: false },
         priorityMapId: 0,
       },
     ];

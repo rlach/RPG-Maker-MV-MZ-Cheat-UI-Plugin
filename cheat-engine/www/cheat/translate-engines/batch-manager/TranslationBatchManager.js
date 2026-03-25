@@ -50,6 +50,61 @@ export class TranslationBatchManager {
     });
   }
 
+  applyBatchTranslationResults(successes, failures) {
+    for (const success of successes || []) {
+      if (!success || !success.cacheKey) {
+        continue;
+      }
+
+      this.panel.setCacheValue(success.cacheKey, success.translated);
+    }
+
+    const safeFailures = Array.isArray(failures) ? failures : [];
+    this.panel.markBatchFailuresAsUntranslated(safeFailures, true);
+
+    for (const failure of safeFailures) {
+      if (!failure || !failure.cacheKey) {
+        continue;
+      }
+
+      const hasUsable =
+        typeof this.panel.hasUsableCacheValue === "function"
+          ? this.panel.hasUsableCacheValue(failure.cacheKey)
+          : false;
+      if (!hasUsable) {
+        this.panel.setCacheValue(failure.cacheKey, "");
+      }
+    }
+  }
+
+  createExecutionOptions(request = {}, options = {}) {
+    const hasOwn = (obj, key) =>
+      !!obj && Object.prototype.hasOwnProperty.call(obj, key);
+
+    return {
+      translationPhaseLabel:
+        request.translationPhaseLabel || options.translationPhaseLabel,
+      stepLabel: request.stepLabel || options.stepLabel,
+      backgroundJob: hasOwn(request, "backgroundJob")
+        ? !!request.backgroundJob
+        : hasOwn(options, "backgroundJob")
+          ? !!options.backgroundJob
+          : true,
+      itemLimit: hasOwn(request, "itemLimit")
+        ? request.itemLimit
+        : options.itemLimit,
+      charLimit: hasOwn(request, "charLimit")
+        ? request.charLimit
+        : options.charLimit,
+      onTranslationBatchCompleted:
+        typeof request.onTranslationBatchCompleted === "function"
+          ? request.onTranslationBatchCompleted
+          : typeof options.onTranslationBatchCompleted === "function"
+            ? options.onTranslationBatchCompleted
+            : null,
+    };
+  }
+
   async runBatchedTranslation(items, options = {}) {
     const queueEntries = [];
     const safeRequests = Array.isArray(items) ? items : [];
@@ -77,12 +132,12 @@ export class TranslationBatchManager {
       const entries =
         (await definition.createEntries({
           request,
-          options,
           manager: this,
           panel: this.panel,
         })) || [];
+      const executionOptions = this.createExecutionOptions(request, options);
       for (const entry of entries) {
-        queueEntries.push(entry);
+        queueEntries.push({ ...entry, executionOptions });
       }
     }
 
@@ -109,7 +164,6 @@ export class TranslationBatchManager {
         pendingItems =
           strategy.collectUntranslated({
             panel: this.panel,
-            options: entryOptions,
           }) || [];
       }
 
@@ -128,14 +182,11 @@ export class TranslationBatchManager {
       const translationPhaseLabel = hasStrategy
         ? strategy.getTranslationPhaseLabel({
             panel: this.panel,
-            options: entryOptions,
           })
         : entryOptions.translationPhaseLabel ||
           entryOptions.stepLabel ||
           "translating batch";
       const backgroundJob = !!entryOptions.backgroundJob;
-      const isPhase = !!entryOptions.isPhase;
-      const showSummary = !isPhase && entryOptions.showSummary !== false;
       const onTranslationBatchCompleted =
         typeof entryOptions.onTranslationBatchCompleted === "function"
           ? entryOptions.onTranslationBatchCompleted
@@ -153,10 +204,6 @@ export class TranslationBatchManager {
           errorStats: this.errorRecovery.getStats(),
           durationMs: Date.now() - startedAt,
         });
-        if (showSummary) {
-          BatchSummaryReporter.showAlert(emptySummary);
-          BatchSummaryReporter.logSummary(emptySummary);
-        }
         return {
           successes: [],
           failures: [],
@@ -170,139 +217,123 @@ export class TranslationBatchManager {
         charLimit: entryOptions.charLimit,
       });
 
-      if (isPhase) {
-        this.progressTracker.beginPhase(
-          translationPhaseLabel,
-          safeItems.length,
-        );
-      } else {
-        this.progressTracker.start(translationPhaseLabel, safeItems.length);
-      }
+      this.progressTracker.beginPhase(translationPhaseLabel, safeItems.length);
 
       const allSuccesses = [];
       const allFailures = [];
       let processed = 0;
       let phaseFailures = 0;
 
-      try {
-        for (let i = 0; i < batches.length; i++) {
-          const batch = batches[i];
-          this.progressTracker.updateStep(
-            translationPhaseLabel,
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        this.progressTracker.updateStep(
+          translationPhaseLabel,
+          processed,
+          safeItems.length,
+        );
+
+        let successes = [];
+        let failures = [];
+
+        try {
+          const result = backgroundJob
+            ? await this.panel.batchTranslateWithBackgroundRetry(
+                batch,
+                translationPhaseLabel,
+              )
+            : await this.panel.engine.batchTranslate(batch, {
+                backgroundJob: false,
+              });
+
+          successes = Array.isArray(result && result.successes)
+            ? result.successes
+            : [];
+          failures = Array.isArray(result && result.failures)
+            ? result.failures
+            : [];
+        } catch (error) {
+          const rejectReason =
+            (error && error.message) || "batch_translate_exception";
+          failures = batch.map((item) => ({
+            ...item,
+            rejectReason,
+          }));
+        }
+
+        for (const success of successes) {
+          allSuccesses.push(success);
+          if (
+            success &&
+            success.cacheKey &&
+            (success.recovered === true || success.recoveryUsed === true)
+          ) {
+            this.errorRecovery.recordRecovery(success.cacheKey);
+          }
+        }
+
+        for (const failure of failures) {
+          allFailures.push(failure);
+          this.errorRecovery.recordFailure(failure);
+        }
+
+        this.applyBatchTranslationResults(successes, failures);
+
+        phaseFailures += failures.length;
+
+        if (onTranslationBatchCompleted) {
+          await onTranslationBatchCompleted({
+            successes,
+            failures,
+            batchIndex: i,
+            batchSize: batch.length,
             processed,
-            safeItems.length,
-          );
+            total: safeItems.length,
+          });
+        }
 
-          let successes = [];
-          let failures = [];
-
-          try {
-            const result = backgroundJob
-              ? await this.panel.batchTranslateWithBackgroundRetry(
-                  batch,
-                  translationPhaseLabel,
-                )
-              : await this.panel.engine.batchTranslate(batch, {
-                  backgroundJob: false,
-                });
-
-            successes = Array.isArray(result && result.successes)
-              ? result.successes
-              : [];
-            failures = Array.isArray(result && result.failures)
-              ? result.failures
-              : [];
-          } catch (error) {
-            const rejectReason =
-              (error && error.message) || "batch_translate_exception";
-            failures = batch.map((item) => ({
-              ...item,
-              rejectReason,
-            }));
-          }
-
-          for (const success of successes) {
-            allSuccesses.push(success);
-            if (
-              success &&
-              success.cacheKey &&
-              (success.recovered === true || success.recoveryUsed === true)
-            ) {
-              this.errorRecovery.recordRecovery(success.cacheKey);
-            }
-          }
-
-          for (const failure of failures) {
-            allFailures.push(failure);
-            this.errorRecovery.recordFailure(failure);
-          }
-
-          phaseFailures += failures.length;
-
-          if (onTranslationBatchCompleted) {
-            await onTranslationBatchCompleted({
-              successes,
-              failures,
+        if (hasStrategy) {
+          await strategy.setData({
+            panel: this.panel,
+            pendingItems,
+            successes,
+            failures,
+            batchMeta: {
               batchIndex: i,
               batchSize: batch.length,
               processed,
               total: safeItems.length,
-            });
-          }
+            },
+            options: entryOptions,
+          });
+        }
 
-          if (hasStrategy) {
-            await strategy.setData({
-              panel: this.panel,
-              pendingItems,
-              successes,
-              failures,
-              batchMeta: {
-                batchIndex: i,
-                batchSize: batch.length,
-                processed,
-                total: safeItems.length,
-              },
-              options: entryOptions,
-            });
-          }
-
-          if (this.isAbortBatchResult(failures, batch.length)) {
-            const cancelReason = failures[0] && failures[0].cancelReason;
-            let skippedFailuresCount = 0;
-            for (let r = i + 1; r < batches.length; r++) {
-              for (const skippedItem of batches[r]) {
-                const skippedFailure = {
-                  ...skippedItem,
-                  rejectReason: cancelReason || "request_aborted",
-                  cancelReason: cancelReason || "request_aborted",
-                };
-                allFailures.push(skippedFailure);
-                this.errorRecovery.recordFailure(skippedFailure);
-                skippedFailuresCount += 1;
-              }
+        if (this.isAbortBatchResult(failures, batch.length)) {
+          const cancelReason = failures[0] && failures[0].cancelReason;
+          const skippedFailures = [];
+          let skippedFailuresCount = 0;
+          for (let r = i + 1; r < batches.length; r++) {
+            for (const skippedItem of batches[r]) {
+              const skippedFailure = {
+                ...skippedItem,
+                rejectReason: cancelReason || "request_aborted",
+                cancelReason: cancelReason || "request_aborted",
+              };
+              allFailures.push(skippedFailure);
+              skippedFailures.push(skippedFailure);
+              this.errorRecovery.recordFailure(skippedFailure);
+              skippedFailuresCount += 1;
             }
-
-            phaseFailures += skippedFailuresCount;
-
-            processed = safeItems.length;
-            this.progressTracker.updateStep(
-              `${translationPhaseLabel} (aborted)`,
-              processed,
-              safeItems.length,
-            );
-            this.progressTracker.updateCurrentStepErrors(
-              phaseFailures,
-              processed,
-            );
-            this.progressTracker.addTotalErrors(
-              failures.length + skippedFailuresCount,
-            );
-            break;
           }
 
-          processed += batch.length;
+          if (skippedFailures.length > 0) {
+            this.applyBatchTranslationResults([], skippedFailures);
+          }
+
+          phaseFailures += skippedFailuresCount;
+
+          processed = safeItems.length;
           this.progressTracker.updateStep(
-            translationPhaseLabel,
+            `${translationPhaseLabel} (aborted)`,
             processed,
             safeItems.length,
           );
@@ -310,12 +341,20 @@ export class TranslationBatchManager {
             phaseFailures,
             processed,
           );
-          this.progressTracker.addTotalErrors(failures.length);
+          this.progressTracker.addTotalErrors(
+            failures.length + skippedFailuresCount,
+          );
+          break;
         }
-      } finally {
-        if (!isPhase) {
-          this.progressTracker.complete();
-        }
+
+        processed += batch.length;
+        this.progressTracker.updateStep(
+          translationPhaseLabel,
+          processed,
+          safeItems.length,
+        );
+        this.progressTracker.updateCurrentStepErrors(phaseFailures, processed);
+        this.progressTracker.addTotalErrors(failures.length);
       }
 
       const summary = BatchSummaryReporter.buildSummary({
@@ -328,16 +367,10 @@ export class TranslationBatchManager {
       });
       const stats = this.errorRecovery.getStats();
 
-      if (showSummary) {
-        BatchSummaryReporter.showAlert(summary);
-        BatchSummaryReporter.logSummary(summary);
-      }
-
       if (hasStrategy && typeof strategy.finalizePhase === "function") {
         strategy.finalizePhase({
           panel: this.panel,
           pendingItems,
-          options: entryOptions,
         });
       }
 
@@ -388,17 +421,27 @@ export class TranslationBatchManager {
 
         let translated;
         if (typeof entry.execute === "function") {
-          translated = await entry.execute();
+          const runGameArrays = async (executeOptions = {}) => {
+            return this.panel.translateGameArrays({
+              ...executeOptions,
+              backgroundJob: !!(
+                entry.executionOptions && entry.executionOptions.backgroundJob
+              ),
+            });
+          };
+          translated = await entry.execute({
+            panel: this.panel,
+            executionOptions: entry.executionOptions || {},
+            runGameArrays,
+          });
         } else {
           const strategy =
             typeof entry.createStrategy === "function"
               ? await entry.createStrategy()
               : entry.strategy;
           translated = await executeEntry(entry.items || [], {
-            ...options,
-            ...(entry.options || {}),
+            ...(entry.executionOptions || {}),
             strategy,
-            showSummary: false,
           });
         }
 
@@ -425,7 +468,7 @@ export class TranslationBatchManager {
       totalCumulativeErrors: aggregatedFailures.length,
     });
 
-    const showSummary = options.showSummary !== false && !options.isPhase;
+    const showSummary = options.showSummary !== false;
     if (showSummary) {
       BatchSummaryReporter.showAlert(summary);
       BatchSummaryReporter.logSummary(summary);

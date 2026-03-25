@@ -36,15 +36,6 @@ export class EmptyStringsTranslationPhaseStrategy extends BaseTranslationPhaseSt
     return [
       {
         strategy: this.configure(items),
-        options: {
-          translationPhaseLabel:
-            request.translationPhaseLabel || "translate empty strings",
-          backgroundJob: !!request.backgroundJob,
-          itemLimit: request.itemLimit,
-          charLimit: request.charLimit,
-          showSummary: request.showSummary !== false,
-          isPhase: !!request.isPhase,
-        },
         priorityMapId: 0,
       },
     ];
