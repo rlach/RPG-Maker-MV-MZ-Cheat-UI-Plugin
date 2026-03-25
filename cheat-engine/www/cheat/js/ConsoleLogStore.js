@@ -4,69 +4,145 @@ class ConsoleLogStore {
     this.logs = [];
     this.maxLogs = 100;
     this.listeners = [];
-    this.originalConsole = {};
-    this.intercepted = false;
+    this.captureStarted = false;
+    this.errorCaptureInstalled = false;
   }
 
-  intercept() {
-    if (this.intercepted) return;
-    this.intercepted = true;
+  startCapture() {
+    if (this.captureStarted) return;
+    this.captureStarted = true;
 
-    // Save original console methods
-    this.originalConsole.log = console.log;
-    this.originalConsole.warn = console.warn;
-    this.originalConsole.error = console.error;
-    this.originalConsole.info = console.info;
-    this.originalConsole.debug = console.debug;
-
-    this.installWrapperMethod("log");
-    this.installWrapperMethod("warn");
-    this.installWrapperMethod("error");
-    this.installWrapperMethod("info");
-    this.installWrapperMethod("debug");
+    this.installNwConsoleCapture();
+    this.installGlobalErrorCapture();
   }
 
-  installWrapperMethod(level) {
-    const original = this.originalConsole[level];
-    if (typeof original !== "function") {
+  installNwConsoleCapture() {
+    if (typeof nw === "undefined" || !nw.Window || typeof nw.Window.get !== "function") {
       return;
     }
 
-    const self = this;
-    console[level] = function (...args) {
-      const safeArgs = Array.isArray(args) ? args : [];
-      const source = self.extractCallerSource(new Error().stack || "");
-      self.add(level, safeArgs, source);
-      return original.apply(console, safeArgs);
-    };
+    try {
+      const win = nw.Window.get();
+      if (!win || typeof win.on !== "function") {
+        return;
+      }
+
+      win.on("console-message", (...args) => {
+        const payload = this.normalizeConsoleMessageArgs(args);
+        if (!payload) {
+          return;
+        }
+
+        const { level, message, source } = payload;
+        this.add(level, [message], source);
+      });
+    } catch (err) {
+      // Ignore runtime-specific failures.
+    }
   }
 
-  extractCallerSource(stackText = "") {
-    const stack = String(stackText || "").split("\n");
-    for (const line of stack) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.includes("ConsoleLogStore.js")) {
-        continue;
+  installGlobalErrorCapture() {
+    if (this.errorCaptureInstalled) {
+      return;
+    }
+    this.errorCaptureInstalled = true;
+
+    window.addEventListener("error", (event) => {
+      if (!event) {
+        return;
       }
 
-      let match = trimmed.match(/\(?([^()]+:\d+:\d+)\)?$/);
-      if (!match && trimmed.includes("@")) {
-        match = trimmed.match(/@([^@]+:\d+:\d+)$/);
-      }
-      if (!match || !match[1]) {
-        continue;
-      }
+      const source = [event.filename, event.lineno, event.colno]
+        .filter((part) => part !== undefined && part !== null && part !== "")
+        .join(":");
 
-      const raw = match[1].replace(/^file:\/\//, "");
-      const marker = "/cheat-engine/www/cheat/";
-      const markerIndex = raw.indexOf(marker);
-      if (markerIndex >= 0) {
-        return raw.slice(markerIndex + 1);
-      }
-      return raw;
+      const message = event.error && event.error.stack
+        ? event.error.stack
+        : event.message || "Unhandled error";
+
+      this.add("error", [message], source);
+    });
+
+    window.addEventListener("unhandledrejection", (event) => {
+      const reason = event && event.reason;
+      const message =
+        reason && reason.stack
+          ? reason.stack
+          : typeof reason === "string"
+            ? reason
+            : JSON.stringify(reason);
+
+      this.add("error", [message || "Unhandled promise rejection"], "");
+    });
+  }
+
+  normalizeConsoleMessageArgs(args) {
+    const list = Array.isArray(args) ? args : [];
+    if (!list.length) {
+      return null;
     }
 
-    return "";
+    if (list.length === 1 && list[0] && typeof list[0] === "object") {
+      const messageObj = list[0];
+      const source = [messageObj.source, messageObj.line]
+        .filter((part) => part !== undefined && part !== null && part !== "")
+        .join(":");
+
+      return {
+        level: this.normalizeConsoleLevel(messageObj.level),
+        message: this.coerceMessage(messageObj.message),
+        source,
+      };
+    }
+
+    const level = this.normalizeConsoleLevel(list[0]);
+    const message = this.coerceMessage(list[1]);
+    const source = [list[3], list[2]]
+      .filter((part) => part !== undefined && part !== null && part !== "")
+      .join(":");
+
+    return { level, message, source };
+  }
+
+  normalizeConsoleLevel(level) {
+    if (typeof level === "string") {
+      const lower = level.toLowerCase();
+      if (["log", "warn", "error", "info", "debug"].includes(lower)) {
+        return lower;
+      }
+      return "log";
+    }
+
+    if (typeof level === "number") {
+      if (level >= 3) {
+        return "error";
+      }
+      if (level === 2) {
+        return "warn";
+      }
+      if (level === 1) {
+        return "log";
+      }
+      return "debug";
+    }
+
+    return "log";
+  }
+
+  coerceMessage(value) {
+    if (typeof value === "string") {
+      return value;
+    }
+
+    if (value instanceof Error) {
+      return value.stack || value.message || String(value);
+    }
+
+    try {
+      return JSON.stringify(value);
+    } catch (err) {
+      return String(value);
+    }
   }
 
   add(level, args, source = "") {
@@ -129,5 +205,5 @@ if (__rootWindow !== window) {
 
 export const CONSOLE_LOG = __rootConsoleLog;
 
-// Auto-intercept to mirror console entries in the panel.
-CONSOLE_LOG.intercept();
+// Always capture all console logs in panel.
+CONSOLE_LOG.startCapture();
