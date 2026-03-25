@@ -797,7 +797,6 @@ export const translateOnTheFlyRuntimeMethods = {
     const isBackgroundJob = !!options.backgroundJob;
     const progressLabel = options.progressLabel || "translating game arrays";
     const showSummary = options.showSummary !== false;
-    const isPhase = !!options.isPhase;
     console.log("[TranslateOnTheFly] Starting translation of game data arrays");
 
     if (!this.batchManager) {
@@ -886,7 +885,6 @@ export const translateOnTheFlyRuntimeMethods = {
           backgroundJob: isBackgroundJob,
           itemLimit: this.batchItemsLimit || 20,
           charLimit: this.charLimit || 1000,
-          isPhase,
           showSummary,
           onTranslationBatchCompleted: ({ successes, failures }) => {
             for (const success of successes || []) {

@@ -90,11 +90,6 @@ export class CurrentEventTranslationPhaseStrategy extends BaseTranslationPhaseSt
           cacheKey: request.cacheKey || "",
           maxDepth,
         }),
-        options: {
-          backgroundJob: false,
-          isPhase: false,
-          showSummary: false,
-        },
         priorityMapId: panel.getCurrentMapIdForPhasePriority
           ? panel.getCurrentMapIdForPhasePriority()
           : 0,

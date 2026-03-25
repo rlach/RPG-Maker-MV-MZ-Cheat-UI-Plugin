@@ -67,6 +67,7 @@ export class BatchSummaryReporter {
     currentStepProcessed = 0,
     totalErrors = 0,
     totalCumulativeErrors = 0,
+    totalProcessed = 0,
     progressLabel = "translated",
   }) {
     const safeProcessed = Math.max(0, Number(processed) || 0);
@@ -76,6 +77,10 @@ export class BatchSummaryReporter {
     const safeTotalCumulativeErrors = Math.max(
       0,
       Number(totalCumulativeErrors) || Number(totalErrors) || 0,
+    );
+    const safeTotalProcessed = Math.max(
+      0,
+      Number(totalProcessed) || safeProcessed,
     );
     const percent =
       safeTotal > 0 ? Math.round((safeProcessed / safeTotal) * 100) : 100;
@@ -97,7 +102,7 @@ export class BatchSummaryReporter {
 
     let totalErrorsLine = null;
     if (safeTotalCumulativeErrors > 0) {
-      const totalErrorsBase = Math.max(0, safeProcessed);
+      const totalErrorsBase = Math.max(0, safeTotalProcessed);
       const totalErrorPercent =
         totalErrorsBase > 0
           ? Math.round((safeTotalCumulativeErrors / totalErrorsBase) * 100)

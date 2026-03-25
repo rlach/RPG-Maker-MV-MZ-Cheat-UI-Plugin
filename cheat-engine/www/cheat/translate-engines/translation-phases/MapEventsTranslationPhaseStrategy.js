@@ -158,12 +158,6 @@ export class MapEventsTranslationPhaseStrategy extends BaseTranslationPhaseStrat
             request.totalMaps || null,
             request.progressLabel || "translating map",
           ),
-          options: {
-            backgroundJob: request.backgroundJob !== false,
-            skipProcessLock: true,
-            isPhase: true,
-            showSummary: false,
-          },
         },
       ];
     }
@@ -190,12 +184,6 @@ export class MapEventsTranslationPhaseStrategy extends BaseTranslationPhaseStrat
             totalMaps,
             `translating map ${mapNumber}/${totalMaps}`,
           );
-        },
-        options: {
-          backgroundJob: true,
-          skipProcessLock: true,
-          isPhase: true,
-          showSummary: false,
         },
       };
     });

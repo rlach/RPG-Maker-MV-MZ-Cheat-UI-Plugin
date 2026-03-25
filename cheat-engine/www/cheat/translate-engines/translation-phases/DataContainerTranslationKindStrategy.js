@@ -38,11 +38,6 @@ export class DataContainerTranslationKindStrategy extends DataObjectsTranslation
     return [
       {
         strategy: this.configure(pendingObjects, this.fields, this.cachePrefix),
-        options: {
-          backgroundJob: request.backgroundJob !== false,
-          isPhase: true,
-          showSummary: false,
-        },
         priorityMapId: 0,
       },
     ];

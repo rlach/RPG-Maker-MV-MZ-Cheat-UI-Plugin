@@ -14,12 +14,6 @@ export class CommonEventsTranslationKindStrategy extends MapEventsTranslationPha
           null,
           "translating common events",
         ),
-        options: {
-          backgroundJob: true,
-          skipProcessLock: true,
-          isPhase: true,
-          showSummary: false,
-        },
         priorityMapId: 0,
       },
     ];

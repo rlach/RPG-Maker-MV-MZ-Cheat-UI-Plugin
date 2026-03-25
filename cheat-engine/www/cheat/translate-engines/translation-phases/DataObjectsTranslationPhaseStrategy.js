@@ -114,11 +114,6 @@ export class DataObjectsTranslationPhaseStrategy extends BaseTranslationPhaseStr
     return [
       {
         strategy: this.configure(dataObjects, fields, type),
-        options: {
-          backgroundJob: request.backgroundJob !== false,
-          isPhase: true,
-          showSummary: false,
-        },
         priorityMapId: 0,
       },
     ];
