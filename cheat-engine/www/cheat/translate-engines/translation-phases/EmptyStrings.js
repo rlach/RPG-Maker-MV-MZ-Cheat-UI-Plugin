@@ -1,4 +1,4 @@
-import { BaseTranslationPhaseStrategy } from "./BaseTranslationPhaseStrategy.js";
+import { BaseTranslationPhaseStrategy } from "./BasePhase.js";
 
 export class EmptyStringsTranslationPhaseStrategy extends BaseTranslationPhaseStrategy {
   static getInstance() {
@@ -53,9 +53,5 @@ export class EmptyStringsTranslationPhaseStrategy extends BaseTranslationPhaseSt
 
   collectUntranslated() {
     return this.items;
-  }
-
-  shouldCacheFailuresAsEmpty() {
-    return true;
   }
 }

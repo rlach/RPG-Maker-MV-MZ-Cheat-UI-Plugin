@@ -1,4 +1,4 @@
-import { BaseTranslationPhaseStrategy } from "./BaseTranslationPhaseStrategy.js";
+import { BaseTranslationPhaseStrategy } from "./BasePhase.js";
 
 export class MapEventsTranslationPhaseStrategy extends BaseTranslationPhaseStrategy {
   static getInstance() {

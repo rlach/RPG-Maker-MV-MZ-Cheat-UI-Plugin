@@ -1,14 +1,14 @@
 import { TranslationBatchManager } from "./TranslationBatchManager.js";
-import { CommonEventsTranslationKindStrategy } from "../translation-phases/CommonEventsTranslationKindStrategy.js";
-import { DataContainerTranslationKindStrategy } from "../translation-phases/DataContainerTranslationKindStrategy.js";
-import { DirectItemsTranslationKindStrategy } from "../translation-phases/DirectItemsTranslationKindStrategy.js";
-import { GameArraysTranslationKindStrategy } from "../translation-phases/GameArraysTranslationKindStrategy.js";
-import { CurrentEventTranslationPhaseStrategy } from "../translation-phases/CurrentEventTranslationPhaseStrategy.js";
-import { DataObjectsTranslationPhaseStrategy } from "../translation-phases/DataObjectsTranslationPhaseStrategy.js";
-import { EmptyStringsTranslationPhaseStrategy } from "../translation-phases/EmptyStringsTranslationPhaseStrategy.js";
-import { MapEventsTranslationPhaseStrategy } from "../translation-phases/MapEventsTranslationPhaseStrategy.js";
-import { SystemCommandsTranslationPhaseStrategy } from "../translation-phases/SystemCommandsTranslationPhaseStrategy.js";
-import { SystemMessagesTranslationPhaseStrategy } from "../translation-phases/SystemMessagesTranslationPhaseStrategy.js";
+import { CommonEventsTranslationKindStrategy } from "../translation-phases/CommonEvents.js";
+import { DataContainerTranslationKindStrategy } from "../translation-phases/DataContainer.js";
+import { DirectItemsTranslationKindStrategy } from "../translation-phases/DirectItems.js";
+import { GameArraysTranslationKindStrategy } from "../translation-phases/GameArrays.js";
+import { CurrentEventTranslationPhaseStrategy } from "../translation-phases/CurrentEvent.js";
+import { DataObjectsTranslationPhaseStrategy } from "../translation-phases/DataObjects.js";
+import { EmptyStringsTranslationPhaseStrategy } from "../translation-phases/EmptyStrings.js";
+import { MapEventsTranslationPhaseStrategy } from "../translation-phases/MapEvents.js";
+import { SystemCommandsTranslationPhaseStrategy } from "../translation-phases/SystemCommands.js";
+import { SystemMessagesTranslationPhaseStrategy } from "../translation-phases/SystemMessages.js";
 
 function registerDefaultStrategies(manager) {
   manager.register(

@@ -1,10 +1,10 @@
-import {MESSAGE_LOG} from '../js/MessageLogStore.js'
-import {CONSOLE_LOG} from '../js/ConsoleLogStore.js'
+import { MESSAGE_LOG } from "../js/MessageLogStore.js";
+import { CONSOLE_LOG } from "../js/ConsoleLogStore.js";
 
 export default {
-    name: 'TextLogPanel',
+  name: "TextLogPanel",
 
-    template: `
+  template: `
 <v-card flat class="ma-0 pa-0" style="background: transparent; height: 100%; display: grid; grid-template-rows: auto auto 1fr;">
     <v-card-subtitle class="pb-0 font-weight-bold">Text Log</v-card-subtitle>
     
@@ -112,191 +112,220 @@ export default {
 </v-card>
     `,
 
-    data () {
-        return {
-            activeTab: 0,
-            messageEntries: [],
-            consoleEntries: [],
-            messageUnsubscribe: null,
-            consoleUnsubscribe: null,
-            hasSelection: false,
-            consoleLogLimit: 100
-        }
-    },
+  data() {
+    return {
+      activeTab: 0,
+      messageEntries: [],
+      consoleEntries: [],
+      messageUnsubscribe: null,
+      consoleUnsubscribe: null,
+      hasSelection: false,
+      consoleLogLimit: 100,
+    };
+  },
 
-    created () {
-        this.messageUnsubscribe = MESSAGE_LOG.subscribe(entries => {
-            this.messageEntries = entries
-            this.$nextTick(() => this.scrollToBottom('message'))
-        })
+  created() {
+    this.messageUnsubscribe = MESSAGE_LOG.subscribe((entries) => {
+      this.messageEntries = entries;
+      this.$nextTick(() => this.scrollToBottom("message"));
+    });
 
-        this.consoleUnsubscribe = CONSOLE_LOG.subscribe(entries => {
-            this.consoleEntries = entries
-            this.$nextTick(() => this.scrollToBottom('console'))
-        })
+    this.consoleUnsubscribe = CONSOLE_LOG.subscribe((entries) => {
+      this.consoleEntries = entries;
+      this.$nextTick(() => this.scrollToBottom("console"));
+    });
 
-        document.addEventListener('selectionchange', this.onSelectionChange)
-    },
+    document.addEventListener("selectionchange", this.onSelectionChange);
+  },
 
-    beforeDestroy () {
-        if (this.messageUnsubscribe) {
-            this.messageUnsubscribe()
-            this.messageUnsubscribe = null
-        }
-
-        if (this.consoleUnsubscribe) {
-            this.consoleUnsubscribe()
-            this.consoleUnsubscribe = null
-        }
-
-        document.removeEventListener('selectionchange', this.onSelectionChange)
-    },
-
-    methods: {
-        formatMessageEntry (entry) {
-            const date = new Date(entry.timestamp)
-            const hours = String(date.getHours()).padStart(2, '0')
-            const minutes = String(date.getMinutes()).padStart(2, '0')
-            const seconds = String(date.getSeconds()).padStart(2, '0')
-            const speaker = entry.speakerName ? ` ${entry.speakerName}: ` : ' '
-            return `[${hours}:${minutes}:${seconds}]${speaker}${entry.text}`
-        },
-
-        formatConsoleEntry (entry) {
-            const date = new Date(entry.timestamp)
-            const hours = String(date.getHours()).padStart(2, '0')
-            const minutes = String(date.getMinutes()).padStart(2, '0')
-            const seconds = String(date.getSeconds()).padStart(2, '0')
-            const millis = String(date.getMilliseconds()).padStart(3, '0')
-            const level = entry.level.toUpperCase().padEnd(5, ' ')
-            
-            // Format arguments
-            const formattedArgs = entry.args.map(arg => {
-                if (typeof arg === 'object' && arg !== null) {
-                    try {
-                        return JSON.stringify(arg, null, 2)
-                    } catch (e) {
-                        return String(arg)
-                    }
-                }
-                return String(arg)
-            }).join(' ')
-
-            return `[${hours}:${minutes}:${seconds}.${millis}][${level}] ${formattedArgs}`
-        },
-
-        getConsoleEntryStyle (entry) {
-            const colors = {
-                log: 'color: #000000',
-                info: 'color: #0066cc',
-                warn: 'color: #ff8800',
-                error: 'color: #cc0000',
-                debug: 'color: #666666'
-            }
-            return colors[entry.level] || colors.log
-        },
-
-        scrollToBottom (type) {
-            const container = type === 'console' 
-                ? this.$refs.consoleLogContainer 
-                : this.$refs.messageLogContainer
-            if (container) {
-                container.scrollTop = container.scrollHeight
-            }
-        },
-
-        async onCopy () {
-            const selection = window.getSelection()
-            const text = selection ? selection.toString() : ''
-
-            if (!text || !this.hasSelection) {
-                return
-            }
-
-            try {
-                if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
-                    await navigator.clipboard.writeText(text)
-                } else {
-                    const textarea = document.createElement('textarea')
-                    textarea.value = text
-                    textarea.style.position = 'fixed'
-                    textarea.style.top = '-1000px'
-                    document.body.appendChild(textarea)
-                    textarea.focus()
-                    textarea.select()
-                    document.execCommand('copy')
-                    document.body.removeChild(textarea)
-                }
-            } catch (err) {
-                console.warn('[TextLogPanel] Failed to copy log', err)
-            }
-        },
-
-        onClearMessages () {
-            MESSAGE_LOG.clear()
-        },
-
-        onClearConsole () {
-            CONSOLE_LOG.clear()
-        },
-
-        onSelectionChange () {
-            try {
-                const sel = window.getSelection()
-                const text = sel ? sel.toString() : ''
-                if (!text) {
-                    this.hasSelection = false
-                    return
-                }
-
-                const messageContainer = this.$refs.messageLogContainer
-                const consoleContainer = this.$refs.consoleLogContainer
-                if (!messageContainer && !consoleContainer) {
-                    this.hasSelection = false
-                    return
-                }
-
-                const anchorNode = sel.anchorNode
-                const focusNode = sel.focusNode
-                
-                const withinMessage = messageContainer && anchorNode && messageContainer.contains(anchorNode) && focusNode && messageContainer.contains(focusNode)
-                const withinConsole = consoleContainer && anchorNode && consoleContainer.contains(anchorNode) && focusNode && consoleContainer.contains(focusNode)
-                
-                this.hasSelection = (withinMessage || withinConsole) && text.trim().length > 0
-            } catch (err) {
-                this.hasSelection = false
-            }
-        },
-
-        onConsoleLogLimitKeydown (event) {
-            const char = event.key
-            const isNumber = /[0-9]/.test(char)
-            const isControl = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Tab'].includes(char)
-            const isCopy = (event.ctrlKey || event.metaKey) && char === 'c'
-            const isPaste = (event.ctrlKey || event.metaKey) && char === 'v'
-            
-            // Allow numbers, control keys, copy/paste, and Ctrl+A
-            if (!isNumber && !isControl && !isCopy && !isPaste && !(event.ctrlKey && char === 'a')) {
-                event.preventDefault()
-            }
-        },
-
-        onConsoleLogLimitChange () {
-            let value = parseInt(this.consoleLogLimit, 10)
-            
-            // Validate: must be 1-1000
-            if (isNaN(value) || value < 1) {
-                value = 1
-            } else if (value > 1000) {
-                value = 1000
-            }
-            
-            this.consoleLogLimit = value
-            
-            // Update CONSOLE_LOG maxLogs
-            if (CONSOLE_LOG) {
-                CONSOLE_LOG.maxLogs = value
-            }
-        }
+  beforeDestroy() {
+    if (this.messageUnsubscribe) {
+      this.messageUnsubscribe();
+      this.messageUnsubscribe = null;
     }
-}
+
+    if (this.consoleUnsubscribe) {
+      this.consoleUnsubscribe();
+      this.consoleUnsubscribe = null;
+    }
+
+    document.removeEventListener("selectionchange", this.onSelectionChange);
+  },
+
+  methods: {
+    formatMessageEntry(entry) {
+      const date = new Date(entry.timestamp);
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      const seconds = String(date.getSeconds()).padStart(2, "0");
+      const speaker = entry.speakerName ? ` ${entry.speakerName}: ` : " ";
+      return `[${hours}:${minutes}:${seconds}]${speaker}${entry.text}`;
+    },
+
+    formatConsoleEntry(entry) {
+      const date = new Date(entry.timestamp);
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      const seconds = String(date.getSeconds()).padStart(2, "0");
+      const millis = String(date.getMilliseconds()).padStart(3, "0");
+      const level = entry.level.toUpperCase().padEnd(5, " ");
+
+      // Format arguments
+      const formattedArgs = entry.args
+        .map((arg) => {
+          if (typeof arg === "object" && arg !== null) {
+            try {
+              return JSON.stringify(arg, null, 2);
+            } catch (e) {
+              return String(arg);
+            }
+          }
+          return String(arg);
+        })
+        .join(" ");
+
+      const source = entry && entry.source ? `\n@ ${entry.source}` : "";
+      return `[${hours}:${minutes}:${seconds}.${millis}][${level}] ${formattedArgs}${source}`;
+    },
+
+    getConsoleEntryStyle(entry) {
+      const colors = {
+        log: "color: #000000",
+        info: "color: #0066cc",
+        warn: "color: #ff8800",
+        error: "color: #cc0000",
+        debug: "color: #666666",
+      };
+      return colors[entry.level] || colors.log;
+    },
+
+    scrollToBottom(type) {
+      const container =
+        type === "console"
+          ? this.$refs.consoleLogContainer
+          : this.$refs.messageLogContainer;
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      }
+    },
+
+    async onCopy() {
+      const selection = window.getSelection();
+      const text = selection ? selection.toString() : "";
+
+      if (!text || !this.hasSelection) {
+        return;
+      }
+
+      try {
+        if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const textarea = document.createElement("textarea");
+          textarea.value = text;
+          textarea.style.position = "fixed";
+          textarea.style.top = "-1000px";
+          document.body.appendChild(textarea);
+          textarea.focus();
+          textarea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textarea);
+        }
+      } catch (err) {
+        console.warn("[TextLogPanel] Failed to copy log", err);
+      }
+    },
+
+    onClearMessages() {
+      MESSAGE_LOG.clear();
+    },
+
+    onClearConsole() {
+      CONSOLE_LOG.clear();
+    },
+
+    onSelectionChange() {
+      try {
+        const sel = window.getSelection();
+        const text = sel ? sel.toString() : "";
+        if (!text) {
+          this.hasSelection = false;
+          return;
+        }
+
+        const messageContainer = this.$refs.messageLogContainer;
+        const consoleContainer = this.$refs.consoleLogContainer;
+        if (!messageContainer && !consoleContainer) {
+          this.hasSelection = false;
+          return;
+        }
+
+        const anchorNode = sel.anchorNode;
+        const focusNode = sel.focusNode;
+
+        const withinMessage =
+          messageContainer &&
+          anchorNode &&
+          messageContainer.contains(anchorNode) &&
+          focusNode &&
+          messageContainer.contains(focusNode);
+        const withinConsole =
+          consoleContainer &&
+          anchorNode &&
+          consoleContainer.contains(anchorNode) &&
+          focusNode &&
+          consoleContainer.contains(focusNode);
+
+        this.hasSelection =
+          (withinMessage || withinConsole) && text.trim().length > 0;
+      } catch (err) {
+        this.hasSelection = false;
+      }
+    },
+
+    onConsoleLogLimitKeydown(event) {
+      const char = event.key;
+      const isNumber = /[0-9]/.test(char);
+      const isControl = [
+        "Backspace",
+        "Delete",
+        "ArrowLeft",
+        "ArrowRight",
+        "Home",
+        "End",
+        "Tab",
+      ].includes(char);
+      const isCopy = (event.ctrlKey || event.metaKey) && char === "c";
+      const isPaste = (event.ctrlKey || event.metaKey) && char === "v";
+
+      // Allow numbers, control keys, copy/paste, and Ctrl+A
+      if (
+        !isNumber &&
+        !isControl &&
+        !isCopy &&
+        !isPaste &&
+        !(event.ctrlKey && char === "a")
+      ) {
+        event.preventDefault();
+      }
+    },
+
+    onConsoleLogLimitChange() {
+      let value = parseInt(this.consoleLogLimit, 10);
+
+      // Validate: must be 1-1000
+      if (isNaN(value) || value < 1) {
+        value = 1;
+      } else if (value > 1000) {
+        value = 1000;
+      }
+
+      this.consoleLogLimit = value;
+
+      // Update CONSOLE_LOG maxLogs
+      if (CONSOLE_LOG) {
+        CONSOLE_LOG.maxLogs = value;
+      }
+    },
+  },
+};
