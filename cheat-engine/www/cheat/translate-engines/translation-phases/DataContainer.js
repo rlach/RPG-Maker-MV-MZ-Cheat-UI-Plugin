@@ -13,6 +13,10 @@ export class DataContainerTranslationKindStrategy extends DataObjectsTranslation
     return this.kind;
   }
 
+  getTranslationPhaseLabel() {
+    return `translating ${this.kind}`;
+  }
+
   async createEntries({ request, panel }) {
     const container = this.getContainer && this.getContainer();
     if (!Array.isArray(container)) {
