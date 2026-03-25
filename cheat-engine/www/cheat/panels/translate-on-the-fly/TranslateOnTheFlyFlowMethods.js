@@ -1,7 +1,7 @@
 import { Alert } from "../../js/AlertHelper.js";
 import { BatchSummaryReporter } from "../../translate-engines/batch-manager/BatchSummaryReporter.js";
 import { createTranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManagerFactory.js";
-import { CurrentEventTranslationPhaseStrategy } from "../../translate-engines/translation-phases/CurrentEventTranslationPhaseStrategy.js";
+import { CurrentEventTranslationPhaseStrategy } from "../../translate-engines/translation-phases/CurrentEvent.js";
 
 export const translateOnTheFlyFlowMethods = {
   hasPendingDialogTranslation() {

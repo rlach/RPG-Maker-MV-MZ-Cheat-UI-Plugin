@@ -1,4 +1,4 @@
-import { MapEventsTranslationPhaseStrategy } from "./MapEventsTranslationPhaseStrategy.js";
+import { MapEventsTranslationPhaseStrategy } from "./MapEvents.js";
 
 export class CommonEventsTranslationKindStrategy extends MapEventsTranslationPhaseStrategy {
   getKind() {

@@ -1,4 +1,4 @@
-import { DataObjectsTranslationPhaseStrategy } from "./DataObjectsTranslationPhaseStrategy.js";
+import { DataObjectsTranslationPhaseStrategy } from "./DataObjects.js";
 
 export class DataContainerTranslationKindStrategy extends DataObjectsTranslationPhaseStrategy {
   constructor({ kind, getContainer, fields, cachePrefix }) {
