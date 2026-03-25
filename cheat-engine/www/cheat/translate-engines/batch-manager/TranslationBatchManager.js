@@ -8,14 +8,35 @@ export class TranslationBatchManager {
     this.panel = panel;
     this.errorRecovery = new ErrorRecoveryStrategy("default");
     this.progressTracker = new BatchProgressTracker(panel);
+    this.kindRegistry = new Map();
+  }
+
+  register(strategy) {
+    if (!strategy || typeof strategy.getKind !== "function") {
+      return;
+    }
+
+    this.registerKind(strategy.getKind(), strategy);
+  }
+
+  registerKind(kind, definition) {
+    const normalizedKind = String(kind || "").trim();
+    if (!normalizedKind || !definition) {
+      return;
+    }
+    this.kindRegistry.set(normalizedKind, definition);
+  }
+
+  getKindDefinition(kind) {
+    return this.kindRegistry.get(String(kind || "").trim()) || null;
   }
 
   onBatchPausedByOtf(reason = "translating event") {
     this.progressTracker.pause(reason);
   }
 
-  onBatchResumed(stepLabel = null) {
-    this.progressTracker.resume(stepLabel);
+  onBatchResumed(translationPhaseLabel = null) {
+    this.progressTracker.resume(translationPhaseLabel);
   }
 
   isAbortBatchResult(failures, batchSize) {
@@ -30,137 +51,258 @@ export class TranslationBatchManager {
   }
 
   async runBatchedTranslation(items, options = {}) {
-    const safeItems = Array.isArray(items) ? items : [];
-    const stepLabel = options.stepLabel || "translating batch";
-    const backgroundJob = !!options.backgroundJob;
-    // isPhase: true  => called as a phase within an active queue;
-    //   uses beginPhase() instead of start(), skips complete() at the end,
-    //   never shows a per-phase summary regardless of showSummary.
-    const isPhase = !!options.isPhase;
-    const showSummary = !isPhase && options.showSummary !== false;
-    const onBatchSettled =
-      typeof options.onBatchSettled === "function"
-        ? options.onBatchSettled
-        : null;
-    const startedAt = Date.now();
-
-    this.errorRecovery.reset(stepLabel);
-
-    if (safeItems.length === 0) {
-      const emptySummary = BatchSummaryReporter.buildSummary({
-        batchLabel: stepLabel,
-        totalItems: 0,
-        successes: 0,
-        failures: 0,
-        errorStats: this.errorRecovery.getStats(),
-        durationMs: Date.now() - startedAt,
-      });
-      if (showSummary) {
-        BatchSummaryReporter.showAlert(emptySummary);
-        BatchSummaryReporter.logSummary(emptySummary);
-      }
-      return { successes: [], failures: [], summary: emptySummary };
-    }
-
-    const batches = BatchChunker.chunkItems(safeItems, {
-      itemLimit: options.itemLimit,
-      charLimit: options.charLimit,
+    const queueEntries = [];
+    const safeRequests = Array.isArray(items) ? items : [];
+    const hasOnlyKindRequests = safeRequests.every((item) => {
+      return !!(
+        item &&
+        typeof item === "object" &&
+        typeof item.kind === "string"
+      );
     });
-
-    if (isPhase) {
-      this.progressTracker.beginPhase(stepLabel, safeItems.length);
-    } else {
-      this.progressTracker.start(stepLabel, safeItems.length);
+    if (!hasOnlyKindRequests) {
+      throw new Error(
+        "runBatchedTranslation expects an array of kind requests: [{ kind, ... }]",
+      );
     }
 
-    const allSuccesses = [];
-    const allFailures = [];
-    let processed = 0;
-    let phaseFailures = 0;
+    for (const request of safeRequests) {
+      const definition = this.getKindDefinition(request && request.kind);
+      if (!definition || typeof definition.createEntries !== "function") {
+        throw new Error(
+          `Unknown translation kind: ${(request && request.kind) || ""}`,
+        );
+      }
 
-    try {
-      for (let i = 0; i < batches.length; i++) {
-        const batch = batches[i];
-        this.progressTracker.updateStep(stepLabel, processed, safeItems.length);
+      const entries =
+        (await definition.createEntries({
+          request,
+          options,
+          manager: this,
+          panel: this.panel,
+        })) || [];
+      for (const entry of entries) {
+        queueEntries.push(entry);
+      }
+    }
 
-        let successes = [];
-        let failures = [];
-
-        try {
-          const result = backgroundJob
-            ? await this.panel.batchTranslateWithBackgroundRetry(
-                batch,
-                stepLabel,
-              )
-            : await this.panel.engine.batchTranslate(batch, {
-                backgroundJob: false,
-              });
-
-          successes = Array.isArray(result && result.successes)
-            ? result.successes
-            : [];
-          failures = Array.isArray(result && result.failures)
-            ? result.failures
-            : [];
-        } catch (error) {
-          const rejectReason =
-            (error && error.message) || "batch_translate_exception";
-          failures = batch.map((item) => ({
-            ...item,
-            rejectReason,
-          }));
+    const startedAt = Date.now();
+    const aggregatedSuccesses = [];
+    const aggregatedFailures = [];
+    const aggregatedErrorStats =
+      BatchSummaryReporter.createErrorStatsAccumulator();
+    const mergeStats = (stats) => {
+      BatchSummaryReporter.mergeErrorStats(aggregatedErrorStats, stats);
+    };
+    const executeEntry = async (entryItems, entryOptions = {}) => {
+      const strategy = entryOptions.strategy;
+      const hasStrategy = !!strategy;
+      let pendingItems = null;
+      if (hasStrategy) {
+        if (
+          typeof strategy.getTranslationPhaseLabel !== "function" ||
+          typeof strategy.collectUntranslated !== "function" ||
+          typeof strategy.setData !== "function"
+        ) {
+          throw new Error("Invalid translation phase strategy");
         }
+        pendingItems =
+          strategy.collectUntranslated({
+            panel: this.panel,
+            options: entryOptions,
+          }) || [];
+      }
 
-        for (const success of successes) {
-          allSuccesses.push(success);
-          if (
-            success &&
-            success.cacheKey &&
-            (success.recovered === true || success.recoveryUsed === true)
-          ) {
-            this.errorRecovery.recordRecovery(success.cacheKey);
-          }
+      const safeItems = hasStrategy
+        ? strategy.toTranslationBatchItems
+          ? strategy.toTranslationBatchItems(pendingItems)
+          : (pendingItems || []).map((item) => ({
+              type: item.type,
+              id: item.id,
+              value: item.value,
+              cacheKey: item.cacheKey,
+            }))
+        : Array.isArray(entryItems)
+          ? entryItems
+          : [];
+      const translationPhaseLabel = hasStrategy
+        ? strategy.getTranslationPhaseLabel({
+            panel: this.panel,
+            options: entryOptions,
+          })
+        : entryOptions.translationPhaseLabel ||
+          entryOptions.stepLabel ||
+          "translating batch";
+      const backgroundJob = !!entryOptions.backgroundJob;
+      const isPhase = !!entryOptions.isPhase;
+      const showSummary = !isPhase && entryOptions.showSummary !== false;
+      const onTranslationBatchCompleted =
+        typeof entryOptions.onTranslationBatchCompleted === "function"
+          ? entryOptions.onTranslationBatchCompleted
+          : null;
+      const startedAt = Date.now();
+
+      this.errorRecovery.reset(translationPhaseLabel);
+
+      if (safeItems.length === 0) {
+        const emptySummary = BatchSummaryReporter.buildSummary({
+          batchLabel: translationPhaseLabel,
+          totalItems: 0,
+          successes: 0,
+          failures: 0,
+          errorStats: this.errorRecovery.getStats(),
+          durationMs: Date.now() - startedAt,
+        });
+        if (showSummary) {
+          BatchSummaryReporter.showAlert(emptySummary);
+          BatchSummaryReporter.logSummary(emptySummary);
         }
+        return {
+          successes: [],
+          failures: [],
+          summary: emptySummary,
+          stats: this.errorRecovery.getStats(),
+        };
+      }
 
-        for (const failure of failures) {
-          allFailures.push(failure);
-          this.errorRecovery.recordFailure(failure);
-        }
+      const batches = BatchChunker.chunkItems(safeItems, {
+        itemLimit: entryOptions.itemLimit,
+        charLimit: entryOptions.charLimit,
+      });
 
-        phaseFailures += failures.length;
+      if (isPhase) {
+        this.progressTracker.beginPhase(
+          translationPhaseLabel,
+          safeItems.length,
+        );
+      } else {
+        this.progressTracker.start(translationPhaseLabel, safeItems.length);
+      }
 
-        if (onBatchSettled) {
-          await onBatchSettled({
-            successes,
-            failures,
-            batchIndex: i,
-            batchSize: batch.length,
+      const allSuccesses = [];
+      const allFailures = [];
+      let processed = 0;
+      let phaseFailures = 0;
+
+      try {
+        for (let i = 0; i < batches.length; i++) {
+          const batch = batches[i];
+          this.progressTracker.updateStep(
+            translationPhaseLabel,
             processed,
-            total: safeItems.length,
-          });
-        }
+            safeItems.length,
+          );
 
-        if (this.isAbortBatchResult(failures, batch.length)) {
-          const cancelReason = failures[0] && failures[0].cancelReason;
-          let skippedFailuresCount = 0;
-          for (let r = i + 1; r < batches.length; r++) {
-            for (const skippedItem of batches[r]) {
-              const skippedFailure = {
-                ...skippedItem,
-                rejectReason: cancelReason || "request_aborted",
-                cancelReason: cancelReason || "request_aborted",
-              };
-              allFailures.push(skippedFailure);
-              this.errorRecovery.recordFailure(skippedFailure);
-              skippedFailuresCount += 1;
+          let successes = [];
+          let failures = [];
+
+          try {
+            const result = backgroundJob
+              ? await this.panel.batchTranslateWithBackgroundRetry(
+                  batch,
+                  translationPhaseLabel,
+                )
+              : await this.panel.engine.batchTranslate(batch, {
+                  backgroundJob: false,
+                });
+
+            successes = Array.isArray(result && result.successes)
+              ? result.successes
+              : [];
+            failures = Array.isArray(result && result.failures)
+              ? result.failures
+              : [];
+          } catch (error) {
+            const rejectReason =
+              (error && error.message) || "batch_translate_exception";
+            failures = batch.map((item) => ({
+              ...item,
+              rejectReason,
+            }));
+          }
+
+          for (const success of successes) {
+            allSuccesses.push(success);
+            if (
+              success &&
+              success.cacheKey &&
+              (success.recovered === true || success.recoveryUsed === true)
+            ) {
+              this.errorRecovery.recordRecovery(success.cacheKey);
             }
           }
 
-          phaseFailures += skippedFailuresCount;
+          for (const failure of failures) {
+            allFailures.push(failure);
+            this.errorRecovery.recordFailure(failure);
+          }
 
-          processed = safeItems.length;
+          phaseFailures += failures.length;
+
+          if (onTranslationBatchCompleted) {
+            await onTranslationBatchCompleted({
+              successes,
+              failures,
+              batchIndex: i,
+              batchSize: batch.length,
+              processed,
+              total: safeItems.length,
+            });
+          }
+
+          if (hasStrategy) {
+            await strategy.setData({
+              panel: this.panel,
+              pendingItems,
+              successes,
+              failures,
+              batchMeta: {
+                batchIndex: i,
+                batchSize: batch.length,
+                processed,
+                total: safeItems.length,
+              },
+              options: entryOptions,
+            });
+          }
+
+          if (this.isAbortBatchResult(failures, batch.length)) {
+            const cancelReason = failures[0] && failures[0].cancelReason;
+            let skippedFailuresCount = 0;
+            for (let r = i + 1; r < batches.length; r++) {
+              for (const skippedItem of batches[r]) {
+                const skippedFailure = {
+                  ...skippedItem,
+                  rejectReason: cancelReason || "request_aborted",
+                  cancelReason: cancelReason || "request_aborted",
+                };
+                allFailures.push(skippedFailure);
+                this.errorRecovery.recordFailure(skippedFailure);
+                skippedFailuresCount += 1;
+              }
+            }
+
+            phaseFailures += skippedFailuresCount;
+
+            processed = safeItems.length;
+            this.progressTracker.updateStep(
+              `${translationPhaseLabel} (aborted)`,
+              processed,
+              safeItems.length,
+            );
+            this.progressTracker.updateCurrentStepErrors(
+              phaseFailures,
+              processed,
+            );
+            this.progressTracker.addTotalErrors(
+              failures.length + skippedFailuresCount,
+            );
+            break;
+          }
+
+          processed += batch.length;
           this.progressTracker.updateStep(
-            `${stepLabel} (aborted)`,
+            translationPhaseLabel,
             processed,
             safeItems.length,
           );
@@ -168,477 +310,177 @@ export class TranslationBatchManager {
             phaseFailures,
             processed,
           );
-          this.progressTracker.addTotalErrors(
-            failures.length + skippedFailuresCount,
+          this.progressTracker.addTotalErrors(failures.length);
+        }
+      } finally {
+        if (!isPhase) {
+          this.progressTracker.complete();
+        }
+      }
+
+      const summary = BatchSummaryReporter.buildSummary({
+        batchLabel: translationPhaseLabel,
+        totalItems: safeItems.length,
+        successes: allSuccesses.length,
+        failures: allFailures.length,
+        errorStats: this.errorRecovery.getStats(),
+        durationMs: Date.now() - startedAt,
+      });
+      const stats = this.errorRecovery.getStats();
+
+      if (showSummary) {
+        BatchSummaryReporter.showAlert(summary);
+        BatchSummaryReporter.logSummary(summary);
+      }
+
+      if (hasStrategy && typeof strategy.finalizePhase === "function") {
+        strategy.finalizePhase({
+          panel: this.panel,
+          pendingItems,
+          options: entryOptions,
+        });
+      }
+
+      return { successes: allSuccesses, failures: allFailures, summary, stats };
+    };
+
+    const safeQueueEntries = [...queueEntries];
+
+    if (safeQueueEntries.length === 0) {
+      const emptySummary = BatchSummaryReporter.buildSummary({
+        batchLabel: options.translationPhaseLabel || "translation",
+        totalItems: 0,
+        successes: 0,
+        failures: 0,
+        errorStats: aggregatedErrorStats,
+        durationMs: Date.now() - startedAt,
+      });
+      return {
+        successes: [],
+        failures: [],
+        summary: emptySummary,
+        stats: aggregatedErrorStats,
+      };
+    }
+
+    this.progressTracker.beginQueue();
+    try {
+      while (safeQueueEntries.length > 0) {
+        const currentMapId =
+          typeof this.panel.getCurrentMapIdForPhasePriority === "function"
+            ? this.panel.getCurrentMapIdForPhasePriority()
+            : 0;
+        if (currentMapId > 0) {
+          const currentMapEntryIndex = safeQueueEntries.findIndex(
+            (entry) =>
+              entry && Number(entry.priorityMapId) === Number(currentMapId),
           );
-          break;
+          if (currentMapEntryIndex > 0) {
+            const [entry] = safeQueueEntries.splice(currentMapEntryIndex, 1);
+            safeQueueEntries.unshift(entry);
+          }
         }
 
-        processed += batch.length;
-        this.progressTracker.updateStep(stepLabel, processed, safeItems.length);
-        this.progressTracker.updateCurrentStepErrors(
-          phaseFailures,
-          processed,
-        );
-        this.progressTracker.addTotalErrors(failures.length);
+        const entry = safeQueueEntries.shift();
+        if (!entry) {
+          continue;
+        }
+
+        let translated;
+        if (typeof entry.execute === "function") {
+          translated = await entry.execute();
+        } else {
+          const strategy =
+            typeof entry.createStrategy === "function"
+              ? await entry.createStrategy()
+              : entry.strategy;
+          translated = await executeEntry(entry.items || [], {
+            ...options,
+            ...(entry.options || {}),
+            strategy,
+            showSummary: false,
+          });
+        }
+
+        for (const success of translated.successes || []) {
+          aggregatedSuccesses.push(success);
+        }
+        for (const failure of translated.failures || []) {
+          aggregatedFailures.push(failure);
+        }
+        mergeStats(translated.stats);
       }
     } finally {
-      // Only a standalone (non-phase) call owns the spinner lifecycle.
-      if (!isPhase) {
-        this.progressTracker.complete();
-      }
+      this.progressTracker.endQueue();
     }
 
     const summary = BatchSummaryReporter.buildSummary({
-      batchLabel: stepLabel,
-      totalItems: safeItems.length,
-      successes: allSuccesses.length,
-      failures: allFailures.length,
-      errorStats: this.errorRecovery.getStats(),
+      batchLabel: options.translationPhaseLabel || "translation",
+      totalItems: aggregatedSuccesses.length + aggregatedFailures.length,
+      successes: aggregatedSuccesses.length,
+      failures: aggregatedFailures.length,
+      errorStats: aggregatedErrorStats,
       durationMs: Date.now() - startedAt,
+      currentPhaseErrors: 0,
+      totalCumulativeErrors: aggregatedFailures.length,
     });
-    const stats = this.errorRecovery.getStats();
 
+    const showSummary = options.showSummary !== false && !options.isPhase;
     if (showSummary) {
       BatchSummaryReporter.showAlert(summary);
       BatchSummaryReporter.logSummary(summary);
     }
 
-    return { successes: allSuccesses, failures: allFailures, summary, stats };
-  }
-
-  async translateSystemCommandsBatch(
-    backgroundJob = false,
-    showSummary = false,
-    options = {},
-  ) {
-    if (
-      !(
-        window.$dataSystem &&
-        $dataSystem.terms &&
-        Array.isArray($dataSystem.terms.commands)
-      )
-    ) {
-      return { successes: 0, failures: 0, summary: null, stats: null };
-    }
-
-    const hasCommandsOriginal = !!$dataSystem.terms.commandsOriginal;
-    const sourceCommands = hasCommandsOriginal
-      ? $dataSystem.terms.commandsOriginal
-      : $dataSystem.terms.commands;
-    if (!hasCommandsOriginal) {
-      $dataSystem.terms.commandsOriginal = [...$dataSystem.terms.commands];
-    }
-
-    const pending = [];
-    for (let i = 0; i < sourceCommands.length; i++) {
-      const val = sourceCommands[i];
-      if (!val || typeof val !== "string" || val.trim() === "") {
-        continue;
-      }
-
-      const cacheKey = this.panel.getCacheKey(val, "command");
-      if (!this.panel.hasUsableCacheValue(cacheKey)) {
-        pending.push({
-          type: "system_command",
-          id: `cmd_${i}`,
-          value: val,
-          cacheKey,
-          index: i,
-        });
-      }
-    }
-
-    const translated = await this.runBatchedTranslation(
-      pending.map((item) => ({
-        type: item.type,
-        id: item.id,
-        value: item.value,
-        cacheKey: item.cacheKey,
-      })),
-      {
-        stepLabel: "translating system commands",
-        backgroundJob,
-        itemLimit: this.panel.batchItemsLimit || 20,
-        charLimit: this.panel.charLimit || 1000,
-        isPhase: !!options.isPhase,
-        showSummary,
-        onBatchSettled: ({ successes, failures }) => {
-          for (const success of successes || []) {
-            if (!success || !success.cacheKey) {
-              continue;
-            }
-
-            this.panel.setCacheValue(success.cacheKey, success.translated);
-            const origin = pending.find(
-              (item) => item.cacheKey === success.cacheKey,
-            );
-            if (
-              origin &&
-              $dataSystem.terms.commands[origin.index] !== undefined
-            ) {
-              $dataSystem.terms.commands[origin.index] = success.translated;
-            }
-          }
-
-          this.panel.markBatchFailuresAsUntranslated(failures || [], true);
-        },
-      },
-    );
-
     return {
-      successes: translated.successes.length,
-      failures: translated.failures.length,
-      summary: translated.summary,
-      stats: translated.stats,
+      successes: aggregatedSuccesses,
+      failures: aggregatedFailures,
+      summary,
+      stats: aggregatedErrorStats,
     };
   }
 
-  async translateSystemMessagesBatch(
-    backgroundJob = false,
-    showSummary = false,
-    options = {},
-  ) {
-    if (
-      !(
-        window.$dataSystem &&
-        $dataSystem.terms &&
-        $dataSystem.terms.messages &&
-        typeof $dataSystem.terms.messages === "object"
-      )
-    ) {
-      return { successes: 0, failures: 0, summary: null, stats: null };
-    }
+  countAmountSync(requests) {
+    const safeRequests = Array.isArray(requests)
+      ? requests
+      : requests && typeof requests === "object"
+        ? [requests]
+        : [];
 
-    const hasMessagesOriginal = !!$dataSystem.terms.messagesOriginal;
-    const sourceMessages = hasMessagesOriginal
-      ? $dataSystem.terms.messagesOriginal
-      : $dataSystem.terms.messages;
-    if (!hasMessagesOriginal) {
-      $dataSystem.terms.messagesOriginal = Object.assign(
-        {},
-        $dataSystem.terms.messages || {},
-      );
-    }
-
-    const pending = [];
-    for (const key of Object.keys(sourceMessages || {})) {
-      const val = sourceMessages[key];
-      if (typeof val !== "string" || val.trim() === "") {
-        continue;
-      }
-
-      if (!this.panel.hasUsableCacheValue(key)) {
-        pending.push({
-          type: "system_message",
-          id: `msg_${key}`,
-          value: val,
-          cacheKey: key,
+    const result = [];
+    for (const request of safeRequests) {
+      const definition = this.getKindDefinition(request && request.kind);
+      if (!definition) {
+        result.push({
+          kind: request && request.kind,
+          total: 0,
+          left: 0,
+          totalStrings: 0,
+          leftStrings: 0,
         });
-      }
-    }
-
-    const translated = await this.runBatchedTranslation(
-      pending.map((item) => ({
-        type: item.type,
-        id: item.id,
-        value: item.value,
-        cacheKey: item.cacheKey,
-      })),
-      {
-        stepLabel: "translating system messages",
-        backgroundJob,
-        itemLimit: this.panel.batchItemsLimit || 20,
-        charLimit: this.panel.charLimit || 1000,
-        isPhase: !!options.isPhase,
-        showSummary,
-        onBatchSettled: ({ successes, failures }) => {
-          for (const success of successes || []) {
-            if (!success || !success.cacheKey) {
-              continue;
-            }
-
-            this.panel.setCacheValue(success.cacheKey, success.translated);
-            if (
-              $dataSystem.terms.messages &&
-              Object.prototype.hasOwnProperty.call(
-                $dataSystem.terms.messages,
-                success.cacheKey,
-              )
-            ) {
-              $dataSystem.terms.messages[success.cacheKey] = success.translated;
-            }
-          }
-
-          this.panel.markBatchFailuresAsUntranslated(failures || [], true);
-        },
-      },
-    );
-
-    return {
-      successes: translated.successes.length,
-      failures: translated.failures.length,
-      summary: translated.summary,
-      stats: translated.stats,
-    };
-  }
-
-  async translateDataBatch(dataObjects, fields, type, options = {}) {
-    if (!Array.isArray(dataObjects) || !Array.isArray(fields) || !type) {
-      return { successes: 0, failures: 0 };
-    }
-
-    const items = [];
-    for (const dataObject of dataObjects) {
-      if (!dataObject) {
         continue;
       }
 
-      if (!dataObject._translateOriginal) {
-        dataObject._translateOriginal = {};
-      }
-
-      for (const field of fields) {
-        const value = dataObject[field];
-        if (typeof value !== "string" || value.trim() === "") {
-          continue;
-        }
-
-        if (!(field in dataObject._translateOriginal)) {
-          dataObject._translateOriginal[field] = value;
-        }
-
-        const originalValue = dataObject._translateOriginal[field];
-        const cacheKey = this.panel.getCacheKey(
-          originalValue,
-          `${type}_${field}`,
-        );
-        if (this.panel.hasUsableCacheValue(cacheKey)) {
-          continue;
-        }
-
-        items.push({
-          type: `${type}_${field}`,
-          id: `${type}_${dataObject.id}_${field}`,
-          value: originalValue,
-          cacheKey,
-          dataObject,
-          field,
-        });
-      }
-    }
-
-    const translated = await this.runBatchedTranslation(
-      items.map((item) => ({
-        type: item.type,
-        id: item.id,
-        value: item.value,
-        cacheKey: item.cacheKey,
-      })),
-      {
-        stepLabel: `translating ${type}`,
-        backgroundJob: !!options.backgroundJob,
-        itemLimit: this.panel.batchItemsLimit || 20,
-        charLimit: this.panel.charLimit || 1000,
-        isPhase: !!options.isPhase,
-        showSummary: false,
-        onBatchSettled: ({ successes, failures }) => {
-          for (const success of successes || []) {
-            if (success && success.cacheKey) {
-              this.panel.setCacheValue(success.cacheKey, success.translated);
-            }
-          }
-
-          this.panel.markBatchFailuresAsUntranslated(failures || [], true);
-        },
-      },
-    );
-
-    for (const dataObject of dataObjects) {
-      if (!dataObject || !dataObject._translateOriginal) {
-        continue;
-      }
-
-      for (const field of fields) {
-        const originalValue = dataObject._translateOriginal[field];
-        if (typeof originalValue !== "string" || originalValue.trim() === "") {
-          continue;
-        }
-
-        const cacheKey = this.panel.getCacheKey(
-          originalValue,
-          `${type}_${field}`,
-        );
-        if (this.panel.hasUsableCacheValue(cacheKey)) {
-          dataObject[field] = this.panel.translationCache.get(cacheKey);
-        }
-      }
-    }
-
-    return {
-      successes: translated.successes.length,
-      failures: translated.failures.length,
-      stats: translated.stats,
-    };
-  }
-
-  async translateMapEvents(
-    mapData = null,
-    mapNumber = null,
-    totalMaps = null,
-    progressLabel = null,
-    options = {},
-  ) {
-    const dataMap = mapData || window.$dataMap;
-    if (!dataMap) {
-      return { successCount: 0, failureCount: 0 };
-    }
-
-    const events = dataMap.events;
-    if (!Array.isArray(events)) {
-      return { successCount: 0, failureCount: 0 };
-    }
-
-    const itemsToTranslate = [];
-    let runningCounter = 0;
-
-    const pushMapTextItem = (rawText, eventIdx, pageIdx, cmdIdx) => {
-      if (typeof rawText !== "string" || rawText.trim() === "") {
-        return;
-      }
-
-      const cacheKey = this.panel.getCacheKey(rawText, "text");
-      if (this.panel.hasUsableCacheValue(cacheKey)) {
-        return;
-      }
-
-      itemsToTranslate.push({
-        type: "text",
-        id: `map_${eventIdx}_${pageIdx}_text_${runningCounter++}`,
-        value: rawText,
-        cacheKey,
-        eventIdx,
-        pageIdx,
-        cmdIdx,
+      const counted =
+        (typeof definition.countAmountSync === "function"
+          ? definition.countAmountSync({
+              request,
+              manager: this,
+              panel: this.panel,
+            })
+          : null) || {};
+      result.push({
+        kind: request && request.kind,
+        total: Math.max(0, Number(counted.total) || 0),
+        left: Math.max(0, Number(counted.left) || 0),
+        totalStrings: Math.max(0, Number(counted.totalStrings) || 0),
+        leftStrings: Math.max(0, Number(counted.leftStrings) || 0),
       });
-    };
-
-    for (let eventIdx = 0; eventIdx < events.length; eventIdx++) {
-      const event = events[eventIdx];
-      if (!event || !Array.isArray(event.pages)) {
-        continue;
-      }
-
-      for (let pageIdx = 0; pageIdx < event.pages.length; pageIdx++) {
-        const page = event.pages[pageIdx];
-        if (!page || !Array.isArray(page.list)) {
-          continue;
-        }
-
-        const list = page.list;
-        let i = 0;
-        while (i < list.length) {
-          const cmd = list[i];
-          if (!cmd || typeof cmd.code !== "number") {
-            i += 1;
-            continue;
-          }
-
-          if (cmd.code === 101) {
-            const speaker = (cmd.parameters && cmd.parameters[4]) || "";
-            const lines = [];
-            let j = i + 1;
-            while (j < list.length && list[j] && list[j].code === 401) {
-              lines.push(list[j].parameters && list[j].parameters[0]);
-              j += 1;
-            }
-
-            pushMapTextItem(lines.join("\n"), eventIdx, pageIdx, i);
-
-            if (speaker) {
-              const speakerKey = this.panel.getCacheKey(speaker, "speaker");
-              if (!this.panel.hasUsableCacheValue(speakerKey)) {
-                itemsToTranslate.push({
-                  type: "speaker",
-                  id: `map_${eventIdx}_${pageIdx}_speaker_${runningCounter++}`,
-                  value: speaker,
-                  cacheKey: speakerKey,
-                  eventIdx,
-                  pageIdx,
-                  cmdIdx: i,
-                });
-              }
-            }
-
-            i = j;
-            continue;
-          }
-
-          if (cmd.code === 102) {
-            const choices = cmd.parameters && cmd.parameters[0];
-            if (Array.isArray(choices)) {
-              for (const choice of choices) {
-                const choiceKey = this.panel.getCacheKey(choice, "choice");
-                if (!this.panel.hasUsableCacheValue(choiceKey)) {
-                  itemsToTranslate.push({
-                    type: "choice",
-                    id: `map_${eventIdx}_${pageIdx}_choice_${runningCounter++}`,
-                    value: choice,
-                    cacheKey: choiceKey,
-                    eventIdx,
-                    pageIdx,
-                    cmdIdx: i,
-                  });
-                }
-              }
-            }
-          }
-
-          i += 1;
-        }
-      }
     }
 
-    const uniqueItems = Array.from(
-      new Map(itemsToTranslate.map((item) => [item.cacheKey, item])).values(),
-    );
-    const stepLabel =
-      progressLabel ||
-      (mapNumber !== null && totalMaps !== null
-        ? `translating map ${mapNumber}/${totalMaps}`
-        : "translating map");
+    if (!Array.isArray(requests) && result.length > 0) {
+      return result[0];
+    }
 
-    const translated = await this.runBatchedTranslation(
-      uniqueItems.map((item) => ({
-        type: item.type,
-        id: item.id,
-        value: item.value,
-        cacheKey: item.cacheKey,
-      })),
-      {
-        stepLabel,
-        backgroundJob: !!(options && options.backgroundJob),
-        itemLimit: this.panel.batchItemsLimit || 20,
-        charLimit: this.panel.charLimit || 1000,
-        isPhase: !!(options && options.isPhase),
-        showSummary: !options.isPhase && mapNumber === null,
-        onBatchSettled: ({ successes, failures }) => {
-          for (const success of successes || []) {
-            if (success && success.cacheKey) {
-              this.panel.setCacheValue(success.cacheKey, success.translated);
-            }
-          }
-
-          this.panel.markBatchFailuresAsUntranslated(failures || [], true);
-        },
-      },
-    );
-
-    return {
-      successCount: translated.successes.length,
-      failureCount: translated.failures.length,
-      totalCount: uniqueItems.length,
-      stats: translated.stats,
-    };
+    return result;
   }
 }

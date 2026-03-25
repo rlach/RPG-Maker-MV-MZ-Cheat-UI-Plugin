@@ -1,6 +1,7 @@
 import { Alert } from "../../js/AlertHelper.js";
 import { BatchSummaryReporter } from "../../translate-engines/batch-manager/BatchSummaryReporter.js";
-import { TranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManager.js";
+import { createTranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManagerFactory.js";
+import { CurrentEventTranslationPhaseStrategy } from "../../translate-engines/translation-phases/CurrentEventTranslationPhaseStrategy.js";
 
 export const translateOnTheFlyFlowMethods = {
   hasPendingDialogTranslation() {
@@ -8,19 +9,8 @@ export const translateOnTheFlyFlowMethods = {
       return true;
     }
 
-    if (!this.pendingTranslations || this.pendingTranslations.size === 0) {
-      return false;
-    }
-
-    for (const key of this.pendingTranslations.keys()) {
-      if (typeof key !== "string") continue;
-      if (
-        key.startsWith("text:") ||
-        key.startsWith("speaker:") ||
-        key.startsWith("choice:")
-      ) {
-        return true;
-      }
+    if (typeof this.engine?.hasActiveBackgroundRequest === "function") {
+      return this.engine.hasActiveBackgroundRequest();
     }
 
     return false;
@@ -300,9 +290,9 @@ export const translateOnTheFlyFlowMethods = {
     const selectedStats = allStats.filter((stat) =>
       selectedTypeIds.includes(stat.id),
     );
-    const defsById = new Map(
-      this.getObjectTranslationTypeDefs().map((def) => [def.id, def]),
-    );
+    const requests = selectedStats
+      .filter((stat) => stat.left > 0)
+      .map((stat) => ({ kind: stat.id }));
 
     this.objectTranslationJob = {
       active: true,
@@ -312,7 +302,7 @@ export const translateOnTheFlyFlowMethods = {
     };
 
     if (!this.batchManager) {
-      this.batchManager = new TranslationBatchManager(this);
+      this.batchManager = createTranslationBatchManager(this);
     }
 
     const startedAt = Date.now();
@@ -322,175 +312,22 @@ export const translateOnTheFlyFlowMethods = {
       BatchSummaryReporter.mergeErrorStats(aggregatedErrorStats, stats);
     };
 
-    this.batchManager.progressTracker.beginQueue();
-
     try {
       this.applyCachedTranslationsToData();
+      const translated = await this.batchManager.runBatchedTranslation(
+        requests,
+        {
+          translationPhaseLabel: "object translation",
+          backgroundJob: true,
+          showSummary: false,
+        },
+      );
 
-      const phaseQueue = [];
-      for (const stat of selectedStats) {
-        const def = defsById.get(stat.id);
-        if (!def || stat.left <= 0) {
-          continue;
-        }
-
-        if (def.kind !== "mapEvents") {
-          phaseQueue.push({ kind: "stat", stat, def });
-          continue;
-        }
-
-        const validMaps = this.getValidMapInfos();
-        const selectedMapIds = new Set(
-          this.getSelectedObjectTranslationMapIds(validMaps),
-        );
-        const mapsToTranslate = validMaps.filter((mapInfo) =>
-          selectedMapIds.has(mapInfo.id),
-        );
-
-        for (let mapIndex = 0; mapIndex < mapsToTranslate.length; mapIndex++) {
-          const mapInfo = mapsToTranslate[mapIndex];
-          phaseQueue.push({
-            kind: "mapEvent",
-            mapInfo,
-            mapNumber: mapIndex + 1,
-            totalMaps: mapsToTranslate.length,
-          });
-        }
-      }
-
-      while (phaseQueue.length > 0) {
-        const currentMapId = this.getCurrentMapIdForPhasePriority();
-        if (currentMapId > 0) {
-          const currentMapPhaseIndex = phaseQueue.findIndex(
-            (phase) =>
-              phase &&
-              phase.kind === "mapEvent" &&
-              phase.mapInfo &&
-              phase.mapInfo.id === currentMapId,
-          );
-          if (currentMapPhaseIndex > 0) {
-            const [currentMapPhase] = phaseQueue.splice(
-              currentMapPhaseIndex,
-              1,
-            );
-            phaseQueue.unshift(currentMapPhase);
-          }
-        }
-
-        const phase = phaseQueue.shift();
-        if (!phase) {
-          continue;
-        }
-
-        if (phase.kind === "mapEvent") {
-          const mapData = await this.loadMapDataById(phase.mapInfo.id);
-          const batchResult = await this.translateMapEvents(
-            mapData,
-            phase.mapNumber,
-            phase.totalMaps,
-            `translating map ${phase.mapNumber}/${phase.totalMaps}`,
-            { skipProcessLock: true, isPhase: true },
-          );
-          this.objectTranslationJob.totalDone += batchResult.successCount || 0;
-          this.objectTranslationJob.totalTarget +=
-            (batchResult.successCount || 0) + (batchResult.failureCount || 0);
-          this.objectTranslationJob.runErrors += batchResult.failureCount || 0;
-          mergeStats(batchResult.stats);
-          continue;
-        }
-
-        const { stat, def } = phase;
-
-        if (def.kind === "systemMessages") {
-          const batchResult = await this.translateSystemMessagesBatch(
-            true,
-            false,
-            { isPhase: true },
-          );
-          this.objectTranslationJob.totalDone += batchResult.successes;
-          this.objectTranslationJob.totalTarget +=
-            (batchResult.successes || 0) + (batchResult.failures || 0);
-          this.objectTranslationJob.runErrors += batchResult.failures;
-          mergeStats(batchResult.stats);
-          continue;
-        }
-
-        if (def.kind === "systemCommands") {
-          const batchResult = await this.translateSystemCommandsBatch(
-            true,
-            false,
-            { isPhase: true },
-          );
-          this.objectTranslationJob.totalDone += batchResult.successes;
-          this.objectTranslationJob.totalTarget +=
-            (batchResult.successes || 0) + (batchResult.failures || 0);
-          this.objectTranslationJob.runErrors += batchResult.failures;
-          mergeStats(batchResult.stats);
-          continue;
-        }
-
-        if (def.kind === "gameArrays") {
-          const batchResult = await this.translateGameArrays({
-            backgroundJob: true,
-            progressLabel: "translating arrays",
-            isPhase: true,
-            showSummary: false,
-          });
-          this.objectTranslationJob.totalDone += batchResult.successCount || 0;
-          this.objectTranslationJob.totalTarget +=
-            (batchResult.successCount || 0) + (batchResult.failureCount || 0);
-          this.objectTranslationJob.runErrors += batchResult.failureCount || 0;
-          mergeStats(batchResult.stats);
-          continue;
-        }
-
-        if (def.kind === "commonEvents") {
-          const batchResult = await this.translateMapEvents(
-            { events: [{ pages: $dataCommonEvents }] },
-            -1,
-            null,
-            "translating common events",
-            { skipProcessLock: true, isPhase: true },
-          );
-          this.objectTranslationJob.totalDone += batchResult.successCount || 0;
-          this.objectTranslationJob.totalTarget +=
-            (batchResult.successCount || 0) + (batchResult.failureCount || 0);
-          this.objectTranslationJob.runErrors += batchResult.failureCount || 0;
-          mergeStats(batchResult.stats);
-          continue;
-        }
-
-        const container = def.getContainer && def.getContainer();
-        if (!Array.isArray(container)) {
-          continue;
-        }
-
-        const pendingObjects = [];
-        for (let i = 1; i < container.length; i++) {
-          const item = container[i];
-          if (!item) continue;
-          const hasUntranslated = this.hasUntranslatedFields(
-            item,
-            def.fields,
-            def.cachePrefix,
-          );
-          if (hasUntranslated) {
-            pendingObjects.push(item);
-          }
-        }
-
-        const batchResult = await this.translateDataBatch(
-          pendingObjects,
-          def.fields,
-          def.cachePrefix,
-          { backgroundJob: true, isPhase: true },
-        );
-        this.objectTranslationJob.totalDone += batchResult.successes || 0;
-        this.objectTranslationJob.totalTarget +=
-          (batchResult.successes || 0) + (batchResult.failures || 0);
-        this.objectTranslationJob.runErrors += batchResult.failures || 0;
-        mergeStats(batchResult.stats);
-      }
+      this.objectTranslationJob.totalDone = translated.successes.length;
+      this.objectTranslationJob.totalTarget =
+        translated.successes.length + translated.failures.length;
+      this.objectTranslationJob.runErrors = translated.failures.length;
+      mergeStats(translated.stats);
 
       const summary = BatchSummaryReporter.buildSummary({
         batchLabel: "object translation",
@@ -512,51 +349,8 @@ export const translateOnTheFlyFlowMethods = {
       Alert.error(`Object translation failed: ${error.message || error}`);
     } finally {
       this.objectTranslationJob.active = false;
-      this.batchManager.progressTracker.endQueue();
       this.endNonOtfTranslationProcess();
     }
-  },
-
-  async translateSystemCommandsBatch(
-    backgroundJob = false,
-    showSummary = false,
-    options = {},
-  ) {
-    if (!this.batchManager) {
-      this.batchManager = new TranslationBatchManager(this);
-    }
-
-    const result = await this.batchManager.translateSystemCommandsBatch(
-      backgroundJob,
-      showSummary,
-      options,
-    );
-    return {
-      successes: result.successes,
-      failures: result.failures,
-      stats: result.stats,
-    };
-  },
-
-  async translateSystemMessagesBatch(
-    backgroundJob = false,
-    showSummary = false,
-    options = {},
-  ) {
-    if (!this.batchManager) {
-      this.batchManager = new TranslationBatchManager(this);
-    }
-
-    const result = await this.batchManager.translateSystemMessagesBatch(
-      backgroundJob,
-      showSummary,
-      options,
-    );
-    return {
-      successes: result.successes,
-      failures: result.failures,
-      stats: result.stats,
-    };
   },
 
   findMessageInterpreter() {
@@ -757,391 +551,39 @@ export const translateOnTheFlyFlowMethods = {
     };
   },
 
-  collectAheadItems(currentText, currentSpeaker, interpreter, options = {}) {
-    const charLimit = options.charLimit || this.charLimit;
-    const maxItems = options.maxItems || this.batchItemsLimit || 20;
-    const maxDepth = options.maxDepth !== undefined ? options.maxDepth : 999;
-
-    console.log("[Lookahead] Starting collection", {
-      charLimit,
-      maxItems,
-      maxDepth,
-      currentText,
-      currentSpeaker,
-    });
-
-    const NL = "\n";
-    const items = []; // Unified list: { type: 'text'|'speaker'|'choice', id: string, value: string }
-    let totalChars = 0;
-    let itemIdCounter = 0;
-    let stopReason = "";
-    const seenCacheKeys = new Set();
-
-    const pushItem = (type, value, force = false) => {
-      // Skip empty strings, null, undefined (but continue scanning)
-      if (value == null || typeof value !== "string" || value.trim() === "") {
-        return true; // Skip empty, continue
-      }
-
-      // Check cache first - skip cached items (don't add to translation)
-      const cacheKey = this.getCacheKey(value, type);
-      if (!force && this.hasUsableCacheValue(cacheKey)) {
-        return true; // Skip cached, continue
-      }
-
-      // Avoid duplicates in one batch
-      if (seenCacheKeys.has(cacheKey)) {
-        return true; // Skip cached, continue
-      }
-
-      if (!force && items.length >= maxItems) {
-        stopReason = "items limit reached";
-        return false;
-      }
-
-      if (!force && totalChars + value.length > charLimit) {
-        stopReason = "charLimit reached";
-        return false;
-      }
-
-      const id = `${type}_${itemIdCounter++}`;
-      items.push({ type, id, value, cacheKey });
-      totalChars += value.length;
-      seenCacheKeys.add(cacheKey);
-
-      return true; // Continue
-    };
-
-    // Always include current text and speaker first (forced)
-    if (currentText) pushItem("text", currentText, true);
-    if (currentSpeaker) pushItem("speaker", currentSpeaker, true);
-
-    // If maxDepth is 0, only return current message
-    if (maxDepth === 0 || !interpreter || !Array.isArray(interpreter._list)) {
-      console.log("[Lookahead] Stopped: early return", {
-        reason:
-          maxDepth === 0
-            ? "maxDepth is 0"
-            : !interpreter
-              ? "no interpreter"
-              : "interpreter._list not array",
-        maxDepth,
-        hasInterpreter: !!interpreter,
-        isListArray: interpreter && Array.isArray(interpreter._list),
-        totalItems: items.length,
-      });
-      return items;
-    }
-
-    const list = interpreter._list;
-    const entries = [];
-    for (let i = 0; i < list.length; i++) {
-      const cmd = list[i];
-      if (!cmd || typeof cmd.code !== "number") {
-        continue;
-      }
-
-      if (cmd.code === 101) {
-        const speaker = (cmd.parameters && cmd.parameters[4]) || "";
-        const lines = [];
-        let j = i + 1;
-        while (j < list.length && list[j] && list[j].code === 401) {
-          lines.push(list[j].parameters && list[j].parameters[0]);
-          j++;
-        }
-
-        const joined = lines.join(NL);
-        entries.push({ cmdIndex: i, type: "text", value: joined });
-        if (speaker) {
-          entries.push({ cmdIndex: i, type: "speaker", value: speaker });
-        }
-        i = j - 1;
-        continue;
-      }
-
-      if (cmd.code === 102) {
-        const choices = cmd.parameters && cmd.parameters[0];
-        if (Array.isArray(choices)) {
-          for (const choice of choices) {
-            entries.push({ cmdIndex: i, type: "choice", value: choice });
-          }
-        }
-      }
-    }
-
-    if (!entries.length) {
-      return items;
-    }
-
-    const startCmdIndex = Math.max(0, Number(interpreter._index) || 0);
-    let pivot = entries.findIndex(
-      (e) =>
-        e.cmdIndex >= startCmdIndex &&
-        e.type === "text" &&
-        e.value === currentText,
-    );
-    if (pivot < 0) {
-      pivot = entries.findIndex(
-        (e) => e.type === "text" && e.value === currentText,
-      );
-    }
-    if (pivot < 0) {
-      pivot = entries.findIndex((e) => e.cmdIndex >= startCmdIndex);
-    }
-    if (pivot < 0) {
-      pivot = 0;
-    }
-
-    for (let k = 0; k < entries.length; k++) {
-      const idx = (pivot + k) % entries.length;
-      const entry = entries[idx];
-      if (!pushItem(entry.type, entry.value)) {
-        break;
-      }
-    }
-
-    // Log completion info
-    console.log("[Lookahead] Scan completed", {
-      totalCandidates: entries.length,
-      listLength: list.length,
-      totalItems: items.length,
-      totalChars,
-      reason: stopReason || "loop ended",
-    });
-
-    return items;
-  },
-
   async startAheadTranslation({
     currentText,
     currentSpeakerName,
     cacheKey,
     maxDepth,
   }) {
-    let pendingKeys = null;
+    if (!this.batchManager) {
+      this.batchManager = createTranslationBatchManager(this);
+    }
+
     try {
-      const interpreter = this.findMessageInterpreter();
-      const normalized = this.resolveOriginalMessageContext(
-        currentText,
-        currentSpeakerName,
-        interpreter,
-      );
-      const normalizedCurrentText = normalized.text || currentText || "";
-      const normalizedCurrentSpeaker =
-        normalized.speaker || currentSpeakerName || "";
-
-      const items = this.collectAheadItems(
-        normalizedCurrentText,
-        normalizedCurrentSpeaker,
-        interpreter,
+      return await this.batchManager.runBatchedTranslation(
+        [
+          {
+            kind: "currentEvent",
+            currentText,
+            currentSpeakerName,
+            cacheKey,
+            fullEvent: true,
+            maxDepth,
+          },
+        ],
         {
-          charLimit: Number.MAX_SAFE_INTEGER,
-          maxItems: Number.MAX_SAFE_INTEGER,
-          maxDepth,
-        },
-      );
-
-      // Add current choices from $gameMessage if present
-      if ($gameMessage && $gameMessage.isChoice && $gameMessage.isChoice()) {
-        const currentChoices =
-          $gameMessage._translateOriginalChoices || $gameMessage.choices();
-        if (Array.isArray(currentChoices)) {
-          for (let i = 0; i < currentChoices.length; i++) {
-            const choice = currentChoices[i];
-            const choiceCacheKey = this.getCacheKey(choice, "choice");
-            if (!this.hasUsableCacheValue(choiceCacheKey)) {
-              if (!items.some((item) => item.cacheKey === choiceCacheKey)) {
-                items.push({
-                  type: "choice",
-                  id: `current_choice_${i}`,
-                  value: choice,
-                  cacheKey: choiceCacheKey,
-                  mandatory: true,
-                });
-              }
-            }
-          }
-        }
-      }
-
-      if (!items.length) {
-        return;
-      }
-
-      const mandatoryCacheKeys = new Set();
-      if (normalizedCurrentText) {
-        mandatoryCacheKeys.add(this.getCacheKey(normalizedCurrentText, "text"));
-      }
-      if (normalizedCurrentSpeaker) {
-        mandatoryCacheKeys.add(
-          this.getCacheKey(normalizedCurrentSpeaker, "speaker"),
-        );
-      }
-      if ($gameMessage && $gameMessage.isChoice && $gameMessage.isChoice()) {
-        const currentChoices =
-          $gameMessage._translateOriginalChoices || $gameMessage.choices();
-        if (Array.isArray(currentChoices)) {
-          for (const choice of currentChoices) {
-            mandatoryCacheKeys.add(this.getCacheKey(choice, "choice"));
-          }
-        }
-      }
-
-      // Filter out items already in cache
-      const uncached = items.filter((item) => {
-        if (!item || !item.cacheKey) {
-          return false;
-        }
-
-        if (this.hasUsableCacheValue(item.cacheKey)) {
-          return false;
-        }
-
-        // Do not endlessly requeue failed lookahead-only items.
-        if (
-          this.failedTranslations.has(item.cacheKey) &&
-          !item.mandatory &&
-          !mandatoryCacheKeys.has(item.cacheKey)
-        ) {
-          return false;
-        }
-
-        return true;
-      });
-
-      if (uncached.length === 0) {
-        // All items cached, apply current text immediately
-        const firstTextItem = items.find((item) => item.type === "text");
-        if (firstTextItem) {
-          const cached = this.translationCache.get(firstTextItem.cacheKey);
-          if (cached) {
-            this.replaceMessageText(cached);
-            this._translationApplied = true;
-          }
-        }
-        return;
-      }
-
-      // Deduplicate by cacheKey - only send unique items to translator
-      const uniqueMap = new Map();
-      for (const item of uncached) {
-        if (!uniqueMap.has(item.cacheKey)) {
-          uniqueMap.set(item.cacheKey, item);
-        }
-      }
-      const uniqueItemsRaw = Array.from(uniqueMap.values());
-
-      const mandatoryItems = [];
-      const optionalItems = [];
-      for (const item of uniqueItemsRaw) {
-        if (item.mandatory || mandatoryCacheKeys.has(item.cacheKey)) {
-          mandatoryItems.push(item);
-        } else {
-          optionalItems.push(item);
-        }
-      }
-
-      const uniqueItems = [...mandatoryItems, ...optionalItems];
-
-      // Mark as pending (all uncached, including duplicates)
-      pendingKeys = new Set();
-      for (const item of uniqueItems) {
-        this.pendingTranslations.set(item.cacheKey, true);
-        pendingKeys.add(item.cacheKey);
-      }
-
-      console.log(
-        `[TranslateOnTheFly] Batch translating ${uniqueItems.length} items (${uniqueItems.filter((i) => i.type === "text").length} texts, ${uniqueItems.filter((i) => i.type === "speaker").length} speakers, ${uniqueItems.filter((i) => i.type === "choice").length} choices)`,
-      );
-
-      // Batch translate via unified batch manager to keep OTF progress UI consistent
-      if (!this.batchManager) {
-        this.batchManager = new TranslationBatchManager(this);
-      }
-      const result = await this.batchManager.runBatchedTranslation(
-        uniqueItems,
-        {
-          stepLabel: "OTF - translating event",
           backgroundJob: false,
-          itemLimit: this.batchItemsLimit || 20,
-          charLimit: this.charLimit || 1000,
           showSummary: false,
         },
       );
-
-      // Apply successes to cache
-      for (const success of result.successes) {
-        if (!success || !success.cacheKey) {
-          continue;
-        }
-        this.setCacheValue(success.cacheKey, success.translated);
-      }
-
-      // Cache failures as empty strings (for harvesting untranslated strings)
-      for (const failure of result.failures) {
-        if (!failure || !failure.cacheKey) {
-          continue;
-        }
-        this.setCacheValue(failure.cacheKey, "");
-      }
-
-      // Log failures
-      for (const failure of result.failures) {
-        console.warn(
-          `[TranslateOnTheFly] Failed to translate ${failure.type}:`,
-          failure.value,
-          "→",
-          failure.rejectReason,
-        );
-      }
-      this.markBatchFailuresAsUntranslated(result.failures, true);
-
-      // Apply the current text (now hopefully cached)
-      const firstTextItem = items.find((item) => item.type === "text");
-      if (firstTextItem) {
-        const translated = this.translationCache.get(firstTextItem.cacheKey);
-        if (translated) {
-          this.replaceMessageText(translated);
-          this._translationApplied = true;
-
-          this.translationCount += result.successes.filter(
-            (s) => s.type === "text",
-          ).length;
-          this.saveSettings();
-        } else {
-          // Translation failed, show original
-          this.replaceMessageText(normalizedCurrentText || currentText || "");
-          this._translationApplied = true;
-        }
-      }
-
-      // Apply translated choices if present (per-choice cache only)
-      if ($gameMessage && $gameMessage.isChoice && $gameMessage.isChoice()) {
-        const originalChoices =
-          $gameMessage._translateOriginalChoices || $gameMessage.choices();
-        const translatedChoices = originalChoices.map((choice) => {
-          const choiceCacheKey = this.getCacheKey(choice, "choice");
-          return this.translationCache.get(choiceCacheKey) || choice;
-        });
-
-        this.replaceChoiceText(translatedChoices);
-      }
     } catch (error) {
-      console.error("[TranslateOnTheFly] Ahead translation error:", error);
-      if (pendingKeys) {
-        for (const key of pendingKeys) {
-          this.failedTranslations.set(key, Date.now());
-        }
+      const strategy = CurrentEventTranslationPhaseStrategy.getInstance();
+      if (typeof strategy.handleFatalError === "function") {
+        strategy.handleFatalError({ panel: this, error });
       }
-      this.replaceMessageText(currentText || "");
-      this._translationApplied = true;
-    } finally {
-      // Clear pending flags
-      if (pendingKeys) {
-        for (const key of pendingKeys) {
-          this.pendingTranslations.delete(key);
-        }
-      }
+      return null;
     }
   },
 };

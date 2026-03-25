@@ -1,4 +1,4 @@
-import { TranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManager.js";
+import { createTranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManagerFactory.js";
 
 export const translateOnTheFlyRuntimeMethods = {
   setupTranslationHook() {
@@ -681,19 +681,20 @@ export const translateOnTheFlyRuntimeMethods = {
 
           try {
             if (!self.batchManager) {
-              self.batchManager = new TranslationBatchManager(self);
+              self.batchManager = createTranslationBatchManager(self);
             }
 
-            const result = await self.batchManager.runBatchedTranslation(
-              items,
+            const result = await self.batchManager.runBatchedTranslation([
               {
-                stepLabel: "translating menu options",
+                kind: "directItems",
+                items,
+                translationPhaseLabel: "translating menu options",
                 backgroundJob: false,
                 itemLimit: self.batchItemsLimit || 20,
                 charLimit: self.charLimit || 1000,
                 showSummary: false,
               },
-            );
+            ]);
 
             // Cache successes
             for (const success of result.successes) {
@@ -800,7 +801,7 @@ export const translateOnTheFlyRuntimeMethods = {
     console.log("[TranslateOnTheFly] Starting translation of game data arrays");
 
     if (!this.batchManager) {
-      this.batchManager = new TranslationBatchManager(this);
+      this.batchManager = createTranslationBatchManager(this);
     }
 
     if (!this.isEngineFullyConfigured()) {
@@ -839,25 +840,16 @@ export const translateOnTheFlyRuntimeMethods = {
 
     if (pendingValues.length === 0) {
       console.log("[TranslateOnTheFly] All array strings already cached");
-      const translated = await this.batchManager.runBatchedTranslation([], {
-        stepLabel: progressLabel,
-        backgroundJob: isBackgroundJob,
-        itemLimit: this.batchItemsLimit || 20,
-        charLimit: this.charLimit || 1000,
-        isPhase,
-        showSummary,
-      });
-
       this.persistCache();
       console.log(
         "[TranslateOnTheFly] Completed translation of game data arrays",
       );
       return {
-        successCount: translated.successes.length,
-        failureCount: translated.failures.length,
+        successCount: 0,
+        failureCount: 0,
         totalCount: 0,
-        stats: translated.stats,
-        summary: translated.summary,
+        stats: null,
+        summary: null,
       };
     } else {
       // Build translation items and delegate chunking/progress to the shared batch manager.
@@ -881,21 +873,22 @@ export const translateOnTheFlyRuntimeMethods = {
         items.map((item) => [item.cacheKey, item.meta]),
       );
 
-      const translated = await this.batchManager.runBatchedTranslation(
-        items.map((item) => ({
-          type: item.type,
-          id: item.id,
-          value: item.value,
-          cacheKey: item.cacheKey,
-        })),
+      const translated = await this.batchManager.runBatchedTranslation([
         {
-          stepLabel: progressLabel,
+          kind: "directItems",
+          items: items.map((item) => ({
+            type: item.type,
+            id: item.id,
+            value: item.value,
+            cacheKey: item.cacheKey,
+          })),
+          translationPhaseLabel: progressLabel,
           backgroundJob: isBackgroundJob,
           itemLimit: this.batchItemsLimit || 20,
           charLimit: this.charLimit || 1000,
           isPhase,
           showSummary,
-          onBatchSettled: ({ successes, failures }) => {
+          onTranslationBatchCompleted: ({ successes, failures }) => {
             for (const success of successes || []) {
               const originalValue = success && success.value;
               const meta = success
@@ -913,7 +906,7 @@ export const translateOnTheFlyRuntimeMethods = {
             this.markBatchFailuresAsUntranslated(failures || [], true);
           },
         },
-      );
+      ]);
 
       for (const failure of translated.failures) {
         console.warn(

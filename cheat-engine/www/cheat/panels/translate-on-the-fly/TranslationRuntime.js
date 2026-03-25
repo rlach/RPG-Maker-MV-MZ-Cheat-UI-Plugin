@@ -5,7 +5,7 @@ import {
   createEngine,
   getAvailableEngines,
 } from "../../translate-engines/index.js";
-import { TranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManager.js";
+import { createTranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManagerFactory.js";
 import { translateOnTheFlySettingsMethods } from "./TranslateOnTheFlySettingsMethods.js";
 import { translateOnTheFlyCacheMethods } from "./TranslateOnTheFlyCacheMethods.js";
 import { translateOnTheFlyUiMethods } from "./TranslateOnTheFlyUiMethods.js";
@@ -78,7 +78,7 @@ class TranslationRuntime {
     this.loadSettings();
     this.loadCacheFromDisk();
     this.engine = createEngine(this.translationEngine, this);
-    this.batchManager = new TranslationBatchManager(this);
+    this.batchManager = createTranslationBatchManager(this);
 
     if (this.engineSettings && this.engineSettings[this.translationEngine]) {
       const engineConfig = this.engineSettings[this.translationEngine];

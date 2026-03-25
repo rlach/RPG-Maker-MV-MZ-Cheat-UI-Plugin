@@ -1,6 +1,6 @@
 import { KeyValueStorage } from "../js/KeyValueStorage.js";
 import { getRowsPerPage, setRowsPerPage } from "../js/TableSettings.js";
-import { TranslationBatchManager } from "../translate-engines/batch-manager/TranslationBatchManager.js";
+import { createTranslationBatchManager } from "../translate-engines/batch-manager/TranslationBatchManagerFactory.js";
 import {
   ensureTranslateCacheRuntime,
   notifyTranslateCacheRuntimeChanged,
@@ -601,34 +601,19 @@ export default {
 
       try {
         if (!runtime.batchManager) {
-          runtime.batchManager = new TranslationBatchManager(runtime);
+          runtime.batchManager = createTranslationBatchManager(runtime);
         }
 
-        const result = await runtime.batchManager.runBatchedTranslation(items, {
-          stepLabel: "translate empty strings",
-          backgroundJob: false,
-          itemLimit: maxItems,
-          charLimit: maxChars,
-          showSummary: true,
-        });
-
-        for (const success of result.successes || []) {
-          runtime.setCacheValue(success.cacheKey, success.translated);
-        }
-
-        for (const failure of result.failures || []) {
-          if (runtime.failedTranslations && failure.cacheKey) {
-            runtime.failedTranslations.set(failure.cacheKey, Date.now());
-          }
-
-          const hasUsable =
-            typeof runtime.hasUsableCacheValue === "function"
-              ? runtime.hasUsableCacheValue(failure.cacheKey)
-              : false;
-          if (failure.cacheKey && !hasUsable) {
-            runtime.setCacheValue(failure.cacheKey, "");
-          }
-        }
+        await runtime.batchManager.runBatchedTranslation([
+          {
+            kind: "emptyStrings",
+            items,
+            backgroundJob: false,
+            itemLimit: maxItems,
+            charLimit: maxChars,
+            showSummary: true,
+          },
+        ]);
       } catch (error) {
         console.error(
           "[TranslateCacheManagerPanel] Translate empty strings failed",
