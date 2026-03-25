@@ -1,5 +1,5 @@
 import { Alert } from "../../js/AlertHelper.js";
-import { TranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManager.js";
+import { createTranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManagerFactory.js";
 
 export const translateOnTheFlyMessageMethods = {
   replaceMessageText(translatedText) {
@@ -218,25 +218,26 @@ export const translateOnTheFlyMessageMethods = {
       }
 
       if (!this.batchManager) {
-        this.batchManager = new TranslationBatchManager(this);
+        this.batchManager = createTranslationBatchManager(this);
       }
-      const result = await this.batchManager.runBatchedTranslation(
-        [
-          {
-            type: "command",
-            id: "cmd_0",
-            value: cleanName,
-            cacheKey: commandKey,
-          },
-        ],
+      const result = await this.batchManager.runBatchedTranslation([
         {
-          stepLabel: "translating menu options",
+          kind: "directItems",
+          items: [
+            {
+              type: "command",
+              id: "cmd_0",
+              value: cleanName,
+              cacheKey: commandKey,
+            },
+          ],
+          translationPhaseLabel: "translating menu options",
           backgroundJob: false,
           itemLimit: this.batchItemsLimit || 20,
           charLimit: this.charLimit || 1000,
           showSummary: false,
         },
-      );
+      ]);
 
       if (result.successes.length > 0) {
         const translated = result.successes[0].translated;
@@ -319,15 +320,19 @@ export const translateOnTheFlyMessageMethods = {
 
     // Translate uncached choices
     if (!this.batchManager) {
-      this.batchManager = new TranslationBatchManager(this);
+      this.batchManager = createTranslationBatchManager(this);
     }
-    const result = await this.batchManager.runBatchedTranslation(items, {
-      stepLabel: "translating choices",
-      backgroundJob: false,
-      itemLimit: this.batchItemsLimit || 20,
-      charLimit: this.charLimit || 1000,
-      showSummary: false,
-    });
+    const result = await this.batchManager.runBatchedTranslation([
+      {
+        kind: "directItems",
+        items,
+        translationPhaseLabel: "translating choices",
+        backgroundJob: false,
+        itemLimit: this.batchItemsLimit || 20,
+        charLimit: this.charLimit || 1000,
+        showSummary: false,
+      },
+    ]);
 
     // Apply successes to cache
     for (const success of result.successes) {
@@ -411,15 +416,11 @@ export const translateOnTheFlyMessageMethods = {
 
   async translateAndApplyCurrentMessage() {
     try {
-      // Use stored $gameMessage reference instead of global one
       const gameMessage = this.currentGameMessage || $gameMessage;
-
       if (!gameMessage || typeof gameMessage.allText !== "function") {
         console.warn("[TranslateOnTheFly] No gameMessage available");
         return;
       }
-
-      // Verify engine exists
       if (!this.engine || typeof this.engine.batchTranslate !== "function") {
         console.error(
           "[TranslateOnTheFly] No engine available or batchTranslate not found",
@@ -433,188 +434,22 @@ export const translateOnTheFlyMessageMethods = {
         Alert.error("Translation engine not initialized");
         return;
       }
-
-      // Get original text (before translation) or current text
-      const originalText =
-        gameMessage._translateOriginalText || gameMessage.allText();
-
-      // Get original speaker (before translation) or current speaker
-      const originalSpeakerName =
-        gameMessage._translateOriginalSpeaker || gameMessage._speakerName || "";
-
-      // Get original choices (before translation) or current choices
-      const choices = gameMessage.choices ? gameMessage.choices() : [];
-      const originalChoices = gameMessage._translateOriginalChoices || choices;
-      const hasChoices =
-        Array.isArray(originalChoices) && originalChoices.length > 0;
-
-      // Validate that we have something to translate (text, speaker, or choices)
-      const hasText = originalText && originalText.trim().length > 0;
-      const hasSpeaker =
-        originalSpeakerName && originalSpeakerName.trim().length > 0;
-
-      if (!hasText && !hasSpeaker && !hasChoices) {
-        console.warn(
-          "[TranslateOnTheFly] Message text is empty and no choices or speaker",
-        );
-        return;
-      }
-
-      console.log("[TranslateOnTheFly] Translating current message:", {
-        text: hasText ? originalText.substring(0, 50) : "(no text)",
-        speaker: originalSpeakerName,
-        choices: originalChoices,
-      });
-
-      // Build items array
-      const items = [];
-      let itemIdCounter = 0;
-
-      // Add text
-      const textKey = this.getCacheKey(originalText, "text");
-      items.push({
-        type: "text",
-        id: `text_${itemIdCounter++}`,
-        value: originalText,
-        cacheKey: textKey,
-      });
-
-      // Add speaker
-      if (originalSpeakerName && originalSpeakerName.trim().length > 0) {
-        const speakerKey = this.getCacheKey(originalSpeakerName, "speaker");
-        items.push({
-          type: "speaker",
-          id: `speaker_${itemIdCounter++}`,
-          value: originalSpeakerName,
-          cacheKey: speakerKey,
-        });
-      }
-
-      // Add choices
-      if (hasChoices) {
-        for (let i = 0; i < originalChoices.length; i++) {
-          const choice = originalChoices[i];
-          const choiceKey = this.getCacheKey(choice, "choice");
-          items.push({
-            type: "choice",
-            id: `choice_${itemIdCounter++}`,
-            value: choice,
-            cacheKey: choiceKey,
-          });
-        }
-      }
-
-      // Clear cache for these items to force re-translation
-      for (const item of items) {
-        this.deleteCacheValue(item.cacheKey, {
-          persist: false,
-          notify: false,
-          deleteSeen: false,
-        });
-      }
-      this.persistCache();
-      this.notifyCacheRuntime("cache-force-retranslate");
-
-      // Translate using batch
       if (!this.batchManager) {
-        this.batchManager = new TranslationBatchManager(this);
+        this.batchManager = createTranslationBatchManager(this);
       }
-      const result = await this.batchManager.runBatchedTranslation(items, {
-        stepLabel: "OTF - translating current message",
-        backgroundJob: false,
-        itemLimit: this.batchItemsLimit || 20,
-        charLimit: this.charLimit || 1000,
-        showSummary: false,
-      });
-
-      console.log("[TranslateOnTheFly] Translation result:", {
-        successes: result.successes.length,
-        failures: result.failures.length,
-      });
-
-      // Cache successes
-      for (const success of result.successes) {
-        this.setCacheValue(success.cacheKey, success.translated);
-      }
-
-      // Cache failures as empty strings (for harvesting untranslated strings)
-      for (const failure of result.failures) {
-        this.setCacheValue(failure.cacheKey, "");
-      }
-
-      // Log failures
-      for (const failure of result.failures) {
-        console.warn(
-          `[TranslateOnTheFly] Failed to translate ${failure.type}:`,
-          failure.value,
-          "→",
-          failure.rejectReason,
-        );
-      }
-      this.markBatchFailuresAsUntranslated(result.failures, true);
-
-      // Apply translations
-      const translatedText = this.translationCache.get(textKey);
-      if (translatedText) {
-        this.replaceMessageText(translatedText);
-        this.translationCount++;
-        this.saveSettings();
-      }
-
-      // Apply speaker
-      if (originalSpeakerName) {
-        const speakerKey = this.getCacheKey(originalSpeakerName, "speaker");
-        const translatedSpeaker = this.translationCache.get(speakerKey);
-        if (translatedSpeaker) {
-          this.replaceSpeakerName(translatedSpeaker);
-        }
-      }
-
-      // Apply choices
-      if (hasChoices) {
-        const translatedChoices = originalChoices.map((choice) => {
-          const choiceKey = this.getCacheKey(choice, "choice");
-          return this.translationCache.get(choiceKey) || choice;
-        });
-        this.replaceChoiceText(translatedChoices);
-      }
-
-      // Force refresh the currently displayed message window
-      if (this.currentMessageWindow && this.currentMessageWindow.isOpen()) {
-        const msgWindow = this.currentMessageWindow;
-
-        console.log(
-          "[TranslateOnTheFly] Refreshing message window by close/open cycle",
-        );
-
-        // Save current state
-        const wasOpen = msgWindow.isOpen();
-        const currentOpenness = msgWindow.openness;
-
-        if (wasOpen) {
-          if (translatedText) {
-            msgWindow.contents.clear();
-            const tState = msgWindow.createTextState(translatedText, 0, 0, 5);
-            msgWindow._textState = tState;
-            msgWindow.pause = false;
-          }
-        }
-
-        // If choices are displayed, refresh them too
-        if (
-          hasChoices &&
-          SceneManager._scene &&
-          SceneManager._scene._choiceListWindow
-        ) {
-          const choiceWindow = SceneManager._scene._choiceListWindow;
-          if (choiceWindow.isOpen()) {
-            choiceWindow.refresh();
-          }
-        }
-      }
-
-      console.log(
-        "[TranslateOnTheFly] Translation applied and window refreshed",
+      await this.batchManager.runBatchedTranslation(
+        [
+          {
+            kind: "currentEvent",
+            fullEvent: false,
+            forceRefreshCache: true,
+          },
+        ],
+        {
+          translationPhaseLabel: "OTF - translating current message",
+          backgroundJob: false,
+          showSummary: false,
+        },
       );
     } catch (error) {
       console.error("[TranslateOnTheFly] Translation error:", error);

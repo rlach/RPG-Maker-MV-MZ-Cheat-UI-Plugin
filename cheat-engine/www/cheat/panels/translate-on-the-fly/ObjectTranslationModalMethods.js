@@ -1,97 +1,22 @@
 import { TRANSLATE_SETTINGS, TRANSLATOR } from "../../js/TranslateHelper.js";
+import { createTranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManagerFactory.js";
 
 export const objectTranslationRuntimeMethods = {
   getObjectTranslationTypeDefs() {
     return [
-      {
-        id: "items",
-        label: "items",
-        kind: "data",
-        getContainer: () => window.$dataItems,
-        fields: ["name", "description", "note"],
-        cachePrefix: "item",
-      },
-      {
-        id: "skills",
-        label: "skills",
-        kind: "data",
-        getContainer: () => window.$dataSkills,
-        fields: ["name", "description", "message1", "message2"],
-        cachePrefix: "skill",
-      },
-      {
-        id: "classes",
-        label: "classes",
-        kind: "data",
-        getContainer: () => window.$dataClasses,
-        fields: ["name"],
-        cachePrefix: "class",
-      },
-      {
-        id: "enemies",
-        label: "enemies",
-        kind: "data",
-        getContainer: () => window.$dataEnemies,
-        fields: ["name"],
-        cachePrefix: "enemy",
-      },
-      {
-        id: "armors",
-        label: "armors",
-        kind: "data",
-        getContainer: () => window.$dataArmors,
-        fields: ["name", "description"],
-        cachePrefix: "armor",
-      },
-      {
-        id: "weapons",
-        label: "weapons",
-        kind: "data",
-        getContainer: () => window.$dataWeapons,
-        fields: ["name", "description"],
-        cachePrefix: "weapon",
-      },
-      {
-        id: "maps",
-        label: "maps",
-        kind: "data",
-        getContainer: () => window.$dataMapInfos,
-        fields: ["name"],
-        cachePrefix: "map",
-      },
-      {
-        id: "actors",
-        label: "actors",
-        kind: "data",
-        getContainer: () => window.$dataActors,
-        fields: ["name", "nickname", "profile"],
-        cachePrefix: "actor",
-      },
-      {
-        id: "systemMessages",
-        label: "system messages",
-        kind: "systemMessages",
-      },
-      {
-        id: "systemCommands",
-        label: "system commands",
-        kind: "systemCommands",
-      },
-      {
-        id: "gameArrays",
-        label: "game arrays (terms, types, elements)",
-        kind: "gameArrays",
-      },
-      {
-        id: "commonEvents",
-        label: "CommonEvents",
-        kind: "commonEvents",
-      },
-      {
-        id: "mapEvents",
-        label: "Map events",
-        kind: "mapEvents",
-      },
+      { id: "items", label: "items" },
+      { id: "skills", label: "skills" },
+      { id: "classes", label: "classes" },
+      { id: "enemies", label: "enemies" },
+      { id: "armors", label: "armors" },
+      { id: "weapons", label: "weapons" },
+      { id: "maps", label: "maps" },
+      { id: "actors", label: "actors" },
+      { id: "systemMessages", label: "system messages" },
+      { id: "systemCommands", label: "system commands" },
+      { id: "gameArrays", label: "game arrays (terms, types, elements)" },
+      { id: "commonEvents", label: "CommonEvents" },
+      { id: "mapEvents", label: "Map events" },
     ];
   },
 
@@ -421,86 +346,26 @@ export const objectTranslationRuntimeMethods = {
   },
 
   getObjectTranslationStats() {
+    if (!this.batchManager) {
+      this.batchManager = createTranslationBatchManager(this);
+    }
+
     const defs = this.getObjectTranslationTypeDefs();
+    const countedByKind = new Map(
+      this.batchManager
+        .countAmountSync(defs.map((def) => ({ kind: def.id })))
+        .map((entry) => [entry.kind, entry]),
+    );
+
     return defs.map((def) => {
-      if (def.kind === "commonEvents") {
-        const stats = this.countCommonEventsStats();
-        return { ...def, ...stats };
-      }
-
-      if (def.kind === "mapEvents") {
-        const stats = this.countMapEventsStats();
-        return { ...def, ...stats };
-      }
-
-      if (def.kind === "systemMessages") {
-        const stats = this.countSystemMessagesStats();
-        return { ...def, ...stats };
-      }
-
-      if (def.kind === "systemCommands") {
-        const stats = this.countSystemCommandsStats();
-        return { ...def, ...stats };
-      }
-
-      if (def.kind === "gameArrays") {
-        const stats = this.countGameArraysStats();
-        return { ...def, ...stats };
-      }
-
-      const container = def.getContainer && def.getContainer();
-      if (!Array.isArray(container)) {
-        return { ...def, total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
-      }
-
-      let total = 0;
-      let left = 0;
-      let totalStrings = 0;
-      let leftStrings = 0;
-
-      for (let i = 1; i < container.length; i++) {
-        const item = container[i];
-        if (!item) continue;
-        total++;
-
-        if (!item._translateOriginal) {
-          item._translateOriginal = {};
-        }
-
-        for (const field of def.fields) {
-          if (!item._translateOriginal[field] && item[field]) {
-            item._translateOriginal[field] = item[field];
-          }
-        }
-
-        let hasUntranslated = false;
-        for (const field of def.fields) {
-          const originalValue = item._translateOriginal[field];
-          if (
-            !originalValue ||
-            typeof originalValue !== "string" ||
-            originalValue.trim() === ""
-          ) {
-            continue;
-          }
-
-          totalStrings++;
-          const cacheKey = this.getCacheKey(
-            originalValue,
-            `${def.cachePrefix}_${field}`,
-          );
-          if (!this.hasUsableCacheValue(cacheKey)) {
-            leftStrings++;
-            hasUntranslated = true;
-          }
-        }
-
-        if (hasUntranslated) {
-          left++;
-        }
-      }
-
-      return { ...def, total, left, totalStrings, leftStrings };
+      const counted = countedByKind.get(def.id) || {};
+      return {
+        ...def,
+        total: Math.max(0, Number(counted.total) || 0),
+        left: Math.max(0, Number(counted.left) || 0),
+        totalStrings: Math.max(0, Number(counted.totalStrings) || 0),
+        leftStrings: Math.max(0, Number(counted.leftStrings) || 0),
+      };
     });
   },
 

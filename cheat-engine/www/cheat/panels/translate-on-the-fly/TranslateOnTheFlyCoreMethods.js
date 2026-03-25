@@ -2,8 +2,7 @@ import { Alert } from "../../js/AlertHelper.js";
 import { MessageCheat } from "../../js/CheatHelper.js";
 import { TranslateOnTheFlyState } from "../../js/TranslateOnTheFlyState.js";
 import { ensureTranslateCacheRuntime } from "../../js/TranslateCacheRuntime.js";
-import { BatchSummaryReporter } from "../../translate-engines/batch-manager/BatchSummaryReporter.js";
-import { TranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManager.js";
+import { createTranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManagerFactory.js";
 
 export const translateOnTheFlyCoreMethods = {
   isTranslationEnabled() {
@@ -303,146 +302,52 @@ export const translateOnTheFlyCoreMethods = {
   },
 
   async translateDataBatch(dataObjects, fields, type, options = {}) {
-    if (!this.batchManager) {
-      this.batchManager = new TranslationBatchManager(this);
+    if (!Array.isArray(dataObjects) || !Array.isArray(fields) || !type) {
+      return { successes: 0, failures: 0, stats: null };
     }
 
-    return this.batchManager.translateDataBatch(
-      dataObjects,
-      fields,
-      type,
-      options,
+    const translated = await this.batchManager.runBatchedTranslation(
+      [
+        {
+          kind: "dataObjects",
+          dataObjects,
+          fields,
+          type,
+          backgroundJob: !!options.backgroundJob,
+        },
+      ],
+      {
+        ...options,
+        backgroundJob: !!options.backgroundJob,
+        showSummary: false,
+      },
     );
+
+    return {
+      successes: translated.successes.length,
+      failures: translated.failures.length,
+      stats: translated.stats,
+    };
   },
 
   async translateAllMaps() {
-    let processStarted = false;
+    const validMaps = this.getValidMapInfos();
+    if (validMaps.length === 0) {
+      Alert.warn("No valid maps found");
+      return;
+    }
+
+    const previousSelectedMapIds = Array.isArray(
+      this.objectTranslationSelectedMapIds,
+    )
+      ? [...this.objectTranslationSelectedMapIds]
+      : null;
+
     try {
-      const startedAt = Date.now();
-      if (!this.engine || !this.isEngineFullyConfigured()) {
-        Alert.error("Translation engine not fully configured");
-        return;
-      }
-
-      if (!$dataMapInfos || !Array.isArray($dataMapInfos)) {
-        Alert.error("Map info not loaded");
-        return;
-      }
-
-      if (!this.beginNonOtfTranslationProcess("all maps translation")) {
-        return;
-      }
-      processStarted = true;
-
-      if (!this.batchManager) {
-        this.batchManager = new TranslationBatchManager(this);
-      }
-      this.batchManager.progressTracker.beginQueue();
-
-      console.log("[TranslateOnTheFly] Starting translation of all maps");
-
-      const validMaps = this.getValidMapInfos();
-
-      if (validMaps.length === 0) {
-        Alert.warn("No valid maps found");
-        return;
-      }
-
-      console.log(
-        `[TranslateOnTheFly] Found ${validMaps.length} maps to translate`,
-      );
-
-      let totalTranslated = 0;
-      let totalFailed = 0;
-      let totalTarget = 0;
-      const aggregatedErrorStats =
-        BatchSummaryReporter.createErrorStatsAccumulator();
-
-      console.log("[TranslateOnTheFly] Translating common events first");
-      try {
-        const result = await this.translateMapEvents(
-          {
-            events: [
-              {
-                pages: $dataCommonEvents,
-              },
-            ],
-          },
-          -1,
-          null,
-          "translating common events",
-          { skipProcessLock: true, isPhase: true },
-        );
-        if (result) {
-          totalTranslated += result.successCount || 0;
-          totalFailed += result.failureCount || 0;
-          totalTarget += result.totalCount || 0;
-          BatchSummaryReporter.mergeErrorStats(
-            aggregatedErrorStats,
-            result.stats,
-          );
-        }
-      } catch (error) {
-        console.error(
-          "[TranslateOnTheFly] Failed to translate common events:",
-          error,
-        );
-      }
-
-      for (let i = 0; i < validMaps.length; i++) {
-        const mapInfo = validMaps[i];
-        const mapId = mapInfo.id;
-        const mapNumber = i + 1;
-
-        console.log(
-          `[TranslateOnTheFly] Processing map ${mapNumber}/${validMaps.length}: ${mapInfo.name} (ID: ${mapId})`,
-        );
-
-        try {
-          const mapData = await this.loadMapDataById(mapId);
-          const result = await this.translateMapEvents(
-            mapData,
-            mapNumber,
-            validMaps.length,
-            `translating map ${mapNumber}/${validMaps.length}`,
-            { skipProcessLock: true, isPhase: true },
-          );
-          if (result) {
-            totalTranslated += result.successCount || 0;
-            totalFailed += result.failureCount || 0;
-            totalTarget += result.totalCount || 0;
-            BatchSummaryReporter.mergeErrorStats(
-              aggregatedErrorStats,
-              result.stats,
-            );
-          }
-        } catch (error) {
-          console.error(
-            `[TranslateOnTheFly] Failed to load or translate map ${mapId}:`,
-            error,
-          );
-        }
-      }
-
-      this.batchManager.progressTracker.endQueue();
-      const summary = BatchSummaryReporter.buildSummary({
-        batchLabel: "all maps translation",
-        totalItems: totalTarget,
-        successes: totalTranslated,
-        failures: totalFailed,
-        errorStats: aggregatedErrorStats,
-        durationMs: Date.now() - startedAt,
-      });
-      BatchSummaryReporter.showAlert(summary);
-      BatchSummaryReporter.logSummary(summary);
-    } catch (error) {
-      if (this.batchManager) this.batchManager.progressTracker.endQueue();
-      console.error("[TranslateOnTheFly] translateAllMaps error:", error);
-      Alert.error("Failed to translate all maps: " + error.message);
+      this.objectTranslationSelectedMapIds = validMaps.map((map) => map.id);
+      await this.runObjectTranslationJob(["commonEvents", "mapEvents"]);
     } finally {
-      if (processStarted) {
-        this.endNonOtfTranslationProcess();
-      }
+      this.objectTranslationSelectedMapIds = previousSelectedMapIds;
     }
   },
 
@@ -469,17 +374,42 @@ export const translateOnTheFlyCoreMethods = {
     }
 
     if (!this.batchManager) {
-      this.batchManager = new TranslationBatchManager(this);
+      this.batchManager = createTranslationBatchManager(this);
     }
 
+    const mapRequest = {
+      kind: "mapEvents",
+      mapData: mapData || null,
+      mapId: mapData && mapData._mapId ? mapData._mapId : null,
+      mapNumber,
+      totalMaps,
+      progressLabel,
+      backgroundJob: !!(options && options.backgroundJob),
+      mapIds:
+        mapData && mapData._mapId
+          ? [mapData._mapId]
+          : typeof mapNumber === "number" && mapNumber > 0
+            ? [mapNumber]
+            : null,
+    };
     try {
-      return await this.batchManager.translateMapEvents(
-        mapData,
-        mapNumber,
-        totalMaps,
-        progressLabel,
-        options,
+      const translatedByKind = await this.batchManager.runBatchedTranslation(
+        [mapRequest],
+        {
+          ...options,
+          translationPhaseLabel: progressLabel || "translating map",
+          backgroundJob: !!(options && options.backgroundJob),
+          showSummary: !options.isPhase && mapNumber === null,
+        },
       );
+
+      return {
+        successCount: translatedByKind.successes.length,
+        failureCount: translatedByKind.failures.length,
+        totalCount:
+          translatedByKind.successes.length + translatedByKind.failures.length,
+        stats: translatedByKind.stats,
+      };
     } finally {
       if (processStarted) {
         this.endNonOtfTranslationProcess();
