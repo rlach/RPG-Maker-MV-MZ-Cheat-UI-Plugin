@@ -19,35 +19,63 @@ class ConsoleLogStore {
     this.originalConsole.info = console.info;
     this.originalConsole.debug = console.debug;
 
-    this.installProxyMethod("log");
-    this.installProxyMethod("warn");
-    this.installProxyMethod("error");
-    this.installProxyMethod("info");
-    this.installProxyMethod("debug");
+    this.installWrapperMethod("log");
+    this.installWrapperMethod("warn");
+    this.installWrapperMethod("error");
+    this.installWrapperMethod("info");
+    this.installWrapperMethod("debug");
   }
 
-  installProxyMethod(level) {
+  installWrapperMethod(level) {
     const original = this.originalConsole[level];
     if (typeof original !== "function") {
       return;
     }
 
     const self = this;
-    console[level] = new Proxy(original, {
-      apply(target, thisArg, argArray) {
-        const args = Array.isArray(argArray) ? argArray : [];
-        self.add(level, args);
-        return Reflect.apply(target, console, args);
-      },
-    });
+    console[level] = function (...args) {
+      const safeArgs = Array.isArray(args) ? args : [];
+      const source = self.extractCallerSource(new Error().stack || "");
+      self.add(level, safeArgs, source);
+      return original.apply(console, safeArgs);
+    };
   }
 
-  add(level, args) {
+  extractCallerSource(stackText = "") {
+    const stack = String(stackText || "").split("\n");
+    for (const line of stack) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.includes("ConsoleLogStore.js")) {
+        continue;
+      }
+
+      let match = trimmed.match(/\(?([^()]+:\d+:\d+)\)?$/);
+      if (!match && trimmed.includes("@")) {
+        match = trimmed.match(/@([^@]+:\d+:\d+)$/);
+      }
+      if (!match || !match[1]) {
+        continue;
+      }
+
+      const raw = match[1].replace(/^file:\/\//, "");
+      const marker = "/cheat-engine/www/cheat/";
+      const markerIndex = raw.indexOf(marker);
+      if (markerIndex >= 0) {
+        return raw.slice(markerIndex + 1);
+      }
+      return raw;
+    }
+
+    return "";
+  }
+
+  add(level, args, source = "") {
     const entry = {
       id: Date.now() + "-" + Math.random(),
       timestamp: Date.now(),
       level,
       args: Array.from(args),
+      source,
     };
 
     this.logs.push(entry);
@@ -101,5 +129,5 @@ if (__rootWindow !== window) {
 
 export const CONSOLE_LOG = __rootConsoleLog;
 
-// Auto-intercept only once (intercept guards internally)
+// Auto-intercept to mirror console entries in the panel.
 CONSOLE_LOG.intercept();
