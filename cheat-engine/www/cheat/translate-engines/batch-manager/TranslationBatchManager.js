@@ -421,18 +421,9 @@ export class TranslationBatchManager {
 
         let translated;
         if (typeof entry.execute === "function") {
-          const runGameArrays = async (executeOptions = {}) => {
-            return this.panel.translateGameArrays({
-              ...executeOptions,
-              backgroundJob: !!(
-                entry.executionOptions && entry.executionOptions.backgroundJob
-              ),
-            });
-          };
           translated = await entry.execute({
             panel: this.panel,
             executionOptions: entry.executionOptions || {},
-            runGameArrays,
           });
         } else {
           const strategy =
