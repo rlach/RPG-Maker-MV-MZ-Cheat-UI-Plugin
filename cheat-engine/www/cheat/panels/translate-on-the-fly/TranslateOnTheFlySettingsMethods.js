@@ -6,6 +6,17 @@ import {
   serializePersistedTranslationSettings,
 } from "./TranslationRuntimeDefaults.js";
 
+const sanitizeEngineConfigForPersistence = (engineConfig = {}) => {
+  const sanitized = {};
+  for (const [key, value] of Object.entries(engineConfig)) {
+    if (/Options$/i.test(key)) {
+      continue;
+    }
+    sanitized[key] = value;
+  }
+  return sanitized;
+};
+
 export const translateOnTheFlySettingsMethods = {
   loadSettings() {
     const json = this.kvStorage.getItem("data");
@@ -33,7 +44,9 @@ export const translateOnTheFlySettingsMethods = {
   saveSettings() {
     // Collect engine-specific settings before saving
     if (this.engine) {
-      const engineConfig = { ...this.engine.getConfigData() };
+      const engineConfig = sanitizeEngineConfigForPersistence({
+        ...this.engine.getConfigData(),
+      });
       if (!this.engineSettings) {
         this.engineSettings = {};
       }
@@ -92,7 +105,9 @@ export const translateOnTheFlySettingsMethods = {
   onChangeTranslationEngine() {
     // Save current engine's configuration before switching
     if (this.engine) {
-      const currentConfig = this.engine.getConfigData();
+      const currentConfig = sanitizeEngineConfigForPersistence(
+        this.engine.getConfigData(),
+      );
       if (!this.engineSettings) {
         this.engineSettings = {};
       }
@@ -106,6 +121,9 @@ export const translateOnTheFlySettingsMethods = {
     if (this.engineSettings && this.engineSettings[this.translationEngine]) {
       const engineConfig = this.engineSettings[this.translationEngine];
       Object.assign(this.engine, engineConfig);
+      if (typeof this.engine.setCustomTags === "function") {
+        this.engine.setCustomTags(this.engine.customTags || []);
+      }
     }
 
     // Bind new engine config data to panel

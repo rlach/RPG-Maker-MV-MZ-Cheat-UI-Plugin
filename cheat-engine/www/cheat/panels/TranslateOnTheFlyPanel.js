@@ -177,8 +177,8 @@ export default {
         </div>
     </v-card-text>
 
-      <v-dialog v-model="customTagDialogVisible" max-width="560">
-        <v-card>
+      <v-dialog v-model="customTagDialogVisible" max-width="560" @keydown.stop>
+        <v-card dark class="pt-2">
           <v-card-title class="subtitle-1 font-weight-bold">{{ customTagEditIndex >= 0 ? 'Edit Custom Tag' : 'Add Custom Tag' }}</v-card-title>
           <v-card-text>
             <v-text-field
@@ -187,6 +187,7 @@ export default {
               outlined
               dense
               hide-details
+              @keydown.stop
               class="mb-2"
             ></v-text-field>
 
@@ -196,6 +197,7 @@ export default {
               outlined
               dense
               hide-details
+              @keydown.stop
               class="mb-2"
             ></v-text-field>
 
@@ -206,6 +208,7 @@ export default {
               outlined
               dense
               hide-details
+              @keydown.stop
               class="mb-2"
             ></v-select>
 
@@ -224,6 +227,7 @@ export default {
                 outlined
                 dense
                 hide-details
+                @keydown.stop
                 class="mb-2"
               ></v-select>
 
@@ -548,11 +552,14 @@ export default {
         this.callRuntime("addAiCustomTag", payload);
       }
 
+      this.callRuntime("bindEngineConfigTo", this.runtime);
+
       this.closeCustomTagDialog();
     },
 
     removeCustomTag(index) {
       this.callRuntime("removeAiCustomTag", index);
+      this.callRuntime("bindEngineConfigTo", this.runtime);
     },
   },
 };

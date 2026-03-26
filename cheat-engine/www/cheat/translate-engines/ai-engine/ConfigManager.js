@@ -212,14 +212,23 @@ export class ConfigManager {
       },
       addAiCustomTag: (tagConfig) => {
         this.aiEngine.addCustomTag(tagConfig);
+        if (typeof this.aiEngine.panel.bindEngineConfigTo === "function") {
+          this.aiEngine.panel.bindEngineConfigTo(this.aiEngine.panel);
+        }
         this.aiEngine.panel.saveSettings();
       },
       updateAiCustomTag: (index, tagConfig) => {
         this.aiEngine.updateCustomTag(index, tagConfig);
+        if (typeof this.aiEngine.panel.bindEngineConfigTo === "function") {
+          this.aiEngine.panel.bindEngineConfigTo(this.aiEngine.panel);
+        }
         this.aiEngine.panel.saveSettings();
       },
       removeAiCustomTag: (index) => {
         this.aiEngine.removeCustomTag(index);
+        if (typeof this.aiEngine.panel.bindEngineConfigTo === "function") {
+          this.aiEngine.panel.bindEngineConfigTo(this.aiEngine.panel);
+        }
         this.aiEngine.panel.saveSettings();
       },
     };

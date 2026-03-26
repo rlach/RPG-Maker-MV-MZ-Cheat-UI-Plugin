@@ -83,6 +83,9 @@ class TranslationRuntime {
     if (this.engineSettings && this.engineSettings[this.translationEngine]) {
       const engineConfig = this.engineSettings[this.translationEngine];
       Object.assign(this.engine, engineConfig);
+      if (typeof this.engine.setCustomTags === "function") {
+        this.engine.setCustomTags(this.engine.customTags || []);
+      }
     }
 
     this.bindEngineConfigTo(this);
