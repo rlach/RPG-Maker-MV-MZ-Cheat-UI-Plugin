@@ -151,8 +151,8 @@ export class TagManager {
         ...config,
         key,
         tagId,
-        prePattern: new RegExp(`\\\\${escapedSymbol}\\[(\\d+)\\]`, "g"),
-        postPattern: new RegExp(`\\[b=${tagId}(\\d+)\\]`, "g"),
+        prePattern: new RegExp(`\\\\${escapedSymbol}\\[(\\d+)\\]`, "gi"),
+        postPattern: new RegExp(`\\[b=${tagId}(\\d+)\\]`, "gi"),
       };
     }
 
@@ -161,8 +161,8 @@ export class TagManager {
         ...config,
         key,
         tagId,
-        prePattern: new RegExp(`\\\\${escapedSymbol}`, "g"),
-        postPattern: new RegExp(`\\[b=${tagId}\\]`, "g"),
+        prePattern: new RegExp(`\\\\${escapedSymbol}`, "gi"),
+        postPattern: new RegExp(`\\[b=${tagId}\\]`, "gi"),
       };
     }
 
@@ -179,11 +179,11 @@ export class TagManager {
         bracketClose: close,
         prePattern: new RegExp(
           `\\\\${escapedSymbol}${escapedOpen}${valueCapture}${escapedClose}`,
-          "g",
+          "gi",
         ),
         postPattern: new RegExp(
           `\\[b=${tagId}${escapedOpen}${valueCapture}${escapedClose}\\]`,
-          "g",
+          "gi",
         ),
       };
     }
@@ -193,8 +193,8 @@ export class TagManager {
         ...config,
         key,
         tagId,
-        prePattern: new RegExp(`<${escapedSymbol}>`, "g"),
-        postPattern: new RegExp(`\\[b=${tagId}\\]`, "g"),
+        prePattern: new RegExp(`<${escapedSymbol}>`, "gi"),
+        postPattern: new RegExp(`\\[b=${tagId}\\]`, "gi"),
       };
     }
 
