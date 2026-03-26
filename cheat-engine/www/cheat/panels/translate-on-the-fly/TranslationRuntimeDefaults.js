@@ -77,6 +77,9 @@ export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
   "currentGameMessage",
   "useJsonFixer",
   "aiFixRecursionMaxDepth",
+  "aiCustomTags",
+  "aiCustomTagTypeOptions",
+  "aiCustomTagBracketOptions",
   "objectTranslationSelectedMapIds",
   "objectTranslationJob",
   "nonOtfTranslationProcess",
@@ -132,6 +135,9 @@ export const UI_SYNC_STATE_KEYS = Object.freeze([
   "currentGameMessage",
   "useJsonFixer",
   "aiFixRecursionMaxDepth",
+  "aiCustomTags",
+  "aiCustomTagTypeOptions",
+  "aiCustomTagBracketOptions",
   "objectTranslationSelectedMapIds",
 ]);
 
@@ -140,6 +146,8 @@ export const UI_SYNC_TO_ONLY_STATE_KEYS = Object.freeze([
   "languageOptions",
   "aiProviderOptions",
   "aiInvalidJsonHandlingStrategyOptions",
+  "aiCustomTagTypeOptions",
+  "aiCustomTagBracketOptions",
 ]);
 
 const cloneOptions = (items) =>
@@ -194,6 +202,9 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
     currentGameMessage: null,
     useJsonFixer: true,
     aiFixRecursionMaxDepth: 0,
+    aiCustomTags: [],
+    aiCustomTagTypeOptions: [],
+    aiCustomTagBracketOptions: [],
     objectTranslationSelectedMapIds: null,
     objectTranslationJob: {
       active: false,

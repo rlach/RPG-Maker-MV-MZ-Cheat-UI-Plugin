@@ -141,8 +141,107 @@ export default {
 
         <!-- AI Engine (OpenAPI compatible / Open WebUI) config -->
         ${AIEngine.getConfigTemplate()}
+
+        <div v-if="translationEngine === 'openApi' || translationEngine === 'gpt4all'" class="mt-3">
+          <div class="d-flex align-center justify-space-between mb-2">
+            <div class="subtitle-2 font-weight-bold">Custom Tags</div>
+            <v-btn
+              small
+              outlined
+              color="primary"
+              @click="openAddCustomTagDialog">
+              <v-icon small left>mdi-plus</v-icon>
+              Add
+            </v-btn>
+          </div>
+
+          <div v-if="!aiCustomTags || aiCustomTags.length === 0" class="caption grey--text text--lighten-1 mb-2">
+            No custom tags defined.
+          </div>
+
+          <div
+            v-for="(tag, idx) in aiCustomTags"
+            :key="'custom-tag-' + idx"
+            class="d-flex align-center mb-1">
+            <span class="caption font-weight-bold mr-2">[{{tag.tagSymbol}}]</span>
+            <span class="caption mr-2">{{tag.description}}</span>
+            <v-spacer></v-spacer>
+            <v-btn icon x-small color="primary" @click="openEditCustomTagDialog(tag, idx)">
+              <v-icon small>mdi-pencil</v-icon>
+            </v-btn>
+            <v-btn icon x-small color="error" @click="removeCustomTag(idx)">
+              <v-icon small>mdi-delete</v-icon>
+            </v-btn>
+          </div>
+        </div>
         </div>
     </v-card-text>
+
+      <v-dialog v-model="customTagDialogVisible" max-width="560">
+        <v-card>
+          <v-card-title class="subtitle-1 font-weight-bold">{{ customTagEditIndex >= 0 ? 'Edit Custom Tag' : 'Add Custom Tag' }}</v-card-title>
+          <v-card-text>
+            <v-text-field
+              v-model="customTagForm.description"
+              label="Description"
+              outlined
+              dense
+              hide-details
+              class="mb-2"
+            ></v-text-field>
+
+            <v-text-field
+              v-model="customTagForm.tagSymbol"
+              label="Tag Symbol"
+              outlined
+              dense
+              hide-details
+              class="mb-2"
+            ></v-text-field>
+
+            <v-select
+              v-model="customTagForm.type"
+              :items="aiCustomTagTypeOptions"
+              label="Type"
+              outlined
+              dense
+              hide-details
+              class="mb-2"
+            ></v-select>
+
+            <v-checkbox
+              v-model="customTagForm.requiredConsistency"
+              label="Required consistency"
+              hide-details
+              class="mt-0 mb-2"
+            ></v-checkbox>
+
+            <template v-if="customTagForm.type === 'withCustomParameter'">
+              <v-select
+                v-model="customTagForm.bracket"
+                :items="aiCustomTagBracketOptions"
+                label="Bracket"
+                outlined
+                dense
+                hide-details
+                class="mb-2"
+              ></v-select>
+
+              <v-checkbox
+                v-model="customTagForm.maskValue"
+                label="Mask value"
+                hide-details
+                class="mt-0"
+              ></v-checkbox>
+            </template>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn text color="grey" @click="closeCustomTagDialog">Cancel</v-btn>
+            <v-btn text color="primary" @click="saveCustomTag">Save</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
 
     <v-card-subtitle class="pb-0 mt-4 font-weight-bold">Text Wrapping</v-card-subtitle>
     
@@ -260,6 +359,16 @@ export default {
       failedTranslations: null,
       batchManager: null,
       engine: null,
+      customTagDialogVisible: false,
+      customTagEditIndex: -1,
+      customTagForm: {
+        description: "",
+        tagSymbol: "",
+        type: "withNumericParameter",
+        requiredConsistency: false,
+        bracket: "<",
+        maskValue: false,
+      },
     };
   },
 
@@ -388,6 +497,62 @@ export default {
 
     clearCache() {
       return this.callRuntime("clearCache");
+    },
+
+    openAddCustomTagDialog() {
+      this.customTagEditIndex = -1;
+      this.customTagForm = {
+        description: "",
+        tagSymbol: "",
+        type: "withNumericParameter",
+        requiredConsistency: false,
+        bracket: "<",
+        maskValue: false,
+      };
+      this.customTagDialogVisible = true;
+    },
+
+    openEditCustomTagDialog(tag, index) {
+      this.customTagEditIndex = index;
+      this.customTagForm = {
+        description: String(tag.description || ""),
+        tagSymbol: String(tag.tagSymbol || ""),
+        type: String(tag.type || "withNumericParameter"),
+        requiredConsistency: !!tag.requiredConsistency,
+        bracket: String(tag.bracket || "<"),
+        maskValue: !!tag.maskValue,
+      };
+      this.customTagDialogVisible = true;
+    },
+
+    closeCustomTagDialog() {
+      this.customTagDialogVisible = false;
+    },
+
+    saveCustomTag() {
+      const payload = {
+        description: String(this.customTagForm.description || "").trim(),
+        tagSymbol: String(this.customTagForm.tagSymbol || "").trim(),
+        type: String(this.customTagForm.type || "withNumericParameter"),
+        requiredConsistency: !!this.customTagForm.requiredConsistency,
+      };
+
+      if (payload.type === "withCustomParameter") {
+        payload.bracket = String(this.customTagForm.bracket || "<");
+        payload.maskValue = !!this.customTagForm.maskValue;
+      }
+
+      if (this.customTagEditIndex >= 0) {
+        this.callRuntime("updateAiCustomTag", this.customTagEditIndex, payload);
+      } else {
+        this.callRuntime("addAiCustomTag", payload);
+      }
+
+      this.closeCustomTagDialog();
+    },
+
+    removeCustomTag(index) {
+      this.callRuntime("removeAiCustomTag", index);
     },
   },
 };

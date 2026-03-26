@@ -16,6 +16,8 @@ import { ConfigManager } from "./ConfigManager.js";
 import {
   DEFAULT_SYSTEM_PROMPT,
   TYPE_TO_TAG,
+  TAG_BRACKET_OPTIONS,
+  TAG_TYPE_OPTIONS,
   buildRequestSettingsForContent,
   REQUEST_CANCEL_REASON,
 } from "./constants.js";
@@ -39,6 +41,9 @@ class AIEngine extends BaseTranslationEngine {
     this.systemPrompt = DEFAULT_SYSTEM_PROMPT;
     this.useJsonFixer = true;
     this._aiFixRecursionMaxDepth = 0;
+    this.customTags = [];
+    this.customTagTypeOptions = [...TAG_TYPE_OPTIONS];
+    this.customTagBracketOptions = [...TAG_BRACKET_OPTIONS];
 
     // State tracking
     this._activeAbortController = null;
@@ -104,6 +109,7 @@ class AIEngine extends BaseTranslationEngine {
         get: () => this.allowNewlineMismatch,
         set: (v) => {
           this.allowNewlineMismatch = !!v;
+          this.tagManager.allowNewlineMismatch = this.allowNewlineMismatch;
         },
       },
       aiAskIfTextTranslated: {
@@ -130,6 +136,18 @@ class AIEngine extends BaseTranslationEngine {
           this._aiFixRecursionMaxDepth = Number(v) || 0;
         },
       },
+      aiCustomTags: {
+        get: () => this.customTags,
+        set: (v) => {
+          this.setCustomTags(v);
+        },
+      },
+      aiCustomTagTypeOptions: {
+        get: () => this.customTagTypeOptions,
+      },
+      aiCustomTagBracketOptions: {
+        get: () => this.customTagBracketOptions,
+      },
       userJsonFixer: {
         get: () => this.useJsonFixer,
         set: (v) => {
@@ -137,6 +155,47 @@ class AIEngine extends BaseTranslationEngine {
         },
       },
     });
+
+    this.tagManager.allowNewlineMismatch = this.allowNewlineMismatch;
+  }
+
+  normalizeCustomTagConfig(config = {}) {
+    const normalized = {
+      description: String(config.description || "").trim(),
+      type: String(config.type || ""),
+      tagSymbol: String(config.tagSymbol || "").trim(),
+      requiredConsistency: !!config.requiredConsistency,
+    };
+
+    if (normalized.type === "withCustomParameter") {
+      normalized.bracket = String(config.bracket || "<");
+      normalized.maskValue = !!config.maskValue;
+    }
+
+    return normalized;
+  }
+
+  setCustomTags(tags) {
+    const safeTags = Array.isArray(tags) ? tags : [];
+    this.customTags = safeTags.map((tag) => this.normalizeCustomTagConfig(tag));
+    this.tagManager.setCustomTagConfigs(this.customTags);
+  }
+
+  addCustomTag(tagConfig) {
+    const next = [...this.customTags, this.normalizeCustomTagConfig(tagConfig)];
+    this.setCustomTags(next);
+  }
+
+  updateCustomTag(index, tagConfig) {
+    const next = [...this.customTags];
+    next[index] = this.normalizeCustomTagConfig(tagConfig);
+    this.setCustomTags(next);
+  }
+
+  removeCustomTag(index) {
+    const next = [...this.customTags];
+    next.splice(index, 1);
+    this.setCustomTags(next);
   }
 
   getId() {
@@ -413,6 +472,7 @@ class AIEngine extends BaseTranslationEngine {
 
     try {
       // 1. PREPROCESS: Tags and payload
+      this.tagManager.allowNewlineMismatch = this.allowNewlineMismatch;
       this._jsonObjectIndexByType = new Map();
       this._jsonObjectSequenceByType = new Map();
       const itemData = items.map((item, i) => {

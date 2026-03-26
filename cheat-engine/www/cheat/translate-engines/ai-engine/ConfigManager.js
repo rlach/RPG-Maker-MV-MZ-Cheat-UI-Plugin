@@ -169,6 +169,9 @@ export class ConfigManager {
       aiSystemPrompt: this.aiEngine.systemPrompt,
       aiFixRecursionMaxDepth: this.aiEngine._aiFixRecursionMaxDepth,
       useJsonFixer: this.aiEngine.useJsonFixer,
+      aiCustomTags: this.aiEngine.customTags,
+      aiCustomTagTypeOptions: this.aiEngine.customTagTypeOptions,
+      aiCustomTagBracketOptions: this.aiEngine.customTagBracketOptions,
     };
   }
 
@@ -206,6 +209,18 @@ export class ConfigManager {
       },
       onChangeUseJsonFixer: (v) => {
         this.aiEngine.useJsonFixer = v;
+      },
+      addAiCustomTag: (tagConfig) => {
+        this.aiEngine.addCustomTag(tagConfig);
+        this.aiEngine.panel.saveSettings();
+      },
+      updateAiCustomTag: (index, tagConfig) => {
+        this.aiEngine.updateCustomTag(index, tagConfig);
+        this.aiEngine.panel.saveSettings();
+      },
+      removeAiCustomTag: (index) => {
+        this.aiEngine.removeCustomTag(index);
+        this.aiEngine.panel.saveSettings();
       },
     };
   }
