@@ -245,6 +245,14 @@ export class TranslationBatchManager {
                 backgroundJob: false,
               });
 
+          if (
+            result &&
+            result.recoveryStrategyUsed === true &&
+            typeof this.errorRecovery.recordRecoveryAttempt === "function"
+          ) {
+            this.errorRecovery.recordRecoveryAttempt(1);
+          }
+
           successes = Array.isArray(result && result.successes)
             ? result.successes
             : [];
@@ -273,6 +281,13 @@ export class TranslationBatchManager {
 
         for (const failure of failures) {
           allFailures.push(failure);
+          if (
+            failure &&
+            failure.recoveryAttempted === true &&
+            typeof this.errorRecovery.recordRecoveryAttempt === "function"
+          ) {
+            this.errorRecovery.recordRecoveryAttempt(1);
+          }
           this.errorRecovery.recordFailure(failure);
         }
 

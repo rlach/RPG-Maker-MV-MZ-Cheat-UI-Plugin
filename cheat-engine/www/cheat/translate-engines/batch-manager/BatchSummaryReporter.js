@@ -10,6 +10,7 @@ export class BatchSummaryReporter {
     return {
       totalErrors: 0,
       recoveredErrors: 0,
+      recoveryAttempts: 0,
       byType: {},
     };
   }
@@ -23,6 +24,10 @@ export class BatchSummaryReporter {
     normalized.recoveredErrors = Math.max(
       0,
       this.toSafeNumber(errorStats && errorStats.recoveredErrors, 0),
+    );
+    normalized.recoveryAttempts = Math.max(
+      0,
+      this.toSafeNumber(errorStats && errorStats.recoveryAttempts, 0),
     );
 
     const byType = (errorStats && errorStats.byType) || {};
@@ -46,6 +51,7 @@ export class BatchSummaryReporter {
 
     accumulator.totalErrors += normalized.totalErrors;
     accumulator.recoveredErrors += normalized.recoveredErrors;
+    accumulator.recoveryAttempts += normalized.recoveryAttempts;
 
     if (!accumulator.byType || typeof accumulator.byType !== "object") {
       accumulator.byType = {};
@@ -187,6 +193,12 @@ export class BatchSummaryReporter {
     if (normalizedErrorStats.recoveredErrors > 0) {
       lines.push(
         `recovered errors using strategy: ${normalizedErrorStats.recoveredErrors}`,
+      );
+    }
+
+    if (normalizedErrorStats.recoveryAttempts > 0) {
+      lines.push(
+        `recovery strategy uses: ${normalizedErrorStats.recoveryAttempts}`,
       );
     }
 

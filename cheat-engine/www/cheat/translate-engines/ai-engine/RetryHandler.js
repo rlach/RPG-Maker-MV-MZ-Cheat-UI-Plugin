@@ -155,11 +155,16 @@ export class RetryHandler {
         ].map((success) => ({
           ...success,
           recoveryUsed: true,
+          recoveryAttempted: true,
         })),
         failures: [
           ...(firstResult.failures || []),
           ...(secondResult.failures || []),
-        ],
+        ].map((failure) => ({
+          ...failure,
+          recoveryAttempted: true,
+        })),
+        recoveryStrategyUsed: true,
       };
 
       return { ok: true, merged };

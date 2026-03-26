@@ -486,6 +486,10 @@ class AIEngine extends BaseTranslationEngine {
       const cancelReason = streamResult.cancelReason || null;
       const preempted =
         cancelReason === REQUEST_CANCEL_REASON.BACKGROUND_PREEMPTED;
+      const shouldPreserveCancelReason =
+        !!cancelReason &&
+        cancelReason !== REQUEST_CANCEL_REASON.BACKGROUND_PREEMPTED &&
+        cancelReason !== REQUEST_CANCEL_REASON.REQUEST_ABORTED;
 
       if (!streamResult.text && !streamResult.bestMap) {
         // Keep preemption behavior explicit, but allow guardrail/no-content paths
@@ -630,6 +634,42 @@ class AIEngine extends BaseTranslationEngine {
       }
 
       if (!shapeCheck.valid && !guardrailPartialMap && !usedStreamFallback) {
+        const retryResult = await this.retryHandler.handleJsonError({
+          strategy: this.invalidJsonHandlingStrategy,
+          originalPayload: payload,
+          previousResponse: rawTranslated,
+          itemData,
+          isBackgroundJob,
+        });
+
+        if (retryResult.ok) {
+          if (retryResult.merged) {
+            return retryResult.merged;
+          }
+
+          try {
+            translatedMap = this.parseTranslatedMapFromText(
+              retryResult.response || retryResult.repaired,
+              expectedKeys,
+            );
+            rawTranslated =
+              retryResult.response || JSON.stringify(retryResult.repaired);
+            shapeCheck = this.validationService.validateTranslatedMapShape(
+              translatedMap,
+              itemData,
+            );
+            translatedMap = shapeCheck.normalizedMap || translatedMap;
+          } catch (retryParseError) {
+            console.error(
+              "[AIEngine] Retry parse failed after shape error:",
+              retryParseError.message,
+            );
+          }
+        }
+
+        if (shapeCheck.valid) {
+          // Continue normal post-processing path with repaired response.
+        } else {
         console.warn(
           "[AIEngine] Response JSON has invalid shape:",
           shapeCheck.errors,
@@ -654,9 +694,11 @@ class AIEngine extends BaseTranslationEngine {
             return {
               ...item,
               rejectReason: reason,
+              cancelReason: shouldPreserveCancelReason ? cancelReason : null,
             };
           }),
         };
+        }
       }
 
       if (
@@ -703,6 +745,7 @@ class AIEngine extends BaseTranslationEngine {
             value: itemD.value,
             cacheKey: itemD.cacheKey,
             rejectReason: "Missing key",
+            cancelReason: shouldPreserveCancelReason ? cancelReason : null,
           });
           continue;
         }
@@ -711,6 +754,7 @@ class AIEngine extends BaseTranslationEngine {
           failures.push({
             ...itemD,
             rejectReason: `Value for "${key}" is not a string`,
+            cancelReason: shouldPreserveCancelReason ? cancelReason : null,
           });
           continue;
         }
@@ -725,6 +769,7 @@ class AIEngine extends BaseTranslationEngine {
           failures.push({
             ...itemD,
             rejectReason: "Tag count mismatch",
+            cancelReason: shouldPreserveCancelReason ? cancelReason : null,
           });
           continue;
         }
@@ -741,6 +786,24 @@ class AIEngine extends BaseTranslationEngine {
           translated: finalTranslated,
           cacheKey: itemD.cacheKey,
         });
+      }
+
+      if (
+        successes.length === 0 &&
+        failures.length > 0 &&
+        shouldPreserveCancelReason
+      ) {
+        const retryResult = await this.retryHandler.handleJsonError({
+          strategy: this.invalidJsonHandlingStrategy,
+          originalPayload: payload,
+          previousResponse: rawTranslated,
+          itemData,
+          isBackgroundJob,
+        });
+
+        if (retryResult.ok && retryResult.merged) {
+          return retryResult.merged;
+        }
       }
 
       return { successes, failures };

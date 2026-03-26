@@ -4,6 +4,7 @@ export class ErrorRecoveryStrategy {
     this.failuresByType = new Map();
     this.failedKeys = new Set();
     this.recoveredKeys = new Set();
+    this.recoveryAttempts = 0;
   }
 
   reset(nextSessionId = "") {
@@ -11,6 +12,7 @@ export class ErrorRecoveryStrategy {
     this.failuresByType.clear();
     this.failedKeys.clear();
     this.recoveredKeys.clear();
+    this.recoveryAttempts = 0;
   }
 
   recordFailure(failure) {
@@ -35,6 +37,11 @@ export class ErrorRecoveryStrategy {
     this.recoveredKeys.add(cacheKey);
   }
 
+  recordRecoveryAttempt(count = 1) {
+    const safeCount = Math.max(1, Number(count) || 1);
+    this.recoveryAttempts += safeCount;
+  }
+
   getStats() {
     const byType = {};
     for (const [type, count] of this.failuresByType.entries()) {
@@ -44,6 +51,7 @@ export class ErrorRecoveryStrategy {
     return {
       totalErrors: this.failedKeys.size,
       recoveredErrors: this.recoveredKeys.size,
+      recoveryAttempts: this.recoveryAttempts,
       byType,
     };
   }
@@ -58,12 +66,12 @@ export class ErrorRecoveryStrategy {
       return failure.errorType;
     }
 
-    if (typeof failure.rejectReason === "string" && failure.rejectReason) {
-      return failure.rejectReason;
-    }
-
     if (typeof failure.cancelReason === "string" && failure.cancelReason) {
       return failure.cancelReason;
+    }
+
+    if (typeof failure.rejectReason === "string" && failure.rejectReason) {
+      return failure.rejectReason;
     }
 
     return "unknown";
