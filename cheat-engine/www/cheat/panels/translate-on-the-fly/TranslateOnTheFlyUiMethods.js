@@ -56,7 +56,8 @@ export const translateOnTheFlyUiMethods = {
       const style = existingStyle || hostDoc.createElement("style");
       style.id = "tof-progress-box-style";
       style.textContent = [
-        "#tof-progress-box { position: fixed; right: 12px; bottom: 72px; padding: 8px 12px; display: none; background: rgba(50, 50, 50, 0.75); border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); pointer-events: none; z-index: 9998; font-family: Arial, sans-serif; text-align: right; }",
+        "#tof-progress-box { position: fixed; right: 12px; bottom: 72px; padding: 8px 12px; display: none; background: rgba(50, 50, 50, 0.75); border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); pointer-events: auto; z-index: 9998; font-family: Arial, sans-serif; text-align: right; cursor: move; user-select: none; }",
+        "#tof-progress-box.tof-dragging { box-shadow: 0 6px 18px rgba(0,0,0,0.4); }",
         "#tof-progress-box .tof-progress-line { color: #fff; font-size: 12px; line-height: 1.5; margin: 1px 0; white-space: nowrap; }",
         "#tof-progress-box .tof-progress-line.map-progress { font-weight: bold; color: #82d4f8; }",
         "#tof-progress-box .tof-progress-line.message-progress { color: #ccc; }",
@@ -81,7 +82,117 @@ export const translateOnTheFlyUiMethods = {
       this._progressBoxEl = el;
     }
 
+    this.ensureProgressBoxDraggable(this._progressBoxEl, hostDoc);
+    this.applyProgressBoxPosition(this._progressBoxEl, hostDoc);
+
     return this._progressBoxEl;
+  },
+
+  ensureProgressBoxDraggable(el, hostDoc) {
+    if (!el || !hostDoc || this._progressBoxDragHandlers) {
+      return;
+    }
+
+    const onMouseDown = (event) => {
+      if (event.button !== 0) {
+        return;
+      }
+
+      const rect = el.getBoundingClientRect();
+      this._progressBoxDragState = {
+        startMouseX: event.clientX,
+        startMouseY: event.clientY,
+        startLeft: rect.left,
+        startTop: rect.top,
+      };
+
+      el.classList.add("tof-dragging");
+      event.preventDefault();
+    };
+
+    const onMouseMove = (event) => {
+      const dragState = this._progressBoxDragState;
+      if (!dragState) {
+        return;
+      }
+
+      const deltaX = event.clientX - dragState.startMouseX;
+      const deltaY = event.clientY - dragState.startMouseY;
+      this.setProgressBoxPosition(
+        dragState.startLeft + deltaX,
+        dragState.startTop + deltaY,
+        el,
+        hostDoc,
+      );
+      event.preventDefault();
+    };
+
+    const onMouseUp = () => {
+      if (!this._progressBoxDragState) {
+        return;
+      }
+      this._progressBoxDragState = null;
+      el.classList.remove("tof-dragging");
+    };
+
+    el.addEventListener("mousedown", onMouseDown);
+    hostDoc.addEventListener("mousemove", onMouseMove);
+    hostDoc.addEventListener("mouseup", onMouseUp);
+
+    this._progressBoxDragHandlers = {
+      onMouseDown,
+      onMouseMove,
+      onMouseUp,
+      hostDoc,
+      el,
+    };
+  },
+
+  setProgressBoxPosition(left, top, el, hostDoc) {
+    const safeEl = el || this._progressBoxEl;
+    const safeDoc = hostDoc || this.getSpinnerHostDocument();
+    if (!safeEl || !safeDoc) {
+      return;
+    }
+
+    const clamped = this.clampProgressBoxPosition(left, top, safeEl, safeDoc);
+    this._progressBoxPosition = clamped;
+    this.applyProgressBoxPosition(safeEl, safeDoc);
+  },
+
+  clampProgressBoxPosition(left, top, el, hostDoc) {
+    const hostWindow = hostDoc.defaultView || window;
+    const viewportWidth = Math.max(0, hostWindow.innerWidth || 0);
+    const viewportHeight = Math.max(0, hostWindow.innerHeight || 0);
+    const boxWidth = Math.max(0, el.offsetWidth || 0);
+    const boxHeight = Math.max(0, el.offsetHeight || 0);
+
+    const maxLeft = Math.max(0, viewportWidth - boxWidth);
+    const maxTop = Math.max(0, viewportHeight - boxHeight);
+
+    return {
+      left: Math.max(0, Math.min(maxLeft, Number(left) || 0)),
+      top: Math.max(0, Math.min(maxTop, Number(top) || 0)),
+    };
+  },
+
+  applyProgressBoxPosition(el, hostDoc) {
+    if (!el || !hostDoc || !this._progressBoxPosition) {
+      return;
+    }
+
+    const clamped = this.clampProgressBoxPosition(
+      this._progressBoxPosition.left,
+      this._progressBoxPosition.top,
+      el,
+      hostDoc,
+    );
+    this._progressBoxPosition = clamped;
+
+    el.style.left = `${clamped.left}px`;
+    el.style.top = `${clamped.top}px`;
+    el.style.right = "auto";
+    el.style.bottom = "auto";
   },
 
   updateProgressBox(

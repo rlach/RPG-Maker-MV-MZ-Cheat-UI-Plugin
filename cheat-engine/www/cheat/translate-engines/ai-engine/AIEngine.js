@@ -670,34 +670,34 @@ class AIEngine extends BaseTranslationEngine {
         if (shapeCheck.valid) {
           // Continue normal post-processing path with repaired response.
         } else {
-        console.warn(
-          "[AIEngine] Response JSON has invalid shape:",
-          shapeCheck.errors,
-        );
-        return {
-          successes: [],
-          failures: items.map((item, idx) => {
-            const mappedItem = itemData[idx] || item;
-            const missingKeySet = new Set(shapeCheck.missingKeys || []);
-            const nonStringKeySet = new Set(shapeCheck.nonStringKeys || []);
-            const key =
-              mappedItem.jsonKey ||
-              `${TYPE_TO_TAG[mappedItem.type] || mappedItem.type}${mappedItem.index || 0}`;
+          console.warn(
+            "[AIEngine] Response JSON has invalid shape:",
+            shapeCheck.errors,
+          );
+          return {
+            successes: [],
+            failures: items.map((item, idx) => {
+              const mappedItem = itemData[idx] || item;
+              const missingKeySet = new Set(shapeCheck.missingKeys || []);
+              const nonStringKeySet = new Set(shapeCheck.nonStringKeys || []);
+              const key =
+                mappedItem.jsonKey ||
+                `${TYPE_TO_TAG[mappedItem.type] || mappedItem.type}${mappedItem.index || 0}`;
 
-            let reason = "Invalid response shape";
-            if (missingKeySet.has(key)) {
-              reason = "Missing key";
-            } else if (nonStringKeySet.has(key)) {
-              reason = "Key is not a string";
-            }
+              let reason = "Invalid response shape";
+              if (missingKeySet.has(key)) {
+                reason = "Missing key";
+              } else if (nonStringKeySet.has(key)) {
+                reason = "Key is not a string";
+              }
 
-            return {
-              ...item,
-              rejectReason: reason,
-              cancelReason: shouldPreserveCancelReason ? cancelReason : null,
-            };
-          }),
-        };
+              return {
+                ...item,
+                rejectReason: reason,
+                cancelReason: shouldPreserveCancelReason ? cancelReason : null,
+              };
+            }),
+          };
         }
       }
 
