@@ -548,7 +548,14 @@ export const translateOnTheFlyRuntimeMethods = {
         "[TranslateOnTheFly] Extracted save contents, applying cached translations if any",
       );
 
-      self.applyCachedActorClassEnemyTranslations();
+      if (!self.batchManager) {
+        self.batchManager = createTranslationBatchManager(self);
+      }
+      if (self.batchManager?.applyDataOnLifecycle) {
+        self.batchManager.applyDataOnLifecycle({
+          trigger: "extractSaveContents",
+        });
+      }
       console.log(
         "[TranslateOnTheFly] Applied cached translations to $dataActors, $dataClasses, $dataEnemies and their game objects",
       );
@@ -563,9 +570,16 @@ export const translateOnTheFlyRuntimeMethods = {
       console.log(
         "[TranslateOnTheFly] Created game objects, applying cached translations if any",
       );
-      self.applyCachedActorClassEnemyTranslations();
+      if (!self.batchManager) {
+        self.batchManager = createTranslationBatchManager(self);
+      }
+      if (self.batchManager?.applyDataOnLifecycle) {
+        self.batchManager.applyDataOnLifecycle({
+          trigger: "createGameObjects",
+        });
+      }
       console.log(
-        "[TranslateOnTheFly] Applied cached translations to $dataActors, $dataClasses, $dataEnemies and their game objects",
+        "[TranslateOnTheFly] Applied cached translations to data containers",
       );
     };
 

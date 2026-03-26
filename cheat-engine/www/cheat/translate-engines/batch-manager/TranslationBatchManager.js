@@ -12,23 +12,28 @@ export class TranslationBatchManager {
   }
 
   register(strategy) {
-    if (!strategy || typeof strategy.getKind !== "function") {
-      return;
-    }
-
-    this.registerKind(strategy.getKind(), strategy);
+    this.kindRegistry.set(strategy.getKind(), strategy);
   }
 
-  registerKind(kind, definition) {
-    const normalizedKind = String(kind || "").trim();
-    if (!normalizedKind || !definition) {
-      return;
+  applyDataOnLifecycle(context = {}) {
+    for (const definition of this.kindRegistry.values()) {
+      try {
+        definition.applyDataOnLifecycle({
+          ...context,
+          manager: this,
+          panel: this.panel,
+        });
+      } catch (error) {
+        console.warn(
+          `[TranslationBatchManager] Lifecycle hook applyDataOnLifecycle failed for ${definition.getKind ? definition.getKind() : "unknown"}`,
+          error,
+        );
+      }
     }
-    this.kindRegistry.set(normalizedKind, definition);
   }
 
   getKindDefinition(kind) {
-    return this.kindRegistry.get(String(kind || "").trim()) || null;
+    return this.kindRegistry.get(kind) || null;
   }
 
   onBatchPausedByOtf(reason = "translating event") {

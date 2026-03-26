@@ -3,6 +3,7 @@ import { MessageCheat } from "../../js/CheatHelper.js";
 import { TranslateOnTheFlyState } from "../../js/TranslateOnTheFlyState.js";
 import { ensureTranslateCacheRuntime } from "../../js/TranslateCacheRuntime.js";
 import { createTranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManagerFactory.js";
+import { DATA_CONTAINER_TRANSLATION_DEFINITIONS } from "../../translate-engines/translation-phases/DataContainerDefinitions.js";
 
 export const translateOnTheFlyCoreMethods = {
   isTranslationEnabled() {
@@ -219,16 +220,32 @@ export const translateOnTheFlyCoreMethods = {
     return appliedCount;
   },
 
-  applyCachedActorClassEnemyTranslations() {
-    this.applyCachedTranslations(
-      $dataActors,
-      ["name", "nickname", "profile"],
-      "actor",
-      $gameActors,
-      "actor",
-    );
-    this.applyCachedTranslations($dataClasses, ["name"], "class");
-    this.applyCachedTranslations($dataEnemies, ["name"], "enemy");
+  getResolvedDataContainerDefinitions(allowedCachePrefixes = null) {
+    const allowedSet = Array.isArray(allowedCachePrefixes)
+      ? new Set(allowedCachePrefixes)
+      : null;
+    const resolved = [];
+
+    for (const definition of DATA_CONTAINER_TRANSLATION_DEFINITIONS) {
+      if (allowedSet && !allowedSet.has(definition.cachePrefix)) {
+        continue;
+      }
+
+      const container = definition.getContainer?.();
+      if (!Array.isArray(container)) {
+        continue;
+      }
+
+      resolved.push({
+        container,
+        fields: definition.fields,
+        cachePrefix: definition.cachePrefix,
+        instanceContainer: definition.getInstanceContainer?.() || null,
+        instanceFunctionName: definition.instanceFunctionName || null,
+      });
+    }
+
+    return resolved;
   },
 
   checkIfDataIsLoaded() {
@@ -255,21 +272,15 @@ export const translateOnTheFlyCoreMethods = {
     }
 
     let appliedCount = 0;
+    const resolvedDefinitions = this.getResolvedDataContainerDefinitions();
 
-    for (const def of this.getObjectTranslationTypeDefs().filter(
-      (d) => d.kind === "data",
-    )) {
-      const container = def.getContainer && def.getContainer();
-      if (!Array.isArray(container)) continue;
-      const instanceContainer =
-        def.cachePrefix === "actor" ? $gameActors : null;
-      const instanceFunctionName = def.cachePrefix === "actor" ? "actor" : null;
+    for (const definition of resolvedDefinitions) {
       appliedCount += this.applyCachedTranslations(
-        container,
-        def.fields,
-        def.cachePrefix,
-        instanceContainer,
-        instanceFunctionName,
+        definition.container,
+        definition.fields,
+        definition.cachePrefix,
+        definition.instanceContainer,
+        definition.instanceFunctionName || null,
       );
     }
 

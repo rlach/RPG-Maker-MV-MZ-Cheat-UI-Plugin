@@ -34,4 +34,8 @@ export class BaseTranslationPhaseStrategy {
   finalizePhase() {
     // Optional hook for strategies that need post-batch data materialization.
   }
+
+  applyDataOnLifecycle() {
+    return true;
+  }
 }

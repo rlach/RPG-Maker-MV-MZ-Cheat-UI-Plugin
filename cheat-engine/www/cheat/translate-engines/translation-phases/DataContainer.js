@@ -56,4 +56,38 @@ export class DataContainerTranslationKindStrategy extends DataObjectsTranslation
       this.cachePrefix,
     );
   }
+
+  applyCachedData(panel) {
+    if (!panel || typeof panel.applyCachedTranslations !== "function") {
+      return true;
+    }
+
+    const container = this.getContainer && this.getContainer();
+    if (!Array.isArray(container)) {
+      return true;
+    }
+
+    const instanceContainer =
+      this.cachePrefix === "actor" ? window.$gameActors : null;
+    const instanceFunctionName = this.cachePrefix === "actor" ? "actor" : null;
+
+    panel.applyCachedTranslations(
+      container,
+      this.fields,
+      this.cachePrefix,
+      instanceContainer,
+      instanceFunctionName,
+    );
+
+    return true;
+  }
+
+  applyDataOnLifecycle({ panel, trigger } = {}) {
+    const isRestart = trigger === "createGameObjects";
+    if (!isRestart && !["actor", "class", "enemy"].includes(this.cachePrefix)) {
+      return true;
+    }
+
+    return this.applyCachedData(panel);
+  }
 }
