@@ -141,14 +141,21 @@ export class RetryHandler {
 
     try {
       // Recursively retry both halves
-      const firstResult = await this.aiEngine.batchTranslate(firstHalf);
-      const secondResult = await this.aiEngine.batchTranslate(secondHalf);
+      const firstResult = await this.aiEngine.batchTranslate(firstHalf, {
+        backgroundJob: isBackgroundJob,
+      });
+      const secondResult = await this.aiEngine.batchTranslate(secondHalf, {
+        backgroundJob: isBackgroundJob,
+      });
 
       const merged = {
         successes: [
           ...(firstResult.successes || []),
           ...(secondResult.successes || []),
-        ],
+        ].map((success) => ({
+          ...success,
+          recoveryUsed: true,
+        })),
         failures: [
           ...(firstResult.failures || []),
           ...(secondResult.failures || []),

@@ -57,7 +57,7 @@ export default {
   created() {
     this.messageUnsubscribe = MESSAGE_LOG.subscribe((entries) => {
       this.messageEntries = entries;
-    this.$nextTick(() => this.scrollToBottom());
+      this.$nextTick(() => this.scrollToBottom());
     });
 
     document.addEventListener("selectionchange", this.onSelectionChange);

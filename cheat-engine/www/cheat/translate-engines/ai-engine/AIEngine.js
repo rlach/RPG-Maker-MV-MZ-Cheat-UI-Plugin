@@ -307,6 +307,80 @@ class AIEngine extends BaseTranslationEngine {
     return map[code] || code;
   }
 
+  buildCompactJsonKey(item, fallbackIndex) {
+    const safeItem = item || {};
+    const rawType = String(safeItem.type || "").toLowerCase();
+
+    // Keep message/speaker/choice compact and sequential as before.
+    if (rawType === "text" || rawType === "speaker" || rawType === "choice") {
+      return `${TYPE_TO_TAG[rawType] || "m"}${fallbackIndex}`;
+    }
+
+    const match = rawType.match(/^([a-z0-9]+)_(.+)$/);
+    if (!match) {
+      return `${TYPE_TO_TAG[rawType] || "m"}${fallbackIndex}`;
+    }
+
+    const baseType = match[1];
+    const field = match[2];
+
+    const baseMap = {
+      item: "i",
+      skill: "s",
+      armor: "a",
+      weapon: "w",
+      class: "c",
+      enemy: "e",
+      actor: "r",
+      map: "mp",
+      state: "st",
+    };
+
+    const fieldMap = {
+      name: "n",
+      description: "d",
+      note: "t",
+      nickname: "nn",
+      profile: "p",
+      message1: "m1",
+      message2: "m2",
+    };
+
+    const shortBase = baseMap[baseType] || baseType.slice(0, 1) || "x";
+    const shortField = fieldMap[field] || field.slice(0, 2) || "v";
+
+    if (!this._jsonObjectIndexByType) {
+      this._jsonObjectIndexByType = new Map();
+    }
+    if (!this._jsonObjectSequenceByType) {
+      this._jsonObjectSequenceByType = new Map();
+    }
+
+    let objectKey = String(safeItem.id || "");
+    const fieldSuffix = `_${field}`;
+    if (objectKey.endsWith(fieldSuffix)) {
+      objectKey = objectKey.slice(0, -fieldSuffix.length);
+    }
+    if (!objectKey) {
+      objectKey = `${baseType}:${safeItem.cacheKey || safeItem.value || fallbackIndex}`;
+    }
+
+    let byType = this._jsonObjectIndexByType.get(baseType);
+    if (!byType) {
+      byType = new Map();
+      this._jsonObjectIndexByType.set(baseType, byType);
+    }
+
+    if (!byType.has(objectKey)) {
+      const nextIndex = this._jsonObjectSequenceByType.get(baseType) || 0;
+      byType.set(objectKey, nextIndex);
+      this._jsonObjectSequenceByType.set(baseType, nextIndex + 1);
+    }
+
+    const objectIndex = byType.get(objectKey);
+    return `${shortBase}${objectIndex}${shortField}`;
+  }
+
   parseTranslatedMapFromText(text, expectedKeys = []) {
     const merged = StreamJsonParser.mergeTopLevelObjects(text);
     if (merged && typeof merged === "object") {
@@ -339,14 +413,15 @@ class AIEngine extends BaseTranslationEngine {
 
     try {
       // 1. PREPROCESS: Tags and payload
+      this._jsonObjectIndexByType = new Map();
+      this._jsonObjectSequenceByType = new Map();
       const itemData = items.map((item, i) => {
         const { preprocessedText, tagCounts, caseMap } =
           this.tagManager.preprocessTags(item.value || "");
-        const shortTag = TYPE_TO_TAG[item.type] || item.type;
         return {
           ...item,
           index: i,
-          jsonKey: `${shortTag}${i}`,
+          jsonKey: this.buildCompactJsonKey(item, i),
           preprocessed: preprocessedText,
           tagCounts,
           caseMap,
@@ -384,7 +459,7 @@ class AIEngine extends BaseTranslationEngine {
           },
           {
             role: "system",
-            content: `Translate video game text from ${sourceName} to ${targetName}. Return only flat one-line JSON object with exactly the same keys as input. No markdown, no comments, no extra keys, no missing keys, no duplicate keys, no arrays, no pretty formatting. Preserve every [b=tag] exactly and keep tag order unchanged. Character name hints: ${nameHints}`,
+            content: `Translate video game text from ${sourceName} to ${targetName}. Return only flat one-line JSON object with exactly the same keys as input. No markdown, no comments, no extra keys, no missing keys, no duplicate keys, no arrays, no pretty formatting. Preserve every [b=tag] exactly and keep tag order unchanged. Keys with the same prefix+index are context-linked fields of one entity (example: i0n and i0d are the same item's name and description), so translate them consistently. Character name hints: ${nameHints}`,
           },
           {
             role: "user",
@@ -408,20 +483,28 @@ class AIEngine extends BaseTranslationEngine {
         isBackgroundJob,
       });
 
+      const cancelReason = streamResult.cancelReason || null;
+      const preempted =
+        cancelReason === REQUEST_CANCEL_REASON.BACKGROUND_PREEMPTED;
+
       if (!streamResult.text && !streamResult.bestMap) {
-        console.warn("[AIEngine] Batch returned no content");
-        const cancelReason = streamResult.cancelReason || null;
-        const preempted =
-          cancelReason === REQUEST_CANCEL_REASON.BACKGROUND_PREEMPTED;
-        return {
-          successes: [],
-          failures: items.map((item) => ({
-            ...item,
-            rejectReason: cancelReason || "No content",
-            cancelReason,
-            preempted,
-          })),
-        };
+        // Keep preemption behavior explicit, but allow guardrail/no-content paths
+        // to fall through to retry strategies (e.g. split in half).
+        if (
+          preempted ||
+          cancelReason === REQUEST_CANCEL_REASON.REQUEST_ABORTED
+        ) {
+          console.warn("[AIEngine] Batch returned no content");
+          return {
+            successes: [],
+            failures: items.map((item) => ({
+              ...item,
+              rejectReason: cancelReason || "No content",
+              cancelReason,
+              preempted,
+            })),
+          };
+        }
       }
 
       let rawTranslated = streamResult.text || "";
@@ -481,12 +564,10 @@ class AIEngine extends BaseTranslationEngine {
                 successes: [],
                 failures: items.map((item) => ({
                   ...item,
-                  rejectReason:
-                    streamResult.cancelReason || "Invalid JSON response",
-                  cancelReason: streamResult.cancelReason || null,
+                  rejectReason: cancelReason || "Invalid JSON response",
+                  cancelReason: cancelReason || null,
                   preempted:
-                    streamResult.cancelReason ===
-                    REQUEST_CANCEL_REASON.BACKGROUND_PREEMPTED,
+                    cancelReason === REQUEST_CANCEL_REASON.BACKGROUND_PREEMPTED,
                 })),
               };
             }
