@@ -3,10 +3,10 @@ import { getRowsPerPage, setRowsPerPage } from "../js/TableSettings.js";
 import { createTranslationBatchManager } from "../translate-engines/batch-manager/TranslationBatchManagerFactory.js";
 import {
   ensureTranslateCacheRuntime,
-  notifyTranslateCacheRuntimeChanged,
   onTranslateCacheRuntimeChanged,
   parseCacheKeyForLangPair,
 } from "../js/TranslateCacheRuntime.js";
+import { ConfirmDialog } from "../js/DialogHelper.js";
 import { ensureTranslationRuntime } from "./translate-on-the-fly/TranslationRuntime.js";
 
 export default {
@@ -46,15 +46,24 @@ export default {
         :custom-filter="tableItemFilter"
         :items-per-page.sync="rowsPerPage">
         <template v-slot:top>
+          <div class="d-flex align-center" style="gap: 8px;">
             <v-text-field
-                v-model="searchInput"
-                label="Search original / translation"
-                solo
-                dense
-                hide-details
-                background-color="grey darken-3"
-                @keydown.self.stop>
+              v-model="searchInput"
+              label="Search original / translation"
+              solo
+              dense
+              hide-details
+              background-color="grey darken-3"
+              @keydown.self.stop>
             </v-text-field>
+            <v-btn
+              small
+              color="error"
+              :disabled="matchingFilterEntryCount <= 0"
+              @click="confirmClearTranslationsMatchingFilter">
+              Clear translations matching filter
+            </v-btn>
+          </div>
         </template>
 
         <template v-slot:item.seenSort="{ item }">
@@ -257,6 +266,12 @@ export default {
     },
   },
 
+  computed: {
+    matchingFilterEntryCount() {
+      return this.getEntriesMatchingFilter(this.searchInput).length;
+    },
+  },
+
   methods: {
     scheduleSearchDebounce(value) {
       if (this.searchDebounceTimer) {
@@ -448,18 +463,8 @@ export default {
       }
 
       const runtime = ensureTranslationRuntime();
-      if (runtime && typeof runtime.persistCache === "function") {
-        runtime.persistCache();
-        if (typeof runtime.notifyCacheRuntime === "function") {
-          runtime.notifyCacheRuntime(reason);
-        }
-      } else {
-        this.cacheStorage.setItem(
-          "data",
-          JSON.stringify(Array.from(this.translationCache.entries())),
-        );
-        notifyTranslateCacheRuntimeChanged(reason);
-      }
+      runtime.persistCache();
+      runtime.notifyCacheRuntime(reason);
 
       this.refreshEntries();
     },
@@ -525,6 +530,76 @@ export default {
       this.onTranslationInput(item, "");
     },
 
+    getEntriesMatchingFilter(searchValue) {
+      const search = this.normalizeCacheValue(searchValue);
+      return (this.entries || []).filter((entry) =>
+        this.tableItemFilter(null, search, entry),
+      );
+    },
+
+    confirmClearTranslationsMatchingFilter() {
+      const matchingEntries = this.getEntriesMatchingFilter(this.searchInput);
+      if (!matchingEntries.length) {
+        return;
+      }
+
+      ConfirmDialog.show({
+        width: 420,
+        message:
+          "Are you sure? This cannot be undone and will clear translations for all entries matching the current search filter.",
+        actions: [
+          {
+            icon: "mdi-close",
+            label: "No",
+            color: "white",
+            action: ConfirmDialog.close,
+          },
+          {
+            icon: "mdi-check",
+            label: "Yes",
+            color: "green",
+            action: () => {
+              this.clearTranslationsMatchingFilter();
+              ConfirmDialog.close();
+            },
+          },
+        ],
+      });
+    },
+
+    clearTranslationsMatchingFilter() {
+      this.flushPendingCacheEdits("cache-manager-pre-clear-filtered");
+
+      const matchingEntries = this.getEntriesMatchingFilter(this.searchInput);
+      let changed = 0;
+      for (const entry of matchingEntries) {
+        if (!entry || !entry.key) {
+          continue;
+        }
+
+        const currentValue = this.normalizeCacheValue(
+          this.translationCache.get(entry.key),
+        );
+        if (currentValue === "") {
+          continue;
+        }
+
+        this.translationCache.set(entry.key, "");
+        changed += 1;
+      }
+
+      if (!changed) {
+        this.refreshEntries();
+        return;
+      }
+
+      const runtime = ensureTranslationRuntime();
+      runtime.persistCache();
+      runtime.notifyCacheRuntime("cache-manager-clear-filtered");
+
+      this.refreshEntries();
+    },
+
     async translateEmptyStrings() {
       if (this.isTranslatingEmptyStrings) {
         return;
@@ -535,16 +610,6 @@ export default {
       this.flushPendingCacheEdits("cache-manager-pre-translate-empty");
 
       const runtime = ensureTranslationRuntime();
-      if (
-        !runtime ||
-        !runtime.engine ||
-        typeof runtime.engine.batchTranslate !== "function"
-      ) {
-        console.warn(
-          "[TranslateCacheManagerPanel] Translation runtime is not ready",
-        );
-        return;
-      }
 
       const items = [];
       let idCounter = 0;
@@ -582,10 +647,7 @@ export default {
         return;
       }
 
-      if (
-        typeof runtime.beginNonOtfTranslationProcess === "function" &&
-        !runtime.beginNonOtfTranslationProcess("translate empty strings")
-      ) {
+      if (!runtime.beginNonOtfTranslationProcess("translate empty strings")) {
         return;
       }
       processStarted = true;
@@ -628,11 +690,7 @@ export default {
       } finally {
         this.isTranslatingEmptyStrings = false;
         this.refreshEntries();
-        if (
-          processStarted &&
-          runtime &&
-          typeof runtime.endNonOtfTranslationProcess === "function"
-        ) {
+        if (processStarted) {
           runtime.endNonOtfTranslationProcess();
         }
       }
