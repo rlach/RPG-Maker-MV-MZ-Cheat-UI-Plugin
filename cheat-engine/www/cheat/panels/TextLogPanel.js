@@ -4,9 +4,8 @@ export default {
   name: "TextLogPanel",
 
   template: `
-<v-card flat class="ma-0 pa-0" style="background: transparent; height: 100%; display: grid; grid-template-rows: auto 1fr;">
+<v-card flat class="ma-0 pa-0" style="background: transparent; height: 100%; overflow: hidden; display: flex; flex-direction: column;">
     <v-card-subtitle class="pb-0 font-weight-bold">Text Log</v-card-subtitle>
-  <div style="height: 100%; display: flex; flex-direction: column; gap: 6px; padding: 0 0 6px 0;">
     <div class="py-1 px-4 caption" style="margin: 0;">
       Latest messages are at the bottom. Text is selectable and can be copied.
     </div>
@@ -29,15 +28,15 @@ export default {
         Clear Log
       </v-btn>
     </div>
-    <div style="flex: 1; min-height: 0; padding: 0 8px 0 8px;">
+    <div style="flex: 1 1 0%; min-height: 0; padding: 0 8px 0 8px; display: flex; flex-direction: column;">
       <div
         ref="messageLogContainer"
-        style="height: 100%; overflow-y: auto; background: white; color: black; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 8px; user-select: text;">
+        style="flex: 1 1 0%; min-height: 0; overflow-y: auto; background: white; color: black; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 8px; user-select: text;">
         <pre
           v-for="(entry, index) in messageEntries"
           :key="entry.id"
-          :style="{ 'background-color': index % 2 === 0 ? 'white' : '#f5f5f5' }"
-          style="white-space: pre-wrap; margin: 0; font-family: 'Fira Code', 'Consolas', monospace; font-size: 12px; margin-bottom: -18px;">
+          :style="{ 'background-color': index % 2 === 0 ? 'white' : '#f5f5f5', marginBottom: '2px' }"
+          style="white-space: pre-wrap; margin: 0; font-family: 'Fira Code', 'Consolas', monospace; font-size: 12px;">
 {{ formatMessageEntry(entry) }}
         </pre>
       </div>
