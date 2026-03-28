@@ -206,7 +206,7 @@ class ObjectTranslationService {
     this.closeMapSelection();
   }
 
-  async startTranslation() {
+  async startTranslation(dryRun = false) {
     const runtime = this.ensureRuntime();
     if (!runtime || typeof runtime.runObjectTranslationJob !== "function") {
       Alert.error("Translation runtime not initialized");
@@ -243,7 +243,12 @@ class ObjectTranslationService {
     }
 
     this.closeModal();
-    await runtime.runObjectTranslationJob(selected);
+    await runtime.runObjectTranslationJob(selected, { dryRun });
+  }
+
+  async startObjectTranslationFromModal(dryRun = false) {
+    this.closeModal();
+    await this.startTranslation(dryRun);
   }
 }
 

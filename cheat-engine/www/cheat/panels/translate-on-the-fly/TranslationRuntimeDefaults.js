@@ -30,12 +30,19 @@ export const AI_INVALID_JSON_HANDLING_STRATEGY_OPTIONS = [
 
 export const DEFAULT_DIALOG_MAX_LINE_WIDTH_MV = 52;
 export const DEFAULT_DIALOG_MAX_LINE_WIDTH_MZ = 60;
-export const DEFAULT_DESCRIPTION_MAX_LINE_WIDTH = 59;
+export const DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MV = 59;
+export const DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MZ = 53;
 
 export function getDefaultDialogMaxLineWidth() {
   return isRpgMakerMv()
     ? DEFAULT_DIALOG_MAX_LINE_WIDTH_MV
     : DEFAULT_DIALOG_MAX_LINE_WIDTH_MZ;
+}
+
+export function getDefaultDescriptionMaxLineWidth() {
+  return isRpgMakerMv()
+    ? DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MV
+    : DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MZ;
 }
 
 export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
@@ -168,7 +175,7 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
     translationCount: 0,
     enableTextWrapping: true,
     maxLineWidth: getDefaultDialogMaxLineWidth(),
-    descriptionMaxLineWidth: DEFAULT_DESCRIPTION_MAX_LINE_WIDTH,
+    descriptionMaxLineWidth: getDefaultDescriptionMaxLineWidth(),
     translationEngine: "mymemory",
     translateCacheWhenDisabled: false,
     tryTranslateAhead: true,

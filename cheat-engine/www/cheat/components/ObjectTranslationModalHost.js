@@ -59,7 +59,8 @@ export default {
       <v-card-actions>
         <v-spacer></v-spacer>
         <v-btn text color="grey" @click="closeObjectTranslationModal">Cancel</v-btn>
-        <v-btn text color="primary" @click="startObjectTranslationFromModal">Start</v-btn>
+        <v-btn text color="orange" @click="startObjectTranslationFromModal(true)">Dry Run</v-btn>
+        <v-btn text color="primary" @click="startObjectTranslationFromModal(false)">Start</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -200,8 +201,8 @@ export default {
       this.service.closeModal();
     },
 
-    startObjectTranslationFromModal() {
-      this.service.startTranslation();
+    startObjectTranslationFromModal(dryRun = false) {
+      this.service.startObjectTranslationFromModal(!!dryRun);
     },
 
     closeMapEventsSelectionModal() {

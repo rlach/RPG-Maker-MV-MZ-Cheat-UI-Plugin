@@ -266,7 +266,9 @@ export const translateOnTheFlyFlowMethods = {
     });
   },
 
-  async runObjectTranslationJob(selectedTypeIds) {
+  async runObjectTranslationJob(selectedTypeIds, options = {}) {
+    const dryRun = !!(options && options.dryRun);
+
     if (this.objectTranslationJob.active) {
       Alert.warn("Object translation is already in progress");
       return;
@@ -320,6 +322,7 @@ export const translateOnTheFlyFlowMethods = {
           translationPhaseLabel: "object translation",
           backgroundJob: true,
           showSummary: false,
+          dryRun,
         },
       );
 

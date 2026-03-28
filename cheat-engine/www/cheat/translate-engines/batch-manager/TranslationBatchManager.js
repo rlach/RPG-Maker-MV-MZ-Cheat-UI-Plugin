@@ -101,6 +101,11 @@ export class TranslationBatchManager {
       charLimit: hasOwn(request, "charLimit")
         ? request.charLimit
         : options.charLimit,
+      dryRun: hasOwn(request, "dryRun")
+        ? !!request.dryRun
+        : hasOwn(options, "dryRun")
+          ? !!options.dryRun
+          : false,
       onTranslationBatchCompleted:
         typeof request.onTranslationBatchCompleted === "function"
           ? request.onTranslationBatchCompleted
@@ -192,6 +197,7 @@ export class TranslationBatchManager {
           entryOptions.stepLabel ||
           "translating batch";
       const backgroundJob = !!entryOptions.backgroundJob;
+      const dryRun = !!entryOptions.dryRun;
       const onTranslationBatchCompleted =
         typeof entryOptions.onTranslationBatchCompleted === "function"
           ? entryOptions.onTranslationBatchCompleted
@@ -241,29 +247,39 @@ export class TranslationBatchManager {
         let failures = [];
 
         try {
-          const result = backgroundJob
-            ? await this.panel.batchTranslateWithBackgroundRetry(
-                batch,
-                translationPhaseLabel,
-              )
-            : await this.panel.engine.batchTranslate(batch, {
-                backgroundJob: false,
-              });
+          if (dryRun) {
+            successes = [];
+            failures = batch.map((item) => ({
+              ...item,
+              cacheKey: item.cacheKey,
+              rejectReason: "dry_run",
+              translated: "",
+            }));
+          } else {
+            const result = backgroundJob
+              ? await this.panel.batchTranslateWithBackgroundRetry(
+                  batch,
+                  translationPhaseLabel,
+                )
+              : await this.panel.engine.batchTranslate(batch, {
+                  backgroundJob: false,
+                });
 
-          if (
-            result &&
-            result.recoveryStrategyUsed === true &&
-            typeof this.errorRecovery.recordRecoveryAttempt === "function"
-          ) {
-            this.errorRecovery.recordRecoveryAttempt(1);
+            if (
+              result &&
+              result.recoveryStrategyUsed === true &&
+              typeof this.errorRecovery.recordRecoveryAttempt === "function"
+            ) {
+              this.errorRecovery.recordRecoveryAttempt(1);
+            }
+
+            successes = Array.isArray(result && result.successes)
+              ? result.successes
+              : [];
+            failures = Array.isArray(result && result.failures)
+              ? result.failures
+              : [];
           }
-
-          successes = Array.isArray(result && result.successes)
-            ? result.successes
-            : [];
-          failures = Array.isArray(result && result.failures)
-            ? result.failures
-            : [];
         } catch (error) {
           const rejectReason =
             (error && error.message) || "batch_translate_exception";
@@ -296,7 +312,9 @@ export class TranslationBatchManager {
           this.errorRecovery.recordFailure(failure);
         }
 
-        this.applyBatchTranslationResults(successes, failures);
+        if (!dryRun) {
+          this.applyBatchTranslationResults(successes, failures);
+        }
 
         phaseFailures += failures.length;
 
@@ -398,6 +416,7 @@ export class TranslationBatchManager {
     };
 
     const safeQueueEntries = [...queueEntries];
+    const dryRun = !!options.dryRun;
 
     if (safeQueueEntries.length === 0) {
       const emptySummary = BatchSummaryReporter.buildSummary({
@@ -466,6 +485,10 @@ export class TranslationBatchManager {
       }
     } finally {
       this.progressTracker.endQueue();
+    }
+
+    if (dryRun && aggregatedFailures.length > 0) {
+      this.applyBatchTranslationResults([], aggregatedFailures);
     }
 
     const summary = BatchSummaryReporter.buildSummary({
