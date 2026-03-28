@@ -55,13 +55,17 @@ export class TranslationBatchManager {
     });
   }
 
-  applyBatchTranslationResults(successes, failures) {
+  applyBatchTranslationResults(successes, failures, options = {}) {
+    const persist = options.persist === undefined ? true : !!options.persist;
+
     for (const success of successes || []) {
       if (!success || !success.cacheKey) {
         continue;
       }
 
-      this.panel.setCacheValue(success.cacheKey, success.translated);
+      this.panel.setCacheValue(success.cacheKey, success.translated, {
+        persist: false,
+      });
     }
 
     const safeFailures = Array.isArray(failures) ? failures : [];
@@ -77,8 +81,12 @@ export class TranslationBatchManager {
           ? this.panel.hasUsableCacheValue(failure.cacheKey)
           : false;
       if (!hasUsable) {
-        this.panel.setCacheValue(failure.cacheKey, "");
+        this.panel.setCacheValue(failure.cacheKey, "", { persist: false });
       }
+    }
+
+    if (persist && typeof this.panel.persistCache === "function") {
+      this.panel.persistCache();
     }
   }
 
@@ -312,8 +320,10 @@ export class TranslationBatchManager {
           this.errorRecovery.recordFailure(failure);
         }
 
-        if (!dryRun) {
-          this.applyBatchTranslationResults(successes, failures);
+        this.applyBatchTranslationResults(successes, failures, { persist: false });
+
+        if (!dryRun && typeof this.panel.persistCache === "function") {
+          this.panel.persistCache();
         }
 
         phaseFailures += failures.length;
@@ -487,8 +497,13 @@ export class TranslationBatchManager {
       this.progressTracker.endQueue();
     }
 
-    if (dryRun && aggregatedFailures.length > 0) {
-      this.applyBatchTranslationResults([], aggregatedFailures);
+    if (dryRun && (aggregatedSuccesses.length > 0 || aggregatedFailures.length > 0)) {
+      this.applyBatchTranslationResults(aggregatedSuccesses, aggregatedFailures, {
+        persist: false,
+      });
+      if (typeof this.panel.persistCache === "function") {
+        this.panel.persistCache();
+      }
     }
 
     const summary = BatchSummaryReporter.buildSummary({
@@ -501,6 +516,15 @@ export class TranslationBatchManager {
       currentPhaseErrors: 0,
       totalCumulativeErrors: aggregatedFailures.length,
     });
+
+    if (dryRun && aggregatedFailures.length > 0) {
+      this.applyBatchTranslationResults([], aggregatedFailures, {
+        persist: false,
+      });
+      if (typeof this.panel.persistCache === "function") {
+        this.panel.persistCache();
+      }
+    }
 
     const showSummary = options.showSummary !== false;
     if (showSummary) {

@@ -104,7 +104,7 @@ export const translateOnTheFlyCoreMethods = {
     return text.startsWith("name_") ? text : `name_${text}`;
   },
 
-  setCacheValue(key, value) {
+  setCacheValue(key, value, options = {}) {
     const normalizedValue =
       typeof value === "string"
         ? value
@@ -112,7 +112,12 @@ export const translateOnTheFlyCoreMethods = {
           ? ""
           : String(value);
     this.translationCache.set(key, normalizedValue);
-    this.persistCache();
+
+    const persist = options.persist === undefined ? true : !!options.persist;
+    if (persist) {
+      this.persistCache();
+    }
+
     this.notifyCacheRuntime("cache-set", key);
   },
 
@@ -158,7 +163,11 @@ export const translateOnTheFlyCoreMethods = {
       const payload = JSON.stringify(
         Array.from(this.translationCache.entries()),
       );
-      this.cacheStorage.setItem("data", payload);
+      if (typeof this.cacheStorage.setBatch === "function") {
+        this.cacheStorage.setBatch({ data: payload });
+      } else {
+        this.cacheStorage.setItem("data", payload);
+      }
     } catch (error) {
       console.warn("[TranslateOnTheFly] Failed to persist cache", error);
     }
