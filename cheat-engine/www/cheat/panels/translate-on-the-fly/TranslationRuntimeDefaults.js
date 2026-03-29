@@ -30,8 +30,8 @@ export const AI_INVALID_JSON_HANDLING_STRATEGY_OPTIONS = [
 
 export const DEFAULT_DIALOG_MAX_LINE_WIDTH_MV = 52;
 export const DEFAULT_DIALOG_MAX_LINE_WIDTH_MZ = 60;
-export const DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MV = 59;
-export const DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MZ = 53;
+export const DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MV = 53;
+export const DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MZ = 59;
 
 export function getDefaultDialogMaxLineWidth() {
   return isRpgMakerMv()

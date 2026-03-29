@@ -1,33 +1,28 @@
 export class KeyValueStorage {
-    constructor (filePath) {
-            this.filePath = filePath
-            this.fileEncoding = 'utf-8'
-            this.fileSystem = require('fs')
+    constructor(filePath) {
+        this.filePath = filePath
+        this.fileEncoding = 'utf-8'
+        this.fileSystem = require('fs')
     }
 
-    getItem (key) {
+    getItem(key) {
         return this.__getItemFromFile(key)
     }
 
-    setItem (key, value) {
+    setItem(key, value) {
         this.__setItemToFile(key, value)
     }
 
-    setBatch (items) {
-        if (!items || typeof items !== 'object') {
-            return
-        }
+    async setItemAsync(key, value) {
+        const data = await this.__readFileAsync();
 
-        const data = this.__readFile()
-        for (const [key, value] of Object.entries(items)) {
-            data[key] = value
-        }
-
-        console.log('[KeyValueStorage] Writing batch data to file', Object.keys(items).length, 'entries')
-        this.fileSystem.writeFileSync(this.filePath, JSON.stringify(data))
+        data[key] = value;
+        await this.fileSystem.promises.writeFile(`${this.filePath}.tmp`, JSON.stringify(data), this.fileEncoding);
+        await this.fileSystem.promises.rename(`${this.filePath}.tmp`, this.filePath);
+        console.log('[KeyValueStorage] Asynchronously wrote data to file', key);
     }
 
-    __readFile () {
+    __readFile() {
         if (!this.fileSystem.existsSync(this.filePath)) {
             return {}
         }
@@ -35,16 +30,24 @@ export class KeyValueStorage {
         return JSON.parse(this.fileSystem.readFileSync(this.filePath, this.fileEncoding))
     }
 
-    __getItemFromFile (key) {
+    async __readFileAsync() {
+        if (!this.fileSystem.existsSync(this.filePath)) {
+            return {}
+        }
+        const content = await this.fileSystem.promises.readFile(this.filePath, this.fileEncoding);
+        return JSON.parse(content);
+    }
+
+    __getItemFromFile(key) {
         return this.__readFile()[key]
     }
 
-    __setItemToFile (key, value) {
+    __setItemToFile(key, value) {
         const data = this.__readFile()
 
         data[key] = value
 
-        console.log('[KeyValueStorage] Writing data to file', key, value);
+    console.log('[KeyValueStorage] Writing data to file', key, value);
         this.fileSystem.writeFileSync(this.filePath, JSON.stringify(data))
     }
 }

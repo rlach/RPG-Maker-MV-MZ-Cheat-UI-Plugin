@@ -1,4 +1,6 @@
-export class DirectItemsTranslationKindStrategy {
+import { BaseTranslationPhaseStrategy } from "./BasePhase.js";
+
+export class DirectItemsTranslationKindStrategy extends BaseTranslationPhaseStrategy {
   getKind() {
     return "directItems";
   }

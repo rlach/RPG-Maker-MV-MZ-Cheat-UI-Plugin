@@ -158,19 +158,35 @@ export const translateOnTheFlyCoreMethods = {
     }
   },
 
+  scheduled: false,
+  saving: false,
+
   persistCache() {
-    try {
-      const payload = JSON.stringify(
-        Array.from(this.translationCache.entries()),
-      );
-      if (typeof this.cacheStorage.setBatch === "function") {
-        this.cacheStorage.setBatch({ data: payload });
-      } else {
-        this.cacheStorage.setItem("data", payload);
-      }
-    } catch (error) {
-      console.warn("[TranslateOnTheFly] Failed to persist cache", error);
+    this.scheduled = true
+
+    if (!this.saving) {
+      setTimeout(() => this.flush(), 1000);
     }
+  },
+
+  async flush() {
+    if (this.saving) {
+      return;
+    }
+    this.saving = true;
+
+      do {
+        this.scheduled = false;
+
+        const payload = JSON.stringify(
+          Array.from(this.translationCache.entries()),
+        );
+
+        await this.cacheStorage.setItemAsync("data", payload);
+
+      } while (this.scheduled)
+
+      this.saving = false
   },
 
   applyCachedTranslations(
