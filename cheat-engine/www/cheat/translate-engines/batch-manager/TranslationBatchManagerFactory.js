@@ -9,6 +9,7 @@ import { CurrentEvent } from "../translation-phases/CurrentEvent.js";
 import { DataObjects } from "../translation-phases/DataObjects.js";
 import { EmptyStrings } from "../translation-phases/EmptyStrings.js";
 import { MapEvents } from "../translation-phases/MapEvents.js";
+import { OtherStrings } from "../translation-phases/OtherStrings.js";
 import { Plugins } from "../translation-phases/Plugins.js";
 import { SystemCommands } from "../translation-phases/SystemCommands.js";
 import { SystemMessages } from "../translation-phases/SystemMessages.js";
@@ -33,6 +34,7 @@ function registerDefaultStrategies(manager) {
   manager.register(EmptyStrings.getInstance());
   manager.register(SystemMessages.getInstance());
   manager.register(SystemCommands.getInstance());
+  manager.register(OtherStrings.getInstance());
   manager.register(new CommonEvents());
   manager.register(MapEvents.getInstance());
   manager.register(new GameArrays());
