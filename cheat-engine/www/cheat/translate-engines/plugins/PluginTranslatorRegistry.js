@@ -1,8 +1,12 @@
 import { DTextPictureTranslator } from "./translators/DTextPictureTranslator.js";
+import { DestinationWindowTranslator } from "./translators/DestinationWindowTranslator.js";
 
 class PluginTranslatorRegistry {
   constructor() {
-    this.translatorClasses = [DTextPictureTranslator];
+    this.translatorClasses = [
+      DTextPictureTranslator,
+      DestinationWindowTranslator,
+    ];
     this.translatorInstances = new Map();
     this.detectedPluginNames = new Set();
     this.detectionPromise = null;
