@@ -49,12 +49,12 @@ export default {
           <div class="d-flex align-center">
             <span class="caption grey--text text--lighten-1 mr-2">{{item.metaText || ('left ' + item.left + ' of ' + item.total)}}</span>
             <v-btn
-              v-if="item.id === 'mapEvents'"
+              v-if="item.id === 'mapEvents' || item.id === 'plugins'"
               icon
               x-small
               color="grey lighten-1"
               :disabled="item.total <= 0"
-              @click.stop="openMapEventsSelectionModal"
+              @click.stop="openObjectTranslationSubSelection(item.id)"
             >
               <v-icon small>mdi-cog</v-icon>
             </v-btn>
@@ -66,6 +66,67 @@ export default {
         <v-btn text color="grey" @click="closeObjectTranslationModal">Cancel</v-btn>
         <v-btn text color="orange" @click="startObjectTranslationFromModal(true)">Dry Run</v-btn>
         <v-btn text color="primary" @click="startObjectTranslationFromModal(false)">Start</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog
+    v-model="objectTranslationPluginsDialogVisible"
+    max-width="760"
+    content-class="object-translation-plugins-dialog"
+    @keydown.stop
+    @mousedown.stop
+    @mouseup.stop
+    @click.stop
+    @wheel.stop
+  >
+    <v-card dark>
+      <v-card-title class="subtitle-1 font-weight-bold">Plugins selection</v-card-title>
+      <v-card-text class="caption pb-1">Choose which detected plugins should be included in object translation.</v-card-text>
+      <v-card-text class="pt-1">
+        <v-text-field
+          v-model="objectTranslationPluginsSearch"
+          label="Search plugins"
+          solo
+          dense
+          hide-details
+          background-color="grey darken-3"
+          class="mb-2"
+          @keydown.self.stop
+          @focus="$event.target.select()"
+        ></v-text-field>
+
+        <div class="d-flex justify-end mb-2">
+          <v-btn text small color="primary" @click="selectAllPluginsForObjectTranslation">Select all</v-btn>
+          <v-btn text small color="grey lighten-1" @click="deselectAllPluginsForObjectTranslation">Deselect all</v-btn>
+        </div>
+
+        <div v-if="objectTranslationPluginsLoading" class="caption grey--text text--lighten-1 py-4 text-center">
+          Loading plugins...
+        </div>
+
+        <div v-else style="max-height: 420px; overflow-y: auto;">
+          <div
+            v-for="item in filteredObjectTranslationPluginDetails"
+            :key="item.id"
+            class="d-flex align-center justify-space-between py-1"
+          >
+            <v-checkbox
+              v-model="objectTranslationPluginDraftSelection[item.id]"
+              :label="item.label"
+              :disabled="item.totalStrings <= 0"
+              hide-details
+              dense
+              class="ma-0 pa-0"
+            ></v-checkbox>
+            <span class="caption grey--text text--lighten-1">left {{item.leftStrings}} of {{item.totalStrings}}</span>
+          </div>
+        </div>
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn text color="grey" @click="closePluginsSelectionModal">Cancel</v-btn>
+        <v-btn text color="primary" :disabled="objectTranslationPluginsLoading" @click="savePluginsSelection">Save</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -159,12 +220,30 @@ export default {
       },
     },
 
+    objectTranslationPluginsDialogVisible: {
+      get() {
+        return this.service.state.pluginsDialogVisible;
+      },
+      set(value) {
+        this.service.state.pluginsDialogVisible = !!value;
+      },
+    },
+
     objectTranslationMapEventsSearch: {
       get() {
         return this.service.state.mapEventsSearch;
       },
       set(value) {
         this.service.state.mapEventsSearch = value;
+      },
+    },
+
+    objectTranslationPluginsSearch: {
+      get() {
+        return this.service.state.pluginsSearch;
+      },
+      set(value) {
+        this.service.state.pluginsSearch = value;
       },
     },
 
@@ -184,11 +263,37 @@ export default {
       return this.service.state.mapEventDraftSelection;
     },
 
+    objectTranslationPluginsLoading() {
+      return this.service.state.pluginsLoading;
+    },
+
+    objectTranslationPluginDraftSelection() {
+      return this.service.state.pluginDraftSelection;
+    },
+
     filteredObjectTranslationMapEventDetails() {
       const items = Array.isArray(this.service.state.mapEventDetails)
         ? this.service.state.mapEventDetails
         : [];
       const search = (this.objectTranslationMapEventsSearch || "")
+        .trim()
+        .toLowerCase();
+      if (!search) {
+        return items;
+      }
+
+      return items.filter((item) => {
+        const label = String(item.label || "").toLowerCase();
+        const id = String(item.id || "").toLowerCase();
+        return label.includes(search) || id.includes(search);
+      });
+    },
+
+    filteredObjectTranslationPluginDetails() {
+      const items = Array.isArray(this.service.state.pluginDetails)
+        ? this.service.state.pluginDetails
+        : [];
+      const search = (this.objectTranslationPluginsSearch || "")
         .trim()
         .toLowerCase();
       if (!search) {
@@ -208,6 +313,21 @@ export default {
       this.service.openMapSelection();
     },
 
+    openPluginsSelectionModal() {
+      this.service.openPluginSelection();
+    },
+
+    openObjectTranslationSubSelection(typeId) {
+      if (typeId === "mapEvents") {
+        this.openMapEventsSelectionModal();
+        return;
+      }
+
+      if (typeId === "plugins") {
+        this.openPluginsSelectionModal();
+      }
+    },
+
     closeObjectTranslationModal() {
       this.service.closeModal();
     },
@@ -220,6 +340,10 @@ export default {
       this.service.closeMapSelection();
     },
 
+    closePluginsSelectionModal() {
+      this.service.closePluginSelection();
+    },
+
     selectAllMapEventsForObjectTranslation() {
       this.service.selectAllMaps();
     },
@@ -228,8 +352,20 @@ export default {
       this.service.deselectAllMaps();
     },
 
+    selectAllPluginsForObjectTranslation() {
+      this.service.selectAllPlugins();
+    },
+
+    deselectAllPluginsForObjectTranslation() {
+      this.service.deselectAllPlugins();
+    },
+
     saveMapEventsSelection() {
       this.service.saveMapSelection();
+    },
+
+    savePluginsSelection() {
+      this.service.savePluginSelection();
     },
 
     onItemDragStart(event, index) {

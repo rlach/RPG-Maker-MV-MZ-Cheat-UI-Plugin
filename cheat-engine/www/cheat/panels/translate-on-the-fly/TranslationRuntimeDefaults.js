@@ -90,6 +90,7 @@ export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
   "aiCustomTagBracketOptions",
   "objectTranslationSelectedMapIds",
   "objectTranslationTypeOrder",
+  "enabledPluginTranslators",
   "objectTranslationJob",
   "nonOtfTranslationProcess",
 ]);
@@ -112,6 +113,7 @@ export const PERSISTED_TRANSLATION_SETTINGS_KEYS = Object.freeze([
   "changeToCurrentMapInMassTranslationMidPhase",
   "engineSettings",
   "objectTranslationTypeOrder",
+  "enabledPluginTranslators",
 ]);
 
 export const UI_SYNC_STATE_KEYS = Object.freeze([
@@ -152,6 +154,7 @@ export const UI_SYNC_STATE_KEYS = Object.freeze([
   "aiCustomTagBracketOptions",
   "objectTranslationSelectedMapIds",
   "objectTranslationTypeOrder",
+  "enabledPluginTranslators",
 ]);
 
 export const UI_SYNC_TO_ONLY_STATE_KEYS = Object.freeze([
@@ -221,6 +224,7 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
     aiCustomTagBracketOptions: [],
     objectTranslationSelectedMapIds: null,
     objectTranslationTypeOrder: [],
+    enabledPluginTranslators: {},
     objectTranslationJob: {
       active: false,
       currentTypeLabel: "",

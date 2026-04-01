@@ -1,5 +1,6 @@
 import { TRANSLATE_SETTINGS, TRANSLATOR } from "../../js/TranslateHelper.js";
 import { createTranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManagerFactory.js";
+import { PLUGIN_TRANSLATOR_REGISTRY } from "../../translate-engines/plugins/PluginTranslatorRegistry.js";
 
 const DEFAULT_OBJECT_TRANSLATION_TYPE_DEFS = Object.freeze([
   { id: "mapEvents", label: "Map events" },
@@ -15,6 +16,7 @@ const DEFAULT_OBJECT_TRANSLATION_TYPE_DEFS = Object.freeze([
   { id: "systemMessages", label: "system messages" },
   { id: "systemCommands", label: "system commands" },
   { id: "gameArrays", label: "game arrays (terms, types, elements)" },
+  { id: "plugins", label: "Plugins" },
 ]);
 
 export const objectTranslationRuntimeMethods = {
@@ -333,6 +335,90 @@ export const objectTranslationRuntimeMethods = {
     }
 
     return `${safeTotal} maps`;
+  },
+
+  getEnabledPluginTranslators() {
+    if (
+      !this.enabledPluginTranslators ||
+      typeof this.enabledPluginTranslators !== "object" ||
+      Array.isArray(this.enabledPluginTranslators)
+    ) {
+      this.enabledPluginTranslators = {};
+    }
+
+    return this.enabledPluginTranslators;
+  },
+
+  isPluginTranslatorEnabled(pluginName) {
+    const key = String(pluginName || "").trim();
+    if (!key) {
+      return false;
+    }
+
+    const enabledMap = this.getEnabledPluginTranslators();
+    if (!Object.prototype.hasOwnProperty.call(enabledMap, key)) {
+      return true;
+    }
+
+    return !!enabledMap[key];
+  },
+
+  setPluginTranslatorEnabled(pluginName, enabled, options = {}) {
+    const key = String(pluginName || "").trim();
+    if (!key) {
+      return;
+    }
+
+    const persist = !options || options.persist !== false;
+    const next = {
+      ...this.getEnabledPluginTranslators(),
+      [key]: !!enabled,
+    };
+    this.enabledPluginTranslators = next;
+
+    if (persist && typeof this.saveSettings === "function") {
+      this.saveSettings();
+    }
+  },
+
+  getObjectTranslationPluginsMetaText(totalPlugins, selectedPluginsCount) {
+    const safeTotal = Math.max(0, Number(totalPlugins) || 0);
+    const safeSelected = Math.max(0, Number(selectedPluginsCount) || 0);
+
+    if (safeTotal <= 0) {
+      return "0 plugins";
+    }
+
+    if (safeSelected > 0 && safeSelected < safeTotal) {
+      return `${safeSelected} of ${safeTotal} plugins`;
+    }
+
+    return `${safeTotal} plugins`;
+  },
+
+  async buildObjectTranslationPluginDetails() {
+    await PLUGIN_TRANSLATOR_REGISTRY.ensureDetectionCompleted({ runtime: this });
+
+    const summaries = PLUGIN_TRANSLATOR_REGISTRY.getDetectedPluginSummaries(this);
+    const details = summaries
+      .map((summary) => ({
+        id: summary.pluginName,
+        label: summary.label || summary.pluginName,
+        total: summary.total,
+        left: summary.left,
+        totalStrings: summary.totalStrings,
+        leftStrings: summary.leftStrings,
+        selected: this.isPluginTranslatorEnabled(summary.pluginName),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    for (const detail of details) {
+      if (!Object.prototype.hasOwnProperty.call(this.getEnabledPluginTranslators(), detail.id)) {
+        this.setPluginTranslatorEnabled(detail.id, true, { persist: false });
+      }
+    }
+
+    return details;
   },
 
   async getTranslatedMapNames(validMaps) {

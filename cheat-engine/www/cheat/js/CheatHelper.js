@@ -747,7 +747,16 @@ export class MessageCheat {
 
   static openObjectTranslationModal() {
     try {
-      OBJECT_TRANSLATION_SERVICE.openModal();
+      Promise.resolve(OBJECT_TRANSLATION_SERVICE.openModal()).catch((err) => {
+        console.error(
+          "[MessageCheat] Failed to open object translation modal",
+          err,
+        );
+        Alert.error(
+          "Failed to open object translation modal: " +
+            (err && err.message ? err.message : err),
+        );
+      });
     } catch (err) {
       console.error(
         "[MessageCheat] Failed to open object translation modal",

@@ -20,6 +20,11 @@ class ObjectTranslationService {
       mapEventsSearch: "",
       mapEventDetails: [],
       mapEventDraftSelection: {},
+      pluginsDialogVisible: false,
+      pluginsLoading: false,
+      pluginsSearch: "",
+      pluginDetails: [],
+      pluginDraftSelection: {},
     });
   }
 
@@ -35,7 +40,7 @@ class ObjectTranslationService {
     }
   }
 
-  openModal() {
+  async openModal() {
     const runtime = this.ensureRuntime();
     if (!runtime) {
       Alert.error("Translation runtime not initialized");
@@ -83,8 +88,16 @@ class ObjectTranslationService {
     const selectedMapIds = runtime.getSelectedObjectTranslationMapIds
       ? runtime.getSelectedObjectTranslationMapIds()
       : [];
+    const pluginDetails =
+      typeof runtime.buildObjectTranslationPluginDetails === "function"
+        ? await runtime.buildObjectTranslationPluginDetails()
+        : [];
+    const selectedPluginsCount = pluginDetails.filter(
+      (item) => item && item.selected,
+    ).length;
 
-    this.state.modalStats = stats.map((item) => {
+    this.state.modalStats = stats
+      .map((item) => {
       if (item.id === "commonEvents") {
         return {
           ...item,
@@ -107,11 +120,35 @@ class ObjectTranslationService {
         };
       }
 
-      return {
-        ...item,
-        metaText: "",
-      };
-    });
+      if (item.id === "plugins") {
+        return {
+          ...item,
+          total: pluginDetails.length,
+          left: pluginDetails.filter((entry) => entry.leftStrings > 0).length,
+          totalStrings: pluginDetails.reduce(
+            (acc, entry) => acc + (Number(entry.totalStrings) || 0),
+            0,
+          ),
+          leftStrings: pluginDetails.reduce(
+            (acc, entry) => acc + (Number(entry.leftStrings) || 0),
+            0,
+          ),
+          metaText:
+            typeof runtime.getObjectTranslationPluginsMetaText === "function"
+              ? runtime.getObjectTranslationPluginsMetaText(
+                  pluginDetails.length,
+                  selectedPluginsCount,
+                )
+              : `${pluginDetails.length} plugins`,
+        };
+      }
+
+        return {
+          ...item,
+          metaText: "",
+        };
+      })
+      .filter((item) => item.id !== "plugins" || pluginDetails.length > 0);
 
     for (const item of this.state.modalStats) {
       if (this.state.selection[item.id] === undefined) {
@@ -152,6 +189,94 @@ class ObjectTranslationService {
     } finally {
       this.state.mapEventsLoading = false;
     }
+  }
+
+  async openPluginSelection() {
+    const runtime = this.ensureRuntime();
+    if (
+      !runtime ||
+      typeof runtime.buildObjectTranslationPluginDetails !== "function"
+    ) {
+      Alert.error("Translation runtime not initialized");
+      return;
+    }
+
+    this.state.pluginsDialogVisible = true;
+    this.state.pluginsLoading = true;
+    this.state.pluginsSearch = "";
+
+    try {
+      const details = await runtime.buildObjectTranslationPluginDetails();
+      this.state.pluginDetails = details;
+
+      const draft = {};
+      for (const item of details) {
+        draft[item.id] = !!item.selected;
+      }
+      this.state.pluginDraftSelection = draft;
+    } finally {
+      this.state.pluginsLoading = false;
+    }
+  }
+
+  closePluginSelection() {
+    this.state.pluginsDialogVisible = false;
+  }
+
+  selectAllPlugins() {
+    const next = { ...this.state.pluginDraftSelection };
+    for (const item of this.state.pluginDetails) {
+      next[item.id] = true;
+    }
+    this.state.pluginDraftSelection = next;
+  }
+
+  deselectAllPlugins() {
+    const next = { ...this.state.pluginDraftSelection };
+    for (const item of this.state.pluginDetails) {
+      next[item.id] = false;
+    }
+    this.state.pluginDraftSelection = next;
+  }
+
+  savePluginSelection() {
+    const runtime = this.ensureRuntime();
+    if (!runtime) {
+      Alert.error("Translation runtime not initialized");
+      return;
+    }
+
+    if (typeof runtime.setPluginTranslatorEnabled === "function") {
+      for (const item of this.state.pluginDetails) {
+        runtime.setPluginTranslatorEnabled(
+          item.id,
+          !!this.state.pluginDraftSelection[item.id],
+          { persist: false },
+        );
+      }
+    }
+
+    if (typeof runtime.saveSettings === "function") {
+      runtime.saveSettings();
+    }
+
+    const selectedPluginsCount = this.state.pluginDetails.filter(
+      (item) => !!this.state.pluginDraftSelection[item.id],
+    ).length;
+    this.state.selection.plugins = selectedPluginsCount > 0;
+
+    const pluginsItem = this.state.modalStats.find((item) => item.id === "plugins");
+    if (pluginsItem) {
+      pluginsItem.metaText =
+        typeof runtime.getObjectTranslationPluginsMetaText === "function"
+          ? runtime.getObjectTranslationPluginsMetaText(
+              this.state.pluginDetails.length,
+              selectedPluginsCount,
+            )
+          : `${this.state.pluginDetails.length} plugins`;
+    }
+
+    this.closePluginSelection();
   }
 
   closeMapSelection() {

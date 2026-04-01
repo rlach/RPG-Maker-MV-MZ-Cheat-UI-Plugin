@@ -7,6 +7,7 @@ import "../libs/vuetify.js";
 
 import MainComponent from "../MainComponent.js";
 import { ensureTranslationRuntime } from "../panels/translate-on-the-fly/TranslationRuntime.js";
+import { PLUGIN_TRANSLATOR_REGISTRY } from "../translate-engines/plugins/PluginTranslatorRegistry.js";
 
 // initialize vue
 const vuetify = new Vuetify();
@@ -35,6 +36,11 @@ window.__ensureTranslationRuntime = ensureTranslateOnTheFlyRuntime;
 
 // Boot translation runtime even if settings panel UI is never opened.
 ensureTranslateOnTheFlyRuntime();
+
+setTimeout(() => {
+  const runtime = ensureTranslateOnTheFlyRuntime();
+  PLUGIN_TRANSLATOR_REGISTRY.ensureDetectionStarted({ runtime });
+}, 2000);
 
 // Override SceneManager to keep game active when cheat window (main or external) has focus
 if (typeof SceneManager !== "undefined" && !window.__CHEAT_EXTERNAL_WINDOW__) {

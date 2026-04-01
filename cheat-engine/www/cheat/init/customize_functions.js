@@ -21,7 +21,7 @@ export function customizeRPGMakerFunctions(mainComponent) {
       document.querySelector("#cheat-modal"),
       ...Array.from(
         document.querySelectorAll(
-          ".object-translation-dialog .v-card, .object-translation-map-events-dialog .v-card",
+          ".object-translation-dialog .v-card, .object-translation-map-events-dialog .v-card, .object-translation-plugins-dialog .v-card",
         ),
       ),
     ].filter(Boolean);
@@ -47,7 +47,7 @@ export function customizeRPGMakerFunctions(mainComponent) {
 
   const isObjectTranslationModalOpen = () =>
     !!document.querySelector(
-      ".object-translation-dialog.v-dialog__content--active, .object-translation-map-events-dialog.v-dialog__content--active",
+      ".object-translation-dialog.v-dialog__content--active, .object-translation-map-events-dialog.v-dialog__content--active, .object-translation-plugins-dialog.v-dialog__content--active",
     );
 
   if (isRpgMakerMv()) {
