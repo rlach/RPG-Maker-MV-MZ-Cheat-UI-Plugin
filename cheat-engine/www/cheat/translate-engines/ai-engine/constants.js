@@ -36,9 +36,10 @@ export const TAG_CONFIGS = [
   { description: "variable", type: TAG_TYPE.WITH_NUMERIC_PARAMETER, tagSymbol: "V", requiredConsistency: true },
   { description: "actor", type: TAG_TYPE.WITH_NUMERIC_PARAMETER, tagSymbol: "N", requiredConsistency: true },
   { description: "partyMember", type: TAG_TYPE.WITH_NUMERIC_PARAMETER, tagSymbol: "P", requiredConsistency: true },
-  { description: "color", type: TAG_TYPE.WITH_NUMERIC_PARAMETER, tagSymbol: "C", requiredConsistency: false },
   { description: "icon", type: TAG_TYPE.WITH_NUMERIC_PARAMETER, tagSymbol: "I", requiredConsistency: false },
+  { description: "color", type: TAG_TYPE.WITH_NUMERIC_PARAMETER, tagSymbol: "C", requiredConsistency: false },
 
+  { description: "reset color", type: TAG_TYPE.WITHOUT_PARAMETER, tagSymbol: "C", requiredConsistency: false },
   { description: "gold", type: TAG_TYPE.WITHOUT_PARAMETER, tagSymbol: "$", requiredConsistency: true },
   { description: "sizeInc", type: TAG_TYPE.WITHOUT_PARAMETER, tagSymbol: "{", requiredConsistency: false },
   { description: "sizeDec", type: TAG_TYPE.WITHOUT_PARAMETER, tagSymbol: "}", requiredConsistency: false },
