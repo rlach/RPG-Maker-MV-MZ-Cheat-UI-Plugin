@@ -8,10 +8,120 @@ import { StreamJsonParser } from "./StreamJsonParser.js";
 import {
   STREAM_MONITOR_CHECK_INTERVAL,
   STREAM_OPEN_BRACE_MAX_CHARS,
+  STREAM_KEY_MAX_CHARS,
   STREAM_CANCEL_REASON,
 } from "./constants.js";
 
 export class StreamGuardrails {
+  static extractInFlightTopLevelKey(partialObjectText) {
+    if (typeof partialObjectText !== "string" || !partialObjectText) {
+      return null;
+    }
+
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    let lastTopLevelPairDelimiterIndex = -1;
+
+    for (let i = 0; i < partialObjectText.length; i++) {
+      const ch = partialObjectText[i];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+        if (ch === '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = true;
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        if (depth === 1 && lastTopLevelPairDelimiterIndex < 0) {
+          lastTopLevelPairDelimiterIndex = i;
+        }
+        continue;
+      }
+
+      if (ch === "}") {
+        if (depth > 0) {
+          depth -= 1;
+        }
+        continue;
+      }
+
+      if (ch === "," && depth === 1) {
+        lastTopLevelPairDelimiterIndex = i;
+      }
+    }
+
+    if (lastTopLevelPairDelimiterIndex < 0) {
+      return null;
+    }
+
+    const tail = partialObjectText
+      .slice(lastTopLevelPairDelimiterIndex + 1)
+      .replace(/^\s+/, "");
+
+    if (!tail.startsWith('"')) {
+      return null;
+    }
+
+    let key = "";
+    let escaped = false;
+    for (let i = 1; i < tail.length; i++) {
+      const ch = tail[i];
+
+      if (escaped) {
+        key += ch;
+        escaped = false;
+        continue;
+      }
+
+      if (ch === "\\") {
+        escaped = true;
+        continue;
+      }
+
+      if (ch === '"') {
+        return {
+          key,
+          isClosed: true,
+        };
+      }
+
+      key += ch;
+    }
+
+    return {
+      key,
+      isClosed: false,
+    };
+  }
+
+  static isExpectedKeyProgress(expectedKeys, key, isClosed) {
+    if (!Array.isArray(expectedKeys) || expectedKeys.length === 0) {
+      return true;
+    }
+
+    if (isClosed) {
+      return expectedKeys.includes(key);
+    }
+
+    return expectedKeys.some((expectedKey) => expectedKey.startsWith(key));
+  }
+
   /**
    * Create initial stream monitor state
    * @param {string[]} expectedKeys - Keys expected in JSON response
@@ -219,28 +329,92 @@ export class StreamGuardrails {
     // Analyze text for JSON structures
     const analysis = this.analyzeAndScan(rawText, state.expectedKeys);
 
-    // Update best candidate
-    if (analysis.candidateMap) {
-      this.updateBestState(state, analysis.candidateMap);
-
-      // Check for unknown keys
-      const allKeys = [];
-      const allDuplicateKeys = [];
-
-      const objectTexts = (analysis.scan.objects || []).map((obj) => obj.text);
-      if (analysis.scan.partialObjectText) {
-        objectTexts.push(analysis.scan.partialObjectText);
+    // Guardrail: trim-too-long in partial object must cancel immediately.
+    if (analysis.scan.partialObjectText) {
+      const repairResult = StreamJsonParser.tryRepairPartialObject(
+        analysis.scan.partialObjectText,
+      );
+      if (
+        !repairResult.ok &&
+        repairResult.reason === STREAM_CANCEL_REASON.TRIM_TOO_LONG
+      ) {
+        state.cancelReason = STREAM_CANCEL_REASON.TRIM_TOO_LONG;
+        state.cancelMeta = { trimmedChars: repairResult.trimmedChars };
+        return {
+          shouldCancel: true,
+          cancelReason: state.cancelReason,
+          bestMap: state.bestMap,
+        };
       }
 
-      for (const text of objectTexts) {
-        const keyParsing = StreamJsonParser.parseTopLevelKeys(text);
-        allKeys.push(...keyParsing.keys);
-        allDuplicateKeys.push(...keyParsing.duplicateKeys);
+      const strictRepairResult =
+        StreamJsonParser.tryRepairPartialObjectKeepingCompleteEntries(
+          analysis.scan.partialObjectText,
+        );
+      if (
+        !strictRepairResult.ok &&
+        strictRepairResult.reason === STREAM_CANCEL_REASON.TRIM_TOO_LONG
+      ) {
+        state.cancelReason = STREAM_CANCEL_REASON.TRIM_TOO_LONG;
+        state.cancelMeta = { trimmedChars: strictRepairResult.trimmedChars };
+        return {
+          shouldCancel: true,
+          cancelReason: state.cancelReason,
+          bestMap: state.bestMap,
+        };
       }
 
-      for (const key of allKeys) {
-        if (!state.expectedKeySet.has(key)) {
+      // Guardrail: detect obvious malformed JSON progress (e.g. stray tokens after value)
+      // when parser is not simply waiting for string closure.
+      const closureState = StreamJsonParser.getJsonClosureState(
+        analysis.scan.partialObjectText,
+      );
+      const partialKeyParsing = StreamJsonParser.parseTopLevelKeys(
+        analysis.scan.partialObjectText,
+      );
+      if (!closureState.isInsideString() && !partialKeyParsing.valid) {
+        state.cancelReason = STREAM_CANCEL_REASON.INVALID_JSON_PROGRESS;
+        return {
+          shouldCancel: true,
+          cancelReason: state.cancelReason,
+          bestMap: state.bestMap,
+        };
+      }
+
+      // Guardrail: track currently generated key and abort early on impossible keys.
+      const inFlightKey = this.extractInFlightTopLevelKey(
+        analysis.scan.partialObjectText,
+      );
+      if (inFlightKey) {
+        if (inFlightKey.key.length > STREAM_KEY_MAX_CHARS) {
           state.cancelReason = STREAM_CANCEL_REASON.UNKNOWN_KEY;
+          state.cancelMeta = {
+            key: inFlightKey.key,
+            isClosed: inFlightKey.isClosed,
+            reason: "key_too_long",
+          };
+          return {
+            shouldCancel: true,
+            cancelReason: state.cancelReason,
+            bestMap: state.bestMap,
+          };
+        }
+
+        if (
+          !this.isExpectedKeyProgress(
+            state.expectedKeys,
+            inFlightKey.key,
+            inFlightKey.isClosed,
+          )
+        ) {
+          state.cancelReason = STREAM_CANCEL_REASON.UNKNOWN_KEY;
+          state.cancelMeta = {
+            key: inFlightKey.key,
+            isClosed: inFlightKey.isClosed,
+            reason: inFlightKey.isClosed
+              ? "closed_key_not_expected"
+              : "key_prefix_not_expected",
+          };
           return {
             shouldCancel: true,
             cancelReason: state.cancelReason,
@@ -248,17 +422,11 @@ export class StreamGuardrails {
           };
         }
       }
+    }
 
-      // Check for duplicate keys
-      if (allDuplicateKeys.length > 0) {
-        state.cancelReason = STREAM_CANCEL_REASON.DUPLICATE_KEY;
-        state.cancelMeta = { duplicateKeys: allDuplicateKeys };
-        return {
-          shouldCancel: true,
-          cancelReason: state.cancelReason,
-          bestMap: state.bestMap,
-        };
-      }
+    // Update best candidate
+    if (analysis.candidateMap) {
+      this.updateBestState(state, analysis.candidateMap);
 
       // Check: already found complete JSON, but stream continues
       if (state.bestIsComplete && analysis.scan.objects?.length > 0) {
@@ -279,6 +447,43 @@ export class StreamGuardrails {
           }
         }
       }
+    }
+
+    // Check for unknown keys / duplicates even when no candidateMap was found.
+    const allKeys = [];
+    const allDuplicateKeys = [];
+    const objectTexts = (analysis.scan.objects || []).map((obj) => obj.text);
+    if (analysis.scan.partialObjectText) {
+      objectTexts.push(analysis.scan.partialObjectText);
+    }
+
+    for (const text of objectTexts) {
+      const keyParsing = StreamJsonParser.parseTopLevelKeys(text);
+      allKeys.push(...keyParsing.keys);
+      allDuplicateKeys.push(...keyParsing.duplicateKeys);
+    }
+
+    for (const key of allKeys) {
+      if (!state.expectedKeySet.has(key)) {
+        state.cancelReason = STREAM_CANCEL_REASON.UNKNOWN_KEY;
+        state.cancelMeta = { key, reason: "parsed_unknown_key" };
+        return {
+          shouldCancel: true,
+          cancelReason: state.cancelReason,
+          bestMap: state.bestMap,
+        };
+      }
+    }
+
+    // Check for duplicate keys
+    if (allDuplicateKeys.length > 0) {
+      state.cancelReason = STREAM_CANCEL_REASON.DUPLICATE_KEY;
+      state.cancelMeta = { duplicateKeys: allDuplicateKeys };
+      return {
+        shouldCancel: true,
+        cancelReason: state.cancelReason,
+        bestMap: state.bestMap,
+      };
     }
 
     return {
