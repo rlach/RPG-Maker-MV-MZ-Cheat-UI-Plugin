@@ -55,6 +55,21 @@ export class TranslationBatchManager {
     });
   }
 
+  getCurrentMapEntryIndex(queueEntries, currentMapId) {
+    if (!Array.isArray(queueEntries)) {
+      return -1;
+    }
+
+    const mapId = Number(currentMapId) || 0;
+    if (mapId <= 0) {
+      return -1;
+    }
+
+    return queueEntries.findIndex(
+      (entry) => entry && Number(entry.priorityMapId) === mapId,
+    );
+  }
+
   applyBatchTranslationResults(successes, failures, options = {}) {
     const persist = options.persist === undefined ? true : !!options.persist;
 
@@ -242,8 +257,18 @@ export class TranslationBatchManager {
       const allFailures = [];
       let processed = 0;
       let phaseFailures = 0;
+      let interruptedForCurrentMap = false;
 
       for (let i = 0; i < batches.length; i++) {
+        if (
+          !!entryOptions.allowCurrentMapMidPhaseSwitch &&
+          typeof entryOptions.shouldInterruptForCurrentMap === "function" &&
+          entryOptions.shouldInterruptForCurrentMap()
+        ) {
+          interruptedForCurrentMap = true;
+          break;
+        }
+
         const batch = batches[i];
         this.progressTracker.updateStep(
           translationPhaseLabel,
@@ -415,14 +440,24 @@ export class TranslationBatchManager {
       });
       const stats = this.errorRecovery.getStats();
 
-      if (hasStrategy && typeof strategy.finalizePhase === "function") {
+      if (
+        !interruptedForCurrentMap &&
+        hasStrategy &&
+        typeof strategy.finalizePhase === "function"
+      ) {
         strategy.finalizePhase({
           panel: this.panel,
           pendingItems,
         });
       }
 
-      return { successes: allSuccesses, failures: allFailures, summary, stats };
+      return {
+        successes: allSuccesses,
+        failures: allFailures,
+        summary,
+        stats,
+        interruptedForCurrentMap,
+      };
     };
 
     const safeQueueEntries = [...queueEntries];
@@ -453,9 +488,9 @@ export class TranslationBatchManager {
             ? this.panel.getCurrentMapIdForPhasePriority()
             : 0;
         if (currentMapId > 0) {
-          const currentMapEntryIndex = safeQueueEntries.findIndex(
-            (entry) =>
-              entry && Number(entry.priorityMapId) === Number(currentMapId),
+          const currentMapEntryIndex = this.getCurrentMapEntryIndex(
+            safeQueueEntries,
+            currentMapId,
           );
           if (currentMapEntryIndex > 0) {
             const [entry] = safeQueueEntries.splice(currentMapEntryIndex, 1);
@@ -463,10 +498,15 @@ export class TranslationBatchManager {
           }
         }
 
-        const entry = safeQueueEntries.shift();
+        const entry = safeQueueEntries[0];
         if (!entry) {
           continue;
         }
+
+        const allowCurrentMapMidPhaseSwitch = !!(
+          this.panel &&
+          this.panel.changeToCurrentMapInMassTranslationMidPhase
+        );
 
         let translated;
         if (typeof entry.execute === "function") {
@@ -482,6 +522,23 @@ export class TranslationBatchManager {
           translated = await executeEntry(entry.items || [], {
             ...(entry.executionOptions || {}),
             strategy,
+            priorityMapId: Number(entry.priorityMapId) || 0,
+            allowCurrentMapMidPhaseSwitch,
+            shouldInterruptForCurrentMap: () => {
+              if (!allowCurrentMapMidPhaseSwitch) {
+                return false;
+              }
+
+              const freshCurrentMapId =
+                typeof this.panel.getCurrentMapIdForPhasePriority === "function"
+                  ? this.panel.getCurrentMapIdForPhasePriority()
+                  : 0;
+              const freshCurrentMapEntryIndex = this.getCurrentMapEntryIndex(
+                safeQueueEntries,
+                freshCurrentMapId,
+              );
+              return freshCurrentMapEntryIndex > 0;
+            },
           });
         }
 
@@ -492,6 +549,12 @@ export class TranslationBatchManager {
           aggregatedFailures.push(failure);
         }
         mergeStats(translated.stats);
+
+        if (translated && translated.interruptedForCurrentMap) {
+          continue;
+        }
+
+        safeQueueEntries.shift();
       }
     } finally {
       this.progressTracker.endQueue();

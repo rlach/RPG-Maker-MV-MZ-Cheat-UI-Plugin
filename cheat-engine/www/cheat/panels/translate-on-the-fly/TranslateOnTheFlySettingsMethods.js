@@ -79,6 +79,10 @@ export const translateOnTheFlySettingsMethods = {
     this.saveSettings();
   },
 
+  onChangeCurrentMapMidPhasePriority() {
+    this.saveSettings();
+  },
+
   onChangeEnabled() {
     TranslateOnTheFlyState.setEnabled(this.enabled);
     this.saveSettings();

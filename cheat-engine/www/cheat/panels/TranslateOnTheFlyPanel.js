@@ -77,6 +77,15 @@ export default {
             @click.self.stop
             @change="onChangeCancelBackgroundForOnTheFly">
         </v-switch>
+
+        <v-switch
+          v-model="changeToCurrentMapInMassTranslationMidPhase"
+          label="Change to current map in mass translation mid-phase"
+          dense
+          hide-details
+          @click.self.stop
+          @change="onChangeCurrentMapMidPhasePriority">
+        </v-switch>
     </v-card-text>
 
     <v-card-subtitle class="pb-0 mt-4 font-weight-bold">Language Settings</v-card-subtitle>
@@ -464,6 +473,10 @@ export default {
 
     onChangeCancelBackgroundForOnTheFly() {
       return this.callRuntime("onChangeCancelBackgroundForOnTheFly");
+    },
+
+    onChangeCurrentMapMidPhasePriority() {
+      return this.callRuntime("onChangeCurrentMapMidPhasePriority");
     },
 
     onChangeTranslationEngine() {
