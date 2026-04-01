@@ -19,6 +19,7 @@ export function customizeRPGMakerFunctions(mainComponent) {
   const getUiInputBlocks = () => {
     const blocks = [
       document.querySelector("#cheat-modal"),
+      document.querySelector("#tof-progress-box"),
       ...Array.from(
         document.querySelectorAll(
           ".object-translation-dialog .v-card, .object-translation-map-events-dialog .v-card, .object-translation-plugins-dialog .v-card",
@@ -30,6 +31,7 @@ export function customizeRPGMakerFunctions(mainComponent) {
 
   const isMouseInsideUiInputBlock = (event) => {
     const blocks = getUiInputBlocks();
+    const progressBox = document.querySelector("#tof-progress-box");
     for (const block of blocks) {
       const bcr = block.getBoundingClientRect();
       if (
@@ -38,6 +40,10 @@ export function customizeRPGMakerFunctions(mainComponent) {
         bcr.top <= event.clientY &&
         event.clientY <= bcr.top + bcr.height
       ) {
+        if (progressBox && block === progressBox) {
+          return Number(event.button) === 0;
+        }
+
         return true;
       }
     }

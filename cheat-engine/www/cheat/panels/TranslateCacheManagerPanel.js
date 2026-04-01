@@ -38,12 +38,10 @@ export default {
     <v-data-table
       class="mt-1 table-with-sticky-footer"
         :headers="tableHeaders"
-        :items="entries"
-        :search="search"
+        :items="filteredEntries"
         :page.sync="page"
         :sort-by.sync="sortBy"
         :sort-desc.sync="sortDesc"
-        :custom-filter="tableItemFilter"
         :items-per-page.sync="rowsPerPage">
         <template v-slot:top>
           <div class="d-flex align-center" style="gap: 8px;">
@@ -56,12 +54,26 @@ export default {
               background-color="grey darken-3"
               @keydown.self.stop>
             </v-text-field>
+            <v-select
+              v-model="selectedTypeFilter"
+              :items="typeFilterOptions"
+              label="Type"
+              item-text="text"
+              item-value="value"
+              solo
+              dense
+              clearable
+              hide-details
+              background-color="grey darken-3"
+              style="max-width: 220px;"
+              @keydown.self.stop>
+            </v-select>
             <v-btn
-              small
+              icon
               color="error"
               :disabled="matchingFilterEntryCount <= 0"
               @click="confirmClearTranslationsMatchingFilter">
-              Clear translations matching filter
+              <v-icon small>mdi-delete</v-icon>
             </v-btn>
           </div>
         </template>
@@ -141,6 +153,7 @@ export default {
       rowsPerPage: getRowsPerPage(),
       sortBy: "seenSort",
       sortDesc: true,
+      selectedTypeFilter: "",
       sourceLang: "ja",
       targetLang: "en",
       entries: [],
@@ -264,11 +277,39 @@ export default {
     search() {
       this.saveTableState();
     },
+
+    selectedTypeFilter() {
+      this.saveTableState();
+    },
   },
 
   computed: {
     matchingFilterEntryCount() {
-      return this.getEntriesMatchingFilter(this.searchInput).length;
+      return this.getEntriesMatchingFilter(
+        this.searchInput,
+        this.selectedTypeFilter,
+      ).length;
+    },
+
+    filteredEntries() {
+      return this.getEntriesMatchingFilter(this.search, this.selectedTypeFilter);
+    },
+
+    typeFilterOptions() {
+      const typeSet = new Set();
+      for (const entry of this.entries || []) {
+        const type = this.normalizeCacheValue(entry && entry.type).trim();
+        if (type) {
+          typeSet.add(type);
+        }
+      }
+
+      const sortedTypes = Array.from(typeSet).sort((a, b) =>
+        a.localeCompare(b),
+      );
+      return [{ text: "", value: "" }].concat(
+        sortedTypes.map((type) => ({ text: type, value: type })),
+      );
     },
   },
 
@@ -413,6 +454,9 @@ export default {
           this.searchInput = parsed.searchInput;
           this.search = parsed.searchInput;
         }
+        if (typeof parsed.selectedTypeFilter === "string") {
+          this.selectedTypeFilter = parsed.selectedTypeFilter;
+        }
       } catch (error) {
         // Ignore malformed state and keep defaults.
       }
@@ -425,6 +469,7 @@ export default {
           sortDesc: !!this.sortDesc,
           page: this.page,
           searchInput: this.searchInput,
+          selectedTypeFilter: this.selectedTypeFilter,
         };
         localStorage.setItem(
           "cheat.translateCacheManager.tableState",
@@ -505,16 +550,18 @@ export default {
       this.entries = items;
     },
 
-    tableItemFilter(value, search, item) {
-      if (search === null || search.trim() === "") {
+    matchesTypeFilter(item, selectedType = "") {
+      const normalizedSelectedType = this.normalizeCacheValue(selectedType)
+        .trim()
+        .toLowerCase();
+      if (!normalizedSelectedType) {
         return true;
       }
 
-      const term = search.toLowerCase();
-      return (
-        (item.original || "").toLowerCase().includes(term) ||
-        (item.translation || "").toLowerCase().includes(term)
-      );
+      const itemType = this.normalizeCacheValue(item && item.type)
+        .trim()
+        .toLowerCase();
+      return itemType === normalizedSelectedType;
     },
 
     onTranslationInput(item, value) {
@@ -530,15 +577,34 @@ export default {
       this.onTranslationInput(item, "");
     },
 
-    getEntriesMatchingFilter(searchValue) {
+    getEntriesMatchingFilter(searchValue, selectedType = "") {
       const search = this.normalizeCacheValue(searchValue);
-      return (this.entries || []).filter((entry) =>
-        this.tableItemFilter(null, search, entry),
-      );
+      const term = search === null ? "" : String(search).trim().toLowerCase();
+      return (this.entries || []).filter((entry) => {
+        if (!this.matchesTypeFilter(entry, selectedType)) {
+          return false;
+        }
+
+        if (!term) {
+          return true;
+        }
+
+        return (
+          this.normalizeCacheValue(entry && entry.original)
+            .toLowerCase()
+            .includes(term) ||
+          this.normalizeCacheValue(entry && entry.translation)
+            .toLowerCase()
+            .includes(term)
+        );
+      });
     },
 
     confirmClearTranslationsMatchingFilter() {
-      const matchingEntries = this.getEntriesMatchingFilter(this.searchInput);
+      const matchingEntries = this.getEntriesMatchingFilter(
+        this.searchInput,
+        this.selectedTypeFilter,
+      );
       if (!matchingEntries.length) {
         return;
       }
@@ -570,7 +636,10 @@ export default {
     clearTranslationsMatchingFilter() {
       this.flushPendingCacheEdits("cache-manager-pre-clear-filtered");
 
-      const matchingEntries = this.getEntriesMatchingFilter(this.searchInput);
+      const matchingEntries = this.getEntriesMatchingFilter(
+        this.searchInput,
+        this.selectedTypeFilter,
+      );
       let changed = 0;
       for (const entry of matchingEntries) {
         if (!entry || !entry.key) {
