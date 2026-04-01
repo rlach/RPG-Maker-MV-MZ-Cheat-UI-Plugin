@@ -394,6 +394,27 @@ export const translateOnTheFlyCoreMethods = {
     progressLabel = null,
     options = {},
   ) {
+    const currentMapData = window.$dataMap || null;
+    const currentMapId =
+      window.$gameMap && typeof window.$gameMap.mapId === "function"
+        ? Number(window.$gameMap.mapId()) || null
+        : null;
+    const resolvedMapData = mapData || currentMapData;
+    const resolvedMapId =
+      (resolvedMapData && Number(resolvedMapData._mapId)) || currentMapId;
+    const resolvedMapNumber =
+      mapNumber !== null && mapNumber !== undefined
+        ? mapNumber
+        : resolvedMapData
+          ? 1
+          : null;
+    const resolvedTotalMaps =
+      totalMaps !== null && totalMaps !== undefined
+        ? totalMaps
+        : resolvedMapData
+          ? 1
+          : null;
+
     const skipProcessLock = !!(options && options.skipProcessLock);
     let processStarted = false;
 
@@ -415,17 +436,17 @@ export const translateOnTheFlyCoreMethods = {
 
     const mapRequest = {
       kind: "mapEvents",
-      mapData: mapData || null,
-      mapId: mapData && mapData._mapId ? mapData._mapId : null,
-      mapNumber,
-      totalMaps,
-      progressLabel,
+      mapData: resolvedMapData || null,
+      mapId: resolvedMapId || null,
+      mapNumber: resolvedMapNumber,
+      totalMaps: resolvedTotalMaps,
+      progressLabel: progressLabel || (resolvedMapData ? "translating map 1/1" : null),
       backgroundJob: !!(options && options.backgroundJob),
       mapIds:
-        mapData && mapData._mapId
-          ? [mapData._mapId]
-          : typeof mapNumber === "number" && mapNumber > 0
-            ? [mapNumber]
+        resolvedMapId
+          ? [resolvedMapId]
+          : typeof resolvedMapNumber === "number" && resolvedMapNumber > 0
+            ? [resolvedMapNumber]
             : null,
     };
     try {
