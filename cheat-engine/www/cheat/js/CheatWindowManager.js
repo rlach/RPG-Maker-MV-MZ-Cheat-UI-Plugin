@@ -1,4 +1,5 @@
 import {KeyValueStorage} from './KeyValueStorage.js'
+import { isRpgMakerMv } from './RpgMakerRuntime.js'
 
 class CheatWindowManager {
     constructor () {
@@ -91,6 +92,55 @@ class CheatWindowManager {
         return { ...this.overlaySize }
     }
 
+    getExternalWindowPath () {
+        const base = isRpgMakerMv() ? 'www/cheat/window.html' : 'cheat/window.html'
+        return this.lastComponent
+            ? `${base}?component=${encodeURIComponent(this.lastComponent)}`
+            : base
+    }
+
+    attachExternalWindowLifecycle (nwWin) {
+        if (!nwWin) {
+            return
+        }
+
+        // NW.js window close event exists in both MV and MZ runtimes.
+        if (typeof nwWin.on === 'function') {
+            nwWin.on('closed', () => {
+                console.log('[CheatWindowManager] External window closed')
+                this.externalWindow = null
+            })
+        }
+
+        const bindDomWindow = () => {
+            const domWin = nwWin.window
+            if (!domWin || typeof domWin.addEventListener !== 'function') {
+                return
+            }
+
+            domWin.__CHEAT_PARENT_WINDOW__ = window
+
+            domWin.addEventListener('beforeunload', () => {
+                console.log('[CheatWindowManager] External window beforeunload')
+                this.externalWindow = null
+            })
+
+            domWin.addEventListener('load', () => {
+                console.log('[CheatWindowManager] External window loaded')
+            })
+
+            domWin.addEventListener('error', (e) => {
+                console.error('[CheatWindowManager] Error in external window:', e)
+            })
+        }
+
+        if (nwWin.window && typeof nwWin.window.addEventListener === 'function') {
+            bindDomWindow()
+        } else if (typeof nwWin.on === 'function') {
+            nwWin.on('loaded', bindDomWindow)
+        }
+    }
+
     openExternalWindow (componentName = null) {
         this.setLastComponent(componentName || this.lastComponent)
 
@@ -107,32 +157,18 @@ class CheatWindowManager {
             }
         }
 
-        const query = this.lastComponent ? `?component=${encodeURIComponent(this.lastComponent)}` : ''
         try {
-            console.log('[CheatWindowManager] Opening external window with query:', query)
-            nw.Window.open(`cheat/window.html${query}`, {}, (newWin) => {
+            const targetPath = this.getExternalWindowPath()
+            console.log('[CheatWindowManager] Opening external window:', targetPath)
+            nw.Window.open(targetPath, {}, (newWin) => {
                 this.externalWindow = newWin;
                 console.log('[CheatWindowManager] External window opened callback:', newWin);
 
                 if (this.externalWindow) {
-                this.externalWindow.__CHEAT_PARENT_WINDOW__ = window
-                this.externalWindow.addEventListener('beforeunload', () => {
-                    console.log('[CheatWindowManager] External window closing')
-                    this.externalWindow = null
-                })
-                
-                // Log when window loads
-                this.externalWindow.addEventListener('load', () => {
-                    console.log('[CheatWindowManager] External window loaded')
-                })
-                
-                // Log any errors in external window to parent console
-                this.externalWindow.addEventListener('error', (e) => {
-                    console.error('[CheatWindowManager] Error in external window:', e)
-                })
-            } else {
-                console.error('[CheatWindowManager] Failed to create external window')
-            }
+                    this.attachExternalWindowLifecycle(this.externalWindow)
+                } else {
+                    console.error('[CheatWindowManager] Failed to create external window')
+                }
             })
         } catch (err) {
             console.error('[CheatWindowManager] Exception opening external window:', err)

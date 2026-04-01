@@ -50,7 +50,14 @@ if (typeof SceneManager !== "undefined" && !window.__CHEAT_EXTERNAL_WINDOW__) {
         try {
           const extWin = manager.externalWindow;
           if (extWin && !extWin.closed) {
-            externalWindowActive = extWin.document.hasFocus();
+            const extDomWindow = extWin.window || extWin;
+            if (
+              extDomWindow &&
+              extDomWindow.document &&
+              typeof extDomWindow.document.hasFocus === "function"
+            ) {
+              externalWindowActive = extDomWindow.document.hasFocus();
+            }
           }
         } catch (e) {
           // Cross-origin or closed window - ignore
