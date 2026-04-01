@@ -9,6 +9,47 @@ export class ConfigManager {
     this.aiEngine = aiEngine;
   }
 
+  _syncPanelEngineConfig() {
+    const panel = this.aiEngine && this.aiEngine.panel;
+    if (!panel) {
+      return;
+    }
+
+    if (typeof panel.bindEngineConfigTo === "function") {
+      panel.bindEngineConfigTo(panel);
+    }
+  }
+
+  _normalizeModelsResponse(data) {
+    const payload = data && typeof data === "object" ? data : {};
+    const candidates = Array.isArray(payload.data)
+      ? payload.data
+      : Array.isArray(payload.models)
+        ? payload.models
+        : Array.isArray(payload)
+          ? payload
+          : [];
+
+    const normalized = [];
+    for (const item of candidates) {
+      const raw =
+        typeof item === "string"
+          ? item
+          : item && typeof item.id === "string"
+            ? item.id
+            : item && typeof item.name === "string"
+              ? item.name
+              : "";
+      const model = raw.trim();
+      if (!model || normalized.includes(model)) {
+        continue;
+      }
+      normalized.push(model);
+    }
+
+    return normalized;
+  }
+
   static getTemplate() {
   return `
        <div v-if="translationEngine === 'openApi' || translationEngine === 'gpt4all'" class="mt-3">
@@ -253,6 +294,7 @@ export class ConfigManager {
   async _fetchAiModels() {
     this.aiEngine.loadingModels = true;
     this.aiEngine.modelsError = "";
+    this._syncPanelEngineConfig();
 
     try {
       const endpoint = this._getModelsUrl();
@@ -264,21 +306,28 @@ export class ConfigManager {
       }
 
       const data = await response.json();
-      let models = [];
-
-      if (this.aiEngine.provider === "openwebui") {
-        models = data.data?.map((m) => m.id) || [];
-      } else {
-        models = data.data?.map((m) => m.id) || [];
-      }
+      const models = this._normalizeModelsResponse(data);
 
       this.aiEngine.models = models;
+      if (
+        this.aiEngine.selectedModel &&
+        !models.includes(this.aiEngine.selectedModel)
+      ) {
+        this.aiEngine.selectedModel = "";
+      }
+      if (!this.aiEngine.selectedModel && models.length > 0) {
+        this.aiEngine.selectedModel = models[0];
+      }
       console.log("[ConfigManager] Fetched models:", models);
     } catch (error) {
       this.aiEngine.modelsError = error.message;
       console.error("[ConfigManager] Failed to fetch models:", error.message);
     } finally {
       this.aiEngine.loadingModels = false;
+      this._syncPanelEngineConfig();
+      if (this.aiEngine.panel && typeof this.aiEngine.panel.saveSettings === "function") {
+        this.aiEngine.panel.saveSettings();
+      }
     }
   }
 
@@ -299,6 +348,8 @@ export class ConfigManager {
     } else {
       this.aiEngine.host = "http://localhost:4891";
     }
+
+    this._syncPanelEngineConfig();
   }
 
   /**
