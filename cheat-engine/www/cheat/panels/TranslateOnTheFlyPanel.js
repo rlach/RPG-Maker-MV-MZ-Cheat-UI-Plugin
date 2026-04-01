@@ -362,7 +362,6 @@ export default {
       pendingTranslations: null,
       failedTranslations: null,
       batchManager: null,
-      engine: null,
       customTagDialogVisible: false,
       customTagEditIndex: -1,
       customTagForm: {
