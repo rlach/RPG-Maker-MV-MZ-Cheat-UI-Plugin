@@ -479,6 +479,50 @@ export default {
       return this.callRuntime("onChangeTargetLang");
     },
 
+    fetchAiModels() {
+      return this.callRuntime("fetchAiModels");
+    },
+
+    onChangeAiProvider(v) {
+      return this.callRuntime("onChangeAiProvider", v);
+    },
+
+    onChangeAiHost(v) {
+      return this.callRuntime("onChangeAiHost", v);
+    },
+
+    onChangeAiApiKey(v) {
+      return this.callRuntime("onChangeAiApiKey", v);
+    },
+
+    onChangeAiModel(v) {
+      return this.callRuntime("onChangeAiModel", v);
+    },
+
+    onChangeAiAllowNewlineMismatch(v) {
+      return this.callRuntime("onChangeAiAllowNewlineMismatch", v);
+    },
+
+    onChangeAiAskIfTextTranslated(v) {
+      return this.callRuntime("onChangeAiAskIfTextTranslated", v);
+    },
+
+    onChangeAiInvalidJsonHandlingStrategy(v) {
+      return this.callRuntime("onChangeAiInvalidJsonHandlingStrategy", v);
+    },
+
+    onChangeAiSystemPrompt(v) {
+      return this.callRuntime("onChangeAiSystemPrompt", v);
+    },
+
+    onChangeAiFixRecursionMaxDepth(v) {
+      return this.callRuntime("onChangeAiFixRecursionMaxDepth", v);
+    },
+
+    onChangeUseJsonFixer(v) {
+      return this.callRuntime("onChangeUseJsonFixer", v);
+    },
+
     onChangeTextWrapping() {
       return this.callRuntime("onChangeTextWrapping");
     },
