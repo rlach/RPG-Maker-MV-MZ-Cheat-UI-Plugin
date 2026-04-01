@@ -6,7 +6,7 @@ export default {
     name: 'TeleportPanel',
 
     template: `
-<v-card flat class="ma-0 pa-0">
+<v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
     <v-row>
         <v-col
             cols="12"
@@ -40,7 +40,7 @@ export default {
 
     <v-data-table
         v-if="tableHeaders"
-        class="mt-2"
+        class="mt-2 table-with-sticky-footer"
         denses
         :headers="filteredTableHeaders"
         :items="maps"

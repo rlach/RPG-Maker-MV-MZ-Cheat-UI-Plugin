@@ -12,7 +12,7 @@ export default {
     },
 
     template: `
-<v-card flat class="ma-0 pa-0">
+<v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
     <v-alert
         v-if="showUnavailable"
         type="warning"
@@ -79,7 +79,7 @@ export default {
         </v-tooltip>
     </v-card-text>
     <v-data-table
-        class="mt-2"
+        class="mt-2 table-with-sticky-footer"
         denses
         single-expand
         :headers="filteredHeaders"

@@ -13,7 +13,7 @@ export default {
   name: "TranslateCacheManagerPanel",
 
   template: `
-<v-card flat class="ma-0 pa-0">
+<v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
     <v-card-title class="subtitle-1 font-weight-bold pb-1">
         Translation Cache Manager
     </v-card-title>
@@ -36,7 +36,7 @@ export default {
     </v-card-text>
 
     <v-data-table
-        class="mt-1"
+      class="mt-1 table-with-sticky-footer"
         :headers="tableHeaders"
         :items="entries"
         :search="search"

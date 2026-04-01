@@ -72,6 +72,31 @@ body::-webkit-scrollbar {
     min-height: 340px;
 }
 
+/* Keep table pagination/footer fixed while rows area scrolls */
+.panel-with-sticky-table {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+
+.panel-with-sticky-table .table-with-sticky-footer {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-with-sticky-table .table-with-sticky-footer .v-data-table__wrapper {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.panel-with-sticky-table .table-with-sticky-footer .v-data-footer {
+    flex: 0 0 auto;
+}
+
 /*.x-small-field .v-input__control {*/
 /*    height: 35px;*/
 /*    width: 1px;*/

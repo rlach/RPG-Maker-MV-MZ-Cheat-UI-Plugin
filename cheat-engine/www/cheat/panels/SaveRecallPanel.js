@@ -6,7 +6,7 @@ export default {
     name: 'SaveRecallPanel',
 
     template: `
-<v-card flat class="ma-0 pa-0">
+<v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
     <v-card-subtitle class="ma-0 pa-0">Save Location</v-card-subtitle>
     <span class="body-2 green--text text--darken-1">Map : {{currentMapName}}</span>
     <v-text-field
@@ -42,7 +42,7 @@ export default {
     <v-card-subtitle class="ma-0 pa-0 mt-5">Recall Location</v-card-subtitle>
     <v-data-table
         v-if="tableHeaders"
-        class="mt-2"
+        class="mt-2 table-with-sticky-footer"
         denses
         :headers="tableHeaders"
         :items="tableItems"

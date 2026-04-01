@@ -5,9 +5,10 @@ export default {
     name: 'VariableSettingPanel',
 
     template: `
-<v-card flat class="ma-0 pa-0">
+<v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
     <v-data-table
         v-if="tableHeaders"
+        class="table-with-sticky-footer"
         denses
         :headers="tableHeaders"
         :items="filteredTableItems"
