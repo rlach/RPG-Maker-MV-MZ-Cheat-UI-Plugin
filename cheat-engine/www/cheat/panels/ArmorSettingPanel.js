@@ -8,8 +8,9 @@ export default {
     },
 
     template: `
-<v-card flat class="ma-0 pa-0">
+<v-card flat class="ma-0 pa-0 fill-height">
     <item-table-tab
+        class="fill-height"
         :items="items"
         :headers="headers"
         :as-table-data="convertToTableData"
