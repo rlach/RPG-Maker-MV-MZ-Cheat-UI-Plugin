@@ -211,6 +211,7 @@ export class TagManager {
     const caseMap = {
       maskedByTagKey: {},
       expectedMaskedIdsByTagKey: {},
+      hasLiteralClosingBTag: text.includes("[/b]"),
     };
 
     for (const entry of this.tagEntries) {
@@ -272,6 +273,7 @@ export class TagManager {
       return {
         text,
         valid: false,
+        errorReason: "Value is not a string",
         expectedCounts: tagCounts,
         actualCounts: {},
       };
@@ -333,6 +335,24 @@ export class TagManager {
     actualCounts[this.simpleNEntry.key] = simpleNMatches.length;
     result = result.replace(this.simpleNEntry.postPattern, () => "\n");
 
+    const originalHadClosingBTag = !!(
+      caseMap && caseMap.hasLiteralClosingBTag
+    );
+    if (!originalHadClosingBTag && /\[\/b\]/i.test(result)) {
+      result = result.replace(/\[\/b\]/gi, "");
+    }
+
+    const hasUnresolvedEscapedTag = /\[b=/i.test(result);
+    if (hasUnresolvedEscapedTag) {
+      return {
+        text: result,
+        valid: false,
+        errorReason: "Unresolved escaped tags left in output ([b=...)",
+        expectedCounts: tagCounts,
+        actualCounts,
+      };
+    }
+
     let valid;
     if (this.allowNewlineMismatch) {
       const requiredTypes = this.tagEntries
@@ -371,7 +391,13 @@ export class TagManager {
       });
     }
 
-    return { text: result, valid, expectedCounts: tagCounts, actualCounts };
+    return {
+      text: result,
+      valid,
+      errorReason: "Tag count mismatch",
+      expectedCounts: tagCounts,
+      actualCounts,
+    };
   }
 
   /**

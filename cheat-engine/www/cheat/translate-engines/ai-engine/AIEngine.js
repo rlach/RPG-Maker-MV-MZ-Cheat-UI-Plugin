@@ -828,7 +828,7 @@ class AIEngine extends BaseTranslationEngine {
         if (!postprocessResult.valid) {
           failures.push({
             ...itemD,
-            rejectReason: "Tag count mismatch",
+            rejectReason: postprocessResult.errorReason || "Tag count mismatch",
             cancelReason: shouldPreserveCancelReason ? cancelReason : null,
           });
           continue;
