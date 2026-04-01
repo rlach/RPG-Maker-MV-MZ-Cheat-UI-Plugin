@@ -16,6 +16,40 @@ export function customizeRPGMakerFunctions(mainComponent) {
     return;
   }
 
+  const getUiInputBlocks = () => {
+    const blocks = [
+      document.querySelector("#cheat-modal"),
+      ...Array.from(
+        document.querySelectorAll(
+          ".object-translation-dialog .v-card, .object-translation-map-events-dialog .v-card",
+        ),
+      ),
+    ].filter(Boolean);
+    return blocks;
+  };
+
+  const isMouseInsideUiInputBlock = (event) => {
+    const blocks = getUiInputBlocks();
+    for (const block of blocks) {
+      const bcr = block.getBoundingClientRect();
+      if (
+        bcr.left <= event.clientX &&
+        event.clientX <= bcr.left + bcr.width &&
+        bcr.top <= event.clientY &&
+        event.clientY <= bcr.top + bcr.height
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const isObjectTranslationModalOpen = () =>
+    !!document.querySelector(
+      ".object-translation-dialog.v-dialog__content--active, .object-translation-map-events-dialog.v-dialog__content--active",
+    );
+
   if (isRpgMakerMv()) {
     // WARN: directly changing engine code can be dangerous
     // remove preventDefault
@@ -24,21 +58,11 @@ export function customizeRPGMakerFunctions(mainComponent) {
       this._events.wheelY += event.deltaY;
     };
 
-    // ignore click event when cheat modal shown and click inside cheat modal
+    // Ignore click input routed to the game when pointer is inside cheat UI.
     const TouchInput_onMouseDown = TouchInput._onMouseDown;
     TouchInput._onMouseDown = function (event) {
-      if (mainComponent.show) {
-        const bcr = document
-          .querySelector("#cheat-modal")
-          .getBoundingClientRect();
-        if (
-          bcr.left <= event.clientX &&
-          event.clientX <= bcr.left + bcr.width &&
-          bcr.top <= event.clientY &&
-          event.clientY <= bcr.top + bcr.height
-        ) {
-          return;
-        }
+      if (isMouseInsideUiInputBlock(event)) {
+        return;
       }
 
       TouchInput_onMouseDown.call(this, event);
@@ -52,24 +76,36 @@ export function customizeRPGMakerFunctions(mainComponent) {
       this._newState.wheelY += event.deltaY;
     };
 
-    // ignore click event when cheat modal shown and click inside cheat modal
+    // Ignore click input routed to the game when pointer is inside cheat UI.
     const TouchInput_onMouseDown = TouchInput._onMouseDown;
     TouchInput._onMouseDown = function (event) {
-      if (mainComponent.show) {
-        const bcr = document
-          .querySelector("#cheat-modal")
-          .getBoundingClientRect();
-        if (
-          bcr.left <= event.clientX &&
-          event.clientX <= bcr.left + bcr.width &&
-          bcr.top <= event.clientY &&
-          event.clientY <= bcr.top + bcr.height
-        ) {
-          return;
-        }
+      if (isMouseInsideUiInputBlock(event)) {
+        return;
       }
 
       TouchInput_onMouseDown.call(this, event);
+    };
+  }
+
+  if (window.Input && typeof window.Input._onKeyDown === "function") {
+    const Input_onKeyDown = Input._onKeyDown;
+    Input._onKeyDown = function (event) {
+      if (isObjectTranslationModalOpen()) {
+        return;
+      }
+
+      Input_onKeyDown.call(this, event);
+    };
+  }
+
+  if (window.Input && typeof window.Input._onKeyUp === "function") {
+    const Input_onKeyUp = Input._onKeyUp;
+    Input._onKeyUp = function (event) {
+      if (isObjectTranslationModalOpen()) {
+        return;
+      }
+
+      Input_onKeyUp.call(this, event);
     };
   }
 

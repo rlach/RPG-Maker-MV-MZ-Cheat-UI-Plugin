@@ -1,23 +1,99 @@
 import { TRANSLATE_SETTINGS, TRANSLATOR } from "../../js/TranslateHelper.js";
 import { createTranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManagerFactory.js";
 
+const DEFAULT_OBJECT_TRANSLATION_TYPE_DEFS = Object.freeze([
+  { id: "mapEvents", label: "Map events" },
+  { id: "commonEvents", label: "CommonEvents" },
+  { id: "items", label: "items" },
+  { id: "skills", label: "skills" },
+  { id: "classes", label: "classes" },
+  { id: "enemies", label: "enemies" },
+  { id: "armors", label: "armors" },
+  { id: "weapons", label: "weapons" },
+  { id: "maps", label: "Map names" },
+  { id: "actors", label: "actors" },
+  { id: "systemMessages", label: "system messages" },
+  { id: "systemCommands", label: "system commands" },
+  { id: "gameArrays", label: "game arrays (terms, types, elements)" },
+]);
+
 export const objectTranslationRuntimeMethods = {
+  getDefaultObjectTranslationTypeDefs() {
+    return DEFAULT_OBJECT_TRANSLATION_TYPE_DEFS.map((item) => ({ ...item }));
+  },
+
+  getObjectTranslationTypeOrder() {
+    const defaults = this.getDefaultObjectTranslationTypeDefs();
+    const validIds = defaults.map((entry) => entry.id);
+    const validSet = new Set(validIds);
+
+    const requestedIds = Array.isArray(this.objectTranslationTypeOrder)
+      ? this.objectTranslationTypeOrder
+      : [];
+
+    const ordered = [];
+    const seen = new Set();
+
+    for (const rawId of requestedIds) {
+      const id = String(rawId || "").trim();
+      if (!id || !validSet.has(id) || seen.has(id)) {
+        continue;
+      }
+      ordered.push(id);
+      seen.add(id);
+    }
+
+    for (const id of validIds) {
+      if (!seen.has(id)) {
+        ordered.push(id);
+      }
+    }
+
+    this.objectTranslationTypeOrder = ordered.slice();
+    return ordered;
+  },
+
+  setObjectTranslationTypeOrder(orderIds = [], options = {}) {
+    const persist = !options || options.persist !== false;
+    const defaults = this.getDefaultObjectTranslationTypeDefs();
+    const validIds = defaults.map((entry) => entry.id);
+    const validSet = new Set(validIds);
+
+    const requestedIds = Array.isArray(orderIds) ? orderIds : [];
+    const next = [];
+    const seen = new Set();
+
+    for (const rawId of requestedIds) {
+      const id = String(rawId || "").trim();
+      if (!id || !validSet.has(id) || seen.has(id)) {
+        continue;
+      }
+      next.push(id);
+      seen.add(id);
+    }
+
+    for (const id of validIds) {
+      if (!seen.has(id)) {
+        next.push(id);
+      }
+    }
+
+    this.objectTranslationTypeOrder = next;
+    if (persist && typeof this.saveSettings === "function") {
+      this.saveSettings();
+    }
+    return next;
+  },
+
   getObjectTranslationTypeDefs() {
-    return [
-      { id: "items", label: "items" },
-      { id: "skills", label: "skills" },
-      { id: "classes", label: "classes" },
-      { id: "enemies", label: "enemies" },
-      { id: "armors", label: "armors" },
-      { id: "weapons", label: "weapons" },
-      { id: "maps", label: "maps" },
-      { id: "actors", label: "actors" },
-      { id: "systemMessages", label: "system messages" },
-      { id: "systemCommands", label: "system commands" },
-      { id: "gameArrays", label: "game arrays (terms, types, elements)" },
-      { id: "commonEvents", label: "CommonEvents" },
-      { id: "mapEvents", label: "Map events" },
-    ];
+    const defaults = this.getDefaultObjectTranslationTypeDefs();
+    const byId = new Map(defaults.map((entry) => [entry.id, entry]));
+    const orderedIds = this.getObjectTranslationTypeOrder();
+
+    return orderedIds
+      .map((id) => byId.get(id))
+      .filter(Boolean)
+      .map((entry) => ({ ...entry }));
   },
 
   getValidMapInfos() {

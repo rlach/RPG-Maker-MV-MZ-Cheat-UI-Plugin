@@ -5,44 +5,49 @@ export default {
 
   template: `
 <div>
-  <v-dialog v-model="objectTranslationDialogVisible" max-width="640">
+  <v-dialog
+    v-model="objectTranslationDialogVisible"
+    max-width="640"
+    content-class="object-translation-dialog"
+    @keydown.stop
+    @mousedown.stop
+    @mouseup.stop
+    @click.stop
+    @wheel.stop
+  >
     <v-card dark>
-      <v-card-title class="subtitle-1 font-weight-bold">Object Translation</v-card-title>
+      <v-card-title class="subtitle-1 font-weight-bold">Mass Translation</v-card-title>
       <v-card-text class="caption pb-1">Select what to translate. Counts show remaining objects and total.</v-card-text>
       <v-card-text class="pt-1">
         <div
-          v-for="item in objectTranslationModalStats"
+          v-for="(item, index) in objectTranslationModalStats"
           :key="item.id"
           class="d-flex align-center justify-space-between py-1"
+          @dragover.prevent="onItemDragOver($event, index)"
+          @drop.prevent="onItemDrop($event, index)"
         >
-          <v-checkbox
-            v-model="objectTranslationSelection[item.id]"
-            :label="item.label"
-            :disabled="item.total <= 0"
-            hide-details
-            dense
-            class="ma-0 pa-0"
-          ></v-checkbox>
-          <span class="caption grey--text text--lighten-1">left {{item.left}} of {{item.total}}</span>
-        </div>
-
-        <v-divider class="my-3"></v-divider>
-
-        <div
-          v-for="item in objectTranslationModalExtraStats"
-          :key="item.id"
-          class="d-flex align-center justify-space-between py-1"
-        >
-          <v-checkbox
-            v-model="objectTranslationSelection[item.id]"
-            :label="item.label"
-            :disabled="item.total <= 0"
-            hide-details
-            dense
-            class="ma-0 pa-0"
-          ></v-checkbox>
+          <div class="d-flex align-center" style="min-width: 0; flex: 1;">
+            <div
+              class="mr-1 d-flex align-center"
+              draggable="true"
+              style="cursor: grab;"
+              title="Drag to reorder"
+              @dragstart="onItemDragStart($event, index)"
+              @dragend="onItemDragEnd"
+            >
+              <v-icon small color="grey lighten-1">mdi-drag-vertical</v-icon>
+            </div>
+            <v-checkbox
+              v-model="objectTranslationSelection[item.id]"
+              :label="item.label"
+              :disabled="item.total <= 0"
+              hide-details
+              dense
+              class="ma-0 pa-0"
+            ></v-checkbox>
+          </div>
           <div class="d-flex align-center">
-            <span class="caption grey--text text--lighten-1 mr-2">{{item.metaText}}</span>
+            <span class="caption grey--text text--lighten-1 mr-2">{{item.metaText || ('left ' + item.left + ' of ' + item.total)}}</span>
             <v-btn
               v-if="item.id === 'mapEvents'"
               icon
@@ -65,7 +70,16 @@ export default {
     </v-card>
   </v-dialog>
 
-  <v-dialog v-model="objectTranslationMapEventsDialogVisible" max-width="760">
+  <v-dialog
+    v-model="objectTranslationMapEventsDialogVisible"
+    max-width="760"
+    content-class="object-translation-map-events-dialog"
+    @keydown.stop
+    @mousedown.stop
+    @mouseup.stop
+    @click.stop
+    @wheel.stop
+  >
     <v-card dark>
       <v-card-title class="subtitle-1 font-weight-bold">Map events selection</v-card-title>
       <v-card-text class="caption pb-1">Choose which maps should be included in object translation.</v-card-text>
@@ -122,6 +136,7 @@ export default {
   data() {
     return {
       service: OBJECT_TRANSLATION_SERVICE,
+      dragSourceIndex: -1,
     };
   },
 
@@ -155,10 +170,6 @@ export default {
 
     objectTranslationModalStats() {
       return this.service.state.modalStats;
-    },
-
-    objectTranslationModalExtraStats() {
-      return this.service.state.modalExtraStats;
     },
 
     objectTranslationSelection() {
@@ -219,6 +230,42 @@ export default {
 
     saveMapEventsSelection() {
       this.service.saveMapSelection();
+    },
+
+    onItemDragStart(event, index) {
+      this.dragSourceIndex = index;
+      if (event && event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", String(index));
+      }
+    },
+
+    onItemDragOver(event, index) {
+      if (this.dragSourceIndex < 0 || this.dragSourceIndex === index) {
+        return;
+      }
+
+      if (event && event.dataTransfer) {
+        event.dataTransfer.dropEffect = "move";
+      }
+    },
+
+    onItemDrop(event, index) {
+      let fromIndex = this.dragSourceIndex;
+      if (event && event.dataTransfer) {
+        const raw = event.dataTransfer.getData("text/plain");
+        const parsed = Number(raw);
+        if (Number.isFinite(parsed)) {
+          fromIndex = parsed;
+        }
+      }
+
+      this.dragSourceIndex = -1;
+      this.service.reorderModalItem(fromIndex, index);
+    },
+
+    onItemDragEnd() {
+      this.dragSourceIndex = -1;
     },
   },
 };

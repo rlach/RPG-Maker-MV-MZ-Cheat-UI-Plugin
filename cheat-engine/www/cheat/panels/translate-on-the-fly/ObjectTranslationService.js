@@ -14,7 +14,6 @@ class ObjectTranslationService {
     this.state = makeObservable({
       dialogVisible: false,
       modalStats: [],
-      modalExtraStats: [],
       selection: {},
       mapEventsDialogVisible: false,
       mapEventsLoading: false,
@@ -71,7 +70,6 @@ class ObjectTranslationService {
       typeof runtime.getObjectTranslationStats === "function"
         ? runtime.getObjectTranslationStats()
         : [];
-    const extraIds = new Set(["commonEvents", "mapEvents"]);
     const commonEventsStats =
       stats.find((item) => item.id === "commonEvents") ||
       (runtime.countCommonEventsStats
@@ -86,36 +84,38 @@ class ObjectTranslationService {
       ? runtime.getSelectedObjectTranslationMapIds()
       : [];
 
-    this.state.modalStats = stats.filter((item) => !extraIds.has(item.id));
-    this.state.modalExtraStats = [
-      {
-        id: "commonEvents",
-        label: "CommonEvents",
-        metaText: `${commonEventsStats.leftStrings} of ${commonEventsStats.totalStrings}`,
-        total: commonEventsStats.totalStrings,
-      },
-      {
-        id: "mapEvents",
-        label: "Map events",
-        metaText: runtime.getObjectTranslationMapEventsMetaText
-          ? runtime.getObjectTranslationMapEventsMetaText(
-              mapEventsStats.total,
-              selectedMapIds.length,
-            )
-          : `${mapEventsStats.total || 0} maps`,
-        total: mapEventsStats.total,
-      },
-    ];
+    this.state.modalStats = stats.map((item) => {
+      if (item.id === "commonEvents") {
+        return {
+          ...item,
+          metaText: `${commonEventsStats.leftStrings} of ${commonEventsStats.totalStrings}`,
+          total: commonEventsStats.totalStrings,
+          left: commonEventsStats.leftStrings,
+        };
+      }
+
+      if (item.id === "mapEvents") {
+        return {
+          ...item,
+          metaText: runtime.getObjectTranslationMapEventsMetaText
+            ? runtime.getObjectTranslationMapEventsMetaText(
+                mapEventsStats.total,
+                selectedMapIds.length,
+              )
+            : `${mapEventsStats.total || 0} maps`,
+          total: mapEventsStats.total,
+        };
+      }
+
+      return {
+        ...item,
+        metaText: "",
+      };
+    });
 
     for (const item of this.state.modalStats) {
       if (this.state.selection[item.id] === undefined) {
         this.state.selection[item.id] = item.left > 0;
-      }
-    }
-
-    for (const item of this.state.modalExtraStats) {
-      if (this.state.selection[item.id] === undefined) {
-        this.state.selection[item.id] = item.total > 0;
       }
     }
 
@@ -193,7 +193,7 @@ class ObjectTranslationService {
     runtime.objectTranslationSelectedMapIds = selectedMapIds;
     this.state.selection.mapEvents = selectedMapIds.length > 0;
 
-    const mapEventsItem = this.state.modalExtraStats.find(
+    const mapEventsItem = this.state.modalStats.find(
       (item) => item.id === "mapEvents",
     );
     if (mapEventsItem && runtime.getObjectTranslationMapEventsMetaText) {
@@ -228,7 +228,7 @@ class ObjectTranslationService {
     }
 
     const selected = [];
-    const stats = [...this.state.modalStats, ...this.state.modalExtraStats];
+    const stats = [...this.state.modalStats];
     for (const item of stats) {
       const checked = !!this.state.selection[item.id];
       this.state.selection[item.id] = checked;
@@ -249,6 +249,35 @@ class ObjectTranslationService {
   async startObjectTranslationFromModal(dryRun = false) {
     this.closeModal();
     await this.startTranslation(dryRun);
+  }
+
+  reorderModalItem(fromIndex, toIndex) {
+    const from = Number(fromIndex);
+    const to = Number(toIndex);
+    if (
+      !Number.isInteger(from) ||
+      !Number.isInteger(to) ||
+      from < 0 ||
+      to < 0 ||
+      from >= this.state.modalStats.length ||
+      to >= this.state.modalStats.length ||
+      from === to
+    ) {
+      return;
+    }
+
+    const reordered = this.state.modalStats.slice();
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
+    this.state.modalStats = reordered;
+
+    const runtime = this.ensureRuntime();
+    if (
+      runtime &&
+      typeof runtime.setObjectTranslationTypeOrder === "function"
+    ) {
+      runtime.setObjectTranslationTypeOrder(reordered.map((item) => item.id));
+    }
   }
 }
 

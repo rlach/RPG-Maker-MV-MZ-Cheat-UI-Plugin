@@ -88,6 +88,7 @@ export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
   "aiCustomTagTypeOptions",
   "aiCustomTagBracketOptions",
   "objectTranslationSelectedMapIds",
+  "objectTranslationTypeOrder",
   "objectTranslationJob",
   "nonOtfTranslationProcess",
 ]);
@@ -108,6 +109,7 @@ export const PERSISTED_TRANSLATION_SETTINGS_KEYS = Object.freeze([
   "translateGameObjects",
   "cancelBackgroundForOnTheFly",
   "engineSettings",
+  "objectTranslationTypeOrder",
 ]);
 
 export const UI_SYNC_STATE_KEYS = Object.freeze([
@@ -146,6 +148,7 @@ export const UI_SYNC_STATE_KEYS = Object.freeze([
   "aiCustomTagTypeOptions",
   "aiCustomTagBracketOptions",
   "objectTranslationSelectedMapIds",
+  "objectTranslationTypeOrder",
 ]);
 
 export const UI_SYNC_TO_ONLY_STATE_KEYS = Object.freeze([
@@ -213,6 +216,7 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
     aiCustomTagTypeOptions: [],
     aiCustomTagBracketOptions: [],
     objectTranslationSelectedMapIds: null,
+    objectTranslationTypeOrder: [],
     objectTranslationJob: {
       active: false,
       currentTypeLabel: "",
