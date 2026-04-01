@@ -621,8 +621,29 @@ export class MessageCheat {
     // Log every message that reaches the window
     const _Window_Message_startMessage = Window_Message.prototype.startMessage;
     Window_Message.prototype.startMessage = function () {
-      MessageCheat.logCurrentMessage();
       _Window_Message_startMessage.call(this);
+      MessageCheat.logCurrentMessage();
+    };
+
+    // MV can apply choices later without re-entering startMessage.
+    // Log again when choices are set so they are visible in Text Log.
+    if (!Game_Message.prototype._messageLogOriginalSetChoices) {
+      Game_Message.prototype._messageLogOriginalSetChoices =
+        Game_Message.prototype.setChoices;
+    }
+
+    Game_Message.prototype.setChoices = function (
+      choices,
+      defaultType,
+      cancelType,
+    ) {
+      Game_Message.prototype._messageLogOriginalSetChoices.call(
+        this,
+        choices,
+        defaultType,
+        cancelType,
+      );
+      MessageCheat.logCurrentMessage();
     };
 
     // --------------------------- 배틀 로그 관련

@@ -388,9 +388,19 @@ export const translateOnTheFlyRuntimeMethods = {
 
       const translationEnabled = self.isTranslationEnabled();
       const skipping = self.isSkippingMessages();
+      const allowTranslation = translationEnabled && !skipping;
+      const useCacheOnly =
+        (translationEnabled && skipping) ||
+        (!translationEnabled && self.translateCacheWhenDisabled);
 
-      if (!translationEnabled) {
+      if (!allowTranslation && !useCacheOnly) {
         return;
+      }
+
+      if (self.shouldTrackRealtimeCacheUsage()) {
+        for (const choice of this._translateOriginalChoices) {
+          self.touchRealtimeEntry(choice, "choice");
+        }
       }
 
       const choiceKeys = this._translateOriginalChoices.map((choice) =>
@@ -410,11 +420,75 @@ export const translateOnTheFlyRuntimeMethods = {
         return;
       }
 
-      if (skipping) {
+      if (!allowTranslation || skipping) {
         return;
       }
 
-      // Don't translate here - choices will be translated together with text in startAheadTranslation
+      const pendingChoiceItems = [];
+      for (let i = 0; i < this._translateOriginalChoices.length; i++) {
+        const choice = this._translateOriginalChoices[i];
+        const cacheKey = choiceKeys[i];
+        if (!choice || typeof choice !== "string" || choice.trim() === "") {
+          continue;
+        }
+        if (!cacheKey || self.hasUsableCacheValue(cacheKey)) {
+          continue;
+        }
+        if (self.pendingTranslations.has(cacheKey)) {
+          continue;
+        }
+
+        pendingChoiceItems.push({
+          type: "choice",
+          id: `choice_rt_${i}`,
+          value: choice,
+          cacheKey,
+        });
+      }
+
+      if (pendingChoiceItems.length === 0) {
+        return;
+      }
+
+      if (!self.batchManager) {
+        self.batchManager = createTranslationBatchManager(self);
+      }
+
+      self
+        .batchManager
+        .runBatchedTranslation(
+          [
+            {
+              kind: "directItems",
+              items: pendingChoiceItems,
+              translationPhaseLabel: "OTF - translating choices",
+              backgroundJob: false,
+              itemLimit: self.batchItemsLimit || 20,
+              charLimit: self.charLimit || 1000,
+              showSummary: false,
+            },
+          ],
+          {
+            translationPhaseLabel: "OTF - translating choices",
+            backgroundJob: false,
+            showSummary: false,
+          },
+        )
+        .then(() => {
+          const refreshedChoices = this._translateOriginalChoices.map(
+            (entryChoice, idx) => {
+              const key = choiceKeys[idx];
+              return self.translationCache.get(key) || entryChoice;
+            },
+          );
+          self.replaceChoiceText(refreshedChoices);
+        })
+        .catch((error) => {
+          console.warn(
+            "[TranslateOnTheFly] Failed to translate choices in setChoices",
+            error,
+          );
+        });
     };
 
     // Block entering choice input until choices are translated
