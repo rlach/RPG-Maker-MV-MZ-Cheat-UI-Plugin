@@ -16,6 +16,14 @@ export class SystemMessages extends BasePhase {
     return "systemMessages";
   }
 
+  getPrimaryCacheKey(panel, messageKey) {
+    if (!panel || typeof panel.getCacheKey !== "function") {
+      return null;
+    }
+
+    return panel.getCacheKey(messageKey, "system_message");
+  }
+
   async createEntries() {
     return [
       {
@@ -35,19 +43,19 @@ export class SystemMessages extends BasePhase {
       return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
     }
 
-    const source =
-      $dataSystem.terms.messagesOriginal || $dataSystem.terms.messages;
-    const keys = Object.keys(source || {});
+    const messages = $dataSystem.terms.messages;
+    const keys = Object.keys(messages || {});
     let total = 0;
     let left = 0;
     for (const key of keys) {
-      const value = source[key];
+      const value = messages[key];
       if (typeof value !== "string" || value.trim() === "") {
         continue;
       }
 
       total += 1;
-      if (!panel.hasUsableCacheValue(key)) {
+      const cacheKey = this.getPrimaryCacheKey(panel, key);
+      if (!cacheKey || !panel.hasUsableCacheValue(cacheKey)) {
         left += 1;
       }
     }
@@ -67,30 +75,23 @@ export class SystemMessages extends BasePhase {
       return [];
     }
 
-    const hasMessagesOriginal = !!$dataSystem.terms.messagesOriginal;
-    const sourceMessages = hasMessagesOriginal
-      ? $dataSystem.terms.messagesOriginal
-      : $dataSystem.terms.messages;
-    if (!hasMessagesOriginal) {
-      $dataSystem.terms.messagesOriginal = Object.assign(
-        {},
-        $dataSystem.terms.messages || {},
-      );
-    }
-
+    const messages = $dataSystem.terms.messages;
     const pending = [];
-    for (const key of Object.keys(sourceMessages || {})) {
-      const value = sourceMessages[key];
+    
+    for (const key of Object.keys(messages || {})) {
+      const value = messages[key];
       if (typeof value !== "string" || value.trim() === "") {
         continue;
       }
 
-      if (!panel.hasUsableCacheValue(key)) {
+      const cacheKey = this.getPrimaryCacheKey(panel, key);
+      if (!cacheKey || !panel.hasUsableCacheValue(cacheKey)) {
         pending.push({
           type: "system_message",
           id: `msg_${key}`,
           value,
-          cacheKey: key,
+          messageKey: key,
+          cacheKey,
         });
       }
     }
@@ -98,11 +99,31 @@ export class SystemMessages extends BasePhase {
     return pending;
   }
 
-  setData({ panel, successes, failures }) {
+  setData({ panel, pendingItems, successes, failures }) {
     super.setData({ panel, successes, failures });
+
+    if (
+      !window.$dataSystem ||
+      !$dataSystem.terms ||
+      !$dataSystem.terms.messages ||
+      typeof $dataSystem.terms.messages !== "object"
+    ) {
+      return;
+    }
+
+    const messageKeyByCacheKey = new Map(
+      (pendingItems || [])
+        .filter((entry) => entry && entry.cacheKey && entry.messageKey)
+        .map((entry) => [entry.cacheKey, entry.messageKey]),
+    );
 
     for (const success of successes || []) {
       if (!success || !success.cacheKey) {
+        continue;
+      }
+
+      const messageKey = messageKeyByCacheKey.get(success.cacheKey);
+      if (!messageKey) {
         continue;
       }
 
@@ -110,11 +131,47 @@ export class SystemMessages extends BasePhase {
         $dataSystem.terms.messages &&
         Object.prototype.hasOwnProperty.call(
           $dataSystem.terms.messages,
-          success.cacheKey,
+          messageKey,
         )
       ) {
-        $dataSystem.terms.messages[success.cacheKey] = success.translated;
+        $dataSystem.terms.messages[messageKey] = success.translated;
       }
     }
+  }
+
+  applyDataOnLifecycle({ panel } = {}) {
+    if (
+      !panel ||
+      !window.$dataSystem ||
+      !$dataSystem.terms ||
+      !$dataSystem.terms.messages ||
+      typeof $dataSystem.terms.messages !== "object"
+    ) {
+      return true;
+    }
+
+    const messages = $dataSystem.terms.messages;
+    let applied = 0;
+
+    for (const key of Object.keys(messages || {})) {
+      const cacheKey = this.getPrimaryCacheKey(panel, key);
+      if (!cacheKey || !panel.hasUsableCacheValue(cacheKey)) {
+        continue;
+      }
+
+      const translated = panel.translationCache.get(cacheKey);
+      if (translated !== undefined) {
+        $dataSystem.terms.messages[key] = translated;
+        applied += 1;
+      }
+    }
+
+    if (applied > 0) {
+      console.log(
+        `[SystemMessages] Applied ${applied} cached system messages`,
+      );
+    }
+
+    return true;
   }
 }

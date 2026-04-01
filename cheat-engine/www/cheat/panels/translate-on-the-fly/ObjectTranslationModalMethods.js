@@ -566,19 +566,19 @@ export const objectTranslationRuntimeMethods = {
       return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
     }
 
-    const source =
-      $dataSystem.terms.messagesOriginal || $dataSystem.terms.messages;
-    const keys = Object.keys(source || {});
+    const messages = $dataSystem.terms.messages;
+    const keys = Object.keys(messages || {});
 
     let total = 0;
     let left = 0;
     for (const key of keys) {
-      const value = source[key];
+      const value = messages[key];
       if (typeof value !== "string" || value.trim() === "") {
         continue;
       }
       total++;
-      if (!this.hasUsableCacheValue(key)) {
+      const cacheKey = this.getCacheKey(key, "system_message");
+      if (!this.hasUsableCacheValue(cacheKey)) {
         left++;
       }
     }

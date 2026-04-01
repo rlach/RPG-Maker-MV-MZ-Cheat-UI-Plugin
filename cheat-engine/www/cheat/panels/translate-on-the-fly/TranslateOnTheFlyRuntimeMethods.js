@@ -3,6 +3,15 @@ import { createTranslationBatchManager } from "../../translate-engines/batch-man
 export const translateOnTheFlyRuntimeMethods = {
   setupTranslationHook() {
     const self = this;
+    const applyLifecycleTranslations = (trigger) => {
+      if (!self.batchManager) {
+        self.batchManager = createTranslationBatchManager(self);
+      }
+
+      if (self.batchManager?.applyDataOnLifecycle) {
+        self.batchManager.applyDataOnLifecycle({ trigger });
+      }
+    };
 
     // Store original canStart if not already stored
     if (!Window_Message.prototype._originalCanStart) {
@@ -548,14 +557,7 @@ export const translateOnTheFlyRuntimeMethods = {
         "[TranslateOnTheFly] Extracted save contents, applying cached translations if any",
       );
 
-      if (!self.batchManager) {
-        self.batchManager = createTranslationBatchManager(self);
-      }
-      if (self.batchManager?.applyDataOnLifecycle) {
-        self.batchManager.applyDataOnLifecycle({
-          trigger: "extractSaveContents",
-        });
-      }
+      applyLifecycleTranslations("extractSaveContents");
       console.log(
         "[TranslateOnTheFly] Applied cached translations to $dataActors, $dataClasses, $dataEnemies and their game objects",
       );
@@ -570,18 +572,52 @@ export const translateOnTheFlyRuntimeMethods = {
       console.log(
         "[TranslateOnTheFly] Created game objects, applying cached translations if any",
       );
-      if (!self.batchManager) {
-        self.batchManager = createTranslationBatchManager(self);
-      }
-      if (self.batchManager?.applyDataOnLifecycle) {
-        self.batchManager.applyDataOnLifecycle({
-          trigger: "createGameObjects",
-        });
-      }
+      applyLifecycleTranslations("createGameObjects");
       console.log(
         "[TranslateOnTheFly] Applied cached translations to data containers",
       );
     };
+
+    if (!DataManager._loadDatabase) {
+      DataManager._loadDatabase = DataManager.loadDatabase;
+    }
+
+    DataManager.loadDatabase = function () {
+      DataManager._loadDatabase();
+      console.log(
+        "[TranslateOnTheFly] Loaded database, applying cached system message translations if any",
+      );
+      applyLifecycleTranslations("loadDatabase");
+      console.log(
+        "[TranslateOnTheFly] Applied cached translations to system messages",
+      );
+    };
+
+    if (typeof Scene_Title !== "undefined") {
+      if (!Scene_Title.prototype._translateOriginalCreateCommandWindow) {
+        Scene_Title.prototype._translateOriginalCreateCommandWindow =
+          Scene_Title.prototype.createCommandWindow;
+      }
+
+      Scene_Title.prototype.createCommandWindow = function () {
+        applyLifecycleTranslations("sceneTitleCreateCommandWindow");
+        return Scene_Title.prototype._translateOriginalCreateCommandWindow.call(
+          this,
+        );
+      };
+    }
+
+    if (typeof Scene_Load !== "undefined") {
+      if (!Scene_Load.prototype._translateOriginalHelpWindowText) {
+        Scene_Load.prototype._translateOriginalHelpWindowText =
+          Scene_Load.prototype.helpWindowText;
+      }
+
+      Scene_Load.prototype.helpWindowText = function () {
+        applyLifecycleTranslations("sceneLoadHelpWindowText");
+        return Scene_Load.prototype._translateOriginalHelpWindowText.call(this);
+      };
+    }
 
     // Hook Window_Command.prototype.refresh to translate commands before rendering
     if (!Window_Command.prototype._originalRefresh) {

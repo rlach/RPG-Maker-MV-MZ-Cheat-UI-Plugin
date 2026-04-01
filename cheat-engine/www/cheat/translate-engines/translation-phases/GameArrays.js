@@ -5,6 +5,16 @@ export class GameArrays extends BasePhase {
     return "gameArrays";
   }
 
+  applyDataOnLifecycle({ panel } = {}) {
+    if (!panel || typeof panel.getGameArrayDefs !== "function") {
+      return true;
+    }
+
+    const arrays = panel.getGameArrayDefs();
+    this.applyCachedTranslationsToArrays(panel, arrays);
+    return true;
+  }
+
   applyCachedTranslationsToArrays(panel, arrays) {
     for (const entry of arrays || []) {
       const parentObj =

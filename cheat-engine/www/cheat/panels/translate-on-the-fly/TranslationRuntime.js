@@ -119,6 +119,18 @@ class TranslationRuntime {
       return;
     }
 
+    try {
+      this.setupTranslationHook();
+      this._hookInitialized = true;
+      console.log("[TranslateOnTheFly] Hook initialized (immediate)");
+      return;
+    } catch (error) {
+      console.warn(
+        "[TranslateOnTheFly] Immediate hook init failed, retrying delayed",
+        error,
+      );
+    }
+
     setTimeout(() => {
       if (this._hookInitialized) {
         return;
