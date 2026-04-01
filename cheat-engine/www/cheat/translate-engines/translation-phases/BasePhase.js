@@ -1,4 +1,4 @@
-export class BaseTranslationPhaseStrategy {
+export class BasePhase {
   getTranslationPhaseLabel() {
     throw new Error(
       "getTranslationPhaseLabel() must be implemented by strategy",

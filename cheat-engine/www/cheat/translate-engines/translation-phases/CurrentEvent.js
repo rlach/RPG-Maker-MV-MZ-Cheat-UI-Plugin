@@ -1,12 +1,11 @@
-import { BaseTranslationPhaseStrategy } from "./BasePhase.js";
+import { BasePhase } from "./BasePhase.js";
 
-export class CurrentEventTranslationPhaseStrategy extends BaseTranslationPhaseStrategy {
+export class CurrentEvent extends BasePhase {
   static getInstance() {
-    if (!CurrentEventTranslationPhaseStrategy._instance) {
-      CurrentEventTranslationPhaseStrategy._instance =
-        new CurrentEventTranslationPhaseStrategy();
+    if (!CurrentEvent._instance) {
+      CurrentEvent._instance = new CurrentEvent();
     }
-    return CurrentEventTranslationPhaseStrategy._instance;
+    return CurrentEvent._instance;
   }
 
   constructor(options = {}) {

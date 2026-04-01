@@ -1,12 +1,24 @@
-import { DataObjectsTranslationPhaseStrategy } from "./DataObjects.js";
+import { DataObjects } from "./DataObjects.js";
 
-export class DataContainerTranslationKindStrategy extends DataObjectsTranslationPhaseStrategy {
-  constructor({ kind, getContainer, fields, cachePrefix }) {
+export class DataContainer extends DataObjects {
+  constructor({
+    kind,
+    getContainer,
+    fields,
+    cachePrefix,
+    getInstanceContainer,
+    instanceFunctionName,
+    requiresReapplyOnLoad = false,
+  }) {
     super([], fields, cachePrefix || "data");
     this.kind = kind;
     this.getContainer = getContainer;
+    this.getInstanceContainer =
+      typeof getInstanceContainer === "function" ? getInstanceContainer : null;
+    this.instanceFunctionName = instanceFunctionName || null;
     this.fields = Array.isArray(fields) ? fields : [];
     this.cachePrefix = cachePrefix || "data";
+    this.requiresReapplyOnLoad = !!requiresReapplyOnLoad;
   }
 
   getKind() {
@@ -68,15 +80,14 @@ export class DataContainerTranslationKindStrategy extends DataObjectsTranslation
     }
 
     const instanceContainer =
-      this.cachePrefix === "actor" ? window.$gameActors : null;
-    const instanceFunctionName = this.cachePrefix === "actor" ? "actor" : null;
+      this.getInstanceContainer && this.getInstanceContainer();
 
     panel.applyCachedTranslations(
       container,
       this.fields,
       this.cachePrefix,
       instanceContainer,
-      instanceFunctionName,
+      this.instanceFunctionName,
     );
 
     return true;
@@ -84,7 +95,7 @@ export class DataContainerTranslationKindStrategy extends DataObjectsTranslation
 
   applyDataOnLifecycle({ panel, trigger } = {}) {
     const isRestart = trigger === "createGameObjects";
-    if (!isRestart && !["actor", "class", "enemy"].includes(this.cachePrefix)) {
+    if (!isRestart && !this.requiresReapplyOnLoad) {
       return true;
     }
 

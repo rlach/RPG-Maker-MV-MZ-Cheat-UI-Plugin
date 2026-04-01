@@ -1,12 +1,11 @@
-import { BaseTranslationPhaseStrategy } from "./BasePhase.js";
+import { BasePhase } from "./BasePhase.js";
 
-export class EmptyStringsTranslationPhaseStrategy extends BaseTranslationPhaseStrategy {
+export class EmptyStrings extends BasePhase {
   static getInstance() {
-    if (!EmptyStringsTranslationPhaseStrategy._instance) {
-      EmptyStringsTranslationPhaseStrategy._instance =
-        new EmptyStringsTranslationPhaseStrategy();
+    if (!EmptyStrings._instance) {
+      EmptyStrings._instance = new EmptyStrings();
     }
-    return EmptyStringsTranslationPhaseStrategy._instance;
+    return EmptyStrings._instance;
   }
 
   constructor(items = []) {

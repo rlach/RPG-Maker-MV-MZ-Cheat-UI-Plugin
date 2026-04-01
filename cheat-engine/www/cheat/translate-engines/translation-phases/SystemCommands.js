@@ -1,12 +1,11 @@
-import { BaseTranslationPhaseStrategy } from "./BasePhase.js";
+import { BasePhase } from "./BasePhase.js";
 
-export class SystemCommandsTranslationPhaseStrategy extends BaseTranslationPhaseStrategy {
+export class SystemCommands extends BasePhase {
   static getInstance() {
-    if (!SystemCommandsTranslationPhaseStrategy._instance) {
-      SystemCommandsTranslationPhaseStrategy._instance =
-        new SystemCommandsTranslationPhaseStrategy();
+    if (!SystemCommands._instance) {
+      SystemCommands._instance = new SystemCommands();
     }
-    return SystemCommandsTranslationPhaseStrategy._instance;
+    return SystemCommands._instance;
   }
 
   getTranslationPhaseLabel() {

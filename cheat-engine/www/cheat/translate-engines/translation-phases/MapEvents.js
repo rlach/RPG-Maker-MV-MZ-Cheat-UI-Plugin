@@ -1,12 +1,11 @@
-import { BaseTranslationPhaseStrategy } from "./BasePhase.js";
+import { BasePhase } from "./BasePhase.js";
 
-export class MapEventsTranslationPhaseStrategy extends BaseTranslationPhaseStrategy {
+export class MapEvents extends BasePhase {
   static getInstance() {
-    if (!MapEventsTranslationPhaseStrategy._instance) {
-      MapEventsTranslationPhaseStrategy._instance =
-        new MapEventsTranslationPhaseStrategy();
+    if (!MapEvents._instance) {
+      MapEvents._instance = new MapEvents();
     }
-    return MapEventsTranslationPhaseStrategy._instance;
+    return MapEvents._instance;
   }
 
   constructor(
@@ -116,11 +115,7 @@ export class MapEventsTranslationPhaseStrategy extends BaseTranslationPhaseStrat
           continue;
         }
 
-        const stats =
-          MapEventsTranslationPhaseStrategy.countEventCommandListStats(
-            panel,
-            page.list,
-          );
+        const stats = MapEvents.countEventCommandListStats(panel, page.list);
         totalStrings += stats.totalStrings;
         leftStrings += stats.leftStrings;
       }

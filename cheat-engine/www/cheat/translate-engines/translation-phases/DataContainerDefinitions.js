@@ -15,12 +15,14 @@ export const DATA_CONTAINER_TRANSLATION_DEFINITIONS = Object.freeze([
     kind: "classes",
     cachePrefix: "class",
     fields: ["name"],
+    requiresReapplyOnLoad: true,
     getContainer: () => window.$dataClasses,
   },
   {
     kind: "enemies",
     cachePrefix: "enemy",
     fields: ["name"],
+    requiresReapplyOnLoad: true,
     getContainer: () => window.$dataEnemies,
   },
   {
@@ -40,13 +42,5 @@ export const DATA_CONTAINER_TRANSLATION_DEFINITIONS = Object.freeze([
     cachePrefix: "map",
     fields: ["name"],
     getContainer: () => window.$dataMapInfos,
-  },
-  {
-    kind: "actors",
-    cachePrefix: "actor",
-    fields: ["name", "nickname", "profile"],
-    getContainer: () => window.$dataActors,
-    getInstanceContainer: () => window.$gameActors,
-    instanceFunctionName: "actor",
   },
 ]);

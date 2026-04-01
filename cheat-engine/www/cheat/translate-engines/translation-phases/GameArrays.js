@@ -1,6 +1,6 @@
-import { BaseTranslationPhaseStrategy } from "./BasePhase.js";
+import { BasePhase } from "./BasePhase.js";
 
-export class GameArraysTranslationKindStrategy extends BaseTranslationPhaseStrategy {
+export class GameArrays extends BasePhase {
   getKind() {
     return "gameArrays";
   }

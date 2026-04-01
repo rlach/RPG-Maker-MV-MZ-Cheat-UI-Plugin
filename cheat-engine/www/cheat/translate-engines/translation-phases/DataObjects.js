@@ -1,12 +1,11 @@
-import { BaseTranslationPhaseStrategy } from "./BasePhase.js";
+import { BasePhase } from "./BasePhase.js";
 
-export class DataObjectsTranslationPhaseStrategy extends BaseTranslationPhaseStrategy {
+export class DataObjects extends BasePhase {
   static getInstance() {
-    if (!DataObjectsTranslationPhaseStrategy._instance) {
-      DataObjectsTranslationPhaseStrategy._instance =
-        new DataObjectsTranslationPhaseStrategy();
+    if (!DataObjects._instance) {
+      DataObjects._instance = new DataObjects();
     }
-    return DataObjectsTranslationPhaseStrategy._instance;
+    return DataObjects._instance;
   }
 
   constructor(dataObjects, fields, type) {
@@ -85,7 +84,7 @@ export class DataObjectsTranslationPhaseStrategy extends BaseTranslationPhaseStr
       objects.push(container[i]);
     }
 
-    return DataObjectsTranslationPhaseStrategy.countAmountFromObjects(
+    return DataObjects.countAmountFromObjects(
       panel,
       objects,
       fields,
@@ -120,7 +119,7 @@ export class DataObjectsTranslationPhaseStrategy extends BaseTranslationPhaseStr
   }
 
   countAmountSync({ request, panel }) {
-    return DataObjectsTranslationPhaseStrategy.countAmountFromObjects(
+    return DataObjects.countAmountFromObjects(
       panel,
       request.dataObjects,
       request.fields,
