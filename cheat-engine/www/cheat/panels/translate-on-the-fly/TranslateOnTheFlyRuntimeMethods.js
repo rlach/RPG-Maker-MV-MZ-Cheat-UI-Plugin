@@ -91,12 +91,15 @@ export const translateOnTheFlyRuntimeMethods = {
         Game_Interpreter.prototype.command101;
     }
 
-    Game_Interpreter.prototype.command101 = function () {
+    Game_Interpreter.prototype.command101 = function (...args) {
       if (window.$gameMessage && !$gameMessage.isBusy()) {
         markCurrentMessageAsEventOrigin("command101", this);
       }
 
-      return Game_Interpreter.prototype._translateOriginalCommand101.call(this);
+      return Game_Interpreter.prototype._translateOriginalCommand101.apply(
+        this,
+        args,
+      );
     };
 
     if (!Game_Interpreter.prototype._translateOriginalCommand102) {
@@ -104,12 +107,15 @@ export const translateOnTheFlyRuntimeMethods = {
         Game_Interpreter.prototype.command102;
     }
 
-    Game_Interpreter.prototype.command102 = function () {
+    Game_Interpreter.prototype.command102 = function (...args) {
       if (window.$gameMessage && !$gameMessage.isBusy()) {
         markCurrentMessageAsEventOrigin("command102", this);
       }
 
-      return Game_Interpreter.prototype._translateOriginalCommand102.call(this);
+      return Game_Interpreter.prototype._translateOriginalCommand102.apply(
+        this,
+        args,
+      );
     };
 
     // Override canStart to block until translation is ready
