@@ -1,5 +1,9 @@
 import { BasePluginTranslator } from "../BasePluginTranslator.js";
 
+function normalizeCommandName(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
 export class DTextPictureTranslator extends BasePluginTranslator {
   constructor() {
     super();
@@ -166,37 +170,108 @@ export class DTextPictureTranslator extends BasePluginTranslator {
 
     for (let cmdIdx = 0; cmdIdx < list.length; cmdIdx++) {
       const cmd = list[cmdIdx];
-      if (!cmd || Number(cmd.code) !== 357) {
+      if (!cmd) {
         continue;
       }
 
-      const parameters = Array.isArray(cmd.parameters) ? cmd.parameters : [];
-      const pluginName = String(parameters[0] || "").trim();
-      const commandName = String(parameters[1] || "").trim();
-      const args = parameters[3] && typeof parameters[3] === "object" ? parameters[3] : null;
-      const text = args && typeof args.text === "string" ? args.text : "";
-
-      if (!pluginName || pluginName.toLowerCase() !== "dtextpicture") {
-        continue;
-      }
-
-      if (commandName !== "dText") {
-        continue;
-      }
-
-      if (!text || !text.trim()) {
+      const entry = this.extractDTextEntry(cmd);
+      if (!entry || !entry.text || !entry.text.trim()) {
         continue;
       }
 
       output.push({
-        text,
-        commandName,
+        text: entry.text,
+        commandName: entry.commandName,
+        engine: entry.engine,
         source: {
           ...baseMeta,
           cmdIdx,
         },
       });
     }
+  }
+
+  extractDTextEntry(cmd) {
+    const commandCode = Number(cmd && cmd.code);
+    if (commandCode === 357) {
+      return this.extractMZDTextEntry(cmd);
+    }
+
+    if (commandCode === 356) {
+      return this.extractMVDTextEntry(cmd);
+    }
+
+    return null;
+  }
+
+  extractMZDTextEntry(cmd) {
+    const parameters = Array.isArray(cmd.parameters) ? cmd.parameters : [];
+    const pluginName = String(parameters[0] || "").trim();
+    const commandName = String(parameters[1] || "").trim();
+    const args = parameters[3] && typeof parameters[3] === "object" ? parameters[3] : null;
+    const text = args && typeof args.text === "string" ? args.text : "";
+
+    if (!pluginName || pluginName.toLowerCase() !== "dtextpicture") {
+      return null;
+    }
+
+    if (commandName !== "dText") {
+      return null;
+    }
+
+    if (!text || !text.trim()) {
+      return null;
+    }
+
+    return {
+      text,
+      commandName,
+      engine: "MZ",
+    };
+  }
+
+  extractMVDTextEntry(cmd) {
+    const commandLine =
+      Array.isArray(cmd.parameters) && typeof cmd.parameters[0] === "string"
+        ? cmd.parameters[0]
+        : "";
+
+    return this.parseMVDTextCommandLine(commandLine);
+  }
+
+  parseMVDTextCommandLine(commandLine) {
+    const line = String(commandLine || "");
+    if (!line.trim()) {
+      return null;
+    }
+
+    const parts = line.split(" ");
+    const commandName = String(parts.shift() || "").trim();
+    if (normalizeCommandName(commandName) !== "D_TEXT") {
+      return null;
+    }
+
+    while (parts.length > 0 && !String(parts[parts.length - 1] || "").trim()) {
+      parts.pop();
+    }
+
+    if (parts.length > 1) {
+      const lastArg = String(parts[parts.length - 1] || "").trim();
+      if (/^[+-]?\d+$/.test(lastArg)) {
+        parts.pop();
+      }
+    }
+
+    const text = parts.join(" ").trim();
+    if (!text) {
+      return null;
+    }
+
+    return {
+      text,
+      commandName: "D_TEXT",
+      engine: "MV",
+    };
   }
 
   loadMapDataById(mapId) {
