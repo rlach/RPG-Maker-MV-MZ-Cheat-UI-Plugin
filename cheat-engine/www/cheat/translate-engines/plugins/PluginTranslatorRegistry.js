@@ -1,4 +1,5 @@
 import { DTextPictureTranslator } from "./translators/DTextPictureTranslator.js";
+import { DynamicDatabaseTranslator } from "./translators/DynamicDatabaseTranslator.js";
 import { DestinationWindowTranslator } from "./translators/DestinationWindowTranslator.js";
 import { KmsMapActiveMessageTranslator } from "./translators/KmsMapActiveMessageTranslator.js";
 import { TorigoyaAchievement2Translator } from "./translators/TorigoyaAchievement2Translator.js";
@@ -7,6 +8,7 @@ class PluginTranslatorRegistry {
   constructor() {
     this.translatorClasses = [
       DTextPictureTranslator,
+      DynamicDatabaseTranslator,
       DestinationWindowTranslator,
       KmsMapActiveMessageTranslator,
       TorigoyaAchievement2Translator,
