@@ -367,10 +367,6 @@ export default {
       }
     },
 
-    isSeenTrackableType(type) {
-      return type === "text" || type === "choice";
-    },
-
     normalizeCacheValue(value) {
       if (typeof value === "string") {
         return value;
@@ -530,9 +526,7 @@ export default {
           continue;
         }
 
-        const seenTs = this.isSeenTrackableType(parsed.type)
-          ? this.lastSeenByCacheKey.get(cacheKey) || null
-          : null;
+        const seenTs = this.lastSeenByCacheKey.get(cacheKey) || null;
 
         const translation = this.normalizeCacheValue(value);
 

@@ -98,11 +98,11 @@ export const translateOnTheFlyRuntimeMethods = {
 
       if (self.shouldTrackRealtimeCacheUsage()) {
         if (hasText) {
-          self.touchRealtimeEntry(originalText, "text");
+          self.markCacheKeySeen(self.getCacheKey(originalText, "text"));
         }
         if (hasChoices) {
           for (const choice of originalChoices) {
-            self.touchRealtimeEntry(choice, "choice");
+            self.markCacheKeySeen(self.getCacheKey(choice, "choice"));
           }
         }
       }
@@ -399,7 +399,7 @@ export const translateOnTheFlyRuntimeMethods = {
 
       if (self.shouldTrackRealtimeCacheUsage()) {
         for (const choice of this._translateOriginalChoices) {
-          self.touchRealtimeEntry(choice, "choice");
+          self.markCacheKeySeen(self.getCacheKey(choice, "choice"));
         }
       }
 

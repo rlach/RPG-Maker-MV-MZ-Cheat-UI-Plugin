@@ -123,6 +123,11 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
     }
 
     const cacheKey = runtime.getCacheKey(parsed.text, this.getCacheType());
+
+    if (typeof runtime.markCacheKeySeen === "function") {
+      runtime.markCacheKeySeen(cacheKey);
+    }
+
     if (!runtime.hasUsableCacheValue(cacheKey)) {
       return null;
     }

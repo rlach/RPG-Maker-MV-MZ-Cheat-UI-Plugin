@@ -21,10 +21,6 @@ export const translateOnTheFlyCacheMethods = {
     return this.isTranslationEnabled() || !!this.translateCacheWhenDisabled;
   },
 
-  isRealtimeTrackableType(type) {
-    return type === "text" || type === "choice";
-  },
-
   isTranslatedCacheValue(value) {
     if (typeof value !== "string") {
       return value !== null && value !== undefined;
@@ -77,56 +73,17 @@ export const translateOnTheFlyCacheMethods = {
     }
   },
 
-  getCacheKeyType(cacheKey) {
-    if (typeof cacheKey !== "string") {
-      return "";
-    }
-
-    const idx = cacheKey.indexOf(":");
-    if (idx <= 0) {
-      return "";
-    }
-
-    return cacheKey.slice(0, idx);
-  },
-
-  ensureRealtimeTrackedCacheEntry(value, type) {
-    if (
-      !this.shouldTrackRealtimeCacheUsage() ||
-      !this.isRealtimeTrackableType(type)
-    ) {
-      return null;
-    }
-
-    if (typeof value !== "string" || value.trim() === "") {
-      return null;
-    }
-
-    const cacheKey = this.getCacheKey(value, type);
-    return cacheKey;
-  },
-
-  markCacheKeySeen(cacheKey, type = null) {
+  markCacheKeySeen(cacheKey) {
     if (!this.shouldTrackRealtimeCacheUsage() || !this.lastSeenByCacheKey) {
       return;
     }
 
-    const resolvedType = type || this.getCacheKeyType(cacheKey);
-    if (!this.isRealtimeTrackableType(resolvedType)) {
+    if (typeof cacheKey !== "string" || cacheKey.length === 0) {
       return;
     }
 
     this.lastSeenByCacheKey.set(cacheKey, Date.now());
     this.notifyCacheRuntime("seen-updated", cacheKey);
-  },
-
-  touchRealtimeEntry(value, type) {
-    const cacheKey = this.ensureRealtimeTrackedCacheEntry(value, type);
-    if (cacheKey) {
-      this.markCacheKeySeen(cacheKey, type);
-    }
-
-    return cacheKey;
   },
 
   deleteCacheValue(cacheKey, options = {}) {

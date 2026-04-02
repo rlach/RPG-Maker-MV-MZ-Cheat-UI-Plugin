@@ -112,8 +112,7 @@ export class KmsMapActiveMessageTranslator extends BasePluginTranslator {
         if (
           !runtime ||
           typeof runtime.getCacheKey !== "function" ||
-          typeof runtime.hasUsableCacheValue !== "function" ||
-          !(runtime.translationCache instanceof Map)
+          typeof runtime.hasUsableCacheValue !== "function"
         ) {
           return messages;
         }
@@ -127,6 +126,15 @@ export class KmsMapActiveMessageTranslator extends BasePluginTranslator {
             msg.text,
             translator.getCacheType(),
           );
+
+          if (typeof runtime.markCacheKeySeen === "function") {
+            runtime.markCacheKeySeen(cacheKey);
+          }
+
+          if (!(runtime.translationCache instanceof Map)) {
+            return msg;
+          }
+
           if (!runtime.hasUsableCacheValue(cacheKey)) {
             return msg;
           }
