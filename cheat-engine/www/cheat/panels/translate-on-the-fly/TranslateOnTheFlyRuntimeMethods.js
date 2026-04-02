@@ -70,6 +70,34 @@ export const translateOnTheFlyRuntimeMethods = {
       }
     };
 
+    const getSafeCurrentMessageText = () => {
+      if (!window.$gameMessage) {
+        return "";
+      }
+
+      if (typeof $gameMessage._translateOriginalText === "string") {
+        return $gameMessage._translateOriginalText;
+      }
+
+      if (typeof $gameMessage.allText === "function") {
+        try {
+          const text = $gameMessage.allText();
+          return typeof text === "string" ? text : text ? String(text) : "";
+        } catch (error) {
+          if (!self._loggedAllTextFallbackError) {
+            console.warn(
+              "[TranslateOnTheFly] Game_Message.allText failed, using _texts fallback",
+              error,
+            );
+            self._loggedAllTextFallbackError = true;
+          }
+        }
+      }
+
+      const texts = Array.isArray($gameMessage._texts) ? $gameMessage._texts : [];
+      return texts.join("\n");
+    };
+
     // Store original canStart if not already stored
     if (!Window_Message.prototype._originalCanStart) {
       Window_Message.prototype._originalCanStart =
@@ -155,8 +183,7 @@ export const translateOnTheFlyRuntimeMethods = {
         return originalCanStart;
       }
 
-      const originalText =
-        $gameMessage._translateOriginalText || $gameMessage.allText();
+      const originalText = getSafeCurrentMessageText();
       const hasText = !!(originalText && originalText.trim().length > 0);
 
       // Remember original text (even empty) for later key lookups (startInput)
@@ -614,8 +641,7 @@ export const translateOnTheFlyRuntimeMethods = {
         (translationEnabled && skipping) ||
         (!translationEnabled && self.translateCacheWhenDisabled);
 
-      const originalText =
-        $gameMessage._translateOriginalText || $gameMessage.allText();
+      const originalText = getSafeCurrentMessageText();
       const hasText = !!(originalText && originalText.trim().length > 0);
       const textKey = hasText ? self.getCacheKey(originalText, "text") : null;
       const originalSpeakerName =
