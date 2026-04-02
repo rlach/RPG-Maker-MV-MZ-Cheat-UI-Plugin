@@ -72,6 +72,7 @@ export class TranslationBatchManager {
 
   applyBatchTranslationResults(successes, failures, options = {}) {
     const persist = options.persist === undefined ? true : !!options.persist;
+    const changedKeys = [];
 
     for (const success of successes || []) {
       if (!success || !success.cacheKey) {
@@ -81,6 +82,7 @@ export class TranslationBatchManager {
       this.panel.setCacheValue(success.cacheKey, success.translated, {
         persist: false,
       });
+      changedKeys.push(success.cacheKey);
     }
 
     const safeFailures = Array.isArray(failures) ? failures : [];
@@ -97,12 +99,15 @@ export class TranslationBatchManager {
           : false;
       if (!hasUsable) {
         this.panel.setCacheValue(failure.cacheKey, "", { persist: false });
+        changedKeys.push(failure.cacheKey);
       }
     }
 
     if (persist && typeof this.panel.persistCache === "function") {
-      this.panel.persistCache();
+      this.panel.persistCache(changedKeys);
     }
+
+    return changedKeys;
   }
 
   createExecutionOptions(request = {}, options = {}) {

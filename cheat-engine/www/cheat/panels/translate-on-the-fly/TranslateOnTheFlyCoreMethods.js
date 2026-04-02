@@ -112,40 +112,317 @@ export const translateOnTheFlyCoreMethods = {
           ? ""
           : String(value);
     this.translationCache.set(key, normalizedValue);
+    this.rememberCacheBucketForKey(key);
 
     const persist = options.persist === undefined ? true : !!options.persist;
     if (persist) {
-      this.persistCache();
+      this.persistCache([key]);
     }
 
     this.notifyCacheRuntime("cache-set", key);
   },
 
+  getCacheFileSystem() {
+    return (this.cacheStorage && this.cacheStorage.fileSystem) || require("fs");
+  },
+
+  getSplitCacheDirectoryPath() {
+    const path = require("path");
+    const cacheFilePath =
+      (this.cacheStorage && this.cacheStorage.filePath) ||
+      "./www/cheat-settings/translate-cache.json";
+    const parsed = path.parse(cacheFilePath);
+    return path.join(parsed.dir, "translate-cache");
+  },
+
+  ensureSplitCacheDirectorySync() {
+    const fs = this.getCacheFileSystem();
+    const directoryPath = this.getSplitCacheDirectoryPath();
+    if (!fs.existsSync(directoryPath)) {
+      fs.mkdirSync(directoryPath, { recursive: true });
+    }
+  },
+
+  parseCompositeCacheKey(cacheKey) {
+    if (typeof cacheKey !== "string" || cacheKey.length === 0) {
+      return null;
+    }
+
+    const colonIndex = cacheKey.indexOf(":");
+    if (colonIndex <= 0) {
+      return null;
+    }
+
+    const type = cacheKey.slice(0, colonIndex);
+    const payload = cacheKey.slice(colonIndex + 1);
+    if (!type || !payload) {
+      return null;
+    }
+
+    const currentLangPair = `${this.sourceLang}-${this.targetLang}`;
+    const currentPrefix = `${currentLangPair}-`;
+    if (payload.startsWith(currentPrefix)) {
+      const textKey = payload.slice(currentPrefix.length);
+      if (!textKey) {
+        return null;
+      }
+
+      return {
+        type,
+        langPair: currentLangPair,
+        textKey,
+      };
+    }
+
+    const firstDash = payload.indexOf("-");
+    if (firstDash <= 0) {
+      return null;
+    }
+
+    const secondDash = payload.indexOf("-", firstDash + 1);
+    if (secondDash <= firstDash + 1) {
+      return null;
+    }
+
+    const sourceLang = payload.slice(0, firstDash);
+    const targetLang = payload.slice(firstDash + 1, secondDash);
+    const textKey = payload.slice(secondDash + 1);
+    if (!sourceLang || !targetLang || !textKey) {
+      return null;
+    }
+
+    return {
+      type,
+      langPair: `${sourceLang}-${targetLang}`,
+      textKey,
+    };
+  },
+
+  normalizeCacheValue(value) {
+    return typeof value === "string"
+      ? value
+      : value === null || value === undefined
+        ? ""
+        : String(value);
+  },
+
+  getCacheBucketId(type, langPair) {
+    if (!type || !langPair) {
+      return null;
+    }
+
+    return `${type}::${langPair}`;
+  },
+
+  parseCacheBucketId(bucketId) {
+    if (typeof bucketId !== "string") {
+      return null;
+    }
+
+    const separatorIndex = bucketId.indexOf("::");
+    if (separatorIndex <= 0) {
+      return null;
+    }
+
+    const type = bucketId.slice(0, separatorIndex);
+    const langPair = bucketId.slice(separatorIndex + 2);
+    if (!type || !langPair) {
+      return null;
+    }
+
+    return { type, langPair };
+  },
+
+  getSplitCacheFileNameFromBucketId(bucketId) {
+    const parsed = this.parseCacheBucketId(bucketId);
+    if (!parsed) {
+      return null;
+    }
+
+    return `${parsed.type}.${parsed.langPair}.cache.json`;
+  },
+
+  getSplitCacheFilePathFromBucketId(bucketId) {
+    const path = require("path");
+    const fileName = this.getSplitCacheFileNameFromBucketId(bucketId);
+    if (!fileName) {
+      return null;
+    }
+
+    return path.join(this.getSplitCacheDirectoryPath(), fileName);
+  },
+
+  parseSplitCacheFileName(fileName) {
+    if (typeof fileName !== "string") {
+      return null;
+    }
+
+    const matched = fileName.match(/^(.*)\.([^.]+)\.cache\.json$/);
+    if (!matched) {
+      return null;
+    }
+
+    const type = matched[1];
+    const langPair = matched[2];
+    if (!type || !langPair) {
+      return null;
+    }
+
+    return {
+      type,
+      langPair,
+      bucketId: this.getCacheBucketId(type, langPair),
+    };
+  },
+
+  getAllSplitCacheBucketsFromDiskSync() {
+    const fs = this.getCacheFileSystem();
+    const directoryPath = this.getSplitCacheDirectoryPath();
+    if (!fs.existsSync(directoryPath)) {
+      return [];
+    }
+
+    try {
+      const names = fs.readdirSync(directoryPath);
+      const buckets = [];
+
+      for (const name of names) {
+        const parsed = this.parseSplitCacheFileName(name);
+        if (parsed && parsed.bucketId) {
+          buckets.push(parsed.bucketId);
+        }
+      }
+
+      return buckets;
+    } catch (error) {
+      console.warn(
+        "[TranslateOnTheFly] Failed to list split cache files",
+        error,
+      );
+      return [];
+    }
+  },
+
+  readJsonFileSync(filePath) {
+    const fs = this.getCacheFileSystem();
+    const raw = fs.readFileSync(filePath, "utf-8");
+    return JSON.parse(raw);
+  },
+
+  writeJsonFileAtomicSync(filePath, payload) {
+    const fs = this.getCacheFileSystem();
+    const data = payload && typeof payload === "object" ? payload : {};
+    fs.writeFileSync(
+      `${filePath}.tmp`,
+      this.formatSplitCacheJson(data),
+      "utf-8",
+    );
+    fs.renameSync(`${filePath}.tmp`, filePath);
+  },
+
+  async writeJsonFileAtomicAsync(filePath, payload) {
+    const fs = this.getCacheFileSystem();
+    const data = payload && typeof payload === "object" ? payload : {};
+    await fs.promises.writeFile(
+      `${filePath}.tmp`,
+      this.formatSplitCacheJson(data),
+      "utf-8",
+    );
+    await fs.promises.rename(`${filePath}.tmp`, filePath);
+  },
+
+  formatSplitCacheJson(data) {
+    const sorted = {};
+    for (const key of Object.keys(data || {}).sort()) {
+      sorted[key] = data[key];
+    }
+
+    return `${JSON.stringify(sorted, null, 2)}\n`;
+  },
+
+  rememberCacheBucketForKey(cacheKey, explicitBucketId = null) {
+    if (!this.cacheBucketByCompositeKey) {
+      this.cacheBucketByCompositeKey = new Map();
+    }
+
+    let bucketId = explicitBucketId;
+    if (!bucketId) {
+      const parsedKey = this.parseCompositeCacheKey(cacheKey);
+      bucketId = parsedKey
+        ? this.getCacheBucketId(parsedKey.type, parsedKey.langPair)
+        : null;
+    }
+
+    if (bucketId) {
+      this.cacheBucketByCompositeKey.set(cacheKey, bucketId);
+    }
+
+    return bucketId;
+  },
+
+  getBucketForCacheKey(cacheKey) {
+    if (this.cacheBucketByCompositeKey?.has(cacheKey)) {
+      return this.cacheBucketByCompositeKey.get(cacheKey);
+    }
+
+    return this.rememberCacheBucketForKey(cacheKey);
+  },
+
+  loadSplitCacheFromDisk() {
+    const fs = this.getCacheFileSystem();
+    const path = require("path");
+    const directoryPath = this.getSplitCacheDirectoryPath();
+    if (!fs.existsSync(directoryPath)) {
+      return;
+    }
+
+    const files = fs.readdirSync(directoryPath);
+    for (const fileName of files) {
+      const parsed = this.parseSplitCacheFileName(fileName);
+      if (!parsed || !parsed.bucketId) {
+        continue;
+      }
+
+      const filePath = path.join(directoryPath, fileName);
+      let payload;
+      try {
+        payload = this.readJsonFileSync(filePath);
+      } catch (error) {
+        console.warn(
+          `[TranslateOnTheFly] Failed to read split cache file ${fileName}`,
+          error,
+        );
+        continue;
+      }
+
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+        continue;
+      }
+
+      for (const [textKey, value] of Object.entries(payload)) {
+        const compositeKey = `${parsed.type}:${parsed.langPair}-${textKey}`;
+        const normalizedValue = this.normalizeCacheValue(value);
+        this.translationCache.set(compositeKey, normalizedValue);
+        this.rememberCacheBucketForKey(compositeKey, parsed.bucketId);
+      }
+    }
+  },
+
   loadCacheFromDisk() {
     try {
-      const json = this.cacheStorage.getItem("data");
-      if (!json) {
-        return;
+      this.migrateLegacyCacheDataToSplitFilesSync();
+
+      if (!this.translationCache) {
+        const runtime = ensureTranslateCacheRuntime(new Map());
+        this.translationCache = runtime.cache;
+        this.lastSeenByCacheKey = runtime.lastSeenByCacheKey;
       }
-      const entries = JSON.parse(json);
-      if (Array.isArray(entries)) {
-        if (!this.translationCache) {
-          const runtime = ensureTranslateCacheRuntime(new Map());
-          this.translationCache = runtime.cache;
-          this.lastSeenByCacheKey = runtime.lastSeenByCacheKey;
-        }
-        this.translationCache.clear();
-        for (const [k, v] of entries) {
-          const normalizedValue =
-            typeof v === "string"
-              ? v
-              : v === null || v === undefined
-                ? ""
-                : String(v);
-          this.translationCache.set(k, normalizedValue);
-        }
-        this.notifyCacheRuntime("cache-loaded");
-      }
+
+      this.translationCache.clear();
+      this.cacheBucketByCompositeKey = new Map();
+      this.loadSplitCacheFromDisk();
+
+      this.notifyCacheRuntime("cache-loaded");
     } catch (error) {
       console.warn(
         "[TranslateOnTheFly] Failed to load cache, starting fresh",
@@ -154,19 +431,133 @@ export const translateOnTheFlyCoreMethods = {
       const runtime = ensureTranslateCacheRuntime(new Map());
       this.translationCache = runtime.cache;
       this.lastSeenByCacheKey = runtime.lastSeenByCacheKey;
+      this.cacheBucketByCompositeKey = new Map();
       this.notifyCacheRuntime("cache-load-failed-reset");
     }
   },
 
+  // Temporary migration shim: migrate monolithic legacy cache into split files.
+  migrateLegacyCacheDataToSplitFilesSync() {
+    const persistedCache = this.cacheStorage.getAll();
+    if (
+      !persistedCache ||
+      typeof persistedCache !== "object" ||
+      Array.isArray(persistedCache)
+    ) {
+      return;
+    }
+
+    const persistedKeys = Object.keys(persistedCache);
+    if (persistedKeys.length === 0) {
+      return;
+    }
+
+    const fullKeyToValue = new Map();
+    const isLegacyDataOnly =
+      persistedKeys.length === 1 && persistedKeys[0] === "data";
+
+    if (isLegacyDataOnly) {
+      const legacyPayload = persistedCache.data;
+      if (typeof legacyPayload === "string") {
+        try {
+          const entries = JSON.parse(legacyPayload);
+          if (Array.isArray(entries)) {
+            for (const [key, value] of entries) {
+              if (!key) {
+                continue;
+              }
+              fullKeyToValue.set(key, this.normalizeCacheValue(value));
+            }
+          }
+        } catch (error) {
+          console.warn(
+            "[TranslateOnTheFly] Legacy cache migration failed to parse payload",
+            error,
+          );
+        }
+      }
+    } else {
+      for (const [key, value] of Object.entries(persistedCache)) {
+        if (!key || key === "data") {
+          continue;
+        }
+        fullKeyToValue.set(key, this.normalizeCacheValue(value));
+      }
+    }
+
+    if (fullKeyToValue.size === 0) {
+      this.cacheStorage.setAll({});
+      return;
+    }
+
+    const buckets = new Map();
+    for (const [key, value] of fullKeyToValue.entries()) {
+      const parsed = this.parseCompositeCacheKey(key);
+      if (!parsed) {
+        continue;
+      }
+
+      const bucketId = this.getCacheBucketId(parsed.type, parsed.langPair);
+      if (!bucketId) {
+        continue;
+      }
+
+      if (!buckets.has(bucketId)) {
+        buckets.set(bucketId, {});
+      }
+      buckets.get(bucketId)[parsed.textKey] = value;
+    }
+
+    this.ensureSplitCacheDirectorySync();
+    for (const [bucketId, payload] of buckets.entries()) {
+      const filePath = this.getSplitCacheFilePathFromBucketId(bucketId);
+      if (!filePath) {
+        continue;
+      }
+      this.writeJsonFileAtomicSync(filePath, payload);
+    }
+
+    this.cacheStorage.setAll({});
+    console.log(
+      `[TranslateOnTheFly] Migrated monolithic cache to split files (${fullKeyToValue.size} entries, ${buckets.size} files)`,
+    );
+  },
+
   scheduled: false,
   saving: false,
+  flushTimer: null,
+  pendingFullCacheRewrite: false,
+  dirtyCacheBuckets: null,
+  cacheBucketByCompositeKey: null,
 
-  persistCache() {
-    this.scheduled = true
+  persistCache(changedKeys = null) {
+    this.scheduled = true;
 
-    if (!this.saving) {
-      setTimeout(() => this.flush(), 1000);
+    if (!this.dirtyCacheBuckets) {
+      this.dirtyCacheBuckets = new Set();
     }
+
+    if (Array.isArray(changedKeys) && changedKeys.length > 0) {
+      for (const key of changedKeys) {
+        const bucketId = this.getBucketForCacheKey(key);
+        if (bucketId) {
+          this.dirtyCacheBuckets.add(bucketId);
+        } else {
+          this.pendingFullCacheRewrite = true;
+        }
+      }
+    } else {
+      this.pendingFullCacheRewrite = true;
+    }
+
+    if (this.saving || this.flushTimer) {
+      return;
+    }
+
+    this.flushTimer = setTimeout(() => {
+      this.flushTimer = null;
+      this.flush();
+    }, 1000);
   },
 
   async flush() {
@@ -175,18 +566,69 @@ export const translateOnTheFlyCoreMethods = {
     }
     this.saving = true;
 
+    try {
       do {
         this.scheduled = false;
 
-        const payload = JSON.stringify(
-          Array.from(this.translationCache.entries()),
-        );
+        const fullRewrite = this.pendingFullCacheRewrite;
+        this.pendingFullCacheRewrite = false;
 
-        await this.cacheStorage.setItemAsync("data", payload);
+        const bucketsToWrite = new Set();
+        if (fullRewrite) {
+          for (const bucketId of this.getAllSplitCacheBucketsFromDiskSync()) {
+            bucketsToWrite.add(bucketId);
+          }
+          for (const [compositeKey] of this.translationCache.entries()) {
+            const bucketId = this.getBucketForCacheKey(compositeKey);
+            if (bucketId) {
+              bucketsToWrite.add(bucketId);
+            }
+          }
+          this.dirtyCacheBuckets = new Set();
+        } else {
+          for (const bucketId of this.dirtyCacheBuckets || []) {
+            bucketsToWrite.add(bucketId);
+          }
+          this.dirtyCacheBuckets = new Set();
+        }
 
-      } while (this.scheduled)
+        this.ensureSplitCacheDirectorySync();
 
-      this.saving = false
+        for (const bucketId of bucketsToWrite) {
+          const parsedBucket = this.parseCacheBucketId(bucketId);
+          if (!parsedBucket) {
+            continue;
+          }
+
+          const payload = {};
+          const prefix = `${parsedBucket.type}:${parsedBucket.langPair}-`;
+          for (const [compositeKey, value] of this.translationCache.entries()) {
+            if (!compositeKey.startsWith(prefix)) {
+              continue;
+            }
+            const textKey = compositeKey.slice(prefix.length);
+            payload[textKey] = this.normalizeCacheValue(value);
+          }
+
+          const filePath = this.getSplitCacheFilePathFromBucketId(bucketId);
+          if (!filePath) {
+            continue;
+          }
+
+          if (Object.keys(payload).length === 0) {
+            const fs = this.getCacheFileSystem();
+            if (fs.existsSync(filePath)) {
+              await fs.promises.unlink(filePath);
+            }
+            continue;
+          }
+
+          await this.writeJsonFileAtomicAsync(filePath, payload);
+        }
+      } while (this.scheduled);
+    } finally {
+      this.saving = false;
+    }
   },
 
   findPropertyDescriptorInChain(target, field) {

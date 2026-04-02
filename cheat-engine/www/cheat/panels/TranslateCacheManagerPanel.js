@@ -542,7 +542,7 @@ export default {
       }
 
       const runtime = ensureTranslationRuntime();
-      runtime.persistCache();
+      runtime.persistCache(changedKeys);
       runtime.notifyCacheRuntime(reason);
 
       this.refreshEntries();
@@ -674,6 +674,7 @@ export default {
         this.selectedTypeFilter,
       );
       let changed = 0;
+      const changedKeys = [];
       for (const entry of matchingEntries) {
         if (!entry || !entry.key) {
           continue;
@@ -688,6 +689,7 @@ export default {
 
         this.translationCache.set(entry.key, "");
         changed += 1;
+        changedKeys.push(entry.key);
       }
 
       if (!changed) {
@@ -696,7 +698,7 @@ export default {
       }
 
       const runtime = ensureTranslationRuntime();
-      runtime.persistCache();
+      runtime.persistCache(changedKeys);
       runtime.notifyCacheRuntime("cache-manager-clear-filtered");
 
       this.refreshEntries();

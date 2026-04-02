@@ -10,6 +10,9 @@ export const translateOnTheFlyCacheMethods = {
     if (this.lastSeenByCacheKey) {
       this.lastSeenByCacheKey.clear();
     }
+    if (this.cacheBucketByCompositeKey) {
+      this.cacheBucketByCompositeKey.clear();
+    }
     this.persistCache();
     this.notifyCacheRuntime("cache-cleared");
     console.log(
@@ -96,7 +99,7 @@ export const translateOnTheFlyCacheMethods = {
       this.lastSeenByCacheKey.delete(cacheKey);
     }
     if (options.persist !== false) {
-      this.persistCache();
+      this.persistCache([cacheKey]);
     }
     if (options.notify !== false) {
       this.notifyCacheRuntime("cache-delete", cacheKey);

@@ -5,6 +5,18 @@ export class KeyValueStorage {
         this.fileSystem = require('fs')
     }
 
+    getAll() {
+        return this.__readFile()
+    }
+
+    setAll(data) {
+        this.__writeFileAtomicSync(data)
+    }
+
+    async setAllAsync(data) {
+        await this.__writeFileAtomicAsync(data)
+    }
+
     getItem(key) {
         return this.__getItemFromFile(key)
     }
@@ -17,8 +29,7 @@ export class KeyValueStorage {
         const data = await this.__readFileAsync();
 
         data[key] = value;
-        await this.fileSystem.promises.writeFile(`${this.filePath}.tmp`, JSON.stringify(data), this.fileEncoding);
-        await this.fileSystem.promises.rename(`${this.filePath}.tmp`, this.filePath);
+        await this.__writeFileAtomicAsync(data);
         console.log('[KeyValueStorage] Asynchronously wrote data to file', key);
     }
 
@@ -48,7 +59,27 @@ export class KeyValueStorage {
         data[key] = value
 
     console.log('[KeyValueStorage] Writing data to file', key, value);
-        this.fileSystem.writeFileSync(this.filePath, JSON.stringify(data))
+        this.__writeFileAtomicSync(data)
+    }
+
+    __writeFileAtomicSync(data) {
+        const normalizedData = this.__normalizeFileData(data)
+        this.fileSystem.writeFileSync(`${this.filePath}.tmp`, JSON.stringify(normalizedData), this.fileEncoding)
+        this.fileSystem.renameSync(`${this.filePath}.tmp`, this.filePath)
+    }
+
+    async __writeFileAtomicAsync(data) {
+        const normalizedData = this.__normalizeFileData(data)
+        await this.fileSystem.promises.writeFile(`${this.filePath}.tmp`, JSON.stringify(normalizedData), this.fileEncoding)
+        await this.fileSystem.promises.rename(`${this.filePath}.tmp`, this.filePath)
+    }
+
+    __normalizeFileData(data) {
+        if (!data || typeof data !== 'object' || Array.isArray(data)) {
+            return {}
+        }
+
+        return data
     }
 }
 

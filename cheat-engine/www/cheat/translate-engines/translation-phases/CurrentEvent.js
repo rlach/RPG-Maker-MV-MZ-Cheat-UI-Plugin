@@ -78,7 +78,7 @@ export class CurrentEvent extends BasePhase {
           deleteSeen: false,
         });
       }
-      panel.persistCache();
+      panel.persistCache(refreshKeys);
       panel.notifyCacheRuntime("cache-force-retranslate");
     }
 

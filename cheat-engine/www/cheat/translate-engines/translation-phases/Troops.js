@@ -157,6 +157,7 @@ export class Troops extends BasePhase {
         .filter((entry) => entry && entry.cacheKey)
         .map((entry) => [entry.cacheKey, entry]),
     );
+    const changedKeys = [];
 
     for (const success of successes || []) {
       if (!success || !success.cacheKey) {
@@ -176,11 +177,9 @@ export class Troops extends BasePhase {
       }
 
       for (const originalType of originalTypes) {
-        panel.setCacheValue(
-          panel.getCacheKey(originalValue, originalType),
-          success.translated,
-          { persist: false },
-        );
+        const cacheKey = panel.getCacheKey(originalValue, originalType);
+        panel.setCacheValue(cacheKey, success.translated, { persist: false });
+        changedKeys.push(cacheKey);
 
         if (originalType === "speaker") {
           const legacySpeakerKey = panel.getLegacySpeakerCacheKey(originalValue);
@@ -188,11 +187,12 @@ export class Troops extends BasePhase {
             panel.setCacheValue(legacySpeakerKey, success.translated, {
               persist: false,
             });
+            changedKeys.push(legacySpeakerKey);
           }
         }
       }
     }
 
-    panel.persistCache();
+    panel.persistCache(changedKeys);
   }
 }
