@@ -379,6 +379,42 @@ export default {
       return String(value);
     },
 
+    normalizeTypeFilterValue(value) {
+      const normalized = this.normalizeCacheValue(value).trim();
+      if (!normalized) {
+        return "";
+      }
+
+      // Defend against stale/broken persisted state where label text was stored.
+      if (normalized.toLowerCase() === "type") {
+        return "";
+      }
+
+      return normalized;
+    },
+
+    ensureSelectedTypeFilterIsValid() {
+      const selected = this.normalizeTypeFilterValue(this.selectedTypeFilter);
+      if (!selected) {
+        if (this.selectedTypeFilter !== "") {
+          this.selectedTypeFilter = "";
+        }
+        return;
+      }
+
+      const available = new Set(
+        (this.entries || [])
+          .map((entry) => this.normalizeCacheValue(entry && entry.type).trim())
+          .filter((type) => !!type),
+      );
+
+      if (!available.has(selected)) {
+        this.selectedTypeFilter = "";
+      } else if (this.selectedTypeFilter !== selected) {
+        this.selectedTypeFilter = selected;
+      }
+    },
+
     formatSeenTimestamp(timestamp) {
       if (!Number.isFinite(timestamp) || timestamp <= 0) {
         return "";
@@ -451,7 +487,9 @@ export default {
           this.search = parsed.searchInput;
         }
         if (typeof parsed.selectedTypeFilter === "string") {
-          this.selectedTypeFilter = parsed.selectedTypeFilter;
+          this.selectedTypeFilter = this.normalizeTypeFilterValue(
+            parsed.selectedTypeFilter,
+          );
         }
       } catch (error) {
         // Ignore malformed state and keep defaults.
@@ -542,6 +580,7 @@ export default {
       }
 
       this.entries = items;
+      this.ensureSelectedTypeFilterIsValid();
     },
 
     matchesTypeFilter(item, selectedType = "") {
