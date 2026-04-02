@@ -3,6 +3,63 @@ import { createTranslationBatchManager } from "../../translate-engines/batch-man
 export const translateOnTheFlyRuntimeMethods = {
   setupTranslationHook() {
     const self = this;
+    const markCurrentMessageAsEventOrigin = (kind, interpreter) => {
+      if (!window.$gameMessage) {
+        return;
+      }
+
+      const eventId =
+        interpreter && typeof interpreter._eventId === "number"
+          ? interpreter._eventId
+          : 0;
+
+      $gameMessage._translateMessageOrigin = {
+        source: "event",
+        kind,
+        eventId,
+        at: Date.now(),
+      };
+    };
+
+    const clearCurrentMessageOrigin = () => {
+      if (!window.$gameMessage) {
+        return;
+      }
+
+      delete $gameMessage._translateMessageOrigin;
+    };
+
+    const isBattleSystemMessage = () => {
+      if (!window.$gameMessage) {
+        return false;
+      }
+
+      const inBattle = !!(
+        window.$gameParty &&
+        typeof $gameParty.inBattle === "function" &&
+        $gameParty.inBattle()
+      );
+
+      if (!inBattle) {
+        return false;
+      }
+
+      const origin = $gameMessage._translateMessageOrigin;
+      if (origin && origin.source === "event") {
+        return false;
+      }
+
+      const interpreter =
+        typeof self.findMessageInterpreter === "function"
+          ? self.findMessageInterpreter()
+          : null;
+      if (interpreter && interpreter._waitMode === "message") {
+        return false;
+      }
+
+      return true;
+    };
+
     const applyLifecycleTranslations = (trigger) => {
       if (!self.batchManager) {
         self.batchManager = createTranslationBatchManager(self);
@@ -18,6 +75,42 @@ export const translateOnTheFlyRuntimeMethods = {
       Window_Message.prototype._originalCanStart =
         Window_Message.prototype.canStart;
     }
+
+    if (!Game_Message.prototype._translateOriginalClear) {
+      Game_Message.prototype._translateOriginalClear =
+        Game_Message.prototype.clear;
+    }
+
+    Game_Message.prototype.clear = function () {
+      Game_Message.prototype._translateOriginalClear.call(this);
+      delete this._translateMessageOrigin;
+    };
+
+    if (!Game_Interpreter.prototype._translateOriginalCommand101) {
+      Game_Interpreter.prototype._translateOriginalCommand101 =
+        Game_Interpreter.prototype.command101;
+    }
+
+    Game_Interpreter.prototype.command101 = function () {
+      if (window.$gameMessage && !$gameMessage.isBusy()) {
+        markCurrentMessageAsEventOrigin("command101", this);
+      }
+
+      return Game_Interpreter.prototype._translateOriginalCommand101.call(this);
+    };
+
+    if (!Game_Interpreter.prototype._translateOriginalCommand102) {
+      Game_Interpreter.prototype._translateOriginalCommand102 =
+        Game_Interpreter.prototype.command102;
+    }
+
+    Game_Interpreter.prototype.command102 = function () {
+      if (window.$gameMessage && !$gameMessage.isBusy()) {
+        markCurrentMessageAsEventOrigin("command102", this);
+      }
+
+      return Game_Interpreter.prototype._translateOriginalCommand102.call(this);
+    };
 
     // Override canStart to block until translation is ready
     Window_Message.prototype.canStart = function () {
@@ -45,9 +138,14 @@ export const translateOnTheFlyRuntimeMethods = {
 
       if (
         !originalCanStart ||
-        (!translationEnabled && !useCacheOnly) ||
-        !!BattleManager._phase
+        (!translationEnabled && !useCacheOnly)
       ) {
+        return originalCanStart;
+      }
+
+      // Skip system-composed battle messages (already localized via SystemMessages strategy)
+      // so they are not re-translated, marked as seen, or cached as concrete variants.
+      if (isBattleSystemMessage()) {
         return originalCanStart;
       }
 
@@ -361,6 +459,7 @@ export const translateOnTheFlyRuntimeMethods = {
         delete $gameMessage._translateOriginalChoices;
         delete $gameMessage._translateOriginalText;
         delete $gameMessage._translateOriginalSpeaker;
+        clearCurrentMessageOrigin();
       }
       Window_Message.prototype._originalTerminateMessage.call(this);
     };
@@ -394,6 +493,10 @@ export const translateOnTheFlyRuntimeMethods = {
         (!translationEnabled && self.translateCacheWhenDisabled);
 
       if (!allowTranslation && !useCacheOnly) {
+        return;
+      }
+
+      if (isBattleSystemMessage()) {
         return;
       }
 
