@@ -1,6 +1,7 @@
 import { DTextPictureTranslator } from "./translators/DTextPictureTranslator.js";
 import { DestinationWindowTranslator } from "./translators/DestinationWindowTranslator.js";
 import { KmsMapActiveMessageTranslator } from "./translators/KmsMapActiveMessageTranslator.js";
+import { TorigoyaAchievement2Translator } from "./translators/TorigoyaAchievement2Translator.js";
 
 class PluginTranslatorRegistry {
   constructor() {
@@ -8,6 +9,7 @@ class PluginTranslatorRegistry {
       DTextPictureTranslator,
       DestinationWindowTranslator,
       KmsMapActiveMessageTranslator,
+      TorigoyaAchievement2Translator,
     ];
     this.translatorInstances = new Map();
     this.detectedPluginNames = new Set();
