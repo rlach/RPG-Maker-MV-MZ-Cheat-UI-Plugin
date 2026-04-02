@@ -1,0 +1,322 @@
+import { BasePluginTranslator } from "../BasePluginTranslator.js";
+
+// Replicated from KMS_MapActiveMessage.js plugin source
+const ACTIVE_MESSAGE_REGEX = /<(?:アクティブメッセージ|ActiveMessage)\s*[:\s]\s*([^>]+)>/i;
+const BEGIN_MESSAGE_REGEX = /<(?:アクティブメッセージ|ActiveMessage)\s*[:\s][^>]+$/i;
+const END_MESSAGE_REGEX = /([^>]*)>/;
+
+export class KmsMapActiveMessageTranslator extends BasePluginTranslator {
+  constructor() {
+    super();
+    this._scanPrepared = false;
+    this._scanEntries = [];
+    this._scanPromise = null;
+  }
+
+  getPluginName() {
+    return "KMS_MapActiveMessage";
+  }
+
+  getPluginLabel() {
+    return "KMS MapActiveMessage";
+  }
+
+  getCacheType() {
+    return "plugin_kms_map_active_message";
+  }
+
+  extractActiveMessageTextsFromList(list) {
+    const texts = [];
+
+    if (!Array.isArray(list)) {
+      return texts;
+    }
+
+    let inMessage = false;
+    let commentUnit = "";
+
+    for (const cmd of list) {
+      if (!cmd || (Number(cmd.code) !== 108 && Number(cmd.code) !== 408)) {
+        // Plugin only parses leading comment block; stop at first non-comment
+        break;
+      }
+
+      const commentText = String(
+        (cmd.parameters && cmd.parameters[0]) || "",
+      );
+
+      if (inMessage) {
+        commentUnit += "\n" + commentText;
+
+        if (END_MESSAGE_REGEX.test(commentText)) {
+          const match = ACTIVE_MESSAGE_REGEX.exec(commentUnit);
+          if (match && match[1] && match[1].trim()) {
+            texts.push(match[1]);
+          }
+          commentUnit = "";
+          inMessage = false;
+        }
+      } else {
+        if (BEGIN_MESSAGE_REGEX.test(commentText)) {
+          commentUnit = commentText;
+          inMessage = true;
+        } else {
+          const match = ACTIVE_MESSAGE_REGEX.exec(commentText);
+          if (match && match[1] && match[1].trim()) {
+            texts.push(match[1]);
+          }
+        }
+      }
+    }
+
+    // Handle unclosed multi-line message block
+    if (inMessage && commentUnit) {
+      const match = ACTIVE_MESSAGE_REGEX.exec(commentUnit);
+      if (match && match[1] && match[1].trim()) {
+        texts.push(match[1]);
+      }
+    }
+
+    return texts;
+  }
+
+  enablePluginTranslation() {
+    if (window.__CHEAT_KMS_MAP_ACTIVE_MESSAGE_TRANSLATOR_HOOKED__) {
+      return;
+    }
+
+    if (
+      !window.Game_Event ||
+      !Game_Event.prototype ||
+      typeof Game_Event.prototype.getMapActiveMessages !== "function"
+    ) {
+      return;
+    }
+
+    const original = Game_Event.prototype.getMapActiveMessages;
+    const translator = this;
+
+    Game_Event.prototype.getMapActiveMessages = function () {
+      const messages = original.call(this);
+
+      if (!Array.isArray(messages)) {
+        return messages;
+      }
+
+      try {
+        const runtime =
+          typeof window.__ensureTranslationRuntime === "function"
+            ? window.__ensureTranslationRuntime()
+            : window.__TranslationRuntime || null;
+
+        if (
+          !runtime ||
+          typeof runtime.getCacheKey !== "function" ||
+          typeof runtime.hasUsableCacheValue !== "function" ||
+          !(runtime.translationCache instanceof Map)
+        ) {
+          return messages;
+        }
+
+        return messages.map((msg) => {
+          if (!msg || typeof msg.text !== "string" || !msg.text.trim()) {
+            return msg;
+          }
+
+          const cacheKey = runtime.getCacheKey(
+            msg.text,
+            translator.getCacheType(),
+          );
+          if (!runtime.hasUsableCacheValue(cacheKey)) {
+            return msg;
+          }
+
+          const cached = runtime.translationCache.get(cacheKey);
+          if (typeof cached !== "string" || !cached.trim()) {
+            return msg;
+          }
+
+          return { ...msg, text: cached };
+        });
+      } catch (error) {
+        console.warn(
+          "[KmsMapActiveMessageTranslator] Failed to apply cached translation",
+          error,
+        );
+        return messages;
+      }
+    };
+
+    window.__CHEAT_KMS_MAP_ACTIVE_MESSAGE_TRANSLATOR_HOOKED__ = true;
+  }
+
+  async prepareTranslator() {
+    if (!this.ensureDetection()) {
+      return;
+    }
+
+    if (this._scanPrepared) {
+      return;
+    }
+
+    if (this._scanPromise) {
+      return this._scanPromise;
+    }
+
+    this._scanPromise = this.buildScanEntries()
+      .then((entries) => {
+        this._scanEntries = Array.isArray(entries) ? entries : [];
+        this._scanPrepared = true;
+      })
+      .catch((error) => {
+        console.warn("[KmsMapActiveMessageTranslator] Scan failed", error);
+      })
+      .finally(() => {
+        this._scanPromise = null;
+      });
+
+    return this._scanPromise;
+  }
+
+  async buildScanEntries() {
+    const entries = [];
+
+    const mapInfos = Array.isArray(window.$dataMapInfos)
+      ? window.$dataMapInfos
+      : [];
+
+    for (const mapInfo of mapInfos) {
+      const mapId = Number(mapInfo && mapInfo.id);
+      if (!mapId) {
+        continue;
+      }
+
+      try {
+        const mapData = await this.loadMapDataById(mapId);
+        if (!mapData || !Array.isArray(mapData.events)) {
+          continue;
+        }
+
+        for (let eventIdx = 0; eventIdx < mapData.events.length; eventIdx++) {
+          const event = mapData.events[eventIdx];
+          if (!event || !Array.isArray(event.pages)) {
+            continue;
+          }
+
+          for (let pageIdx = 0; pageIdx < event.pages.length; pageIdx++) {
+            const page = event.pages[pageIdx];
+            if (!page || !Array.isArray(page.list)) {
+              continue;
+            }
+
+            this.collectActiveMessageTextsFromList(
+              page.list,
+              { scope: "mapEvent", mapId, eventIdx, pageIdx },
+              entries,
+            );
+          }
+        }
+      } catch (error) {
+        console.warn(
+          `[KmsMapActiveMessageTranslator] Failed to scan map ${mapId}`,
+          error,
+        );
+      }
+    }
+
+    return entries;
+  }
+
+  collectActiveMessageTextsFromList(list, baseMeta, output) {
+    if (!Array.isArray(list) || !Array.isArray(output)) {
+      return;
+    }
+
+    const texts = this.extractActiveMessageTextsFromList(list);
+    for (let i = 0; i < texts.length; i++) {
+      output.push({
+        text: texts[i],
+        source: { ...baseMeta, textIdx: i },
+      });
+    }
+  }
+
+  loadMapDataById(mapId) {
+    return new Promise((resolve, reject) => {
+      const safeMapId = Number(mapId) || 0;
+      if (safeMapId <= 0) {
+        reject(new Error("Invalid map id"));
+        return;
+      }
+
+      const filename = `Map${String(safeMapId).padStart(3, "0")}.json`;
+      const xhr = new XMLHttpRequest();
+      xhr.open("GET", `data/${filename}`, true);
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch (error) {
+            reject(error);
+          }
+          return;
+        }
+
+        reject(new Error(`HTTP ${xhr.status}`));
+      };
+      xhr.onerror = () => reject(new Error("Network error"));
+      xhr.send();
+    });
+  }
+
+  buildUniquePendingItems(panel) {
+    const byCacheKey = new Map();
+
+    for (const entry of this._scanEntries) {
+      const text = typeof entry.text === "string" ? entry.text : "";
+      if (!text || !text.trim()) {
+        continue;
+      }
+
+      const cacheKey = panel.getCacheKey(text, this.getCacheType());
+      if (!byCacheKey.has(cacheKey)) {
+        byCacheKey.set(cacheKey, {
+          type: this.getCacheType(),
+          id: `plugin_kms_map_active_message_${byCacheKey.size}`,
+          value: text,
+          cacheKey,
+        });
+      }
+    }
+
+    return Array.from(byCacheKey.values());
+  }
+
+  collectUntranslated({ panel }) {
+    if (!panel || typeof panel.getCacheKey !== "function") {
+      return [];
+    }
+
+    const items = this.buildUniquePendingItems(panel);
+    return items.filter((item) => !panel.hasUsableCacheValue(item.cacheKey));
+  }
+
+  countPluginAmountSync({ panel }) {
+    if (!panel || typeof panel.getCacheKey !== "function") {
+      return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
+    }
+
+    const items = this.buildUniquePendingItems(panel);
+    const totalStrings = items.length;
+    const leftStrings = items.filter(
+      (item) => !panel.hasUsableCacheValue(item.cacheKey),
+    ).length;
+
+    return {
+      total: totalStrings,
+      left: leftStrings,
+      totalStrings,
+      leftStrings,
+    };
+  }
+}

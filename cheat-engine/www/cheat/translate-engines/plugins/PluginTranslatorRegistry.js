@@ -1,11 +1,13 @@
 import { DTextPictureTranslator } from "./translators/DTextPictureTranslator.js";
 import { DestinationWindowTranslator } from "./translators/DestinationWindowTranslator.js";
+import { KmsMapActiveMessageTranslator } from "./translators/KmsMapActiveMessageTranslator.js";
 
 class PluginTranslatorRegistry {
   constructor() {
     this.translatorClasses = [
       DTextPictureTranslator,
       DestinationWindowTranslator,
+      KmsMapActiveMessageTranslator,
     ];
     this.translatorInstances = new Map();
     this.detectedPluginNames = new Set();
