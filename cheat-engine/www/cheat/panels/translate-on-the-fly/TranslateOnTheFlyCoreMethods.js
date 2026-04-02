@@ -189,6 +189,90 @@ export const translateOnTheFlyCoreMethods = {
       this.saving = false
   },
 
+  findPropertyDescriptorInChain(target, field) {
+    let current = target;
+    while (current) {
+      const descriptor = Object.getOwnPropertyDescriptor(current, field);
+      if (descriptor) {
+        return descriptor;
+      }
+      current = Object.getPrototypeOf(current);
+    }
+
+    return null;
+  },
+
+  canAssignField(target, field) {
+    if (!target) {
+      return false;
+    }
+
+    const ownDescriptor = Object.getOwnPropertyDescriptor(target, field);
+    if (ownDescriptor) {
+      return !!ownDescriptor.writable || typeof ownDescriptor.set === "function";
+    }
+
+    const prototypeDescriptor = this.findPropertyDescriptorInChain(
+      Object.getPrototypeOf(target),
+      field,
+    );
+    if (!prototypeDescriptor) {
+      return true;
+    }
+
+    return (
+      !!prototypeDescriptor.writable ||
+      typeof prototypeDescriptor.set === "function"
+    );
+  },
+
+  tryAssignField(target, field, value) {
+    if (!this.canAssignField(target, field)) {
+      return false;
+    }
+
+    try {
+      target[field] = value;
+      return true;
+    } catch (error) {
+      return false;
+    }
+  },
+
+  applyTranslatedFieldValueSafely({
+    item,
+    itemInstance,
+    field,
+    translatedValue,
+    warningScope,
+  }) {
+    const warningSet =
+      this._readonlyApplyCacheWarningSet ||
+      (this._readonlyApplyCacheWarningSet = new Set());
+    const warningKey = `${warningScope}:${field}`;
+    const backingField = `_${field}`;
+
+    const assignedItem =
+      this.tryAssignField(item, field, translatedValue) ||
+      this.tryAssignField(item, backingField, translatedValue);
+
+    let assignedInstance = false;
+    if (itemInstance) {
+      assignedInstance =
+        this.tryAssignField(itemInstance, backingField, translatedValue) ||
+        this.tryAssignField(itemInstance, field, translatedValue);
+    }
+
+    if (!assignedItem && !assignedInstance && !warningSet.has(warningKey)) {
+      warningSet.add(warningKey);
+      console.warn(
+        `[TranslateOnTheFly] Skipped read-only field assignment for ${warningKey}`,
+      );
+    }
+
+    return assignedItem || assignedInstance;
+  },
+
   applyCachedTranslations(
     dataContainer,
     fields,
@@ -229,14 +313,16 @@ export const translateOnTheFlyCoreMethods = {
             `${cacheKeyPrefix}_${field}`,
           );
           if (this.hasUsableCacheValue(cacheKey)) {
-            try {
-              item[field] = this.translationCache.get(cacheKey);
-              if (itemInstance) {
-                itemInstance[`_${field}`] = item[field];
-              }
+            const translatedValue = this.translationCache.get(cacheKey);
+            const assigned = this.applyTranslatedFieldValueSafely({
+              item,
+              itemInstance,
+              field,
+              translatedValue,
+              warningScope: cacheKeyPrefix,
+            });
+            if (assigned) {
               appliedCount++;
-            } catch (error) {
-              console.log(error);
             }
           }
         }

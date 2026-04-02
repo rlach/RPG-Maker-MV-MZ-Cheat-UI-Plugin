@@ -175,6 +175,74 @@ export class DataObjects extends BasePhase {
     return pendingItems;
   }
 
+  findPropertyDescriptorInChain(target, field) {
+    let current = target;
+    while (current) {
+      const descriptor = Object.getOwnPropertyDescriptor(current, field);
+      if (descriptor) {
+        return descriptor;
+      }
+      current = Object.getPrototypeOf(current);
+    }
+
+    return null;
+  }
+
+  canAssignField(target, field) {
+    const ownDescriptor = Object.getOwnPropertyDescriptor(target, field);
+    if (ownDescriptor) {
+      return !!ownDescriptor.writable || typeof ownDescriptor.set === "function";
+    }
+
+    const prototypeDescriptor = this.findPropertyDescriptorInChain(
+      Object.getPrototypeOf(target),
+      field,
+    );
+
+    if (!prototypeDescriptor) {
+      return true;
+    }
+
+    return (
+      !!prototypeDescriptor.writable ||
+      typeof prototypeDescriptor.set === "function"
+    );
+  }
+
+  applyTranslatedFieldValue(dataObject, field, translatedValue) {
+    const warningSet =
+      this._readonlyFieldWarningSet || (this._readonlyFieldWarningSet = new Set());
+    const warningKey = `${this.type}:${field}`;
+
+    if (this.canAssignField(dataObject, field)) {
+      try {
+        dataObject[field] = translatedValue;
+        return true;
+      } catch (error) {
+        // Fall back to backing field handling below.
+      }
+    }
+
+    const backingField = `_${field}`;
+    if (this.canAssignField(dataObject, backingField)) {
+      try {
+        dataObject[backingField] = translatedValue;
+        return true;
+      } catch (error) {
+        // Fall through to warning.
+      }
+    }
+
+    if (!warningSet.has(warningKey)) {
+      warningSet.add(warningKey);
+      console.warn(
+        `[DataObjects] Skipped read-only field assignment for ${warningKey}`,
+      );
+    }
+
+    return false;
+  }
+
   finalizePhase({ panel }) {
     for (const dataObject of this.dataObjects) {
       if (!dataObject || !dataObject._translateOriginal) {
@@ -192,7 +260,11 @@ export class DataObjects extends BasePhase {
           `${this.type}_${field}`,
         );
         if (panel.hasUsableCacheValue(cacheKey)) {
-          dataObject[field] = panel.translationCache.get(cacheKey);
+          this.applyTranslatedFieldValue(
+            dataObject,
+            field,
+            panel.translationCache.get(cacheKey),
+          );
         }
       }
     }
