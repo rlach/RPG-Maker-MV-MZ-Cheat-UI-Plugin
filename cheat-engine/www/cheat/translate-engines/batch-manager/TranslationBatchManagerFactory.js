@@ -13,6 +13,7 @@ import { OtherStrings } from "../translation-phases/OtherStrings.js";
 import { Plugins } from "../translation-phases/Plugins.js";
 import { SystemCommands } from "../translation-phases/SystemCommands.js";
 import { SystemMessages } from "../translation-phases/SystemMessages.js";
+import { Troops } from "../translation-phases/Troops.js";
 
 function registerDefaultStrategies(manager) {
   for (const definition of DATA_CONTAINER_TRANSLATION_DEFINITIONS) {
@@ -38,6 +39,7 @@ function registerDefaultStrategies(manager) {
   manager.register(new CommonEvents());
   manager.register(MapEvents.getInstance());
   manager.register(new GameArrays());
+  manager.register(Troops.getInstance());
   manager.register(new Plugins());
   manager.register(CurrentEvent.getInstance());
 }
