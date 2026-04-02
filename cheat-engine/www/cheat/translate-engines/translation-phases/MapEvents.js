@@ -1,4 +1,8 @@
 import { BasePhase } from "./BasePhase.js";
+import {
+  collectEventCommandEntries,
+  countEventCommandEntries,
+} from "../../js/EventCommandTraversal.js";
 
 export class MapEvents extends BasePhase {
   static getInstance() {
@@ -32,69 +36,13 @@ export class MapEvents extends BasePhase {
   }
 
   static countEventCommandListStats(panel, list = []) {
-    if (!Array.isArray(list)) {
-      return { totalStrings: 0, leftStrings: 0 };
-    }
-
-    let totalStrings = 0;
-    let leftStrings = 0;
-
-    for (let i = 0; i < list.length; i++) {
-      const cmd = list[i];
-      if (!cmd || typeof cmd.code !== "number") {
-        continue;
-      }
-
-      if (cmd.code === 101) {
-        const speaker = (cmd.parameters && cmd.parameters[4]) || "";
-        if (speaker && speaker.trim()) {
-          totalStrings += 1;
-          if (
-            !panel.hasUsableCacheValue(panel.getCacheKey(speaker, "speaker"))
-          ) {
-            leftStrings += 1;
-          }
-        }
-
-        let j = i + 1;
-        const lines = [];
-        while (j < list.length && list[j] && list[j].code === 401) {
-          lines.push(list[j].parameters && list[j].parameters[0]);
-          j += 1;
-        }
-
-        const text = lines.join("\n");
-        if (text && text.trim()) {
-          totalStrings += 1;
-          if (!panel.hasUsableCacheValue(panel.getCacheKey(text, "text"))) {
-            leftStrings += 1;
-          }
-        }
-
-        i = j - 1;
-        continue;
-      }
-
-      if (cmd.code === 102) {
-        const choices = cmd.parameters && cmd.parameters[0];
-        if (!Array.isArray(choices)) {
-          continue;
-        }
-
-        for (const choice of choices) {
-          if (!choice || typeof choice !== "string" || choice.trim() === "") {
-            continue;
-          }
-
-          totalStrings += 1;
-          if (!panel.hasUsableCacheValue(panel.getCacheKey(choice, "choice"))) {
-            leftStrings += 1;
-          }
-        }
-      }
-    }
-
-    return { totalStrings, leftStrings };
+    return countEventCommandEntries(list, {
+      isUntranslated(entry) {
+        return !panel.hasUsableCacheValue(
+          panel.getCacheKey(entry.value, entry.type),
+        );
+      },
+    });
   }
 
   static countMapEventStatsForData(panel, mapData) {
@@ -235,66 +183,27 @@ export class MapEvents extends BasePhase {
           continue;
         }
 
-        const list = page.list;
-        let i = 0;
-        while (i < list.length) {
-          const cmd = list[i];
-          if (!cmd || typeof cmd.code !== "number") {
-            i += 1;
+        const entries = collectEventCommandEntries(page.list);
+        for (const entry of entries) {
+          if (entry.type === "text") {
+            pushMapTextItem(entry.value, eventIdx, pageIdx, entry.cmdIndex);
             continue;
           }
 
-          if (cmd.code === 101) {
-            const speaker = (cmd.parameters && cmd.parameters[4]) || "";
-            const lines = [];
-            let j = i + 1;
-            while (j < list.length && list[j] && list[j].code === 401) {
-              lines.push(list[j].parameters && list[j].parameters[0]);
-              j += 1;
-            }
-
-            pushMapTextItem(lines.join("\n"), eventIdx, pageIdx, i);
-
-            if (speaker) {
-              const speakerKey = panel.getCacheKey(speaker, "speaker");
-              if (!panel.hasUsableCacheValue(speakerKey)) {
-                itemsToTranslate.push({
-                  type: "speaker",
-                  id: `map_${eventIdx}_${pageIdx}_speaker_${runningCounter++}`,
-                  value: speaker,
-                  cacheKey: speakerKey,
-                  eventIdx,
-                  pageIdx,
-                  cmdIdx: i,
-                });
-              }
-            }
-
-            i = j;
+          const cacheKey = panel.getCacheKey(entry.value, entry.type);
+          if (panel.hasUsableCacheValue(cacheKey)) {
             continue;
           }
 
-          if (cmd.code === 102) {
-            const choices = cmd.parameters && cmd.parameters[0];
-            if (Array.isArray(choices)) {
-              for (const choice of choices) {
-                const choiceKey = panel.getCacheKey(choice, "choice");
-                if (!panel.hasUsableCacheValue(choiceKey)) {
-                  itemsToTranslate.push({
-                    type: "choice",
-                    id: `map_${eventIdx}_${pageIdx}_choice_${runningCounter++}`,
-                    value: choice,
-                    cacheKey: choiceKey,
-                    eventIdx,
-                    pageIdx,
-                    cmdIdx: i,
-                  });
-                }
-              }
-            }
-          }
-
-          i += 1;
+          itemsToTranslate.push({
+            type: entry.type,
+            id: `map_${eventIdx}_${pageIdx}_${entry.type}_${runningCounter++}`,
+            value: entry.value,
+            cacheKey,
+            eventIdx,
+            pageIdx,
+            cmdIdx: entry.cmdIndex,
+          });
         }
       }
     }

@@ -1,4 +1,8 @@
 import { BasePhase } from "./BasePhase.js";
+import {
+  collectEventCommandEntries,
+  countEventCommandEntries,
+} from "../../js/EventCommandTraversal.js";
 
 export class Troops extends BasePhase {
   static getInstance() {
@@ -43,61 +47,15 @@ export class Troops extends BasePhase {
           continue;
         }
 
-        const list = page.list;
-        let i = 0;
-        while (i < list.length) {
-          const cmd = list[i];
-          if (!cmd || typeof cmd.code !== "number") {
-            i += 1;
-            continue;
-          }
-
-          if (cmd.code === 101) {
-            const speaker = (cmd.parameters && cmd.parameters[4]) || "";
-            if (speaker && speaker.trim()) {
-              totalStrings += 1;
-              if (!panel.hasUsableCacheValue(panel.getCacheKey(speaker, "troop"))) {
-                leftStrings += 1;
-              }
-            }
-
-            const lines = [];
-            let j = i + 1;
-            while (j < list.length && list[j] && list[j].code === 401) {
-              lines.push(list[j].parameters && list[j].parameters[0]);
-              j += 1;
-            }
-
-            const text = lines.join("\n");
-            if (text && text.trim()) {
-              totalStrings += 1;
-              if (!panel.hasUsableCacheValue(panel.getCacheKey(text, "troop"))) {
-                leftStrings += 1;
-              }
-            }
-
-            i = j;
-            continue;
-          }
-
-          if (cmd.code === 102) {
-            const choices = cmd.parameters && cmd.parameters[0];
-            if (Array.isArray(choices)) {
-              for (const choice of choices) {
-                if (!choice || typeof choice !== "string" || choice.trim() === "") {
-                  continue;
-                }
-
-                totalStrings += 1;
-                if (!panel.hasUsableCacheValue(panel.getCacheKey(choice, "troop"))) {
-                  leftStrings += 1;
-                }
-              }
-            }
-          }
-
-          i += 1;
-        }
+        const stats = countEventCommandEntries(page.list, {
+          isUntranslated(entry) {
+            return !panel.hasUsableCacheValue(
+              panel.getCacheKey(entry.value, "troop"),
+            );
+          },
+        });
+        totalStrings += stats.totalStrings;
+        leftStrings += stats.leftStrings;
       }
     }
 
@@ -165,43 +123,15 @@ export class Troops extends BasePhase {
           continue;
         }
 
-        const list = page.list;
-        let i = 0;
-        while (i < list.length) {
-          const cmd = list[i];
-          if (!cmd || typeof cmd.code !== "number") {
-            i += 1;
-            continue;
-          }
-
-          if (cmd.code === 101) {
-            const speaker = (cmd.parameters && cmd.parameters[4]) || "";
-            if (speaker && speaker.trim()) {
-              pushTroopItem(speaker, "speaker", troopIdx, pageIdx, i);
-            }
-
-            const lines = [];
-            let j = i + 1;
-            while (j < list.length && list[j] && list[j].code === 401) {
-              lines.push(list[j].parameters && list[j].parameters[0]);
-              j += 1;
-            }
-
-            pushTroopItem(lines.join("\n"), "text", troopIdx, pageIdx, i);
-            i = j;
-            continue;
-          }
-
-          if (cmd.code === 102) {
-            const choices = cmd.parameters && cmd.parameters[0];
-            if (Array.isArray(choices)) {
-              for (const choice of choices) {
-                pushTroopItem(choice, "choice", troopIdx, pageIdx, i);
-              }
-            }
-          }
-
-          i += 1;
+        const entries = collectEventCommandEntries(page.list);
+        for (const entry of entries) {
+          pushTroopItem(
+            entry.value,
+            entry.type,
+            troopIdx,
+            pageIdx,
+            entry.cmdIndex,
+          );
         }
       }
     }

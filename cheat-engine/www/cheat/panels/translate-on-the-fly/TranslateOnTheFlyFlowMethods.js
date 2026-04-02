@@ -1,4 +1,5 @@
 import { Alert } from "../../js/AlertHelper.js";
+import { findNearestMessageEntry } from "../../js/EventCommandTraversal.js";
 import { BatchSummaryReporter } from "../../translate-engines/batch-manager/BatchSummaryReporter.js";
 import { createTranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManagerFactory.js";
 import { CurrentEvent } from "../../translate-engines/translation-phases/CurrentEvent.js";
@@ -459,54 +460,18 @@ export const translateOnTheFlyFlowMethods = {
       return null;
     }
 
-    const list = interpreter._list;
-    const start = Math.max(
-      0,
-      Math.min(list.length - 1, Number(interpreter._index) || 0),
+    const found = findNearestMessageEntry(
+      interpreter._list,
+      Number(interpreter._index) || 0,
     );
+    if (!found) {
+      return null;
+    }
 
-    const extractAt = (messageCmdIndex) => {
-      if (messageCmdIndex < 0 || messageCmdIndex >= list.length) {
-        return null;
-      }
-      const cmd = list[messageCmdIndex];
-      if (!cmd || cmd.code !== 101) {
-        return null;
-      }
-
-      const speaker = (cmd.parameters && cmd.parameters[4]) || "";
-      const lines = [];
-      let j = messageCmdIndex + 1;
-      while (j < list.length && list[j] && list[j].code === 401) {
-        lines.push(list[j].parameters && list[j].parameters[0]);
-        j++;
-      }
-
-      if (lines.length === 0) {
-        return null;
-      }
-
-      return {
-        text: lines.join("\n"),
-        speaker,
-      };
+    return {
+      text: found.text,
+      speaker: found.speaker,
     };
-
-    for (let i = start; i >= 0; i--) {
-      const found = extractAt(i);
-      if (found) {
-        return found;
-      }
-    }
-
-    for (let i = start + 1; i < list.length; i++) {
-      const found = extractAt(i);
-      if (found) {
-        return found;
-      }
-    }
-
-    return null;
   },
 
   resolveOriginalMessageContext(currentText, currentSpeaker, interpreter) {

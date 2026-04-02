@@ -1,4 +1,5 @@
 import { BasePhase } from "./BasePhase.js";
+import { collectEventCommandEntries } from "../../js/EventCommandTraversal.js";
 
 export class CurrentEvent extends BasePhase {
   static getInstance() {
@@ -119,7 +120,6 @@ export class CurrentEvent extends BasePhase {
       currentSpeaker,
     });
 
-    const NL = "\n";
     const items = [];
     let totalChars = 0;
     let itemIdCounter = 0;
@@ -178,40 +178,7 @@ export class CurrentEvent extends BasePhase {
     }
 
     const list = interpreter._list;
-    const entries = [];
-    for (let i = 0; i < list.length; i++) {
-      const cmd = list[i];
-      if (!cmd || typeof cmd.code !== "number") {
-        continue;
-      }
-
-      if (cmd.code === 101) {
-        const speaker = (cmd.parameters && cmd.parameters[4]) || "";
-        const lines = [];
-        let j = i + 1;
-        while (j < list.length && list[j] && list[j].code === 401) {
-          lines.push(list[j].parameters && list[j].parameters[0]);
-          j++;
-        }
-
-        const joined = lines.join(NL);
-        entries.push({ cmdIndex: i, type: "text", value: joined });
-        if (speaker) {
-          entries.push({ cmdIndex: i, type: "speaker", value: speaker });
-        }
-        i = j - 1;
-        continue;
-      }
-
-      if (cmd.code === 102) {
-        const choices = cmd.parameters && cmd.parameters[0];
-        if (Array.isArray(choices)) {
-          for (const choice of choices) {
-            entries.push({ cmdIndex: i, type: "choice", value: choice });
-          }
-        }
-      }
-    }
+    const entries = collectEventCommandEntries(list);
 
     if (!entries.length) {
       return items;

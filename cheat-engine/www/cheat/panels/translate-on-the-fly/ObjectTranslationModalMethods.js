@@ -1,4 +1,5 @@
 import { TRANSLATE_SETTINGS, TRANSLATOR } from "../../js/TranslateHelper.js";
+import { countEventCommandEntries } from "../../js/EventCommandTraversal.js";
 import { createTranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManagerFactory.js";
 import { PLUGIN_TRANSLATOR_REGISTRY } from "../../translate-engines/plugins/PluginTranslatorRegistry.js";
 
@@ -132,68 +133,12 @@ export const objectTranslationRuntimeMethods = {
         continue;
       }
 
-      for (let i = 0; i < entry.list.length; i++) {
-        const cmd = entry.list[i];
-        if (!cmd || typeof cmd.code !== "number") {
-          continue;
-        }
-
-        if (cmd.code === 101) {
-          const speaker = (cmd.parameters && cmd.parameters[4]) || "";
-          const speakerKey = speaker
-            ? this.getCacheKey(speaker, "speaker")
-            : null;
-          if (speakerKey) {
-            total++;
-            if (!this.hasUsableCacheValue(speakerKey)) {
-              left++;
-            }
-          }
-
-          let j = i + 1;
-          const lines = [];
-          while (
-            j < entry.list.length &&
-            entry.list[j] &&
-            entry.list[j].code === 401
-          ) {
-            lines.push(entry.list[j].parameters && entry.list[j].parameters[0]);
-            j += 1;
-          }
-
-          const joined = lines.join("\n");
-          if (joined && joined.trim()) {
-            total++;
-            if (!this.hasUsableCacheValue(this.getCacheKey(joined, "text"))) {
-              left++;
-            }
-          }
-
-          i = j - 1;
-          continue;
-        }
-
-        if (cmd.code === 102) {
-          const choices = cmd.parameters && cmd.parameters[0];
-          if (Array.isArray(choices)) {
-            for (const choice of choices) {
-              if (
-                !choice ||
-                typeof choice !== "string" ||
-                choice.trim() === ""
-              ) {
-                continue;
-              }
-              total++;
-              if (
-                !this.hasUsableCacheValue(this.getCacheKey(choice, "choice"))
-              ) {
-                left++;
-              }
-            }
-          }
-        }
-      }
+      const stats = countEventCommandEntries(entry.list, {
+        isUntranslated: (item) =>
+          !this.hasUsableCacheValue(this.getCacheKey(item.value, item.type)),
+      });
+      total += stats.totalStrings;
+      left += stats.leftStrings;
     }
 
     return { total, left, totalStrings: total, leftStrings: left };
@@ -211,67 +156,10 @@ export const objectTranslationRuntimeMethods = {
   },
 
   countEventCommandListStats(list = []) {
-    if (!Array.isArray(list)) {
-      return { totalStrings: 0, leftStrings: 0 };
-    }
-
-    let totalStrings = 0;
-    let leftStrings = 0;
-
-    for (let i = 0; i < list.length; i++) {
-      const cmd = list[i];
-      if (!cmd || typeof cmd.code !== "number") {
-        continue;
-      }
-
-      if (cmd.code === 101) {
-        const speaker = (cmd.parameters && cmd.parameters[4]) || "";
-        if (speaker && speaker.trim()) {
-          totalStrings += 1;
-          if (!this.hasUsableCacheValue(this.getCacheKey(speaker, "speaker"))) {
-            leftStrings += 1;
-          }
-        }
-
-        let j = i + 1;
-        const lines = [];
-        while (j < list.length && list[j] && list[j].code === 401) {
-          lines.push(list[j].parameters && list[j].parameters[0]);
-          j += 1;
-        }
-
-        const text = lines.join("\n");
-        if (text && text.trim()) {
-          totalStrings += 1;
-          if (!this.hasUsableCacheValue(this.getCacheKey(text, "text"))) {
-            leftStrings += 1;
-          }
-        }
-
-        i = j - 1;
-        continue;
-      }
-
-      if (cmd.code === 102) {
-        const choices = cmd.parameters && cmd.parameters[0];
-        if (!Array.isArray(choices)) {
-          continue;
-        }
-
-        for (const choice of choices) {
-          if (!choice || typeof choice !== "string" || choice.trim() === "") {
-            continue;
-          }
-
-          totalStrings += 1;
-          if (!this.hasUsableCacheValue(this.getCacheKey(choice, "choice"))) {
-            leftStrings += 1;
-          }
-        }
-      }
-    }
-
-    return { totalStrings, leftStrings };
+    return countEventCommandEntries(list, {
+      isUntranslated: (item) =>
+        !this.hasUsableCacheValue(this.getCacheKey(item.value, item.type)),
+    });
   },
 
   countMapEventStatsForData(mapData) {
