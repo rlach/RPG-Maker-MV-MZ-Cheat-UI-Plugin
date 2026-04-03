@@ -217,6 +217,7 @@ export class ConfigManager {
       aiCustomTags: this.aiEngine.customTags,
       aiCustomTagTypeOptions: this.aiEngine.customTagTypeOptions,
       aiCustomTagBracketOptions: this.aiEngine.customTagBracketOptions,
+      aiCustomTagStyleOptions: this.aiEngine.customTagStyleOptions,
     };
   }
 

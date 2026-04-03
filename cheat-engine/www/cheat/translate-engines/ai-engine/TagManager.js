@@ -4,7 +4,7 @@
  * Handles preprocessing \V[5] -> [b=xy5] and postprocessing [b=xy5] -> \V[5]
  */
 
-import { TAG_BRACKET, TAG_CONFIGS, TAG_TYPE } from "./constants.js";
+import { TAG_BRACKET, TAG_CONFIGS, TAG_STYLE, TAG_TYPE } from "./constants.js";
 
 const BRACKET_CLOSE_BY_OPEN = Object.freeze({
   [TAG_BRACKET.ANGLE]: ">",
@@ -14,6 +14,7 @@ const BRACKET_CLOSE_BY_OPEN = Object.freeze({
 });
 
 const ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
+const ESCAPE_PREFIX_PATTERN = "(?:\\\\|\\u001b)";
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -95,16 +96,36 @@ export class TagManager {
     if (!Object.values(TAG_TYPE).includes(normalized.type)) {
       throw new Error(`Tag config has invalid type: ${normalized.description}`);
     }
+
+    // Normalize style — default to ESCAPE for backward compatibility
+    normalized.style = Object.values(TAG_STYLE).includes(normalized.style)
+      ? normalized.style
+      : TAG_STYLE.ESCAPE;
+
     if (normalized.type === TAG_TYPE.WITH_CUSTOM_PARAMETER) {
-      if (!Object.values(TAG_BRACKET).includes(normalized.bracket)) {
-        throw new Error(
-          `Custom-parameter tag missing valid bracket: ${normalized.description}`,
-        );
-      }
-      if (typeof normalized.maskValue !== "boolean") {
-        throw new Error(
-          `Custom-parameter tag missing maskValue: ${normalized.description}`,
-        );
+      if (normalized.style === TAG_STYLE.XML) {
+        // XML custom-parameter tags use colon as separator; bracket defaults to NONE
+        normalized.bracket = Object.values(TAG_BRACKET).includes(normalized.bracket)
+          ? normalized.bracket
+          : TAG_BRACKET.NONE;
+        if (typeof normalized.maskValue !== "boolean") {
+          normalized.maskValue = false;
+        }
+      } else {
+        // Escape-style: bracket must be a real bracket (not NONE)
+        if (
+          !Object.values(TAG_BRACKET).includes(normalized.bracket) ||
+          normalized.bracket === TAG_BRACKET.NONE
+        ) {
+          throw new Error(
+            `Custom-parameter tag missing valid bracket: ${normalized.description}`,
+          );
+        }
+        if (typeof normalized.maskValue !== "boolean") {
+          throw new Error(
+            `Custom-parameter tag missing maskValue: ${normalized.description}`,
+          );
+        }
       }
     }
 
@@ -145,13 +166,56 @@ export class TagManager {
     const key = `${config.description}#${index}`;
     const symbol = config.tagSymbol;
     const escapedSymbol = escapeRegExp(symbol);
+    const isXml = config.style === TAG_STYLE.XML;
+
+    // ---- XML-style tags: <Symbol>, <Symbol:N>, <Symbol:value> ----
+
+    if (isXml && config.type === TAG_TYPE.WITH_NUMERIC_PARAMETER) {
+      return {
+        ...config,
+        key,
+        tagId,
+        // Matches <Symbol:123>
+        prePattern: new RegExp(`<${escapedSymbol}:(\\d+)>`, "gi"),
+        // Same encoded form as escape-style numeric: [b=idN]
+        postPattern: new RegExp(`\\[b=${tagId}(\\d+)\\]`, "gi"),
+      };
+    }
+
+    if (isXml && config.type === TAG_TYPE.WITHOUT_PARAMETER) {
+      return {
+        ...config,
+        key,
+        tagId,
+        // Matches <Symbol>
+        prePattern: new RegExp(`<${escapedSymbol}>`, "gi"),
+        // Same encoded form as escape-style no-param: [b=id]
+        postPattern: new RegExp(`\\[b=${tagId}\\]`, "gi"),
+      };
+    }
+
+    if (isXml && config.type === TAG_TYPE.WITH_CUSTOM_PARAMETER) {
+      // Original: <Symbol:value>  Encoded: [b=id<value>] (angle brackets for encoding)
+      return {
+        ...config,
+        key,
+        tagId,
+        bracket: "<",      // encoding bracket (for customParameterEntries / normalizeTagIdentity)
+        bracketClose: ">", // encoding bracket close
+        // Matches <Symbol:anything-except-> >
+        prePattern: new RegExp(`<${escapedSymbol}:([^>]*)>`, "gi"),
+        postPattern: new RegExp(`\\[b=${tagId}<([^>]*)>\\]`, "gi"),
+      };
+    }
+
+    // ---- Escape-style tags (default / legacy): \Symbol, \Symbol[N], \Symbol<v> ----
 
     if (config.type === TAG_TYPE.WITH_NUMERIC_PARAMETER) {
       return {
         ...config,
         key,
         tagId,
-        prePattern: new RegExp(`\\\\${escapedSymbol}\\[(\\d+)\\]`, "gi"),
+        prePattern: new RegExp(`${ESCAPE_PREFIX_PATTERN}${escapedSymbol}\\[(\\d+)\\]`, "gi"),
         postPattern: new RegExp(`\\[b=${tagId}(\\d+)\\]`, "gi"),
       };
     }
@@ -161,7 +225,7 @@ export class TagManager {
         ...config,
         key,
         tagId,
-        prePattern: new RegExp(`\\\\${escapedSymbol}`, "gi"),
+        prePattern: new RegExp(`${ESCAPE_PREFIX_PATTERN}${escapedSymbol}`, "gi"),
         postPattern: new RegExp(`\\[b=${tagId}\\]`, "gi"),
       };
     }
@@ -178,7 +242,7 @@ export class TagManager {
         tagId,
         bracketClose: close,
         prePattern: new RegExp(
-          `\\\\${escapedSymbol}${escapedOpen}${valueCapture}${escapedClose}`,
+          `${ESCAPE_PREFIX_PATTERN}${escapedSymbol}${escapedOpen}${valueCapture}${escapedClose}`,
           "gi",
         ),
         postPattern: new RegExp(
@@ -188,6 +252,7 @@ export class TagManager {
       };
     }
 
+    // Legacy TAG_TYPE.XML — kept for backward compatibility; use style: TAG_STYLE.XML instead
     if (config.type === TAG_TYPE.XML) {
       return {
         ...config,
@@ -290,6 +355,9 @@ export class TagManager {
 
       if (entry.type === TAG_TYPE.WITH_NUMERIC_PARAMETER) {
         result = result.replace(entry.postPattern, (_, param) => {
+          if (entry.style === TAG_STYLE.XML) {
+            return `<${entry.tagSymbol}:${param}>`;
+          }
           return `\\${entry.tagSymbol}[${param}]`;
         });
         continue;
@@ -297,6 +365,9 @@ export class TagManager {
 
       if (entry.type === TAG_TYPE.WITHOUT_PARAMETER) {
         result = result.replace(entry.postPattern, () => {
+          if (entry.style === TAG_STYLE.XML) {
+            return `<${entry.tagSymbol}>`;
+          }
           const replacement = `\\${entry.tagSymbol}`;
           return entry.addSpace ? `${replacement} ` : replacement;
         });
@@ -305,27 +376,32 @@ export class TagManager {
 
       if (entry.type === TAG_TYPE.WITH_CUSTOM_PARAMETER) {
         result = result.replace(entry.postPattern, (_, paramValue) => {
-          if (!entry.maskValue) {
-            return `\\${entry.tagSymbol}${entry.bracket}${paramValue}${entry.bracketClose}`;
+          let resolvedValue = paramValue;
+
+          if (entry.maskValue) {
+            const maskedValues = maskedByTagKey[entry.key] || [];
+            const maskId = Number(paramValue);
+            if (!usedMaskedIdsByTagKey[entry.key]) {
+              usedMaskedIdsByTagKey[entry.key] = new Set();
+            }
+            if (Number.isFinite(maskId)) {
+              usedMaskedIdsByTagKey[entry.key].add(maskId);
+            }
+            resolvedValue =
+              Number.isFinite(maskId) && maskedValues[maskId] !== undefined
+                ? maskedValues[maskId]
+                : paramValue;
           }
 
-          const maskedValues = maskedByTagKey[entry.key] || [];
-          const maskId = Number(paramValue);
-          if (!usedMaskedIdsByTagKey[entry.key]) {
-            usedMaskedIdsByTagKey[entry.key] = new Set();
+          if (entry.style === TAG_STYLE.XML) {
+            return `<${entry.tagSymbol}:${resolvedValue}>`;
           }
-          if (Number.isFinite(maskId)) {
-            usedMaskedIdsByTagKey[entry.key].add(maskId);
-          }
-          const restoredValue =
-            Number.isFinite(maskId) && maskedValues[maskId] !== undefined
-              ? maskedValues[maskId]
-              : paramValue;
-          return `\\${entry.tagSymbol}${entry.bracket}${restoredValue}${entry.bracketClose}`;
+          return `\\${entry.tagSymbol}${entry.bracket}${resolvedValue}${entry.bracketClose}`;
         });
         continue;
       }
 
+      // Legacy TAG_TYPE.XML — always restores as <symbol>
       if (entry.type === TAG_TYPE.XML) {
         result = result.replace(entry.postPattern, () => `<${entry.tagSymbol}>`);
       }

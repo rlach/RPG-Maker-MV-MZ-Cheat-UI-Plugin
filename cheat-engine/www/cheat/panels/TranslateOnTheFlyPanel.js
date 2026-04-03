@@ -172,7 +172,7 @@ export default {
             v-for="(tag, idx) in aiCustomTags"
             :key="'custom-tag-' + idx"
             class="d-flex align-center mb-1">
-            <span class="caption font-weight-bold mr-2">[{{tag.tagSymbol}}]</span>
+            <span class="caption font-weight-bold mr-2">{{formatCustomTagDisplay(tag)}}</span>
             <span class="caption mr-2">{{tag.description}}</span>
             <v-spacer></v-spacer>
             <v-btn icon x-small color="primary" @click="openEditCustomTagDialog(tag, idx)">
@@ -211,6 +211,17 @@ export default {
             ></v-text-field>
 
             <v-select
+              v-model="customTagForm.style"
+              :items="aiCustomTagStyleOptions"
+              label="Style"
+              outlined
+              dense
+              hide-details
+              @keydown.stop
+              class="mb-2"
+            ></v-select>
+
+            <v-select
               v-model="customTagForm.type"
               :items="aiCustomTagTypeOptions"
               label="Type"
@@ -231,7 +242,7 @@ export default {
             <template v-if="customTagForm.type === 'withCustomParameter'">
               <v-select
                 v-model="customTagForm.bracket"
-                :items="aiCustomTagBracketOptions"
+                :items="customTagBracketOptionsForStyle"
                 label="Bracket"
                 outlined
                 dense
@@ -242,7 +253,7 @@ export default {
 
               <v-checkbox
                 v-model="customTagForm.maskValue"
-                label="Mask value"
+                label="Mask value (preserve exact value, LLM cannot change it)"
                 hide-details
                 class="mt-0"
               ></v-checkbox>
@@ -378,6 +389,7 @@ export default {
         tagSymbol: "",
         type: "withNumericParameter",
         requiredConsistency: false,
+        style: "escape",
         bracket: "<",
         maskValue: false,
       },
@@ -418,6 +430,15 @@ export default {
 
     cachedCount() {
       return this.translationCache ? this.translationCache.size : 0;
+    },
+
+    customTagBracketOptionsForStyle() {
+      const all = this.aiCustomTagBracketOptions || [];
+      // NONE bracket is only valid for xml-style tags
+      if (this.customTagForm.style === "xml") {
+        return all;
+      }
+      return all.filter((o) => o.value !== "none");
     },
   },
 
@@ -566,6 +587,7 @@ export default {
         tagSymbol: "",
         type: "withNumericParameter",
         requiredConsistency: false,
+        style: "escape",
         bracket: "<",
         maskValue: false,
       };
@@ -579,6 +601,7 @@ export default {
         tagSymbol: String(tag.tagSymbol || ""),
         type: String(tag.type || "withNumericParameter"),
         requiredConsistency: !!tag.requiredConsistency,
+        style: String(tag.style || "escape"),
         bracket: String(tag.bracket || "<"),
         maskValue: !!tag.maskValue,
       };
@@ -595,10 +618,11 @@ export default {
         tagSymbol: String(this.customTagForm.tagSymbol || "").trim(),
         type: String(this.customTagForm.type || "withNumericParameter"),
         requiredConsistency: !!this.customTagForm.requiredConsistency,
+        style: String(this.customTagForm.style || "escape"),
       };
 
       if (payload.type === "withCustomParameter") {
-        payload.bracket = String(this.customTagForm.bracket || "<");
+        payload.bracket = String(this.customTagForm.bracket || (payload.style === "xml" ? "none" : "<"));
         payload.maskValue = !!this.customTagForm.maskValue;
       }
 
@@ -616,6 +640,23 @@ export default {
     removeCustomTag(index) {
       this.callRuntime("removeAiCustomTag", index);
       this.callRuntime("bindEngineConfigTo", this.runtime);
+    },
+
+    formatCustomTagDisplay(tag) {
+      const sym = tag.tagSymbol || "?";
+      if (tag.style === "xml") {
+        if (tag.type === "withNumericParameter") return `<${sym}:N>`;
+        if (tag.type === "withCustomParameter") return `<${sym}:…>`;
+        return `<${sym}>`;
+      }
+      // escape style
+      if (tag.type === "withNumericParameter") return `\\${sym}[N]`;
+      if (tag.type === "withCustomParameter") {
+        const open = tag.bracket && tag.bracket !== "none" ? tag.bracket : "<";
+        const close = { "<": ">", "[": "]", "(": ")", "{": "}" }[open] || ">";
+        return `\\${sym}${open}…${close}`;
+      }
+      return `\\${sym}`;
     },
   },
 };

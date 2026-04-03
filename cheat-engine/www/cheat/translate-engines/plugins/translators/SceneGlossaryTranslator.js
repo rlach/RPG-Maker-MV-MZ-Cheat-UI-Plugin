@@ -3,6 +3,88 @@ import { BasePluginTranslator } from "../BasePluginTranslator.js";
 const RUNTIME_HOOK_GUARD = "__CHEAT_SCENE_GLOSSARY_TRANSLATOR_HOOKED__";
 const ITEM_NOTE_CACHE_TYPE = "item_note";
 
+// All SceneGlossary note-field tags that need to be protected during LLM translation.
+// XML-style with NONE bracket means the format is <TagSymbol:value>.
+// maskValue:true  → value is opaque (filename / enum); LLM never sees or changes it.
+// maskValue:false → value is translatable text that the LLM is allowed to modify.
+const SCENE_GLOSSARY_PLUGIN_TAGS = (() => {
+  const xmlCustom = (description, tagSymbol, maskValue) => ({
+    description,
+    tagSymbol,
+    style: "xml",
+    type: "withCustomParameter",
+    bracket: "none",
+    maskValue,
+    requiredConsistency: true,
+  });
+  const xmlNumeric = (description, tagSymbol) => ({
+    description,
+    tagSymbol,
+    style: "xml",
+    type: "withNumericParameter",
+    requiredConsistency: true,
+  });
+  const xmlFlag = (description, tagSymbol) => ({
+    description,
+    tagSymbol,
+    style: "xml",
+    type: "withoutParameter",
+    requiredConsistency: true,
+  });
+
+  const tags = [
+    // Description — translatable text, pages 1–3
+    xmlCustom("SG description (ja)", "SG説明", false),
+    xmlCustom("SG description (en)", "SGDescription", false),
+    xmlCustom("SG description page2 (ja)", "SG説明2", false),
+    xmlCustom("SG description page2 (en)", "SGDescription2", false),
+    xmlCustom("SG description page3 (ja)", "SG説明3", false),
+    xmlCustom("SG description page3 (en)", "SGDescription3", false),
+
+    // Glossary screen / type selector — must be preserved
+    xmlNumeric("SG type/screen index (ja)", "SG種別"),
+    xmlNumeric("SG type/screen index (en)", "SGType"),
+
+    // Display order — must be preserved
+    xmlNumeric("SG display order (ja)", "SG表示順"),
+    xmlNumeric("SG display order (en)", "SGOrder"),
+
+    // Category — translatable text
+    xmlCustom("SG category (ja)", "SGカテゴリ", false),
+    xmlCustom("SG category (en)", "SGCategory", false),
+
+    // Auto-register exclusion flag — no value
+    xmlFlag("SG manual exclusion flag (ja)", "SG手動"),
+    xmlFlag("SG manual exclusion flag (en)", "SGManual"),
+
+    // Picture filenames — must NOT be translated, pages 1–3
+    xmlCustom("SG picture filename (ja)", "SGピクチャ", true),
+    xmlCustom("SG picture filename (en)", "SGPicture", true),
+    xmlCustom("SG picture filename page2 (ja)", "SGピクチャ2", true),
+    xmlCustom("SG picture filename page2 (en)", "SGPicture2", true),
+    xmlCustom("SG picture filename page3 (ja)", "SGピクチャ3", true),
+    xmlCustom("SG picture filename page3 (en)", "SGPicture3", true),
+
+    // Picture position enum (top/bottom/text/under) — must be preserved
+    xmlCustom("SG picture position (ja)", "SGピクチャ位置", true),
+    xmlCustom("SG picture position (en)", "SGPicturePosition", true),
+    xmlCustom("SG picture position page2 (ja)", "SGピクチャ位置2", true),
+    xmlCustom("SG picture position page2 (en)", "SGPicturePosition2", true),
+
+    // Picture alignment enum (left/center/right) — must be preserved
+    xmlCustom("SG picture align (ja)", "SGピクチャ揃え", true),
+    xmlCustom("SG picture align (en)", "SGPictureAlign", true),
+    xmlCustom("SG picture align page2 (ja)", "SGピクチャ揃え2", true),
+    xmlCustom("SG picture align page2 (en)", "SGPictureAlign2", true),
+
+    // Picture scale (float value) — use customParameter+mask to handle floats
+    xmlCustom("SG picture scale (ja)", "SGピクチャ拡大率", true),
+    xmlCustom("SG picture scale (en)", "SGPictureScale", true),
+  ];
+
+  return tags;
+})();
+
 function getRuntime() {
   return typeof window.__ensureTranslationRuntime === "function"
     ? window.__ensureTranslationRuntime()
@@ -178,6 +260,11 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
     ) {
       return;
     }
+
+    // Register SceneGlossary-specific tags with the translation engine so that
+    // all <SG...:value> tags in item notes are properly encoded/decoded during
+    // LLM translation instead of being left as raw text.
+    this.registerPluginCustomTags(SCENE_GLOSSARY_PLUGIN_TAGS);
 
     const translator = this;
     const originalCreateGlossaryWindow = Scene_Glossary.prototype.createGlossaryWindow;

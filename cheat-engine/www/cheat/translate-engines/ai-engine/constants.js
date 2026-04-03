@@ -7,14 +7,30 @@ export const TAG_TYPE = Object.freeze({
   WITH_NUMERIC_PARAMETER: "withNumericParameter",
   WITHOUT_PARAMETER: "withoutParameter",
   WITH_CUSTOM_PARAMETER: "withCustomParameter",
+  XML: "xml", // legacy — kept for backward compatibility; prefer style: TAG_STYLE.XML
+});
+
+/**
+ * Tag rendering style.
+ * ESCAPE: classic RPG Maker escape codes, e.g. \C[5] or \N<name>
+ * XML:    angle-bracket tags,              e.g. <SGOrder:5> or <br>
+ */
+export const TAG_STYLE = Object.freeze({
+  ESCAPE: "escape",
   XML: "xml",
 });
+
+export const TAG_STYLE_OPTIONS = Object.freeze([
+  { text: "Escape style (\\Symbol)", value: TAG_STYLE.ESCAPE },
+  { text: "XML style (<Symbol>)", value: TAG_STYLE.XML },
+]);
 
 export const TAG_BRACKET = Object.freeze({
   ANGLE: "<",
   SQUARE: "[",
   ROUND: "(",
   CURLY: "{",
+  NONE: "none", // XML-style colon separator: <Symbol:value>
 });
 
 export const TAG_BRACKET_OPTIONS = Object.freeze([
@@ -22,13 +38,14 @@ export const TAG_BRACKET_OPTIONS = Object.freeze([
   { text: "[ ]", value: TAG_BRACKET.SQUARE },
   { text: "( )", value: TAG_BRACKET.ROUND },
   { text: "{ }", value: TAG_BRACKET.CURLY },
+  { text: "none (xml :value)", value: TAG_BRACKET.NONE },
 ]);
 
 export const TAG_TYPE_OPTIONS = Object.freeze([
   { text: "withNumericParameter", value: TAG_TYPE.WITH_NUMERIC_PARAMETER },
   { text: "withoutParameter", value: TAG_TYPE.WITHOUT_PARAMETER },
   { text: "withCustomParameter", value: TAG_TYPE.WITH_CUSTOM_PARAMETER },
-  { text: "xml", value: TAG_TYPE.XML },
+  // TAG_TYPE.XML is omitted — create xml-style tags via style: TAG_STYLE.XML instead
 ]);
 
 // Base tag configuration. Regex patterns are generated once in TagManager initialization.
@@ -78,7 +95,7 @@ export const TAG_CONFIGS = [
     requiredConsistency: false,
   },
 
-  { description: "lineBreak", type: TAG_TYPE.XML, tagSymbol: "br", requiredConsistency: false },
+  { description: "lineBreak", style: TAG_STYLE.XML, type: TAG_TYPE.WITHOUT_PARAMETER, tagSymbol: "br", requiredConsistency: false },
 
   { description: "posX", type: TAG_TYPE.WITH_NUMERIC_PARAMETER, tagSymbol: "PX", requiredConsistency: false },
   { description: "posY", type: TAG_TYPE.WITH_NUMERIC_PARAMETER, tagSymbol: "PY", requiredConsistency: false },

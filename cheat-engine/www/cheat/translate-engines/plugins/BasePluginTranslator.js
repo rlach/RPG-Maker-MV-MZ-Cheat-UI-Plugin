@@ -47,6 +47,35 @@ export class BasePluginTranslator extends BasePhase {
     // Optional hook point for plugin-specific runtime integration.
   }
 
+  /**
+   * Register XML-style plugin tag configs with the active translation engine.
+   * Call this inside enablePluginTranslation() to automatically protect plugin-specific
+   * tags during LLM translation (they are encoded/decoded rather than passed raw).
+   *
+   * @param {Array} tagConfigs - Array of tag config objects (same shape as TAG_CONFIGS entries,
+   *   plus style:"xml" and bracket:"none" for XML-colon-separator tags).
+   */
+  registerPluginCustomTags(tagConfigs) {
+    if (!Array.isArray(tagConfigs) || tagConfigs.length === 0) {
+      return;
+    }
+
+    const runtime =
+      typeof window.__ensureTranslationRuntime === "function"
+        ? window.__ensureTranslationRuntime()
+        : window.__TranslationRuntime || null;
+
+    if (
+      !runtime ||
+      !runtime.engine ||
+      typeof runtime.engine.addPluginTags !== "function"
+    ) {
+      return;
+    }
+
+    runtime.engine.addPluginTags(this.getPluginName(), tagConfigs);
+  }
+
   prepareTranslator() {
     // Optional hook point for plugin-specific one-time async preparation.
     return Promise.resolve();

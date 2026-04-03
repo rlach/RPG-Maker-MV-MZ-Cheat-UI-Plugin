@@ -88,6 +88,7 @@ export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
   "aiCustomTags",
   "aiCustomTagTypeOptions",
   "aiCustomTagBracketOptions",
+  "aiCustomTagStyleOptions",
   "objectTranslationSelectedMapIds",
   "objectTranslationTypeOrder",
   "enabledPluginTranslators",
@@ -152,6 +153,7 @@ export const UI_SYNC_STATE_KEYS = Object.freeze([
   "aiCustomTags",
   "aiCustomTagTypeOptions",
   "aiCustomTagBracketOptions",
+  "aiCustomTagStyleOptions",
   "objectTranslationSelectedMapIds",
   "objectTranslationTypeOrder",
   "enabledPluginTranslators",
@@ -164,6 +166,7 @@ export const UI_SYNC_TO_ONLY_STATE_KEYS = Object.freeze([
   "aiInvalidJsonHandlingStrategyOptions",
   "aiCustomTagTypeOptions",
   "aiCustomTagBracketOptions",
+  "aiCustomTagStyleOptions",
 ]);
 
 const cloneOptions = (items) =>
@@ -222,6 +225,7 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
     aiCustomTags: [],
     aiCustomTagTypeOptions: [],
     aiCustomTagBracketOptions: [],
+    aiCustomTagStyleOptions: [],
     objectTranslationSelectedMapIds: null,
     objectTranslationTypeOrder: [],
     enabledPluginTranslators: {},

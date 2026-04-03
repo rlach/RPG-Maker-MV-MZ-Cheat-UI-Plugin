@@ -18,6 +18,7 @@ import {
   TYPE_TO_TAG,
   TAG_BRACKET_OPTIONS,
   TAG_TYPE_OPTIONS,
+  TAG_STYLE_OPTIONS,
   buildRequestSettingsForContent,
   REQUEST_CANCEL_REASON,
 } from "./constants.js";
@@ -42,8 +43,10 @@ class AIEngine extends BaseTranslationEngine {
     this.useJsonFixer = true;
     this._aiFixRecursionMaxDepth = 0;
     this.customTags = [];
+    this.pluginTags = []; // auto-registered by plugin translators, not user-editable
     this.customTagTypeOptions = [...TAG_TYPE_OPTIONS];
     this.customTagBracketOptions = [...TAG_BRACKET_OPTIONS];
+    this.customTagStyleOptions = [...TAG_STYLE_OPTIONS];
 
     // State tracking
     this._activeAbortController = null;
@@ -148,6 +151,9 @@ class AIEngine extends BaseTranslationEngine {
       aiCustomTagBracketOptions: {
         get: () => this.customTagBracketOptions,
       },
+      aiCustomTagStyleOptions: {
+        get: () => this.customTagStyleOptions,
+      },
       userJsonFixer: {
         get: () => this.useJsonFixer,
         set: (v) => {
@@ -165,20 +171,63 @@ class AIEngine extends BaseTranslationEngine {
       type: String(config.type || ""),
       tagSymbol: String(config.tagSymbol || "").trim(),
       requiredConsistency: !!config.requiredConsistency,
+      style: config.style === "xml" ? "xml" : "escape",
     };
 
     if (normalized.type === "withCustomParameter") {
-      normalized.bracket = String(config.bracket || "<");
+      normalized.bracket = String(config.bracket || (normalized.style === "xml" ? "none" : "<"));
       normalized.maskValue = !!config.maskValue;
     }
 
     return normalized;
   }
 
+  /** Merge plugin + user custom tags and push to TagManager. */
+  _refreshTagManager() {
+    this.tagManager.setCustomTagConfigs([...this.pluginTags, ...this.customTags]);
+  }
+
   setCustomTags(tags) {
     const safeTags = Array.isArray(tags) ? tags : [];
     this.customTags = safeTags.map((tag) => this.normalizeCustomTagConfig(tag));
-    this.tagManager.setCustomTagConfigs(this.customTags);
+    this._refreshTagManager();
+  }
+
+  /**
+   * Register plugin-specific tags. Called automatically from BasePluginTranslator.
+   * @param {string} pluginName
+   * @param {Array}  tagConfigs
+   */
+  addPluginTags(pluginName, tagConfigs) {
+    const safePluginName = String(pluginName || "_unknown").trim();
+    const configs = Array.isArray(tagConfigs) ? tagConfigs : [];
+
+    // Replace any previously registered tags for this plugin
+    this.pluginTags = (this.pluginTags || []).filter(
+      (t) => t._pluginName !== safePluginName,
+    );
+
+    const normalized = configs
+      .filter((c) => c && typeof c === "object" && c.description && c.tagSymbol)
+      .map((c) => ({
+        ...this.normalizeCustomTagConfig(c),
+        _pluginName: safePluginName,
+      }));
+
+    this.pluginTags = [...this.pluginTags, ...normalized];
+    this._refreshTagManager();
+  }
+
+  /**
+   * Remove all tags previously registered by a plugin.
+   * @param {string} pluginName
+   */
+  removePluginTags(pluginName) {
+    const safePluginName = String(pluginName || "_unknown").trim();
+    this.pluginTags = (this.pluginTags || []).filter(
+      (t) => t._pluginName !== safePluginName,
+    );
+    this._refreshTagManager();
   }
 
   addCustomTag(tagConfig) {
