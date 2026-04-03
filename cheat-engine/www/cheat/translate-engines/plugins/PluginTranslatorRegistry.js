@@ -3,6 +3,7 @@ import { DynamicDatabaseTranslator } from "./translators/DynamicDatabaseTranslat
 import { DestinationWindowTranslator } from "./translators/DestinationWindowTranslator.js";
 import { KmsMapActiveMessageTranslator } from "./translators/KmsMapActiveMessageTranslator.js";
 import { MppChoiceExTranslator } from "./translators/MppChoiceExTranslator.js";
+import { PandaProgressTextWindowTranslator } from "./translators/PandaProgressTextWindowTranslator.js";
 import { SceneGlossaryTranslator } from "./translators/SceneGlossaryTranslator.js";
 import { TextPictureTranslator } from "./translators/TextPictureTranslator.js";
 import { TorigoyaAchievement2Translator } from "./translators/TorigoyaAchievement2Translator.js";
@@ -17,6 +18,7 @@ class PluginTranslatorRegistry {
       DestinationWindowTranslator,
       KmsMapActiveMessageTranslator,
       MppChoiceExTranslator,
+      PandaProgressTextWindowTranslator,
       SceneGlossaryTranslator,
       TextPictureTranslator,
       TorigoyaAchievement2Translator,
