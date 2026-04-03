@@ -4,6 +4,7 @@ import { DestinationWindowTranslator } from "./translators/DestinationWindowTran
 import { KmsMapActiveMessageTranslator } from "./translators/KmsMapActiveMessageTranslator.js";
 import { MppChoiceExTranslator } from "./translators/MppChoiceExTranslator.js";
 import { SceneGlossaryTranslator } from "./translators/SceneGlossaryTranslator.js";
+import { TextPictureTranslator } from "./translators/TextPictureTranslator.js";
 import { TorigoyaAchievement2Translator } from "./translators/TorigoyaAchievement2Translator.js";
 import { TorigoyaAchievementTranslator } from "./translators/TorigoyaAchievementTranslator.js";
 import { YEPCoreEngineScriptTranslator } from "./translators/YEPCoreEngineScriptTranslator.js";
@@ -17,6 +18,7 @@ class PluginTranslatorRegistry {
       KmsMapActiveMessageTranslator,
       MppChoiceExTranslator,
       SceneGlossaryTranslator,
+      TextPictureTranslator,
       TorigoyaAchievement2Translator,
       TorigoyaAchievementTranslator,
       YEPCoreEngineScriptTranslator,
