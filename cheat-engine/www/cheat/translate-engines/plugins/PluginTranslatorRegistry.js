@@ -1,3 +1,4 @@
+import { CbrEroStatusTranslator } from "./translators/CbrEroStatusTranslator.js";
 import { DTextPictureTranslator } from "./translators/DTextPictureTranslator.js";
 import { DynamicDatabaseTranslator } from "./translators/DynamicDatabaseTranslator.js";
 import { DestinationWindowTranslator } from "./translators/DestinationWindowTranslator.js";
@@ -13,6 +14,7 @@ import { YEPCoreEngineScriptTranslator } from "./translators/YEPCoreEngineScript
 class PluginTranslatorRegistry {
   constructor() {
     this.translatorClasses = [
+      CbrEroStatusTranslator,
       DTextPictureTranslator,
       DynamicDatabaseTranslator,
       DestinationWindowTranslator,
