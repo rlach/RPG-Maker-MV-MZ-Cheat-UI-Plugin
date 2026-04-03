@@ -1,4 +1,5 @@
 import { CbrEroStatusTranslator } from "./translators/CbrEroStatusTranslator.js";
+import { CbrEroStatusMvTranslator } from "./translators/CbrEroStatusMvTranslator.js";
 import { DTextPictureTranslator } from "./translators/DTextPictureTranslator.js";
 import { DynamicDatabaseTranslator } from "./translators/DynamicDatabaseTranslator.js";
 import { DestinationWindowTranslator } from "./translators/DestinationWindowTranslator.js";
@@ -15,6 +16,7 @@ class PluginTranslatorRegistry {
   constructor() {
     this.translatorClasses = [
       CbrEroStatusTranslator,
+      CbrEroStatusMvTranslator,
       DTextPictureTranslator,
       DynamicDatabaseTranslator,
       DestinationWindowTranslator,
