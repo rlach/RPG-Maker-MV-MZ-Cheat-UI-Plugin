@@ -2,7 +2,9 @@ import { DTextPictureTranslator } from "./translators/DTextPictureTranslator.js"
 import { DynamicDatabaseTranslator } from "./translators/DynamicDatabaseTranslator.js";
 import { DestinationWindowTranslator } from "./translators/DestinationWindowTranslator.js";
 import { KmsMapActiveMessageTranslator } from "./translators/KmsMapActiveMessageTranslator.js";
+import { SceneGlossaryTranslator } from "./translators/SceneGlossaryTranslator.js";
 import { TorigoyaAchievement2Translator } from "./translators/TorigoyaAchievement2Translator.js";
+import { TorigoyaAchievementTranslator } from "./translators/TorigoyaAchievementTranslator.js";
 
 class PluginTranslatorRegistry {
   constructor() {
@@ -11,7 +13,9 @@ class PluginTranslatorRegistry {
       DynamicDatabaseTranslator,
       DestinationWindowTranslator,
       KmsMapActiveMessageTranslator,
+      SceneGlossaryTranslator,
       TorigoyaAchievement2Translator,
+      TorigoyaAchievementTranslator,
     ];
     this.translatorInstances = new Map();
     this.detectedPluginNames = new Set();

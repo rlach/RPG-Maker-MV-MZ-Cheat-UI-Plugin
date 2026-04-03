@@ -147,8 +147,8 @@ export const buildRequestSettingsForContent = (content) => ({
 // Stream monitoring constants
 export const STREAM_MONITOR_CHECK_INTERVAL = 64;
 export const STREAM_OPEN_BRACE_MAX_CHARS = 100;
-export const STREAM_JSON_TRIM_MAX_CHARS = 400;
-export const STREAM_JSONL_TRIM_MAX_CHARS = 400;
+export const STREAM_JSON_TRIM_MAX_CHARS = 1000;
+export const STREAM_JSONL_TRIM_MAX_CHARS = 1000;
 export const STREAM_KEY_MAX_CHARS = 10;
 export const LLM_MAX_CONSECUTIVE_IDENTICAL_CHARS = 5;
 

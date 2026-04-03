@@ -218,7 +218,7 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
       return this._scanPromise;
     }
 
-    this._scanPromise = this.buildScanEntries()
+    this._scanPromise = Promise.resolve(this.buildScanEntries())
       .then((entries) => {
         this._scanEntries = Array.isArray(entries) ? entries : [];
         this._scanPrepared = true;
