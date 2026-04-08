@@ -1,58 +1,47 @@
-import {getRowsPerPage, setRowsPerPage} from '../js/TableSettings.js'
+import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
 
 export default {
     name: 'ItemTableTab',
 
     template: `
 <v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
- <v-data-table
+    <v-card-text class="pt-1 pb-1">
+        <v-text-field
+            label="Search..."
+            solo
+            background-color="grey darken-3"
+            v-model="search"
+            dense
+            hide-details
+            @keydown.self.stop
+            @focus="$event.target.select()">
+        </v-text-field>
+        <div class="d-flex align-center mt-2">
+            <v-checkbox
+                v-model="excludeNameless"
+                dense
+                hide-details
+                label="Hide Nameless Items"
+                @change="onTableFilterChange">
+            </v-checkbox>
+            <v-spacer></v-spacer>
+            <v-checkbox
+                v-model="onlyOwnedItems"
+                dense
+                hide-details
+                label="Only Owned Items"
+                @change="onTableFilterChange">
+            </v-checkbox>
+        </div>
+    </v-card-text>
+    <v-data-table
         v-if="tableHeaders"
-    class="table-with-sticky-footer"
-        denses
+        class="table-with-sticky-footer"
         :headers="tableHeaders"
         :items="filteredTableItems"
         :search="search"
         :custom-filter="tableItemFilter"
         :items-per-page.sync="rowsPerPage">
-        <template v-slot:top>
-            <v-text-field
-                label="Search..."
-                solo
-                background-color="grey darken-3"
-                v-model="search"
-                dense
-                hide-details
-                @keydown.self.stop
-                @focus="$event.target.select()">
-            </v-text-field>
-            <v-row
-                class="ma-0 pa-0">
-                <v-col
-                    cols="12"
-                    md="6">
-                    <v-checkbox
-                        v-model="excludeNameless"
-                        dense
-                        hide-details
-                        label="Hide Nameless Items"
-                        @change="onTableFilterChange">
-                    
-                    </v-checkbox>
-                </v-col>
-                <v-col
-                    cols="12"
-                    md="6">
-                    <v-checkbox
-                        v-model="onlyOwnedItems"
-                        dense
-                        hide-details
-                        label="Only Owned Items"
-                        @change="onTableFilterChange">
-                    
-                    </v-checkbox>
-                </v-col>
-            </v-row>
-        </template>
         <template
             v-slot:item.amount="{ item }">
             <v-text-field
@@ -95,115 +84,115 @@ export default {
 </v-card>
     `,
 
-    data () {
+    data() {
         return {
             search: '',
             excludeNameless: false,
             onlyOwnedItems: false,
             rowsPerPage: getRowsPerPage(),
             tableHeaders: [],
-            tableItems: []
-        }
+            tableItems: [],
+        };
     },
 
     props: {
         items: [],
         headers: {
-            type: Array
+            type: Array,
         },
         asTableData: {
-            type: Function
+            type: Function,
         },
         searchableAttrs: {
             type: Array,
-            default: []
-        }
+            default: [],
+        },
     },
 
-    created () {
-    },
+    created() {},
 
     watch: {
         items: {
             immediate: true,
-            handler () {
-                this.initializeVariables()
-            }
+            handler() {
+                this.initializeVariables();
+            },
         },
 
-        rowsPerPage (val) {
-            const parsed = Number(val)
+        rowsPerPage(val) {
+            const parsed = Number(val);
             if (!Number.isFinite(parsed) || parsed <= 0) {
-                return
+                return;
             }
 
             if (parsed !== val) {
-                this.rowsPerPage = parsed
-                return
+                this.rowsPerPage = parsed;
+                return;
             }
 
-            setRowsPerPage(parsed)
-        }
+            setRowsPerPage(parsed);
+        },
     },
 
     computed: {
-        filteredTableItems () {
-            return this.tableItems.filter(item => {
+        filteredTableItems() {
+            return this.tableItems.filter((item) => {
                 if (this.excludeNameless && !item.name) {
-                    return false
+                    return false;
                 }
 
                 if (this.onlyOwnedItems && item.amount === 0) {
-                    return false
+                    return false;
                 }
 
-                return true
-            })
-        }
+                return true;
+            });
+        },
     },
 
     methods: {
-        initializeVariables () {
-            this.tableHeaders = this.headers.slice(0)
+        initializeVariables() {
+            this.tableHeaders = this.headers.slice(0);
             this.tableHeaders.push({
                 text: 'Amount',
-                value: 'amount'
-            })
+                value: 'amount',
+            });
 
-            this.tableItems = this.items.filter(item => !!item).map(item => {
-                const tableItem = this.asTableData(item)
-                tableItem._item = item
-                tableItem.amount = $gameParty.numItems(item)
+            this.tableItems = this.items
+                .filter((item) => !!item)
+                .map((item) => {
+                    const tableItem = this.asTableData(item);
+                    tableItem._item = item;
+                    tableItem.amount = $gameParty.numItems(item);
 
-                return tableItem
-            })
+                    return tableItem;
+                });
         },
 
-        onItemChange (item) {
+        onItemChange(item) {
             // modify amount
-            const diff = item.amount - $gameParty.numItems(item._item)
-            $gameParty.gainItem(item._item, diff)
+            const diff = item.amount - $gameParty.numItems(item._item);
+            $gameParty.gainItem(item._item, diff);
 
             // refresh
-            item.amount = $gameParty.numItems(item._item)
+            item.amount = $gameParty.numItems(item._item);
         },
 
-        onTableFilterChange () {
-        },
+        onTableFilterChange() {},
 
-        tableItemFilter (value, search, item) {
+        tableItemFilter(value, search, item) {
             if (search === null || search.trim() === '') {
-                return true
+                return true;
             }
 
-            search = search.toLowerCase()
+            search = search.toLowerCase();
             for (const attr of this.searchableAttrs) {
                 if (item[attr].toLowerCase().contains(search)) {
-                    return true
+                    return true;
                 }
             }
 
-            return false
-        }
-    }
-}
+            return false;
+        },
+    },
+};

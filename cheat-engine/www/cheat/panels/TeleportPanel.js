@@ -1,68 +1,71 @@
-import {TRANSLATE_SETTINGS, TRANSLATOR} from '../js/TranslateHelper.js'
-import {Alert} from '../js/AlertHelper.js'
-import {getRowsPerPage, setRowsPerPage} from '../js/TableSettings.js'
+import { TRANSLATE_SETTINGS, TRANSLATOR } from '../js/TranslateHelper.js';
+import { Alert } from '../js/AlertHelper.js';
+import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
 
 export default {
     name: 'TeleportPanel',
 
     template: `
 <v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
-    <v-row>
-        <v-col
-            cols="12"
-            md="6">
-            <v-text-field
-                v-model="inputX"
-                label="X"
+    <v-card-text class="pt-1 pb-1">
+        <v-row>
+            <v-col
+                cols="12"
+                md="6">
+                <v-text-field
+                    v-model="inputX"
+                    label="X"
+                    dense
+                    background-color="grey darken-3"
+                    hide-details
+                    outlined
+                    @keydown.self.stop
+                    @focus="$event.target.select()">
+                </v-text-field>
+            </v-col>
+            <v-col
+                cols="12"
+                md="6">
+                <v-text-field
+                    v-model="inputY"
+                    label="Y"
+                    dense
+                    background-color="grey darken-3"
+                    hide-details
+                    outlined
+                    @keydown.self.stop
+                    @focus="$event.target.select()">
+                </v-text-field>
+            </v-col>
+        </v-row>
+        <v-text-field
+            label="Search..."
+            solo
+            background-color="grey darken-3"
+            v-model="search"
+            dense
+            hide-details
+            class="mt-2"
+            @keydown.self.stop
+            @focus="$event.target.select()">
+        </v-text-field>
+        <div class="d-flex align-center mt-2">
+            <v-checkbox
+                v-model="excludeFullPath"
                 dense
-                background-color="grey darken-3"
                 hide-details
-                outlined
-                @keydown.self.stop
-                @focus="$event.target.select()">
-            </v-text-field>
-        </v-col>
-        <v-col
-            cols="12"
-            md="6">
-            <v-text-field
-                v-model="inputY"
-                label="Y"
-                dense
-                background-color="grey darken-3"
-                hide-details
-                outlined
-                @keydown.self.stop
-                @focus="$event.target.select()">
-            </v-text-field>
-        </v-col>
-    </v-row>
-
+                label="Hide Full Path Field">
+            </v-checkbox>
+        </div>
+    </v-card-text>
     <v-data-table
         v-if="tableHeaders"
-        class="mt-2 table-with-sticky-footer"
-        denses
+        class="table-with-sticky-footer"
         :headers="filteredTableHeaders"
         :items="maps"
         :search="search"
         :custom-filter="tableItemFilter"
         :items-per-page.sync="rowsPerPage">
-        <template v-slot:top>
-            <v-text-field
-                label="Search..."
-                solo
-                background-color="grey darken-3"
-                v-model="search"
-                dense
-                hide-details
-                @keydown.self.stop
-                @focus="$event.target.select()">
-            </v-text-field>
-            <v-checkbox
-                v-model="excludeFullPath"
-                label="Hide Full Path Field">
-            </v-checkbox>
-        </template>
         <template
             v-slot:item.fullPath="{ item }">
             {{item.fullPathJoin}}
@@ -90,7 +93,7 @@ export default {
 </v-card>
     `,
 
-    data () {
+    data() {
         return {
             inputX: '0',
             inputY: '0',
@@ -105,108 +108,114 @@ export default {
             tableHeaders: [
                 {
                     text: 'Id',
-                    value: 'id'
+                    value: 'id',
                 },
                 {
                     text: 'Name',
-                    value: 'name'
+                    value: 'name',
                 },
                 {
                     text: 'FullPath',
-                    value: 'fullPath'
+                    value: 'fullPath',
                 },
                 {
                     text: 'Actions',
-                    value: 'actions'
-                }
-            ]
-        }
+                    value: 'actions',
+                },
+            ],
+        };
     },
 
-    created () {
-        this.initializeVariables()
+    created() {
+        this.initializeVariables();
     },
 
     watch: {
-        rowsPerPage (val) {
-            const parsed = Number(val)
+        rowsPerPage(val) {
+            const parsed = Number(val);
             if (!Number.isFinite(parsed) || parsed <= 0) {
-                return
+                return;
             }
 
             if (parsed !== val) {
-                this.rowsPerPage = parsed
-                return
+                this.rowsPerPage = parsed;
+                return;
             }
 
-            setRowsPerPage(parsed)
-        }
+            setRowsPerPage(parsed);
+        },
     },
 
     computed: {
-        filteredTableHeaders () {
+        filteredTableHeaders() {
             if (this.excludeFullPath) {
-                return this.tableHeaders.filter(header => header.value !== 'fullPath')
+                return this.tableHeaders.filter((header) => header.value !== 'fullPath');
             }
 
-            return this.tableHeaders
-        }
+            return this.tableHeaders;
+        },
     },
 
     methods: {
-        async initializeVariables () {
-            const rawDataMapInfos = $dataMapInfos.filter(mapInfo => !!mapInfo)
-            const mapNames = await this.getMapNames($dataMapInfos)
+        async initializeVariables() {
+            const rawDataMapInfos = $dataMapInfos.filter((mapInfo) => !!mapInfo);
+            const mapNames = await this.getMapNames($dataMapInfos);
 
-            this.maps = $dataMapInfos.filter(mapInfo => !!mapInfo).map(mapInfo => {
-                let fullPath = []
+            this.maps = $dataMapInfos
+                .filter((mapInfo) => !!mapInfo)
+                .map((mapInfo) => {
+                    let fullPath = [];
 
-                this.getMapAncestors(mapInfo.id, fullPath)
-                fullPath = fullPath.map(id => mapNames[id])
+                    this.getMapAncestors(mapInfo.id, fullPath);
+                    fullPath = fullPath.map((id) => mapNames[id]);
 
-                return {
-                    _mapInfo: mapInfo,
-                    id: mapInfo.id,
-                    fullPath: fullPath,
-                    fullPathJoin: fullPath.join(' / '),
-                    name: mapNames[mapInfo.id],
-                }
-            })
+                    return {
+                        _mapInfo: mapInfo,
+                        id: mapInfo.id,
+                        fullPath: fullPath,
+                        fullPathJoin: fullPath.join(' / '),
+                        name: mapNames[mapInfo.id],
+                    };
+                });
         },
 
-        async getMapNames (dataMapInfos) {
-            const rawNames = dataMapInfos.map(m => m ? m.name : '')
+        async getMapNames(dataMapInfos) {
+            const rawNames = dataMapInfos.map((m) => (m ? m.name : ''));
 
             if (TRANSLATE_SETTINGS.isMapTranslateEnabled()) {
-                return await TRANSLATOR.translateBulk(rawNames)
+                return await TRANSLATOR.translateBulk(rawNames);
             }
 
-            return rawNames
+            return rawNames;
         },
 
-        getMapAncestors (id, path) {
-            path.push(id)
+        getMapAncestors(id, path) {
+            path.push(id);
             if ($dataMapInfos[id].parentId === 0) {
-                path.reverse()
-                return
+                path.reverse();
+                return;
             }
 
-            this.getMapAncestors($dataMapInfos[id].parentId, path)
+            this.getMapAncestors($dataMapInfos[id].parentId, path);
         },
 
-        teleportLocation (mapId, x, y) {
+        teleportLocation(mapId, x, y) {
             $gamePlayer.reserveTransfer(mapId, x, y, $gamePlayer.direction(), 0);
             $gamePlayer.setPosition(x, y);
         },
 
-        tableItemFilter (value, search, item) {
+        tableItemFilter(value, search, item) {
             if (search === null || search.trim() === '') {
-                return true
+                return true;
             }
 
-            search = search.toLowerCase()
+            search = search.toLowerCase();
 
-            return item.name.toLowerCase().contains(search) || item.fullPathJoin.toLowerCase().contains(search) || String(item.id).toLowerCase().contains(search)
-        }
-    }
-}
+            return (
+                item.name.toLowerCase().contains(search) ||
+                item.fullPathJoin.toLowerCase().contains(search) ||
+                String(item.id).toLowerCase().contains(search)
+            );
+        },
+    },
+};

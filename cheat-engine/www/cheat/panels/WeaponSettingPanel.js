@@ -1,10 +1,10 @@
-import ItemTableTab from './ItemTableTab.js'
+import ItemTableTab from './ItemTableTab.js';
 
 export default {
     name: 'WeaponSettingPanel',
 
     components: {
-        ItemTableTab
+        ItemTableTab,
     },
 
     template: `
@@ -20,37 +20,42 @@ export default {
 </v-card>
     `,
 
-    data () {
+    data() {
         return {
             items: [],
 
             headers: [
                 {
+                    text: 'Id',
+                    value: 'id',
+                },
+                {
                     text: 'Name',
-                    value: 'name'
+                    value: 'name',
                 },
                 {
                     text: 'Description',
-                    value: 'desc'
-                }
-            ]
-        }
+                    value: 'desc',
+                },
+            ],
+        };
     },
 
-    created () {
-        this.initializeVariables()
+    created() {
+        this.initializeVariables();
     },
 
     methods: {
-        initializeVariables () {
-            this.items = $dataWeapons
+        initializeVariables() {
+            this.items = $dataWeapons;
         },
 
-        convertToTableData (item) {
+        convertToTableData(item) {
             return {
+                id: item.id,
                 name: item.name,
-                desc: item.description
-            }
-        }
-    }
-}
+                desc: item.description,
+            };
+        },
+    },
+};

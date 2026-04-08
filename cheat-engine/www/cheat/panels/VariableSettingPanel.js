@@ -1,46 +1,39 @@
-import {TRANSLATE_SETTINGS, TRANSLATOR} from '../js/TranslateHelper.js'
-import {getRowsPerPage, setRowsPerPage} from '../js/TableSettings.js'
+import { TRANSLATE_SETTINGS, TRANSLATOR } from '../js/TranslateHelper.js';
+import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
 
 export default {
     name: 'VariableSettingPanel',
 
     template: `
 <v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
+    <v-card-text class="pt-1 pb-1">
+        <v-text-field
+            label="Search..."
+            solo
+            background-color="grey darken-3"
+            v-model="search"
+            dense
+            hide-details
+            @keydown.self.stop
+            @focus="$event.target.select()">
+        </v-text-field>
+        <div class="d-flex align-center mt-2">
+            <v-checkbox
+                v-model="excludeNameless"
+                dense
+                hide-details
+                label="Hide Nameless Items">
+            </v-checkbox>
+        </div>
+    </v-card-text>
     <v-data-table
         v-if="tableHeaders"
         class="table-with-sticky-footer"
-        denses
         :headers="tableHeaders"
         :items="filteredTableItems"
         :search="search"
         :custom-filter="tableItemFilter"
         :items-per-page.sync="rowsPerPage">
-        <template v-slot:top>
-            <v-text-field
-                label="Search..."
-                solo
-                background-color="grey darken-3"
-                v-model="search"
-                dense
-                hide-details
-                @keydown.self.stop
-                @focus="$event.target.select()">
-            </v-text-field>
-            <v-row
-                class="ma-0 pa-0">
-                <v-col
-                    cols="12"
-                    md="12">
-                    <v-checkbox
-                        v-model="excludeNameless"
-                        dense
-                        hide-details
-                        label="Hide Nameless Items">
-                    
-                    </v-checkbox>
-                </v-col>
-            </v-row>
-        </template>
         <template
             v-slot:item.value="{ item }">
             <v-text-field
@@ -83,7 +76,7 @@ export default {
 </v-card>
     `,
 
-    data () {
+    data() {
         return {
             search: '',
             excludeNameless: false,
@@ -94,93 +87,100 @@ export default {
 
             tableHeaders: [
                 {
+                    text: 'Id',
+                    value: 'id',
+                },
+                {
                     text: 'Name',
-                    value: 'name'
+                    value: 'name',
                 },
                 {
                     text: 'Value',
-                    value: 'value'
-                }
+                    value: 'value',
+                },
             ],
-            tableItems: []
-        }
+            tableItems: [],
+        };
     },
 
-    created () {
-        this.initializeVariables()
+    created() {
+        this.initializeVariables();
     },
 
     watch: {
-        rowsPerPage (val) {
-            const parsed = Number(val)
+        rowsPerPage(val) {
+            const parsed = Number(val);
             if (!Number.isFinite(parsed) || parsed <= 0) {
-                return
+                return;
             }
 
             if (parsed !== val) {
-                this.rowsPerPage = parsed
-                return
+                this.rowsPerPage = parsed;
+                return;
             }
 
-            setRowsPerPage(parsed)
-        }
+            setRowsPerPage(parsed);
+        },
     },
 
     computed: {
-        filteredTableItems () {
-            return this.tableItems.filter(item => {
+        filteredTableItems() {
+            return this.tableItems.filter((item) => {
                 if (this.excludeNameless && !item.name) {
-                    return false
+                    return false;
                 }
 
-                return true
-            })
-        }
+                return true;
+            });
+        },
     },
 
     methods: {
-        async initializeVariables () {
-            this.variableNames = await this.getVariableNames()
+        async initializeVariables() {
+            this.variableNames = await this.getVariableNames();
 
             this.tableItems = this.variableNames.map((varName, idx) => {
                 return {
                     id: idx,
                     name: varName,
-                    value: $gameVariables.value(idx)
-                }
-            })
+                    value: $gameVariables.value(idx),
+                };
+            });
         },
 
-        async getVariableNames () {
-            const rawVariableNames = $dataSystem.variables.slice()
+        async getVariableNames() {
+            const rawVariableNames = $dataSystem.variables.slice();
 
             if (TRANSLATE_SETTINGS.isVariableTranslateEnabled()) {
-                return await TRANSLATOR.translateBulk(rawVariableNames)
+                return await TRANSLATOR.translateBulk(rawVariableNames);
             }
 
-            return rawVariableNames
+            return rawVariableNames;
         },
 
-        onItemChange (item) {
+        onItemChange(item) {
             // modify value
-            let value = item.value
+            let value = item.value;
             // Convert to number if it's a numeric string
             if (!isNaN(value) && value !== '' && value !== null) {
-                value = Number(value)
+                value = Number(value);
             }
-            $gameVariables.setValue(item.id, value)
+            $gameVariables.setValue(item.id, value);
             // refresh
-            item.value = $gameVariables.value(item.id)
+            item.value = $gameVariables.value(item.id);
         },
 
-        tableItemFilter (value, search, item) {
+        tableItemFilter(value, search, item) {
             if (search === null || search.trim() === '') {
-                return true
+                return true;
             }
 
-            search = search.toLowerCase()
+            search = search.toLowerCase();
 
-            return item.name.toLowerCase().contains(search) || String(item.value).toLowerCase().contains(search)
-        }
-    }
-}
+            return (
+                item.name.toLowerCase().contains(search) ||
+                String(item.value).toLowerCase().contains(search)
+            );
+        },
+    },
+};
