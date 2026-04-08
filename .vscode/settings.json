@@ -1,66 +1,66 @@
 {
-  "editor.formatOnSave": true,
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
 
-  "[javascript]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
-  "[html]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
-  "[css]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
-  "[json]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
-  "[vue]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
-
-  "javascript.validate.enable": true,
-  "css.validate.enable": true,
-  "html.validate.scripts": true,
-  "typescript.tsserver.experimental.enableProjectDiagnostics": true,
-  "eslint.useFlatConfig": true,
-  "eslint.validate": ["javascript", "vue"],
-  "eslint.workingDirectories": [{ "mode": "auto" }],
-  "eslint.lintTask.enable": true,
-
-  "javascript.implicitProjectConfig.checkJs": true,
-  "js/ts.suggestionActions.enabled": true,
-
-  "sonarlint.focusOnNewCode": false,
-  "sonarlint.analysisExcludesStandalone": "**/cheat-engine/www/cheat/libs/**",
-  "sonarlint.rules": {
-    "javascript:S3003": {
-      "level": "off"
+    "[javascript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
     },
-    "typescript:S3003": {
-      "level": "off"
+    "[html]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
     },
-    "javascript:prefer-global-this": {
-      "level": "off"
+    "[css]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
     },
-    "typescript:prefer-global-this": {
-      "level": "off"
+    "[json]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[vue]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+
+    "javascript.validate.enable": true,
+    "css.validate.enable": true,
+    "html.validate.scripts": true,
+    "typescript.tsserver.experimental.enableProjectDiagnostics": true,
+    "eslint.useFlatConfig": true,
+    "eslint.validate": ["javascript", "vue"],
+    "eslint.workingDirectories": [{ "mode": "auto" }],
+    "eslint.lintTask.enable": true,
+
+    "javascript.implicitProjectConfig.checkJs": true,
+    "js/ts.suggestionActions.enabled": true,
+
+    "sonarlint.focusOnNewCode": false,
+    "sonarlint.analysisExcludesStandalone": "**/cheat-engine/www/cheat/libs/**",
+    "sonarlint.rules": {
+        "javascript:S3003": {
+            "level": "off"
+        },
+        "typescript:S3003": {
+            "level": "off"
+        },
+        "javascript:prefer-global-this": {
+            "level": "off"
+        },
+        "typescript:prefer-global-this": {
+            "level": "off"
+        }
+    },
+    "eslint.rules.customizations": [
+        {
+            "rule": "prefer-global-this",
+            "severity": "off"
+        },
+        {
+            "rule": "unicorn/prefer-global-this",
+            "severity": "off"
+        }
+    ],
+
+    "search.exclude": {
+        "**/cheat-engine/www/cheat/libs/**": true
+    },
+    "files.watcherExclude": {
+        "**/cheat-engine/www/cheat/libs/**": true
     }
-  },
-  "eslint.rules.customizations": [
-    {
-      "rule": "prefer-global-this",
-      "severity": "off"
-    },
-    {
-      "rule": "unicorn/prefer-global-this",
-      "severity": "off"
-    }
-  ],
-
-  "search.exclude": {
-    "**/cheat-engine/www/cheat/libs/**": true
-  },
-  "files.watcherExclude": {
-    "**/cheat-engine/www/cheat/libs/**": true
-  }
 }

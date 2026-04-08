@@ -33,7 +33,7 @@ const result = spawnSync(
     {
         cwd: repoRoot,
         encoding: 'utf-8',
-        shell: true
+        shell: true,
     }
 );
 
@@ -96,13 +96,15 @@ const filteredReport = {
         totalClones: duplicates.length,
         sameFileClones: duplicates.filter(
             (duplication) =>
-                normalizePath(duplication.firstFile.name) === normalizePath(duplication.secondFile.name)
+                normalizePath(duplication.firstFile.name) ===
+                normalizePath(duplication.secondFile.name)
         ).length,
         crossFileClones: duplicates.filter(
             (duplication) =>
-                normalizePath(duplication.firstFile.name) !== normalizePath(duplication.secondFile.name)
-        ).length
-    }
+                normalizePath(duplication.firstFile.name) !==
+                normalizePath(duplication.secondFile.name)
+        ).length,
+    },
 };
 
 fs.writeFileSync(reportPath, JSON.stringify(filteredReport, null, 2) + '\n');

@@ -1,8 +1,8 @@
 {
-  "recommendations": [
-    "dbaeumer.vscode-eslint",
-    "esbenp.prettier-vscode",
-    "sonarsource.sonarlint-vscode",
-    "vue.volar"
-  ]
+    "recommendations": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "sonarsource.sonarlint-vscode",
+        "vue.volar"
+    ]
 }

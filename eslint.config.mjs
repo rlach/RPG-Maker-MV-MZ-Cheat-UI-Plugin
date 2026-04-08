@@ -54,7 +54,7 @@ const rpgMakerGlobals = {
     Window_BattleLog: 'readonly',
     Window_Message: 'readonly',
     Window_ScrollText: 'readonly',
-    Window_Selectable: 'readonly'
+    Window_Selectable: 'readonly',
 };
 
 const sharedLanguageOptions = {
@@ -63,8 +63,8 @@ const sharedLanguageOptions = {
     globals: {
         ...globals.browser,
         ...globals.es2024,
-        ...rpgMakerGlobals
-    }
+        ...rpgMakerGlobals,
+    },
 };
 
 const sharedRules = {
@@ -76,9 +76,9 @@ const sharedRules = {
         {
             args: 'none',
             caughtErrors: 'none',
-            ignoreRestSiblings: true
-        }
-    ]
+            ignoreRestSiblings: true,
+        },
+    ],
 };
 
 export default [
@@ -87,16 +87,16 @@ export default [
             'node_modules/**',
             'deploy/output/**',
             'deploy/tmp/**',
-            'cheat-engine/www/cheat/libs/**'
-        ]
+            'cheat-engine/www/cheat/libs/**',
+        ],
     },
     {
         files: ['cheat-engine/www/**/*.js'],
         languageOptions: sharedLanguageOptions,
         linterOptions: {
-            reportUnusedDisableDirectives: 'warn'
+            reportUnusedDisableDirectives: 'warn',
         },
-        rules: sharedRules
+        rules: sharedRules,
     },
     {
         files: ['cheat-engine/www/**/*.vue'],
@@ -105,18 +105,18 @@ export default [
             parser: vueParser,
             parserOptions: {
                 ecmaVersion: 'latest',
-                sourceType: 'module'
-            }
+                sourceType: 'module',
+            },
         },
         plugins: {
-            vue: vuePlugin
+            vue: vuePlugin,
         },
         rules: {
             ...sharedRules,
             'vue/no-parsing-error': 'error',
             'vue/no-unused-components': 'warn',
             'vue/no-unused-vars': 'error',
-            'vue/multi-word-component-names': 'off'
-        }
-    }
+            'vue/multi-word-component-names': 'off',
+        },
+    },
 ];
