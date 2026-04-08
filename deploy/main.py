@@ -6,6 +6,11 @@ import argparse
 import json
 
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(SCRIPT_DIR)
+PACKAGE_JSON_PATH = os.path.join(REPO_ROOT, 'package.json')
+
+
 class GameTypes(Enum):
     MV = 0
     MZ = 1
@@ -37,12 +42,14 @@ class CheatPaths:
 
 class Paths:
     def __init__(self):
-        self.temp_root_path = 'tmp'
+        self.deploy_dir = SCRIPT_DIR
+        self.repo_root = REPO_ROOT
+        self.temp_root_path = os.path.join(self.deploy_dir, 'tmp')
 
-        self.origin = CheatPaths('../cheat-engine/www')
+        self.origin = CheatPaths(os.path.join(self.repo_root, 'cheat-engine', 'www'))
         self.temp = CheatPaths(os.path.join(self.temp_root_path, 'www'))
 
-        self.deploy_output_dir = 'output'
+        self.deploy_output_dir = os.path.join(self.deploy_dir, 'output')
         self.output_files = {
             GameTypes.MV: 'rpg-mv-cheat-{}-core',
             GameTypes.MZ: 'rpg-mz-cheat-{}-core'
@@ -87,13 +94,27 @@ def create_cheat_version_file(version, paths):
         json.dump(data, wf, indent=2)
 
 
+def read_default_version():
+    with open(PACKAGE_JSON_PATH, 'r', encoding='utf-8') as rf:
+        package_data = json.load(rf)
+
+    version = package_data.get('version')
+
+    if not isinstance(version, str) or not version.strip():
+        raise ValueError('package.json must contain a non-empty version string')
+
+    return version.strip()
+
+
 if __name__ == '__main__':
     # parse args
     parser = argparse.ArgumentParser(description='RPG Maker MV/MZ cheat deploy maker')
-    parser.add_argument('--version', required=True, type=str, help='version of deployment')
+    parser.add_argument('--version', required=False, type=str, help='version of deployment')
     args = parser.parse_args()
+    version = args.version or read_default_version()
 
     paths = Paths()
+    os.makedirs(paths.deploy_output_dir, exist_ok=True)
 
     # Clean up temp directory at the start to avoid conflicts
     if os.path.exists(paths.temp_root_path):
@@ -126,7 +147,7 @@ if __name__ == '__main__':
             shutil.rmtree(idea_dir)
 
         # Create version file before restructuring
-        create_cheat_version_file(args.version, paths)
+        create_cheat_version_file(version, paths)
 
         # For MV: restructure to have everything under www/
         # For MZ: keep everything in root (cheat, js, www/cheat-settings)
@@ -145,7 +166,7 @@ if __name__ == '__main__':
             # For MZ, use temp root directly
             archive_root = paths.temp.root_dir
         
-        shutil.make_archive(paths.get_output_file_path(game_type, args.version), 'gztar', archive_root)
+        shutil.make_archive(paths.get_output_file_path(game_type, version), 'gztar', archive_root)
 
         # remove temp directory
         shutil.rmtree(paths.temp_root_path)

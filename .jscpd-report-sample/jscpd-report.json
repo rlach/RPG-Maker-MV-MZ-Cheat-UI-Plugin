@@ -1,0 +1,1033 @@
+{
+  "statistics": {
+    "detectionDate": "2026-04-08T11:37:55.901Z",
+    "formats": {
+      "javascript": {
+        "sources": {
+          "cheat-engine/www/cheat/js/EventCommandTraversal.js": {
+            "lines": 149,
+            "tokens": 1398,
+            "sources": 1,
+            "clones": 53,
+            "duplicatedLines": 136,
+            "duplicatedTokens": 957,
+            "percentage": 91.28,
+            "percentageTokens": 68.45,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "cheat-engine/www/cheat/js/DialogHelper.js": {
+            "lines": 8,
+            "tokens": 55,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 4,
+            "duplicatedTokens": 21,
+            "percentage": 50,
+            "percentageTokens": 38.18,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 157,
+          "tokens": 1453,
+          "sources": 2,
+          "clones": 27,
+          "duplicatedLines": 70,
+          "duplicatedTokens": 489,
+          "percentage": 44.59,
+          "percentageTokens": 33.65,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      }
+    },
+    "total": {
+      "lines": 157,
+      "tokens": 1453,
+      "sources": 2,
+      "clones": 27,
+      "duplicatedLines": 70,
+      "duplicatedTokens": 489,
+      "percentage": 44.59,
+      "percentageTokens": 33.65,
+      "newDuplicatedLines": 0,
+      "newClones": 0
+    }
+  },
+  "duplicates": [
+    {
+      "format": "javascript",
+      "lines": 5,
+      "fragment": ") {\r\n        return null;\r\n    }\r\n\r\n    const speaker",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 19,
+        "end": 23,
+        "startLoc": {
+          "line": 19,
+          "column": 15,
+          "position": 185
+        },
+        "endLoc": {
+          "line": 23,
+          "column": 8,
+          "position": 206
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 14,
+        "end": 18,
+        "startLoc": {
+          "line": 14,
+          "column": 7,
+          "position": 137
+        },
+        "endLoc": {
+          "line": 18,
+          "column": 4,
+          "position": 158
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 2,
+      "fragment": "&&\r\n        list[nextIndex].",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 28,
+        "end": 29,
+        "startLoc": {
+          "line": 28,
+          "column": 2,
+          "position": 282
+        },
+        "endLoc": {
+          "line": 29,
+          "column": 2,
+          "position": 290
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 27,
+        "end": 28,
+        "startLoc": {
+          "line": 27,
+          "column": 2,
+          "position": 273
+        },
+        "endLoc": {
+          "line": 28,
+          "column": 3,
+          "position": 282
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 2,
+      "fragment": ") {\r\n    if (!Array.isArray(list))",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 45,
+        "end": 46,
+        "startLoc": {
+          "line": 45,
+          "column": 5,
+          "position": 413
+        },
+        "endLoc": {
+          "line": 46,
+          "column": 2,
+          "position": 429
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 13,
+        "end": 14,
+        "startLoc": {
+          "line": 13,
+          "column": 16,
+          "position": 103
+        },
+        "endLoc": {
+          "line": 14,
+          "column": 3,
+          "position": 120
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 2,
+      "fragment": "];\r\n        if (!cmd || typeof",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 53,
+        "end": 54,
+        "startLoc": {
+          "line": 53,
+          "column": 2,
+          "position": 501
+        },
+        "endLoc": {
+          "line": 54,
+          "column": 7,
+          "position": 514
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 18,
+        "end": 19,
+        "startLoc": {
+          "line": 18,
+          "column": 16,
+          "position": 165
+        },
+        "endLoc": {
+          "line": 19,
+          "column": 4,
+          "position": 178
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 5,
+      "fragment": ") {\r\n                continue;\r\n            }\r\n\r\n            if (isNonEmptyString",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 60,
+        "end": 64,
+        "startLoc": {
+          "line": 60,
+          "column": 13,
+          "position": 578
+        },
+        "endLoc": {
+          "line": 64,
+          "column": 17,
+          "position": 598
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 54,
+        "end": 58,
+        "startLoc": {
+          "line": 54,
+          "column": 9,
+          "position": 523
+        },
+        "endLoc": {
+          "line": 58,
+          "column": 4,
+          "position": 543
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 3,
+      "fragment": "nextIndex,\r\n                    command: cmd,\r\n                }",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 69,
+        "end": 71,
+        "startLoc": {
+          "line": 69,
+          "column": 2,
+          "position": 649
+        },
+        "endLoc": {
+          "line": 71,
+          "column": 2,
+          "position": 662
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 37,
+        "end": 39,
+        "startLoc": {
+          "line": 37,
+          "column": 9,
+          "position": 361
+        },
+        "endLoc": {
+          "line": 39,
+          "column": 8,
+          "position": 374
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 4,
+      "fragment": ";\r\n            }\r\n\r\n            if (isNonEmptyString(messageEntry.text",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 71,
+        "end": 74,
+        "startLoc": {
+          "line": 71,
+          "column": 2,
+          "position": 664
+        },
+        "endLoc": {
+          "line": 74,
+          "column": 5,
+          "position": 681
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 61,
+        "end": 64,
+        "startLoc": {
+          "line": 61,
+          "column": 9,
+          "position": 585
+        },
+        "endLoc": {
+          "line": 64,
+          "column": 8,
+          "position": 602
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 3,
+      "fragment": ")) {\r\n                entries.push({\r\n                    type: 'text'",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 74,
+        "end": 76,
+        "startLoc": {
+          "line": 74,
+          "column": 5,
+          "position": 682
+        },
+        "endLoc": {
+          "line": 76,
+          "column": 7,
+          "position": 700
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 64,
+        "end": 66,
+        "startLoc": {
+          "line": 64,
+          "column": 8,
+          "position": 603
+        },
+        "endLoc": {
+          "line": 66,
+          "column": 10,
+          "position": 621
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 2,
+      "fragment": ",\r\n                    value: messageEntry.text",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 76,
+        "end": 77,
+        "startLoc": {
+          "line": 76,
+          "column": 7,
+          "position": 701
+        },
+        "endLoc": {
+          "line": 77,
+          "column": 5,
+          "position": 710
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 66,
+        "end": 67,
+        "startLoc": {
+          "line": 66,
+          "column": 10,
+          "position": 622
+        },
+        "endLoc": {
+          "line": 67,
+          "column": 8,
+          "position": 631
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 8,
+      "fragment": ",\r\n                    cmdIndex: i,\r\n                    nextIndex: messageEntry.nextIndex,\r\n                    command: cmd,\r\n                });\r\n            }\r\n\r\n            continue",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 77,
+        "end": 84,
+        "startLoc": {
+          "line": 77,
+          "column": 5,
+          "position": 711
+        },
+        "endLoc": {
+          "line": 84,
+          "column": 9,
+          "position": 753
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 67,
+        "end": 74,
+        "startLoc": {
+          "line": 67,
+          "column": 8,
+          "position": 632
+        },
+        "endLoc": {
+          "line": 74,
+          "column": 3,
+          "position": 674
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 4,
+      "fragment": "continue;\r\n        }\r\n\r\n        if (cmd.code === SHOW_CHOICES_CODE",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 84,
+        "end": 87,
+        "startLoc": {
+          "line": 84,
+          "column": 13,
+          "position": 753
+        },
+        "endLoc": {
+          "line": 87,
+          "column": 18,
+          "position": 773
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 55,
+        "end": 58,
+        "startLoc": {
+          "line": 55,
+          "column": 13,
+          "position": 529
+        },
+        "endLoc": {
+          "line": 58,
+          "column": 15,
+          "position": 549
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 2,
+      "fragment": "];\r\n            if (!Array",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 88,
+        "end": 89,
+        "startLoc": {
+          "line": 88,
+          "column": 2,
+          "position": 797
+        },
+        "endLoc": {
+          "line": 89,
+          "column": 6,
+          "position": 806
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 18,
+        "end": 19,
+        "startLoc": {
+          "line": 18,
+          "column": 16,
+          "position": 165
+        },
+        "endLoc": {
+          "line": 19,
+          "column": 4,
+          "position": 174
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 5,
+      "fragment": ") {\r\n                continue;\r\n            }\r\n\r\n            for",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 89,
+        "end": 93,
+        "startLoc": {
+          "line": 89,
+          "column": 2,
+          "position": 812
+        },
+        "endLoc": {
+          "line": 93,
+          "column": 4,
+          "position": 829
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 54,
+        "end": 58,
+        "startLoc": {
+          "line": 54,
+          "column": 9,
+          "position": 523
+        },
+        "endLoc": {
+          "line": 58,
+          "column": 3,
+          "position": 540
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 2,
+      "fragment": "];\r\n                if (!isNonEmptyString",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 94,
+        "end": 95,
+        "startLoc": {
+          "line": 94,
+          "column": 12,
+          "position": 867
+        },
+        "endLoc": {
+          "line": 95,
+          "column": 17,
+          "position": 876
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 18,
+        "end": 19,
+        "startLoc": {
+          "line": 18,
+          "column": 16,
+          "position": 165
+        },
+        "endLoc": {
+          "line": 19,
+          "column": 4,
+          "position": 174
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 5,
+      "fragment": ")) {\r\n                    continue;\r\n                }\r\n\r\n                entries",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 95,
+        "end": 99,
+        "startLoc": {
+          "line": 95,
+          "column": 7,
+          "position": 879
+        },
+        "endLoc": {
+          "line": 99,
+          "column": 8,
+          "position": 897
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 89,
+        "end": 58,
+        "startLoc": {
+          "line": 89,
+          "column": 8,
+          "position": 811
+        },
+        "endLoc": {
+          "line": 58,
+          "column": 3,
+          "position": 540
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 2,
+      "fragment": "entries.push({\r\n                    type: 'choice'",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 99,
+        "end": 100,
+        "startLoc": {
+          "line": 99,
+          "column": 17,
+          "position": 897
+        },
+        "endLoc": {
+          "line": 100,
+          "column": 9,
+          "position": 908
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 65,
+        "end": 66,
+        "startLoc": {
+          "line": 65,
+          "column": 17,
+          "position": 610
+        },
+        "endLoc": {
+          "line": 66,
+          "column": 10,
+          "position": 621
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 3,
+      "fragment": ",\r\n                    cmdIndex: i,\r\n                    choiceIndex",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 101,
+        "end": 103,
+        "startLoc": {
+          "line": 101,
+          "column": 7,
+          "position": 917
+        },
+        "endLoc": {
+          "line": 103,
+          "column": 12,
+          "position": 929
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 67,
+        "end": 69,
+        "startLoc": {
+          "line": 67,
+          "column": 8,
+          "position": 632
+        },
+        "endLoc": {
+          "line": 69,
+          "column": 10,
+          "position": 644
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 5,
+      "fragment": ",\r\n                    command: cmd,\r\n                });\r\n            }\r\n        }",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 103,
+        "end": 107,
+        "startLoc": {
+          "line": 103,
+          "column": 12,
+          "position": 930
+        },
+        "endLoc": {
+          "line": 107,
+          "column": 2,
+          "position": 952
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 37,
+        "end": 74,
+        "startLoc": {
+          "line": 37,
+          "column": 10,
+          "position": 362
+        },
+        "endLoc": {
+          "line": 74,
+          "column": 3,
+          "position": 674
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 4,
+      "fragment": "};\r\n}\r\n\r\nexport function findNearestMessageEntry",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 125,
+        "end": 128,
+        "startLoc": {
+          "line": 125,
+          "column": 2,
+          "position": 1116
+        },
+        "endLoc": {
+          "line": 128,
+          "column": 24,
+          "position": 1129
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 42,
+        "end": 45,
+        "startLoc": {
+          "line": 42,
+          "column": 5,
+          "position": 397
+        },
+        "endLoc": {
+          "line": 45,
+          "column": 27,
+          "position": 410
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 2,
+      "fragment": ") {\r\n    if (!Array.isArray(list) || list",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 128,
+        "end": 129,
+        "startLoc": {
+          "line": 128,
+          "column": 2,
+          "position": 1139
+        },
+        "endLoc": {
+          "line": 129,
+          "column": 5,
+          "position": 1158
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 13,
+        "end": 14,
+        "startLoc": {
+          "line": 13,
+          "column": 16,
+          "position": 103
+        },
+        "endLoc": {
+          "line": 14,
+          "column": 16,
+          "position": 122
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 5,
+      "fragment": ") {\r\n        return null;\r\n    }\r\n\r\n    const start",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 129,
+        "end": 133,
+        "startLoc": {
+          "line": 129,
+          "column": 2,
+          "position": 1165
+        },
+        "endLoc": {
+          "line": 133,
+          "column": 6,
+          "position": 1186
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 14,
+        "end": 18,
+        "startLoc": {
+          "line": 14,
+          "column": 7,
+          "position": 137
+        },
+        "endLoc": {
+          "line": 18,
+          "column": 4,
+          "position": 158
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 3,
+      "fragment": ";\r\n\r\n    for (let i = start",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 133,
+        "end": 135,
+        "startLoc": {
+          "line": 133,
+          "column": 2,
+          "position": 1220
+        },
+        "endLoc": {
+          "line": 135,
+          "column": 6,
+          "position": 1235
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 50,
+        "end": 52,
+        "startLoc": {
+          "line": 50,
+          "column": 2,
+          "position": 457
+        },
+        "endLoc": {
+          "line": 52,
+          "column": 2,
+          "position": 472
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 2,
+      "fragment": "= extractMessageEntryAt(list, i);\r\n        if (found",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 136,
+        "end": 137,
+        "startLoc": {
+          "line": 136,
+          "column": 2,
+          "position": 1257
+        },
+        "endLoc": {
+          "line": 137,
+          "column": 6,
+          "position": 1273
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 59,
+        "end": 60,
+        "startLoc": {
+          "line": 59,
+          "column": 2,
+          "position": 560
+        },
+        "endLoc": {
+          "line": 60,
+          "column": 2,
+          "position": 576
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 2,
+      "fragment": ".text)) {\r\n            return",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 137,
+        "end": 138,
+        "startLoc": {
+          "line": 137,
+          "column": 6,
+          "position": 1280
+        },
+        "endLoc": {
+          "line": 138,
+          "column": 7,
+          "position": 1289
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 74,
+        "end": 75,
+        "startLoc": {
+          "line": 74,
+          "column": 13,
+          "position": 680
+        },
+        "endLoc": {
+          "line": 75,
+          "column": 8,
+          "position": 689
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 2,
+      "fragment": "; i < list.length; i++) {\r\n        const found",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 142,
+        "end": 143,
+        "startLoc": {
+          "line": 142,
+          "column": 2,
+          "position": 1320
+        },
+        "endLoc": {
+          "line": 143,
+          "column": 6,
+          "position": 1341
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 52,
+        "end": 53,
+        "startLoc": {
+          "line": 52,
+          "column": 2,
+          "position": 473
+        },
+        "endLoc": {
+          "line": 53,
+          "column": 4,
+          "position": 494
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 8,
+      "fragment": ") {\r\n        const found = extractMessageEntryAt(list, i);\r\n        if (found && isNonEmptyString(found.text)) {\r\n            return found;\r\n        }\r\n    }\r\n\r\n    return",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 142,
+        "end": 149,
+        "startLoc": {
+          "line": 142,
+          "column": 3,
+          "position": 1333
+        },
+        "endLoc": {
+          "line": 149,
+          "column": 7,
+          "position": 1392
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 135,
+        "end": 142,
+        "startLoc": {
+          "line": 135,
+          "column": 3,
+          "position": 1247
+        },
+        "endLoc": {
+          "line": 142,
+          "column": 4,
+          "position": 1306
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 5,
+      "fragment": "}\r\n\r\nfunction foobar() {\r\n    return 'foobar';\r\n}",
+      "tokens": 0,
+      "firstFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\DialogHelper.js",
+        "start": 5,
+        "end": 9,
+        "startLoc": {
+          "line": 5,
+          "column": 1,
+          "position": 34
+        },
+        "endLoc": {
+          "line": 9,
+          "column": 2,
+          "position": 55
+        }
+      },
+      "secondFile": {
+        "name": "cheat-engine\\www\\cheat\\js\\EventCommandTraversal.js",
+        "start": 7,
+        "end": 11,
+        "startLoc": {
+          "line": 7,
+          "column": 1,
+          "position": 67
+        },
+        "endLoc": {
+          "line": 11,
+          "column": 2,
+          "position": 88
+        }
+      }
+    }
+  ]
+}

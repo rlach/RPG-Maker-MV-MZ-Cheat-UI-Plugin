@@ -1,0 +1,23 @@
+{
+  "absolute": false,
+  "format": [
+    "javascript",
+    "markup"
+  ],
+  "ignore": [
+    "**/node_modules/**",
+    "**/deploy/output/**",
+    "**/deploy/tmp/**",
+    "**/cheat-engine/www/cheat/libs/**"
+  ],
+  "minLines": 10,
+  "minTokens": 20,
+  "output": "./.jscpd-report",
+  "pattern": "**/*.{js,vue,html}",
+  "path": [
+    "./cheat-engine/www"
+  ],
+  "reporters": [
+    "json"
+  ]
+}

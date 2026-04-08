@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "allowJs": true,
+    "checkJs": true,
+    "noImplicitAny": false,
+    "noUnusedLocals": true,
+    "maxNodeModuleJsDepth": 0
+  },
+  "include": [
+    "cheat-engine/www/**/*.js",
+    "cheat-engine/www/**/*.vue",
+    "cheat-engine/www/**/*.html",
+    "types/**/*.d.ts"
+  ],
+  "exclude": [
+    "cheat-engine/www/cheat/libs/**",
+    "**/node_modules/**"
+  ]
+}

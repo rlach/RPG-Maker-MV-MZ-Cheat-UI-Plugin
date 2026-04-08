@@ -1,4 +1,8 @@
 .idea/
 venv/
+node_modules/
+.jscpd-report/
 deploy/output/
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
