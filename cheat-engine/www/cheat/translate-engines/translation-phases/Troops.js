@@ -1,198 +1,174 @@
-import { BasePhase } from "./BasePhase.js";
+import { BasePhase } from './BasePhase.js';
 import {
-  collectEventCommandEntries,
-  countEventCommandEntries,
-} from "../../js/EventCommandTraversal.js";
+    collectEventCommandEntries,
+    countEventCommandEntries,
+} from '../../js/EventCommandTraversal.js';
 
 export class Troops extends BasePhase {
-  static getInstance() {
-    if (!Troops._instance) {
-      Troops._instance = new Troops();
-    }
-    return Troops._instance;
-  }
-
-  getTranslationPhaseLabel() {
-    return "translating troops";
-  }
-
-  getKind() {
-    return "troops";
-  }
-
-  async createEntries() {
-    return [
-      {
-        strategy: this,
-        priorityMapId: 0,
-      },
-    ];
-  }
-
-  countAmountSync({ panel }) {
-    if (!Array.isArray(window.$dataTroops)) {
-      return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
+    static getInstance() {
+        if (!Troops._instance) {
+            Troops._instance = new Troops();
+        }
+        return Troops._instance;
     }
 
-    let totalStrings = 0;
-    let leftStrings = 0;
+    getTranslationPhaseLabel() {
+        return 'translating troops';
+    }
 
-    for (const troop of $dataTroops) {
-      if (!troop || !Array.isArray(troop.pages)) {
-        continue;
-      }
+    getKind() {
+        return 'troops';
+    }
 
-      for (const page of troop.pages) {
-        if (!page || !Array.isArray(page.list)) {
-          continue;
+    async createEntries() {
+        return [
+            {
+                strategy: this,
+                priorityMapId: 0,
+            },
+        ];
+    }
+
+    countAmountSync({ panel }) {
+        if (!Array.isArray(window.$dataTroops)) {
+            return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 
-        const stats = countEventCommandEntries(page.list, {
-          isUntranslated(entry) {
-            return !panel.hasUsableCacheValue(
-              panel.getCacheKey(entry.value, "troop"),
-            );
-          },
-        });
-        totalStrings += stats.totalStrings;
-        leftStrings += stats.leftStrings;
-      }
-    }
+        let totalStrings = 0;
+        let leftStrings = 0;
 
-    return {
-      total: totalStrings,
-      left: leftStrings,
-      totalStrings,
-      leftStrings,
-    };
-  }
+        for (const troop of $dataTroops) {
+            if (!troop || !Array.isArray(troop.pages)) {
+                continue;
+            }
 
-  collectUntranslated({ panel }) {
-    if (!Array.isArray(window.$dataTroops)) {
-      return [];
-    }
+            for (const page of troop.pages) {
+                if (!page || !Array.isArray(page.list)) {
+                    continue;
+                }
 
-    const itemsByCacheKey = new Map();
-    let runningCounter = 0;
-
-    const pushTroopItem = (
-      rawText,
-      originalType,
-      troopIdx,
-      pageIdx,
-      cmdIdx,
-    ) => {
-      if (typeof rawText !== "string" || rawText.trim() === "") {
-        return;
-      }
-
-      const cacheKey = panel.getCacheKey(rawText, "troop");
-      if (panel.hasUsableCacheValue(cacheKey)) {
-        return;
-      }
-
-      const existing = itemsByCacheKey.get(cacheKey);
-      if (existing) {
-        if (!existing.originalTypes.includes(originalType)) {
-          existing.originalTypes.push(originalType);
-        }
-        return;
-      }
-
-      itemsByCacheKey.set(cacheKey, {
-        type: "troop",
-        id: `troop_${troopIdx}_${pageIdx}_${originalType}_${runningCounter++}`,
-        value: rawText,
-        cacheKey,
-        originalTypes: [originalType],
-        troopIdx,
-        pageIdx,
-        cmdIdx,
-      });
-    };
-
-    for (let troopIdx = 0; troopIdx < $dataTroops.length; troopIdx++) {
-      const troop = $dataTroops[troopIdx];
-      if (!troop || !Array.isArray(troop.pages)) {
-        continue;
-      }
-
-      for (let pageIdx = 0; pageIdx < troop.pages.length; pageIdx++) {
-        const page = troop.pages[pageIdx];
-        if (!page || !Array.isArray(page.list)) {
-          continue;
+                const stats = countEventCommandEntries(page.list, {
+                    isUntranslated(entry) {
+                        return !panel.hasUsableCacheValue(panel.getCacheKey(entry.value, 'troop'));
+                    },
+                });
+                totalStrings += stats.totalStrings;
+                leftStrings += stats.leftStrings;
+            }
         }
 
-        const entries = collectEventCommandEntries(page.list);
-        for (const entry of entries) {
-          pushTroopItem(
-            entry.value,
-            entry.type,
-            troopIdx,
-            pageIdx,
-            entry.cmdIndex,
-          );
+        return {
+            total: totalStrings,
+            left: leftStrings,
+            totalStrings,
+            leftStrings,
+        };
+    }
+
+    collectUntranslated({ panel }) {
+        if (!Array.isArray(window.$dataTroops)) {
+            return [];
         }
-      }
-    }
 
-    return Array.from(itemsByCacheKey.values());
-  }
+        const itemsByCacheKey = new Map();
+        let runningCounter = 0;
 
-  setData({ panel, pendingItems, successes, failures }) {
-    for (const success of successes || []) {
-      if (!success || !success.cacheKey) {
-        continue;
-      }
+        const pushTroopItem = (rawText, originalType, troopIdx, pageIdx, cmdIdx) => {
+            if (typeof rawText !== 'string' || rawText.trim() === '') {
+                return;
+            }
 
-      panel.setCacheValue(success.cacheKey, success.translated, {
-        persist: false,
-      });
-    }
+            const cacheKey = panel.getCacheKey(rawText, 'troop');
+            if (panel.hasUsableCacheValue(cacheKey)) {
+                return;
+            }
 
-    panel.markBatchFailuresAsUntranslated(failures || [], true);
+            const existing = itemsByCacheKey.get(cacheKey);
+            if (existing) {
+                if (!existing.originalTypes.includes(originalType)) {
+                    existing.originalTypes.push(originalType);
+                }
+                return;
+            }
 
-    const pendingByCacheKey = new Map(
-      (pendingItems || [])
-        .filter((entry) => entry && entry.cacheKey)
-        .map((entry) => [entry.cacheKey, entry]),
-    );
-    const changedKeys = [];
-
-    for (const success of successes || []) {
-      if (!success || !success.cacheKey) {
-        continue;
-      }
-
-      const source = pendingByCacheKey.get(success.cacheKey);
-      const originalTypes =
-        source && Array.isArray(source.originalTypes)
-          ? source.originalTypes
-          : source && source.originalType
-            ? [source.originalType]
-            : [];
-      const originalValue = source && source.value;
-      if (originalTypes.length === 0 || !originalValue) {
-        continue;
-      }
-
-      for (const originalType of originalTypes) {
-        const cacheKey = panel.getCacheKey(originalValue, originalType);
-        panel.setCacheValue(cacheKey, success.translated, { persist: false });
-        changedKeys.push(cacheKey);
-
-        if (originalType === "speaker") {
-          const legacySpeakerKey = panel.getLegacySpeakerCacheKey(originalValue);
-          if (legacySpeakerKey) {
-            panel.setCacheValue(legacySpeakerKey, success.translated, {
-              persist: false,
+            itemsByCacheKey.set(cacheKey, {
+                type: 'troop',
+                id: `troop_${troopIdx}_${pageIdx}_${originalType}_${runningCounter++}`,
+                value: rawText,
+                cacheKey,
+                originalTypes: [originalType],
+                troopIdx,
+                pageIdx,
+                cmdIdx,
             });
-            changedKeys.push(legacySpeakerKey);
-          }
+        };
+
+        for (let troopIdx = 0; troopIdx < $dataTroops.length; troopIdx++) {
+            const troop = $dataTroops[troopIdx];
+            if (!troop || !Array.isArray(troop.pages)) {
+                continue;
+            }
+
+            for (let pageIdx = 0; pageIdx < troop.pages.length; pageIdx++) {
+                const page = troop.pages[pageIdx];
+                if (!page || !Array.isArray(page.list)) {
+                    continue;
+                }
+
+                const entries = collectEventCommandEntries(page.list);
+                for (const entry of entries) {
+                    pushTroopItem(entry.value, entry.type, troopIdx, pageIdx, entry.cmdIndex);
+                }
+            }
         }
-      }
+
+        return Array.from(itemsByCacheKey.values());
     }
 
-    panel.persistCache(changedKeys);
-  }
+    setData({ panel, pendingItems, successes, failures }) {
+        for (const success of successes || []) {
+            if (!success || !success.cacheKey) {
+                continue;
+            }
+
+            panel.setCacheValue(success.cacheKey, success.translated, {
+                persist: false,
+            });
+        }
+
+        panel.markBatchFailuresAsUntranslated(failures || [], true);
+
+        const pendingByCacheKey = new Map(
+            (pendingItems || [])
+                .filter((entry) => entry && entry.cacheKey)
+                .map((entry) => [entry.cacheKey, entry])
+        );
+        const changedKeys = [];
+
+        for (const success of successes || []) {
+            if (!success || !success.cacheKey) {
+                continue;
+            }
+
+            const source = pendingByCacheKey.get(success.cacheKey);
+            const originalTypes =
+                source && Array.isArray(source.originalTypes)
+                    ? source.originalTypes
+                    : source && source.originalType
+                      ? [source.originalType]
+                      : [];
+            const originalValue = source && source.value;
+            if (originalTypes.length === 0 || !originalValue) {
+                continue;
+            }
+
+            for (const originalType of originalTypes) {
+                const cacheKey = panel.getCacheKey(originalValue, originalType);
+                panel.setCacheValue(cacheKey, success.translated, { persist: false });
+                changedKeys.push(cacheKey);
+            }
+        }
+
+        panel.persistCache(changedKeys);
+    }
 }
