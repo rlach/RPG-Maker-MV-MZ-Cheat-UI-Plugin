@@ -1,20 +1,20 @@
-import GeneralPanel from './panels/GeneralPanel.js'
-import HealthSettingPanel from './panels/HealthSettingPanel.js'
-import StatsSettingPanel from './panels/StatsSettingPanel.js'
-import ItemSettingPanel from './panels/ItemSettingPanel.js'
-import WeaponSettingPanel from './panels/WeaponSettingPanel.js'
-import ArmorSettingPanel from './panels/ArmorSettingPanel.js'
-import VariableSettingPanel from './panels/VariableSettingPanel.js'
-import SwitchSettingPanel from './panels/SwitchSettingPanel.js'
-import SaveRecallPanel from './panels/SaveRecallPanel.js'
-import TeleportPanel from './panels/TeleportPanel.js'
-import TextLogPanel from './panels/TextLogPanel.js'
-import ShortcutPanel from './panels/ShortcutPanel.js'
-import TranslateSettingsPanel from './panels/TranslateSettingsPanel.js'
-import TranslateOnTheFlyPanel from './panels/TranslateOnTheFlyPanel.js'
-import TranslateNamesPanel from './panels/TranslateNamesPanel.js'
-import TranslateCacheManagerPanel from './panels/TranslateCacheManagerPanel.js'
-import { CHEAT_WINDOW_MANAGER } from './js/CheatWindowManager.js'
+import GeneralPanel from './panels/GeneralPanel.js';
+import HealthSettingPanel from './panels/HealthSettingPanel.js';
+import StatsSettingPanel from './panels/StatsSettingPanel.js';
+import ItemSettingPanel from './panels/ItemSettingPanel.js';
+import WeaponSettingPanel from './panels/WeaponSettingPanel.js';
+import ArmorSettingPanel from './panels/ArmorSettingPanel.js';
+import VariableSettingPanel from './panels/VariableSettingPanel.js';
+import SwitchSettingPanel from './panels/SwitchSettingPanel.js';
+import SaveRecallPanel from './panels/SaveRecallPanel.js';
+import TeleportPanel from './panels/TeleportPanel.js';
+import TextLogPanel from './panels/TextLogPanel.js';
+import ShortcutPanel from './panels/ShortcutPanel.js';
+import TranslateSettingsPanel from './panels/TranslateSettingsPanel.js';
+import TranslateOnTheFlyPanel from './panels/TranslateOnTheFlyPanel.js';
+import TranslateNamesPanel from './panels/TranslateNamesPanel.js';
+import TranslateCacheManagerPanel from './panels/TranslateCacheManagerPanel.js';
+import { CHEAT_WINDOW_MANAGER } from './js/CheatWindowManager.js';
 
 export default {
     name: 'CheatModal',
@@ -35,7 +35,7 @@ export default {
         TranslateSettingsPanel,
         TranslateOnTheFlyPanel,
         TranslateNamesPanel,
-        TranslateCacheManagerPanel
+        TranslateCacheManagerPanel,
     },
 
     template: `
@@ -80,211 +80,206 @@ export default {
 
     model: {
         prop: 'currentComponentName',
-        event: 'change'
+        event: 'change',
     },
 
     props: {
         currentComponentName: {
-            type: String
-        }
+            type: String,
+        },
     },
 
-    data () {
-      return {
-          navWidth: 200,
+    data() {
+        return {
+            navWidth: 200,
 
-          navTreeModel: undefined,
+            navTreeModel: undefined,
 
-          navTreeItems: [
-              {
-                  name: 'General',
-                  icon: 'mdi-hammer-screwdriver',
-                  component: 'general-panel'
-              },
-              {
-                  name: 'Shortcuts',
-                  icon: 'mdi-keyboard-outline',
-                  component: 'shortcut-panel'
-              },
-              {
-                  name: 'HP/MP/Battle',
-                  icon: 'mdi-battery-70',
-                  component: 'health-setting-panel'
-              },
-              {
-                  name: 'Stats/Level',
-                  icon: 'mdi-sword-cross',
-                  component: 'stats-setting-panel'
-              },
-              {
-                  name: 'Items',
-                  icon: 'mdi-bag-personal-outline',
-                  children: [
-                      {
-                          name: 'Item',
-                          icon: 'mdi-flask-empty-plus',
-                          component: 'item-setting-panel'
-                      },
-                      {
-                          name: 'Weapon',
-                          icon: 'mdi-sword',
-                          component: 'weapon-setting-panel'
-                      },
-                      {
-                          name: 'Armor',
-                          icon: 'mdi-shield-plus',
-                          component: 'armor-setting-panel'
-                      }
-                  ]
-              },
-              {
-                  name: 'Clear States',
-                  icon: 'mdi-water-off',
-                  component: ''
-              },
-              {
-                  name: 'Variables',
-                  icon: 'mdi-variable',
-                  component: 'variable-setting-panel'
-              },
-              {
-                  name: 'Switches',
-                  icon: 'mdi-toggle-switch',
-                  component: 'switch-setting-panel'
-              },
-              {
-                  name: 'Save Locations',
-                  icon: 'mdi-map-marker-plus',
-                  component: 'save-recall-panel'
-              },
-              {
-                  name: 'Teleport',
-                  icon: 'mdi-run-fast',
-                  component: 'teleport-panel'
-              },
-              {
-                  name: 'Text Log',
-                  icon: 'mdi-text-box-outline',
-                  component: 'text-log-panel'
-              },
-              {
-                  name: 'Translations',
-                  icon: 'mdi-cog',
-                  children: [
-                      {
-                          name: 'Translate',
-                          icon: 'mdi-google-translate',
-                          component: 'translate-settings-panel'
-                      },
-                      {
-                          name: 'Translate On The Fly',
-                          icon: 'mdi-translate',
-                          component: 'translate-on-the-fly-panel'
-                      },
-                      {
-                          name: 'Translate Names',
-                          icon: 'mdi-account-edit',
-                          component: 'translate-names-panel'
-                      },
-                      {
-                          name: 'Cache Manager',
-                          icon: 'mdi-table-search',
-                          component: 'translate-cache-manager-panel'
-                      }
-                  ]
-                            }
+            navTreeItems: [
+                {
+                    name: 'General',
+                    icon: 'mdi-hammer-screwdriver',
+                    component: 'general-panel',
+                },
+                {
+                    name: 'Shortcuts',
+                    icon: 'mdi-keyboard-outline',
+                    component: 'shortcut-panel',
+                },
+                {
+                    name: 'HP/MP/Battle',
+                    icon: 'mdi-battery-70',
+                    component: 'health-setting-panel',
+                },
+                {
+                    name: 'Stats/Level',
+                    icon: 'mdi-sword-cross',
+                    component: 'stats-setting-panel',
+                },
+                {
+                    name: 'Items',
+                    icon: 'mdi-bag-personal-outline',
+                    children: [
+                        {
+                            name: 'Item',
+                            icon: 'mdi-flask-empty-plus',
+                            component: 'item-setting-panel',
+                        },
+                        {
+                            name: 'Weapon',
+                            icon: 'mdi-sword',
+                            component: 'weapon-setting-panel',
+                        },
+                        {
+                            name: 'Armor',
+                            icon: 'mdi-shield-plus',
+                            component: 'armor-setting-panel',
+                        },
                     ],
-                    overlayWidth: 700,
-                    overlayHeight: 400,
-                    resizeObserver: null
-      }
+                },
+                {
+                    name: 'Variables',
+                    icon: 'mdi-variable',
+                    component: 'variable-setting-panel',
+                },
+                {
+                    name: 'Switches',
+                    icon: 'mdi-toggle-switch',
+                    component: 'switch-setting-panel',
+                },
+                {
+                    name: 'Save Locations',
+                    icon: 'mdi-map-marker-plus',
+                    component: 'save-recall-panel',
+                },
+                {
+                    name: 'Teleport',
+                    icon: 'mdi-run-fast',
+                    component: 'teleport-panel',
+                },
+                {
+                    name: 'Text Log',
+                    icon: 'mdi-text-box-outline',
+                    component: 'text-log-panel',
+                },
+                {
+                    name: 'Translations',
+                    icon: 'mdi-cog',
+                    children: [
+                        {
+                            name: 'Settings',
+                            icon: 'mdi-translate',
+                            component: 'translate-on-the-fly-panel',
+                        },
+                        {
+                            name: 'Names Manager',
+                            icon: 'mdi-account-edit',
+                            component: 'translate-names-panel',
+                        },
+                        {
+                            name: 'Cache Manager',
+                            icon: 'mdi-table-search',
+                            component: 'translate-cache-manager-panel',
+                        },
+                        {
+                            name: 'ezTrans Settings',
+                            icon: 'mdi-google-translate',
+                            component: 'translate-settings-panel',
+                        },
+                    ],
+                },
+            ],
+            overlayWidth: 700,
+            overlayHeight: 400,
+            resizeObserver: null,
+        };
     },
 
     computed: {
-        componentNameToNavItem () {
-            const ret = {}
-            this.iterateLeaf(this.navTreeItems, item => {
-                ret[item.component] = item
-            })
-            return ret
-        }
+        componentNameToNavItem() {
+            const ret = {};
+            this.iterateLeaf(this.navTreeItems, (item) => {
+                ret[item.component] = item;
+            });
+            return ret;
+        },
     },
 
-    mounted () {
-        const size = CHEAT_WINDOW_MANAGER.getOverlaySize()
+    mounted() {
+        const size = CHEAT_WINDOW_MANAGER.getOverlaySize();
         if (size && Number.isFinite(size.width) && Number.isFinite(size.height)) {
-            this.overlayWidth = size.width
-            this.overlayHeight = size.height
+            this.overlayWidth = size.width;
+            this.overlayHeight = size.height;
         }
 
-        this.initResizeObserver()
+        this.initResizeObserver();
 
-        let navItem = this.componentNameToNavItem[this.currentComponentName]
+        let navItem = this.componentNameToNavItem[this.currentComponentName];
 
         if (!navItem) {
-            navItem = Object.values(this.componentNameToNavItem)[0]
-            this.$emit('change', navItem.component)
+            navItem = Object.values(this.componentNameToNavItem)[0];
+            this.$emit('change', navItem.component);
         }
-        this.navTreeModel = [navItem]
+        this.navTreeModel = [navItem];
     },
 
     methods: {
-        initResizeObserver () {
+        initResizeObserver() {
             if (!window.ResizeObserver) {
-                return
+                return;
             }
 
-            this.resizeObserver = new ResizeObserver(entries => {
-                if (!entries || !entries.length) return
-                const rect = entries[0].contentRect
-                if (!rect) return
-                const newWidth = Math.round(rect.width)
-                const newHeight = Math.round(rect.height)
+            this.resizeObserver = new ResizeObserver((entries) => {
+                if (!entries || !entries.length) return;
+                const rect = entries[0].contentRect;
+                if (!rect) return;
+                const newWidth = Math.round(rect.width);
+                const newHeight = Math.round(rect.height);
 
-                const changed = newWidth !== this.overlayWidth || newHeight !== this.overlayHeight
-                this.overlayWidth = newWidth
-                this.overlayHeight = newHeight
+                const changed = newWidth !== this.overlayWidth || newHeight !== this.overlayHeight;
+                this.overlayWidth = newWidth;
+                this.overlayHeight = newHeight;
 
                 if (changed) {
-                    CHEAT_WINDOW_MANAGER.setOverlaySize(newWidth, newHeight)
+                    CHEAT_WINDOW_MANAGER.setOverlaySize(newWidth, newHeight);
                 }
-            })
+            });
 
             this.$nextTick(() => {
                 if (this.$el && this.resizeObserver) {
-                    this.resizeObserver.observe(this.$el)
+                    this.resizeObserver.observe(this.$el);
                 }
-            })
+            });
         },
 
-        onNavTreeUpdate (data) {
+        onNavTreeUpdate(data) {
             if (data && data.length === 1) {
-                this.$emit('change', data[0].component)
+                this.$emit('change', data[0].component);
             }
         },
 
-        iterateLeaf (node, leafFunc) {
+        iterateLeaf(node, leafFunc) {
             if (Array.isArray(node)) {
                 for (const item of node) {
-                    this.iterateLeaf(item, leafFunc)
+                    this.iterateLeaf(item, leafFunc);
                 }
             } else if (Object.hasOwnProperty.call(node, 'children')) {
-                this.iterateLeaf(node.children, leafFunc)
+                this.iterateLeaf(node.children, leafFunc);
             } else {
-                leafFunc(node)
+                leafFunc(node);
             }
-        }
+        },
     },
 
-    beforeDestroy () {
+    beforeDestroy() {
         if (this.resizeObserver && this.$el) {
             try {
-                this.resizeObserver.unobserve(this.$el)
+                this.resizeObserver.unobserve(this.$el);
             } catch (e) {}
         }
         if (this.resizeObserver) {
-            this.resizeObserver.disconnect()
-            this.resizeObserver = null
+            this.resizeObserver.disconnect();
+            this.resizeObserver = null;
         }
-    }
-}
+    },
+};
