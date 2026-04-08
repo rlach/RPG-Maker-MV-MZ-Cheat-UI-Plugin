@@ -6,7 +6,6 @@
 
 import BaseTranslationEngine from '../BaseTranslationEngine.js';
 import { TagManager } from './TagManager.js';
-import { LlmPayloadPreprocessor } from './LlmPayloadPreprocessor.js';
 import { StreamJsonParser } from './StreamJsonParser.js';
 import { StreamGuardrails } from './StreamGuardrails.js';
 import { ValidationService } from './ValidationService.js';
@@ -784,8 +783,11 @@ class AIEngine extends BaseTranslationEngine {
             try {
                 // Preprocess payload
                 const processedPayload = preprocessPayloadForLlm(payload);
+                const preservedFetch =
+                    typeof window !== 'undefined' ? window['chromiumFetch'] : undefined;
+                const requestFetch = typeof preservedFetch === 'function' ? preservedFetch : fetch;
 
-                const response = await fetch(this.getChatUrl(), {
+                const response = await requestFetch(this.getChatUrl(), {
                     method: 'POST',
                     headers: this.getRequestHeaders(),
                     body: JSON.stringify(processedPayload),

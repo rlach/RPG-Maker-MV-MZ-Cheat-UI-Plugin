@@ -2,6 +2,18 @@
 // main.js
 //=============================================================================
 
+function preserveOriginalFetchForCheat() {
+    // Some plugins override global fetch breaking LLM translate.
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    if (typeof window.chromiumFetch !== 'function' && typeof window.fetch === 'function') {
+        window.chromiumFetch = window.fetch.bind(window);
+        console.log('[Cheat] Preserved window.fetch as window.chromiumFetch (MV bootstrap)');
+    }
+}
+
 function compareVersions(a, b) {
     var av = a.split('.').map(Number);
     var bv = b.split('.').map(Number);
@@ -15,50 +27,50 @@ function compareVersions(a, b) {
     return 0;
 }
 
-
-
-function validateNwjsVersion () {
+function validateNwjsVersion() {
     if (!(typeof require === 'function' && typeof process === 'object')) {
-        return true
+        return true;
     }
 
-    const nwjsVersion = process.versions['node-webkit']
-    const minRequiredNwjsVersion = '0.26.4'
+    const nwjsVersion = process.versions['node-webkit'];
+    const minRequiredNwjsVersion = '0.26.4';
 
-    console.log(`Cheat: Detected NW.js version: ${nwjsVersion}`)
+    console.log(`Cheat: Detected NW.js version: ${nwjsVersion}`);
     if (compareVersions(nwjsVersion, minRequiredNwjsVersion) < 0) {
         const isKorean = /^ko\b/.test(navigator.language);
-        var msg = ''
+        var msg = '';
 
         if (isKorean) {
-                        msg = `게임의 Node Webkit 버전이 치트를 사용하기에 너무 낮습니다.
+            msg = `게임의 Node Webkit 버전이 치트를 사용하기에 너무 낮습니다.
   - 현재 버전=${nwjsVersion}, 최소 요구 버전=${minRequiredNwjsVersion}
 치트가 제대로 동작하지 않을 수 있습니다.
 
-해결 방법을 보려면 "확인"을 눌러주세요. 해결 방법을 보려면 GitHub를 방문하세요.`
+해결 방법을 보려면 "확인"을 눌러주세요. 해결 방법을 보려면 GitHub를 방문하세요.`;
         } else {
             msg = `Node Webkit version of game is too low to using cheat
   - version=${nwjsVersion}, minimum required version=${minRequiredNwjsVersion}
 Cheat may not work properly. Visit github for the solution.
-`
+`;
         }
 
         window.alert(msg);
 
-        return false
+        return false;
     }
 
-    return true
+    return true;
 }
+
+// Preserve original fetch before any other cheat startup logic.
+preserveOriginalFetchForCheat();
 
 validateNwjsVersion();
 
 PluginManager.setup($plugins);
 
 // import cheat js file
-PluginManager._path= 'js/plugins/';
 PluginManager.loadScript('../../cheat/init/import.js');
 
-window.onload = function() {
+window.onload = function () {
     SceneManager.run(Scene_Boot);
 };
