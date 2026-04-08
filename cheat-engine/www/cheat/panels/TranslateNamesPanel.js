@@ -50,6 +50,14 @@ export default {
                 Look for names in cache
             </v-btn>
         </div>
+            <div class="mt-2">
+                <v-checkbox
+                    v-model="enforceOfficialNamesInResponses"
+                    dense
+                    hide-details
+                    label="Enforce official names in responses with proper regex">
+                </v-checkbox>
+            </div>
     </v-card-text>
 
     <v-card-text class="py-0">
@@ -144,16 +152,43 @@ export default {
             translating: false,
             filter: '',
             namePattern: '\\\\N<(.*)>',
+            enforceOfficialNamesInResponses: false,
             entries: [],
         };
     },
 
     created() {
         this.refresh();
+        const runtime = ensureTranslationRuntime();
+        if (runtime) {
+            if (runtime.namePatternForEnforcing) {
+                this.namePattern = runtime.namePatternForEnforcing;
+            }
+            if (typeof runtime.enforceOfficialNamesInResponses === 'boolean') {
+                this.enforceOfficialNamesInResponses = runtime.enforceOfficialNamesInResponses;
+            }
+        }
     },
 
     activated() {
         this.refresh();
+    },
+
+    watch: {
+        namePattern(newVal) {
+            const runtime = ensureTranslationRuntime();
+            if (runtime) {
+                runtime.namePatternForEnforcing = newVal;
+                runtime.saveSettings();
+            }
+        },
+        enforceOfficialNamesInResponses(newVal) {
+            const runtime = ensureTranslationRuntime();
+            if (runtime) {
+                runtime.enforceOfficialNamesInResponses = newVal;
+                runtime.saveSettings();
+            }
+        },
     },
 
     computed: {
@@ -507,6 +542,11 @@ export default {
 
             const runtime = ensureTranslationRuntime();
             runtime.setCacheValue(entry.cacheKey, entry.translation);
+
+            const normalizedTranslation = entry.translation && entry.translation.trim();
+            if (normalizedTranslation) {
+                this.saveNameProfile(entry.originalName, { translation: normalizedTranslation });
+            }
 
             // Apply to live game actors if the entry is tied to the DB
             if (entry.actorId !== null) {

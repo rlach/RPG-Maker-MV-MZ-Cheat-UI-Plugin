@@ -6,6 +6,7 @@
 
 import BaseTranslationEngine from '../BaseTranslationEngine.js';
 import { TagManager } from './TagManager.js';
+
 import { StreamJsonParser } from './StreamJsonParser.js';
 import { StreamGuardrails } from './StreamGuardrails.js';
 import { ValidationService } from './ValidationService.js';
@@ -969,6 +970,114 @@ class AIEngine extends BaseTranslationEngine {
         }
 
         return rawBodyText;
+    }
+
+    postprocessTranslatedItem(item, translated) {
+        // Call parent postprocessing first
+        const baseProcessed = super.postprocessTranslatedItem(item, translated);
+
+        // Enforce official names after tag restoration when regex matches exactly once
+        if (
+            item &&
+            this.panel &&
+            this.panel.enforceOfficialNamesInResponses &&
+            this.panel.namePatternForEnforcing
+        ) {
+            try {
+                const originalValue = item.value;
+                const translatedValue = baseProcessed;
+
+                if (typeof originalValue !== 'string' || typeof translatedValue !== 'string') {
+                    return baseProcessed;
+                }
+
+                // Build case-insensitive regex for tag names (RPG tags are case-insensitive).
+                const regex = new RegExp(this.panel.namePatternForEnforcing, 'gi');
+
+                // Find matches in original and translated
+                const originalMatches = [];
+                let match;
+                regex.lastIndex = 0;
+                while ((match = regex.exec(originalValue)) !== null) {
+                    originalMatches.push(match);
+                    if (match[0] === '') {
+                        regex.lastIndex += 1;
+                    }
+                }
+
+                const translatedMatches = [];
+                regex.lastIndex = 0;
+                while ((match = regex.exec(translatedValue)) !== null) {
+                    translatedMatches.push(match);
+                    if (match[0] === '') {
+                        regex.lastIndex += 1;
+                    }
+                }
+
+                // Only enforce if both have exactly 1 match
+                if (originalMatches.length === 1 && translatedMatches.length === 1) {
+                    const origMatch = originalMatches[0];
+                    const translatedMatch = translatedMatches[0];
+
+                    // Get the name from capture group 1 of original
+                    const originalName = origMatch[1];
+                    if (!originalName) {
+                        return baseProcessed;
+                    }
+
+                    const sourceLang = this.panel.sourceLang || 'ja';
+                    const targetLang = this.panel.targetLang || 'en';
+                    const pairKey = `${sourceLang}-${targetLang}`;
+
+                    // 1) Try name profiles for current pair.
+                    const pairProfiles =
+                        this.panel.nameProfilesByLangPair &&
+                        this.panel.nameProfilesByLangPair[pairKey] &&
+                        typeof this.panel.nameProfilesByLangPair[pairKey] === 'object'
+                            ? this.panel.nameProfilesByLangPair[pairKey]
+                            : {};
+                    const profile = pairProfiles[originalName];
+
+                    // 2) Fallback to actor_name cache value.
+                    const fallbackCacheKey = `actor_name:${sourceLang}-${targetLang}-${originalName}`;
+                    const cacheValue =
+                        this.panel.translationCache && this.panel.translationCache instanceof Map
+                            ? this.panel.translationCache.get(fallbackCacheKey)
+                            : undefined;
+
+                    const officialTranslation =
+                        profile &&
+                        typeof profile.translation === 'string' &&
+                        profile.translation.trim()
+                            ? profile.translation.trim()
+                            : typeof cacheValue === 'string' && cacheValue.trim()
+                              ? cacheValue.trim()
+                              : null;
+
+                    if (officialTranslation) {
+                        // Replace only first translated match capture-group content.
+                        const translatedCapturedName = translatedMatch[1];
+                        if (typeof translatedCapturedName !== 'string' || !translatedCapturedName) {
+                            return baseProcessed;
+                        }
+
+                        return translatedValue.replace(
+                            new RegExp(this.panel.namePatternForEnforcing, 'i'),
+                            (fullMatch) => {
+                                return fullMatch.replace(
+                                    translatedCapturedName,
+                                    officialTranslation
+                                );
+                            }
+                        );
+                    }
+                }
+            } catch (err) {
+                console.warn('[AIEngine] Error enforcing official names:', err);
+            }
+        }
+
+        return baseProcessed;
     }
 
     getRequestHeaders() {

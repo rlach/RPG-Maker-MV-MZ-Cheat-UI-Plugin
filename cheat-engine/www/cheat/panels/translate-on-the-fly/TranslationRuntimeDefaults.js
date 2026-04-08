@@ -91,6 +91,8 @@ export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
     'objectTranslationTypeOrder',
     'enabledPluginTranslators',
     'nameProfilesByLangPair',
+    'namePatternForEnforcing',
+    'enforceOfficialNamesInResponses',
     'objectTranslationJob',
     'nonOtfTranslationProcess',
 ]);
@@ -115,6 +117,8 @@ export const PERSISTED_TRANSLATION_SETTINGS_KEYS = Object.freeze([
     'objectTranslationTypeOrder',
     'enabledPluginTranslators',
     'nameProfilesByLangPair',
+    'namePatternForEnforcing',
+    'enforceOfficialNamesInResponses',
 ]);
 
 export const UI_SYNC_STATE_KEYS = Object.freeze([
@@ -230,6 +234,8 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
         objectTranslationTypeOrder: [],
         enabledPluginTranslators: {},
         nameProfilesByLangPair: {},
+        namePatternForEnforcing: '\\\\N<(.*)>',
+        enforceOfficialNamesInResponses: false,
         objectTranslationJob: {
             active: false,
             currentTypeLabel: '',
