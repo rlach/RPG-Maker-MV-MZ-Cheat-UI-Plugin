@@ -350,10 +350,18 @@ export class TranslationBatchManager {
           this.errorRecovery.recordFailure(failure);
         }
 
-        this.applyBatchTranslationResults(successes, failures, { persist: false });
+        const changedKeys = this.applyBatchTranslationResults(
+          successes,
+          failures,
+          { persist: false },
+        );
 
-        if (!dryRun && typeof this.panel.persistCache === "function") {
-          this.panel.persistCache();
+        if (
+          !dryRun &&
+          changedKeys.length > 0 &&
+          typeof this.panel.persistCache === "function"
+        ) {
+          this.panel.persistCache(changedKeys);
         }
 
         phaseFailures += failures.length;
@@ -565,12 +573,22 @@ export class TranslationBatchManager {
       this.progressTracker.endQueue();
     }
 
-    if (dryRun && (aggregatedSuccesses.length > 0 || aggregatedFailures.length > 0)) {
-      this.applyBatchTranslationResults(aggregatedSuccesses, aggregatedFailures, {
-        persist: false,
-      });
-      if (typeof this.panel.persistCache === "function") {
-        this.panel.persistCache();
+    if (
+      dryRun &&
+      (aggregatedSuccesses.length > 0 || aggregatedFailures.length > 0)
+    ) {
+      const changedKeys = this.applyBatchTranslationResults(
+        aggregatedSuccesses,
+        aggregatedFailures,
+        {
+          persist: false,
+        },
+      );
+      if (
+        changedKeys.length > 0 &&
+        typeof this.panel.persistCache === "function"
+      ) {
+        this.panel.persistCache(changedKeys);
       }
     }
 
@@ -586,11 +604,18 @@ export class TranslationBatchManager {
     });
 
     if (dryRun && aggregatedFailures.length > 0) {
-      this.applyBatchTranslationResults([], aggregatedFailures, {
-        persist: false,
-      });
-      if (typeof this.panel.persistCache === "function") {
-        this.panel.persistCache();
+      const changedKeys = this.applyBatchTranslationResults(
+        [],
+        aggregatedFailures,
+        {
+          persist: false,
+        },
+      );
+      if (
+        changedKeys.length > 0 &&
+        typeof this.panel.persistCache === "function"
+      ) {
+        this.panel.persistCache(changedKeys);
       }
     }
 
