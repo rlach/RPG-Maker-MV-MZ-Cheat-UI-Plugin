@@ -68,6 +68,24 @@ export const translateOnTheFlyRuntimeMethods = {
             }
         };
 
+        const resolveCommandNameFromCache = (name, symbol) => {
+            if (!name || typeof name !== 'string' || name.trim() === '' || symbol === 'choice') {
+                return name;
+            }
+
+            const commandKey = self.getCacheKey(name, 'command');
+
+            if (self.hasUsableCacheValue(commandKey)) {
+                return self.translationCache.get(commandKey);
+            }
+
+            if (!self.isTranslationEnabled() && self.translateCacheWhenDisabled) {
+                self.setCacheValue(commandKey, '');
+            }
+
+            return name;
+        };
+
         const getSafeCurrentMessageText = () => {
             if (!window.$gameMessage) {
                 return '';
@@ -765,6 +783,18 @@ export const translateOnTheFlyRuntimeMethods = {
             const translationEnabled = self.isTranslationEnabled();
             const useCacheOnly = !translationEnabled && self.translateCacheWhenDisabled;
 
+            // In cache-only mode keep the engine's original synchronous refresh flow.
+            // MZ title/menu windows are initialized during scene creation and expect
+            // refresh to complete synchronously.
+            if (useCacheOnly) {
+                this._translateApplyingCommandCache = true;
+                try {
+                    return Window_Command.prototype._originalRefresh.call(this);
+                } finally {
+                    this._translateApplyingCommandCache = false;
+                }
+            }
+
             // If translation is completely disabled, use original
             if (!translationEnabled && !useCacheOnly) {
                 return Window_Command.prototype._originalRefresh.call(this);
@@ -945,6 +975,10 @@ export const translateOnTheFlyRuntimeMethods = {
                 console.log('[TranslateOnTheFly] Collected command for translation:', name, symbol);
                 this._collectedCommands.push({ name, symbol, enabled, ext });
                 return;
+            }
+
+            if (this._translateApplyingCommandCache) {
+                name = resolveCommandNameFromCache(name, symbol);
             }
 
             // Normal mode - use original
