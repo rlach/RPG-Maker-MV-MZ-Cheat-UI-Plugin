@@ -441,14 +441,14 @@ class AIEngine extends BaseTranslationEngine {
                         role: 'system',
                         content: `Translate video game text from ${sourceName} to ${targetName}. Return only flat one-line JSON object with exactly the same keys as input. No markdown, no comments, no extra keys, no missing keys, no duplicate keys, no arrays, no pretty formatting. Preserve every [b=tag] exactly and keep tag order unchanged. The only exception are tags with <values> like this - [b=na<しえる>]. In this case the <value> can be translated, but otherwise don't modify the tag. Keys with the same prefix+index are context-linked fields of one entity (example: i0n and i0d are the same item's name and description), so translate them consistently. Official name translations, they HAVE to be used for consistency with existing material, don't make up your own translations: ${nameHints}. The names might contain additional info, like gender, in brackets. Use it for additional context.`,
                     },
-                    {
-                        role: 'user',
-                        content: `{"${TYPE_TO_TAG.text}0":"[b=na<テスト>]それはいいですね","${TYPE_TO_TAG.text}1":"[b=na<テスト>]情報\\nありがとうございます。"}`,
-                    },
-                    {
-                        role: 'assistant',
-                        content: `{"${TYPE_TO_TAG.text}0":"[b=na<Test>]That's great","${TYPE_TO_TAG.text}1":"[b=na<Test>]Thank you for the information"}`,
-                    },
+                    // {
+                    //     role: 'user',
+                    //     content: `{"${TYPE_TO_TAG.text}0":"[b=na<テスト>]それはいいですね","${TYPE_TO_TAG.text}1":"[b=na<テスト>]情報\\nありがとうございます。"}`,
+                    // },
+                    // {
+                    //     role: 'assistant',
+                    //     content: `{"${TYPE_TO_TAG.text}0":"[b=na<Test>]That's great","${TYPE_TO_TAG.text}1":"[b=na<Test>]Thank you for the information"}`,
+                    // },
                     {
                         role: 'user',
                         content: `Good. Keep this one-line JSON style and exact keys! Now translate this: ${content}`,
