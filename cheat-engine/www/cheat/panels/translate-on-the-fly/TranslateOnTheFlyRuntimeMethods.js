@@ -79,9 +79,7 @@ export const translateOnTheFlyRuntimeMethods = {
                 return self.translationCache.get(commandKey);
             }
 
-            if (!self.isTranslationEnabled() && self.translateCacheWhenDisabled) {
-                self.setCacheValue(commandKey, '');
-            }
+            self.trackCacheKeyUsage(commandKey);
 
             return name;
         };
@@ -209,14 +207,12 @@ export const translateOnTheFlyRuntimeMethods = {
                 $gameMessage._translateOriginalSpeaker = originalSpeakerName;
             }
 
-            if (self.shouldTrackRealtimeCacheUsage()) {
-                if (hasText) {
-                    self.markCacheKeySeen(self.getCacheKey(originalText, 'text'));
-                }
-                if (hasChoices) {
-                    for (const choice of originalChoices) {
-                        self.markCacheKeySeen(self.getCacheKey(choice, 'choice'));
-                    }
+            if (hasText) {
+                self.trackCacheKeyUsage(cacheKey);
+            }
+            if (hasChoices) {
+                for (const choice of originalChoices) {
+                    self.trackCacheKeyUsage(self.getCacheKey(choice, 'choice'));
                 }
             }
 
@@ -493,10 +489,8 @@ export const translateOnTheFlyRuntimeMethods = {
                 return;
             }
 
-            if (self.shouldTrackRealtimeCacheUsage()) {
-                for (const choice of this._translateOriginalChoices) {
-                    self.markCacheKeySeen(self.getCacheKey(choice, 'choice'));
-                }
+            for (const choice of this._translateOriginalChoices) {
+                self.trackCacheKeyUsage(self.getCacheKey(choice, 'choice'));
             }
 
             const choiceKeys = this._translateOriginalChoices.map((choice) =>
