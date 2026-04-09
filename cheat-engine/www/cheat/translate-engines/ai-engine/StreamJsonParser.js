@@ -547,6 +547,8 @@ export class StreamJsonParser {
 
         const closureState = this.getJsonClosureState(partialText);
         const candidates = [];
+        let exceededTrimLimit = false;
+        let maxTrimmedCharsSeen = 0;
 
         // If we are not inside a string, we can try brace-only closure first.
         if (!closureState.isInsideString()) {
@@ -566,12 +568,10 @@ export class StreamJsonParser {
             }
 
             const trimmedChars = partialText.length - (lastComma + 1);
+            maxTrimmedCharsSeen = Math.max(maxTrimmedCharsSeen, trimmedChars);
             if (trimmedChars > trimLimit) {
-                return {
-                    ok: false,
-                    reason: STREAM_CANCEL_REASON.TRIM_TOO_LONG,
-                    trimmedChars,
-                };
+                exceededTrimLimit = true;
+                break;
             }
 
             candidates.push({
@@ -607,6 +607,14 @@ export class StreamJsonParser {
             } catch (e) {
                 // Try next stricter candidate.
             }
+        }
+
+        if (exceededTrimLimit) {
+            return {
+                ok: false,
+                reason: STREAM_CANCEL_REASON.TRIM_TOO_LONG,
+                trimmedChars: maxTrimmedCharsSeen,
+            };
         }
 
         return {

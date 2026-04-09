@@ -443,11 +443,11 @@ class AIEngine extends BaseTranslationEngine {
                     },
                     {
                         role: 'user',
-                        content: `{"${TYPE_TO_TAG.text}0":"それはいいですね","${TYPE_TO_TAG.text}1":"情報\\nありがとうございます。"}`,
+                        content: `{"${TYPE_TO_TAG.text}0":"[b=na<テスト>]それはいいですね","${TYPE_TO_TAG.text}1":"[b=na<テスト>]情報\\nありがとうございます。"}`,
                     },
                     {
                         role: 'assistant',
-                        content: `{"${TYPE_TO_TAG.text}0":"That's great","${TYPE_TO_TAG.text}1":"Thank you for the information"}`,
+                        content: `{"${TYPE_TO_TAG.text}0":"[b=na<Test>]That's great","${TYPE_TO_TAG.text}1":"[b=na<Test>]Thank you for the information"}`,
                     },
                     {
                         role: 'user',
