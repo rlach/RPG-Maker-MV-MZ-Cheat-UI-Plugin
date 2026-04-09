@@ -59,6 +59,16 @@ export const translateOnTheFlyRuntimeMethods = {
         };
 
         const applyLifecycleTranslations = (trigger) => {
+            const shouldApplyLifecycleCache =
+                self.isTranslationEnabled() ||
+                !!self.translateCacheWhenDisabled ||
+                (typeof self.isNonOtfTranslationProcessActive === 'function' &&
+                    self.isNonOtfTranslationProcessActive());
+
+            if (!shouldApplyLifecycleCache) {
+                return;
+            }
+
             if (!self.batchManager) {
                 self.batchManager = createTranslationBatchManager(self);
             }
