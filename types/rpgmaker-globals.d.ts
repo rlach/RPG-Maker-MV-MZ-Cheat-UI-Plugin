@@ -58,6 +58,8 @@ declare const Utils: any;
 declare interface Window {
     nw?: any;
     __CHEAT_EXTERNAL_WINDOW__?: boolean;
+    $externMessage?: any;
+    $plugins?: any[];
     __CHEAT_MAIN_WINDOW__?: Window | null;
     GeneralCheat?: any;
     GameSpeedCheat?: any;
