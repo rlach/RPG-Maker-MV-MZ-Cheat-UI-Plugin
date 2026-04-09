@@ -122,6 +122,14 @@ export const translateOnTheFlyRuntimeMethods = {
             return texts.join('\n');
         };
 
+        const imported = typeof Imported === 'object' && Imported ? Imported : {};
+        const hasStrictMessageCore = !!(
+            imported.VisuMZ_1_MessageCore ||
+            imported.YEP_MessageCore ||
+            imported.ExternalMessage
+        );
+        const shouldHookInterpreterCommands = !hasStrictMessageCore;
+
         // Store original canStart if not already stored
         if (!Window_Message.prototype._originalCanStart) {
             Window_Message.prototype._originalCanStart = Window_Message.prototype.canStart;
@@ -136,31 +144,33 @@ export const translateOnTheFlyRuntimeMethods = {
             delete this._translateMessageOrigin;
         };
 
-        if (!Game_Interpreter.prototype._translateOriginalCommand101) {
-            Game_Interpreter.prototype._translateOriginalCommand101 =
-                Game_Interpreter.prototype.command101;
-        }
-
-        Game_Interpreter.prototype.command101 = function (...args) {
-            if (window.$gameMessage && !$gameMessage.isBusy()) {
-                markCurrentMessageAsEventOrigin('command101', this);
+        if (shouldHookInterpreterCommands) {
+            if (!Game_Interpreter.prototype._translateOriginalCommand101) {
+                Game_Interpreter.prototype._translateOriginalCommand101 =
+                    Game_Interpreter.prototype.command101;
             }
 
-            return Game_Interpreter.prototype._translateOriginalCommand101.apply(this, args);
-        };
+            Game_Interpreter.prototype.command101 = function (...args) {
+                if (window.$gameMessage && !$gameMessage.isBusy()) {
+                    markCurrentMessageAsEventOrigin('command101', this);
+                }
 
-        if (!Game_Interpreter.prototype._translateOriginalCommand102) {
-            Game_Interpreter.prototype._translateOriginalCommand102 =
-                Game_Interpreter.prototype.command102;
-        }
+                return Game_Interpreter.prototype._translateOriginalCommand101.apply(this, args);
+            };
 
-        Game_Interpreter.prototype.command102 = function (...args) {
-            if (window.$gameMessage && !$gameMessage.isBusy()) {
-                markCurrentMessageAsEventOrigin('command102', this);
+            if (!Game_Interpreter.prototype._translateOriginalCommand102) {
+                Game_Interpreter.prototype._translateOriginalCommand102 =
+                    Game_Interpreter.prototype.command102;
             }
 
-            return Game_Interpreter.prototype._translateOriginalCommand102.apply(this, args);
-        };
+            Game_Interpreter.prototype.command102 = function (...args) {
+                if (window.$gameMessage && !$gameMessage.isBusy()) {
+                    markCurrentMessageAsEventOrigin('command102', this);
+                }
+
+                return Game_Interpreter.prototype._translateOriginalCommand102.apply(this, args);
+            };
+        }
 
         // Override canStart to block until translation is ready
         Window_Message.prototype.canStart = function () {
