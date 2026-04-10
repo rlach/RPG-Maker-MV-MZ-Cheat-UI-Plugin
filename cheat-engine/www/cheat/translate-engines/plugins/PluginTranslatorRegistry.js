@@ -7,6 +7,7 @@ import { DestinationWindowTranslator } from './translators/DestinationWindowTran
 import { KmsMapActiveMessageTranslator } from './translators/KmsMapActiveMessageTranslator.js';
 import { MgpExternChoicesTranslator } from './translators/MgpExternChoicesTranslator.js';
 import { MppChoiceExTranslator } from './translators/MppChoiceExTranslator.js';
+import { MultipleWindowSkinSystemTranslator } from './translators/MultipleWindowSkinSystemTranslator.js';
 import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTextWindowTranslator.js';
 import { SceneGlossaryTranslator } from './translators/SceneGlossaryTranslator.js';
 import { TextPictureTranslator } from './translators/TextPictureTranslator.js';
@@ -26,6 +27,7 @@ class PluginTranslatorRegistry {
             KmsMapActiveMessageTranslator,
             MgpExternChoicesTranslator,
             MppChoiceExTranslator,
+            MultipleWindowSkinSystemTranslator,
             PandaProgressTextWindowTranslator,
             SceneGlossaryTranslator,
             TextPictureTranslator,
