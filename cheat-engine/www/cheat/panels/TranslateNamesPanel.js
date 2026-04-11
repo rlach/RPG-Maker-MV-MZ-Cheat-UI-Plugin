@@ -50,6 +50,23 @@ export default {
                 Look for names in cache
             </v-btn>
         </div>
+        <div class="mt-2 d-flex align-center">
+            <v-btn
+                small
+                outlined
+                color="teal"
+                @click="applyTranslatedNamesToDbActors">
+                <v-icon small left>mdi-account-check</v-icon>
+                Apply translated names to DB Actors
+            </v-btn>
+            <v-checkbox
+                v-model="applyOnlyActorsWithOriginalNames"
+                class="ml-3 mt-0 pt-0"
+                dense
+                hide-details
+                label="Only actors with original names">
+            </v-checkbox>
+        </div>
             <div class="mt-2">
                 <v-checkbox
                     v-model="enforceOfficialNamesInResponses"
@@ -153,6 +170,7 @@ export default {
             filter: '',
             namePattern: '\\\\N<(.*)>',
             enforceOfficialNamesInResponses: false,
+            applyOnlyActorsWithOriginalNames: true,
             entries: [],
         };
     },
@@ -559,6 +577,63 @@ export default {
                     if (gameActor) gameActor._name = entry.translation || entry.originalName;
                 }
             }
+        },
+
+        applyTranslatedNamesToDbActors() {
+            const dataActors = window.$dataActors;
+            if (!Array.isArray(dataActors)) {
+                return;
+            }
+
+            const onlyOriginal = !!this.applyOnlyActorsWithOriginalNames;
+            let updatedCount = 0;
+            let skippedCount = 0;
+
+            for (const entry of this.entries) {
+                if (entry.actorId === null) {
+                    continue;
+                }
+
+                const translatedName = entry.translation && entry.translation.trim();
+                if (!translatedName) {
+                    continue;
+                }
+
+                const actor = dataActors[entry.actorId];
+                if (!actor) {
+                    continue;
+                }
+
+                const originalName = entry.originalName || '';
+                const currentDbName = actor.name || '';
+
+                if (onlyOriginal && currentDbName !== originalName) {
+                    skippedCount += 1;
+                    continue;
+                }
+
+                actor.name = translatedName;
+
+                if (window.$gameActors && typeof window.$gameActors.actor === 'function') {
+                    const gameActor = window.$gameActors.actor(entry.actorId);
+                    if (gameActor) {
+                        gameActor._name = translatedName;
+                    }
+                }
+
+                updatedCount += 1;
+            }
+
+            if (window.Alert) {
+                const modeLabel = onlyOriginal
+                    ? 'only actors with original names'
+                    : 'all actors';
+                window.Alert.info(
+                    `Applied translated names to ${updatedCount} actor(s) (${modeLabel}). Skipped: ${skippedCount}.`
+                );
+            }
+
+            this.refresh();
         },
 
         async copyOriginal(entry) {
