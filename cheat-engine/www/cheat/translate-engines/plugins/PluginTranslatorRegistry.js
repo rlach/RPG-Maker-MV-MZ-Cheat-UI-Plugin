@@ -11,6 +11,7 @@ import { MultipleWindowSkinSystemTranslator } from './translators/MultipleWindow
 import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTextWindowTranslator.js';
 import { SceneGlossaryTranslator } from './translators/SceneGlossaryTranslator.js';
 import { TextPictureTranslator } from './translators/TextPictureTranslator.js';
+import { TMNamePopTranslator } from './translators/TMNamePopTranslator.js';
 import { TorigoyaAchievement2Translator } from './translators/TorigoyaAchievement2Translator.js';
 import { TorigoyaAchievementTranslator } from './translators/TorigoyaAchievementTranslator.js';
 import { YEPCoreEngineScriptTranslator } from './translators/YEPCoreEngineScriptTranslator.js';
@@ -31,6 +32,7 @@ class PluginTranslatorRegistry {
             PandaProgressTextWindowTranslator,
             SceneGlossaryTranslator,
             TextPictureTranslator,
+            TMNamePopTranslator,
             TorigoyaAchievement2Translator,
             TorigoyaAchievementTranslator,
             YEPCoreEngineScriptTranslator,

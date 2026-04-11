@@ -1,0 +1,329 @@
+import { BasePluginTranslator } from '../BasePluginTranslator.js';
+import { loadMapDataById } from '../../../panels/translate-on-the-fly/ObjectTranslationModalMethods.js';
+
+const NAME_POP_COMMAND = 'namePop';
+const NAME_POP_TAG_REGEX = /<namePop:([^>]+)>/i;
+const CACHE_TYPE = 'plugin_tm_name_pop';
+
+// Tag value format: "nameText [shiftY] [outlineColor]"
+// The name is the first space-separated token (mirroring arr[0] in the plugin source).
+function extractNameFromTagValue(tagValue) {
+    const firstToken = String(tagValue || '')
+        .trim()
+        .split(' ')[0];
+    return firstToken || null;
+}
+
+function getTranslationRuntime() {
+    return typeof window.__ensureTranslationRuntime === 'function'
+        ? window.__ensureTranslationRuntime()
+        : window.__TranslationRuntime || null;
+}
+
+function applyNamePopTranslation(namePop) {
+    if (typeof namePop !== 'string' || !namePop.trim()) {
+        return namePop;
+    }
+
+    const runtime = getTranslationRuntime();
+    if (
+        !runtime ||
+        typeof runtime.getCacheKey !== 'function' ||
+        typeof runtime.hasUsableCacheValue !== 'function' ||
+        !(runtime.translationCache instanceof Map)
+    ) {
+        return namePop;
+    }
+
+    const cacheKey = runtime.getCacheKey(namePop, CACHE_TYPE);
+
+    if (typeof runtime.markCacheKeySeen === 'function') {
+        runtime.markCacheKeySeen(cacheKey);
+    }
+
+    if (!runtime.hasUsableCacheValue(cacheKey)) {
+        return namePop;
+    }
+
+    const cached = runtime.translationCache.get(cacheKey);
+    return typeof cached === 'string' && cached.trim() ? cached : namePop;
+}
+
+export class TMNamePopTranslator extends BasePluginTranslator {
+    constructor() {
+        super();
+        this._scanPrepared = false;
+        this._scanEntries = [];
+        this._scanPromise = null;
+    }
+
+    getPluginName() {
+        return 'TMNamePop';
+    }
+
+    getPluginLabel() {
+        return 'TMNamePop';
+    }
+
+    getCacheType() {
+        return CACHE_TYPE;
+    }
+
+    enablePluginTranslation() {
+        if (window.__CHEAT_TM_NAME_POP_TRANSLATOR_HOOKED__) {
+            return;
+        }
+
+        if (
+            !window.Game_CharacterBase ||
+            !Game_CharacterBase.prototype ||
+            typeof Game_CharacterBase.prototype.setNamePop !== 'function'
+        ) {
+            return;
+        }
+
+        const original = Game_CharacterBase.prototype.setNamePop;
+
+        // Hook the narrowest stable method that receives the raw name text.
+        // Both the plugin-command path and the meta-tag path call setNamePop with
+        // the raw (pre-escape-conversion) name string, so we intercept here to
+        // substitute the cached translation before the original method processes it.
+        Game_CharacterBase.prototype.setNamePop = function (namePop, shiftY) {
+            let translatedName = namePop;
+            try {
+                translatedName = applyNamePopTranslation(namePop);
+            } catch (error) {
+                console.warn('[TMNamePopTranslator] Failed to apply cached translation', error);
+            }
+            return original.call(this, translatedName, shiftY);
+        };
+
+        window.__CHEAT_TM_NAME_POP_TRANSLATOR_HOOKED__ = true;
+    }
+
+    async prepareTranslator() {
+        if (!this.ensureDetection()) {
+            return;
+        }
+
+        if (this._scanPrepared) {
+            return;
+        }
+
+        if (this._scanPromise) {
+            return this._scanPromise;
+        }
+
+        this._scanPromise = this.buildScanEntries()
+            .then((entries) => {
+                this._scanEntries = Array.isArray(entries) ? entries : [];
+                this._scanPrepared = true;
+            })
+            .catch((error) => {
+                console.warn('[TMNamePopTranslator] Scan failed', error);
+            })
+            .finally(() => {
+                this._scanPromise = null;
+            });
+
+        return this._scanPromise;
+    }
+
+    async buildScanEntries() {
+        const entries = [];
+        this.collectCommonEventEntries(entries);
+        await this.collectMapEntries(entries);
+        return entries;
+    }
+
+    collectCommonEventEntries(output) {
+        if (!Array.isArray(window.$dataCommonEvents)) {
+            return;
+        }
+
+        for (let commonEventId = 0; commonEventId < $dataCommonEvents.length; commonEventId++) {
+            const commonEvent = $dataCommonEvents[commonEventId];
+            if (!commonEvent || !Array.isArray(commonEvent.list)) {
+                continue;
+            }
+
+            this.collectNamePopFromList(
+                commonEvent.list,
+                { scope: 'commonEvent', commonEventId },
+                output
+            );
+        }
+    }
+
+    async collectMapEntries(output) {
+        const mapInfos = Array.isArray(window.$dataMapInfos) ? window.$dataMapInfos : [];
+
+        for (const mapInfo of mapInfos) {
+            const mapId = Number(mapInfo?.id);
+            if (!mapId) {
+                continue;
+            }
+
+            try {
+                const mapData = await loadMapDataById(mapId);
+                if (!mapData || !Array.isArray(mapData.events)) {
+                    continue;
+                }
+                this.collectMapEventEntries(mapData.events, mapId, output);
+            } catch (error) {
+                console.warn(`[TMNamePopTranslator] Failed to scan map ${mapId}`, error);
+            }
+        }
+    }
+
+    collectMapEventEntries(events, mapId, output) {
+        for (let eventIdx = 0; eventIdx < events.length; eventIdx++) {
+            const event = events[eventIdx];
+            if (!event) {
+                continue;
+            }
+
+            this.collectEventNoteEntry(event, mapId, eventIdx, output);
+            this.collectEventPageEntries(event, mapId, eventIdx, output);
+        }
+    }
+
+    collectEventNoteEntry(event, mapId, eventIdx, output) {
+        const note = typeof event.note === 'string' ? event.note : '';
+        if (!note) {
+            return;
+        }
+
+        const match = NAME_POP_TAG_REGEX.exec(note);
+        const name = match?.[1] ? extractNameFromTagValue(match[1]) : null;
+        if (name?.trim()) {
+            output.push({ text: name, source: { scope: 'eventNote', mapId, eventIdx } });
+        }
+    }
+
+    collectEventPageEntries(event, mapId, eventIdx, output) {
+        if (!Array.isArray(event.pages)) {
+            return;
+        }
+
+        for (let pageIdx = 0; pageIdx < event.pages.length; pageIdx++) {
+            const page = event.pages[pageIdx];
+            if (!page || !Array.isArray(page.list)) {
+                continue;
+            }
+
+            this.collectNamePopFromList(
+                page.list,
+                { scope: 'mapEvent', mapId, eventIdx, pageIdx },
+                output
+            );
+        }
+    }
+
+    // Collects namePop text from a command list via:
+    //   - MV plugin commands (code 356): "namePop <eventId> <name> [shiftY] [outlineColor]"
+    //   - Comment block tags (code 108/408): <namePop:name [shiftY] [outlineColor]>
+    collectNamePopFromList(list, baseMeta, output) {
+        if (!Array.isArray(list) || !Array.isArray(output)) {
+            return;
+        }
+
+        for (let cmdIdx = 0; cmdIdx < list.length; cmdIdx++) {
+            const cmd = list[cmdIdx];
+            if (!cmd) {
+                continue;
+            }
+
+            const code = Number(cmd.code);
+
+            if (code === 356) {
+                this.pushPluginCommandEntry(cmd, cmdIdx, baseMeta, output);
+            } else if (code === 108 || code === 408) {
+                this.pushCommentTagEntry(cmd, cmdIdx, baseMeta, output);
+            }
+        }
+    }
+
+    pushPluginCommandEntry(cmd, cmdIdx, baseMeta, output) {
+        const text = this.extractNameFromPluginCommand(cmd);
+        if (text?.trim()) {
+            output.push({ text, source: { ...baseMeta, cmdIdx } });
+        }
+    }
+
+    pushCommentTagEntry(cmd, cmdIdx, baseMeta, output) {
+        const commentText = String(cmd.parameters?.[0] || '');
+        const match = NAME_POP_TAG_REGEX.exec(commentText);
+        const name = match?.[1] ? extractNameFromTagValue(match[1]) : null;
+        if (name?.trim()) {
+            output.push({ text: name, source: { ...baseMeta, cmdIdx } });
+        }
+    }
+
+    // Parses an MV plugin command event (code 356) and returns the name text, or null.
+    // Command line format: "namePop <eventId> <nameText> [shiftY] [outlineColor]"
+    // In RMMV, parameters[0] is the full command string; args[1] is the name token.
+    extractNameFromPluginCommand(cmd) {
+        const commandLine =
+            typeof cmd.parameters?.[0] === 'string' ? cmd.parameters[0] : '';
+
+        const parts = commandLine.trim().split(' ');
+        if (String(parts[0] || '').trim() !== NAME_POP_COMMAND) {
+            return null;
+        }
+
+        // parts[0] = 'namePop', parts[1] = eventId, parts[2] = name text
+        return String(parts[2] || '').trim() || null;
+    }
+
+    buildUniquePendingItems(panel) {
+        const byCacheKey = new Map();
+
+        for (const entry of this._scanEntries) {
+            const text = typeof entry.text === 'string' ? entry.text : '';
+            if (!text?.trim()) {
+                continue;
+            }
+
+            const cacheKey = panel.getCacheKey(text, this.getCacheType());
+            if (!byCacheKey.has(cacheKey)) {
+                byCacheKey.set(cacheKey, {
+                    type: this.getCacheType(),
+                    id: `plugin_tm_name_pop_${byCacheKey.size}`,
+                    value: text,
+                    cacheKey,
+                });
+            }
+        }
+
+        return Array.from(byCacheKey.values());
+    }
+
+    collectUntranslated({ panel }) {
+        if (!panel || typeof panel.getCacheKey !== 'function') {
+            return [];
+        }
+
+        const items = this.buildUniquePendingItems(panel);
+        return items.filter((item) => !panel.hasUsableCacheValue(item.cacheKey));
+    }
+
+    countPluginAmountSync({ panel }) {
+        if (!panel || typeof panel.getCacheKey !== 'function') {
+            return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
+        }
+
+        const items = this.buildUniquePendingItems(panel);
+        const totalStrings = items.length;
+        const leftStrings = items.filter(
+            (item) => !panel.hasUsableCacheValue(item.cacheKey)
+        ).length;
+
+        return {
+            total: totalStrings,
+            left: leftStrings,
+            totalStrings,
+            leftStrings,
+        };
+    }
+}
