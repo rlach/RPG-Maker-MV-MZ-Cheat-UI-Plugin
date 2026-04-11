@@ -662,6 +662,19 @@ export default {
             this.refresh();
         },
 
+        getSpawnedGameActor(actorId) {
+            if (!window.$gameActors || !Array.isArray(window.$gameActors._data)) {
+                return null;
+            }
+
+            const safeActorId = Number(actorId);
+            if (!Number.isFinite(safeActorId) || safeActorId <= 0) {
+                return null;
+            }
+
+            return window.$gameActors._data[safeActorId] || null;
+        },
+
         onTranslationChange(entry, value) {
             entry.translation = value || '';
 
@@ -673,25 +686,17 @@ export default {
                 this.saveNameProfile(entry.originalName, { translation: normalizedTranslation });
             }
 
-            // Apply to live game actors if the entry is tied to the DB
+            // Apply only to already spawned in-game actor instances.
+            // Never mutate DB actor names ($dataActors[*].name), because original name is immutable key.
             if (entry.actorId !== null) {
-                const dataActors = window.$dataActors;
-                if (Array.isArray(dataActors) && dataActors[entry.actorId]) {
-                    dataActors[entry.actorId].name = entry.translation || entry.originalName;
-                }
-                if (window.$gameActors && typeof window.$gameActors.actor === 'function') {
-                    const gameActor = window.$gameActors.actor(entry.actorId);
-                    if (gameActor) gameActor._name = entry.translation || entry.originalName;
+                const gameActor = this.getSpawnedGameActor(entry.actorId);
+                if (gameActor) {
+                    gameActor._name = entry.translation || entry.originalName;
                 }
             }
         },
 
         applyTranslatedNamesToDbActors() {
-            const dataActors = window.$dataActors;
-            if (!Array.isArray(dataActors)) {
-                return;
-            }
-
             const onlyOriginal = !!this.applyOnlyActorsWithOriginalNames;
             let updatedCount = 0;
             let skippedCount = 0;
@@ -706,27 +711,21 @@ export default {
                     continue;
                 }
 
-                const actor = dataActors[entry.actorId];
-                if (!actor) {
+                const gameActor = this.getSpawnedGameActor(entry.actorId);
+                if (!gameActor) {
+                    // Not spawned in current session; do not create instances implicitly.
                     continue;
                 }
 
                 const originalName = entry.originalName || '';
-                const currentDbName = actor.name || '';
+                const currentSpawnedName = gameActor._name || '';
 
-                if (onlyOriginal && currentDbName !== originalName) {
+                if (onlyOriginal && currentSpawnedName !== originalName) {
                     skippedCount += 1;
                     continue;
                 }
 
-                actor.name = translatedName;
-
-                if (window.$gameActors && typeof window.$gameActors.actor === 'function') {
-                    const gameActor = window.$gameActors.actor(entry.actorId);
-                    if (gameActor) {
-                        gameActor._name = translatedName;
-                    }
-                }
+                gameActor._name = translatedName;
 
                 updatedCount += 1;
             }
@@ -736,7 +735,7 @@ export default {
                     ? 'only actors with original names'
                     : 'all actors';
                 window.Alert.info(
-                    `Applied translated names to ${updatedCount} actor(s) (${modeLabel}). Skipped: ${skippedCount}.`
+                    `Applied translated names to ${updatedCount} spawned actor(s) (${modeLabel}). Skipped: ${skippedCount}.`
                 );
             }
 
