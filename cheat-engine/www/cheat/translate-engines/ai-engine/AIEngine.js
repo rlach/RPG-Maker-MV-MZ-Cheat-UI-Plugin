@@ -245,6 +245,87 @@ class AIEngine extends BaseTranslationEngine {
         this.setCustomTags(next);
     }
 
+    /**
+     * Scan cache keys for unrecognized tag-like patterns.
+     * Preprocesses each key through the TagManager; any tag-like sequences that
+     * were NOT consumed (i.e. survived preprocessing) are counted and returned
+     * sorted by occurrence count descending.
+     *
+     * @param {Map|Iterable} cacheKeys
+     * @returns {{ pattern: string, count: number }[]}
+     */
+    scanForUnknownTags(cacheKeys) {
+        // Regex to detect remaining tag-like sequences after preprocessing:
+        // 1. XML-style:    <Symbol>, <Symbol:N>, <Symbol:value>
+        // 2. Escape-style: \Symbol, \Symbol[N], \Symbol[val], \Symbol<val>, \Symbol(val), \Symbol{val}
+        const XML_TAG_RE = /<([A-Za-z][A-Za-z0-9]*)(?::([^>\n]*))?>/g;
+        // Use RegExp constructor: avoids a literal ESC control char (\u001b) in source.
+        // In a RegExp string, '\\u001b' becomes \u001b in the pattern = ESC byte.
+        const ESC_TAG_SOURCE =
+            '(?:\\\\|\\u001b)([A-Za-z${}|.!><^][A-Za-z0-9]*)' +
+            '(?:\\[(\\d+)\\]|\\[([^\\]\\n]*)\\]|<([^>\\n]*)>|\\(([^)\\n]*)\\)|\\{([^}\\n]*)\\})?';
+        const ESC_TAG_RE = new RegExp(ESC_TAG_SOURCE, 'g');
+
+        const counts = new Map();
+
+        const recordXml = (sym, val) => {
+            let pattern;
+            if (val === undefined || val === null) {
+                pattern = `<${sym}>`;
+            } else if (/^\d+$/.test(val)) {
+                pattern = `<${sym}:N>`;
+            } else {
+                pattern = `<${sym}:…>`;
+            }
+            counts.set(pattern, (counts.get(pattern) || 0) + 1);
+        };
+
+        const recordEsc = (sym, numVal, sqVal, angVal, roundVal, curlyVal) => {
+            let pattern;
+            if (numVal !== undefined) {
+                pattern = `\\${sym}[N]`;
+            } else if (sqVal !== undefined) {
+                pattern = `\\${sym}[…]`;
+            } else if (angVal !== undefined) {
+                pattern = `\\${sym}<…>`;
+            } else if (roundVal !== undefined) {
+                pattern = `\\${sym}(…)`;
+            } else if (curlyVal !== undefined) {
+                pattern = `\\${sym}{…}`;
+            } else {
+                pattern = `\\${sym}`;
+            }
+            counts.set(pattern, (counts.get(pattern) || 0) + 1);
+        };
+
+        const keys = cacheKeys instanceof Map ? cacheKeys.keys() : cacheKeys;
+        for (const key of keys) {
+            if (typeof key !== 'string') continue;
+
+            let text = key;
+            try {
+                const result = this.tagManager.preprocessTags(key);
+                text = result.preprocessedText;
+            } catch (_e) {
+                // keep original key on preprocessing failure
+            }
+
+            let m;
+            XML_TAG_RE.lastIndex = 0;
+            while ((m = XML_TAG_RE.exec(text)) !== null) {
+                recordXml(m[1], m[2]);
+            }
+            ESC_TAG_RE.lastIndex = 0;
+            while ((m = ESC_TAG_RE.exec(text)) !== null) {
+                recordEsc(m[1], m[2], m[3], m[4], m[5], m[6]);
+            }
+        }
+
+        return Array.from(counts.entries())
+            .map(([pattern, count]) => ({ pattern, count }))
+            .sort((a, b) => b.count - a.count);
+    }
+
     getId() {
         return 'openApi';
     }

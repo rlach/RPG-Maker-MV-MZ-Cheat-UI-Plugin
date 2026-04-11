@@ -80,6 +80,17 @@ export default class BaseTranslationEngine {
     // Override if needed
   }
 
+  /**
+   * Scan a collection of cache keys for unrecognized tag-like patterns.
+   * Returns an array of { pattern, count } objects sorted by count descending.
+   * Default implementation returns an empty array (not all engines use tags).
+   * @param {Map|Iterable} cacheKeys - Iterable of original text strings to scan
+   * @returns {{ pattern: string, count: number }[]}
+   */
+  scanForUnknownTags(cacheKeys) {
+    return [];
+  }
+
   // Helper methods available to all engines
   getCacheKey(text, type = "text") {
     return this.panel.getCacheKey(text, type);

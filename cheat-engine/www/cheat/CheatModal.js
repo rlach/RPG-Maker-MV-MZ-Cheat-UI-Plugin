@@ -14,6 +14,7 @@ import TranslateSettingsPanel from './panels/TranslateSettingsPanel.js';
 import TranslateOnTheFlyPanel from './panels/TranslateOnTheFlyPanel.js';
 import TranslateNamesPanel from './panels/TranslateNamesPanel.js';
 import TranslateCacheManagerPanel from './panels/TranslateCacheManagerPanel.js';
+import TranslateTagManagerPanel from './panels/TranslateTagManagerPanel.js';
 import { CHEAT_WINDOW_MANAGER } from './js/CheatWindowManager.js';
 
 export default {
@@ -36,6 +37,7 @@ export default {
         TranslateOnTheFlyPanel,
         TranslateNamesPanel,
         TranslateCacheManagerPanel,
+        TranslateTagManagerPanel,
     },
 
     template: `
@@ -175,6 +177,11 @@ export default {
                             name: 'Names Manager',
                             icon: 'mdi-account-edit',
                             component: 'translate-names-panel',
+                        },
+                        {
+                            name: 'Tag Manager',
+                            icon: 'mdi-tag-multiple',
+                            component: 'translate-tag-manager-panel',
                         },
                         {
                             name: 'Cache Manager',

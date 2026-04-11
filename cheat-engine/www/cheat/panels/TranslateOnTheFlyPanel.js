@@ -151,121 +151,7 @@ export default {
         <!-- AI Engine (OpenAPI compatible / Open WebUI) config -->
         ${AIEngine.getConfigTemplate()}
 
-        <div v-if="translationEngine === 'openApi' || translationEngine === 'gpt4all'" class="mt-3">
-          <div class="d-flex align-center justify-space-between mb-2">
-            <div class="subtitle-2 font-weight-bold">Custom Tags</div>
-            <v-btn
-              small
-              outlined
-              color="primary"
-              @click="openAddCustomTagDialog">
-              <v-icon small left>mdi-plus</v-icon>
-              Add
-            </v-btn>
-          </div>
-
-          <div v-if="!aiCustomTags || aiCustomTags.length === 0" class="caption grey--text text--lighten-1 mb-2">
-            No custom tags defined.
-          </div>
-
-          <div
-            v-for="(tag, idx) in aiCustomTags"
-            :key="'custom-tag-' + idx"
-            class="d-flex align-center mb-1">
-            <span class="caption font-weight-bold mr-2">{{formatCustomTagDisplay(tag)}}</span>
-            <span class="caption mr-2">{{tag.description}}</span>
-            <v-spacer></v-spacer>
-            <v-btn icon x-small color="primary" @click="openEditCustomTagDialog(tag, idx)">
-              <v-icon small>mdi-pencil</v-icon>
-            </v-btn>
-            <v-btn icon x-small color="error" @click="removeCustomTag(idx)">
-              <v-icon small>mdi-delete</v-icon>
-            </v-btn>
-          </div>
-        </div>
-        </div>
     </v-card-text>
-
-      <v-dialog v-model="customTagDialogVisible" max-width="560" @keydown.stop>
-        <v-card dark class="pt-2">
-          <v-card-title class="subtitle-1 font-weight-bold">{{ customTagEditIndex >= 0 ? 'Edit Custom Tag' : 'Add Custom Tag' }}</v-card-title>
-          <v-card-text>
-            <v-text-field
-              v-model="customTagForm.description"
-              label="Description"
-              outlined
-              dense
-              hide-details
-              @keydown.stop
-              class="mb-2"
-            ></v-text-field>
-
-            <v-text-field
-              v-model="customTagForm.tagSymbol"
-              label="Tag Symbol"
-              outlined
-              dense
-              hide-details
-              @keydown.stop
-              class="mb-2"
-            ></v-text-field>
-
-            <v-select
-              v-model="customTagForm.style"
-              :items="aiCustomTagStyleOptions"
-              label="Style"
-              outlined
-              dense
-              hide-details
-              @keydown.stop
-              class="mb-2"
-            ></v-select>
-
-            <v-select
-              v-model="customTagForm.type"
-              :items="aiCustomTagTypeOptions"
-              label="Type"
-              outlined
-              dense
-              hide-details
-              @keydown.stop
-              class="mb-2"
-            ></v-select>
-
-            <v-checkbox
-              v-model="customTagForm.requiredConsistency"
-              label="Required consistency"
-              hide-details
-              class="mt-0 mb-2"
-            ></v-checkbox>
-
-            <template v-if="customTagForm.type === 'withCustomParameter'">
-              <v-select
-                v-model="customTagForm.bracket"
-                :items="customTagBracketOptionsForStyle"
-                label="Bracket"
-                outlined
-                dense
-                hide-details
-                @keydown.stop
-                class="mb-2"
-              ></v-select>
-
-              <v-checkbox
-                v-model="customTagForm.maskValue"
-                label="Mask value (preserve exact value, LLM cannot change it)"
-                hide-details
-                class="mt-0"
-              ></v-checkbox>
-            </template>
-          </v-card-text>
-          <v-card-actions>
-            <v-spacer></v-spacer>
-            <v-btn text color="grey" @click="closeCustomTagDialog">Cancel</v-btn>
-            <v-btn text color="primary" @click="saveCustomTag">Save</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
 
     <v-card-subtitle class="pb-0 mt-4 font-weight-bold">Text Wrapping</v-card-subtitle>
     
@@ -382,17 +268,6 @@ export default {
       pendingTranslations: null,
       failedTranslations: null,
       batchManager: null,
-      customTagDialogVisible: false,
-      customTagEditIndex: -1,
-      customTagForm: {
-        description: "",
-        tagSymbol: "",
-        type: "withNumericParameter",
-        requiredConsistency: false,
-        style: "escape",
-        bracket: "<",
-        maskValue: false,
-      },
     };
   },
 
@@ -432,14 +307,6 @@ export default {
       return this.translationCache ? this.translationCache.size : 0;
     },
 
-    customTagBracketOptionsForStyle() {
-      const all = this.aiCustomTagBracketOptions || [];
-      // NONE bracket is only valid for xml-style tags
-      if (this.customTagForm.style === "xml") {
-        return all;
-      }
-      return all.filter((o) => o.value !== "none");
-    },
   },
 
   methods: {
@@ -580,83 +447,5 @@ export default {
       return this.callRuntime("clearCache");
     },
 
-    openAddCustomTagDialog() {
-      this.customTagEditIndex = -1;
-      this.customTagForm = {
-        description: "",
-        tagSymbol: "",
-        type: "withNumericParameter",
-        requiredConsistency: false,
-        style: "escape",
-        bracket: "<",
-        maskValue: false,
-      };
-      this.customTagDialogVisible = true;
-    },
-
-    openEditCustomTagDialog(tag, index) {
-      this.customTagEditIndex = index;
-      this.customTagForm = {
-        description: String(tag.description || ""),
-        tagSymbol: String(tag.tagSymbol || ""),
-        type: String(tag.type || "withNumericParameter"),
-        requiredConsistency: !!tag.requiredConsistency,
-        style: String(tag.style || "escape"),
-        bracket: String(tag.bracket || "<"),
-        maskValue: !!tag.maskValue,
-      };
-      this.customTagDialogVisible = true;
-    },
-
-    closeCustomTagDialog() {
-      this.customTagDialogVisible = false;
-    },
-
-    saveCustomTag() {
-      const payload = {
-        description: String(this.customTagForm.description || "").trim(),
-        tagSymbol: String(this.customTagForm.tagSymbol || "").trim(),
-        type: String(this.customTagForm.type || "withNumericParameter"),
-        requiredConsistency: !!this.customTagForm.requiredConsistency,
-        style: String(this.customTagForm.style || "escape"),
-      };
-
-      if (payload.type === "withCustomParameter") {
-        payload.bracket = String(this.customTagForm.bracket || (payload.style === "xml" ? "none" : "<"));
-        payload.maskValue = !!this.customTagForm.maskValue;
-      }
-
-      if (this.customTagEditIndex >= 0) {
-        this.callRuntime("updateAiCustomTag", this.customTagEditIndex, payload);
-      } else {
-        this.callRuntime("addAiCustomTag", payload);
-      }
-
-      this.callRuntime("bindEngineConfigTo", this.runtime);
-
-      this.closeCustomTagDialog();
-    },
-
-    removeCustomTag(index) {
-      this.callRuntime("removeAiCustomTag", index);
-      this.callRuntime("bindEngineConfigTo", this.runtime);
-    },
-
-    formatCustomTagDisplay(tag) {
-      const sym = tag.tagSymbol || "?";
-      if (tag.style === "xml") {
-        if (tag.type === "withNumericParameter") return `<${sym}:N>`;
-        if (tag.type === "withCustomParameter") return `<${sym}:…>`;
-        return `<${sym}>`;
-      }
-      // escape style
-      if (tag.type === "withNumericParameter") return `\\${sym}[N]`;
-      if (tag.type === "withCustomParameter") {
-        const open = tag.bracket && tag.bracket !== "none" ? tag.bracket : "<";
-        const close = { "<": ">", "[": "]", "(": ")", "{": "}" }[open] || ">";
-        return `\\${sym}${open}…${close}`;
-      }
-      return `\\${sym}`;
-    },
   },
 };
