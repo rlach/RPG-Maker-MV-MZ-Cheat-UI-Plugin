@@ -84,72 +84,109 @@ export class KmsMapActiveMessageTranslator extends BasePluginTranslator {
             return;
         }
 
-        if (
-            !window.Game_Event ||
-            !Game_Event.prototype ||
-            typeof Game_Event.prototype.getMapActiveMessages !== 'function'
-        ) {
+        if (!window.Game_Event || !Game_Event.prototype) {
             return;
         }
 
-        const original = Game_Event.prototype.getMapActiveMessages;
-        const translator = this;
+        const hasNewApi = typeof Game_Event.prototype.getMapActiveMessages === 'function';
+        const hasLegacyApi = typeof Game_Event.prototype.getMapActiveMessage === 'function';
 
-        Game_Event.prototype.getMapActiveMessages = function () {
-            const messages = original.call(this);
+        if (!hasNewApi && !hasLegacyApi) {
+            return;
+        }
 
-            if (!Array.isArray(messages)) {
-                return messages;
+        const cacheType = this.getCacheType();
+        const resolveRuntime = () =>
+            typeof window.__ensureTranslationRuntime === 'function'
+                ? window.__ensureTranslationRuntime()
+                : window.__TranslationRuntime || null;
+
+        const translateTextFromCache = (text) => {
+            if (typeof text !== 'string' || !text.trim()) {
+                return text;
             }
 
-            try {
-                const runtime =
-                    typeof window.__ensureTranslationRuntime === 'function'
-                        ? window.__ensureTranslationRuntime()
-                        : window.__TranslationRuntime || null;
+            const runtime = resolveRuntime();
+            if (
+                !runtime ||
+                typeof runtime.getCacheKey !== 'function' ||
+                typeof runtime.hasUsableCacheValue !== 'function'
+            ) {
+                return text;
+            }
 
-                if (
-                    !runtime ||
-                    typeof runtime.getCacheKey !== 'function' ||
-                    typeof runtime.hasUsableCacheValue !== 'function'
-                ) {
+            const cacheKey = runtime.getCacheKey(text, cacheType);
+
+            if (typeof runtime.markCacheKeySeen === 'function') {
+                runtime.markCacheKeySeen(cacheKey);
+            }
+
+            if (!(runtime.translationCache instanceof Map)) {
+                return text;
+            }
+
+            if (!runtime.hasUsableCacheValue(cacheKey)) {
+                return text;
+            }
+
+            const cached = runtime.translationCache.get(cacheKey);
+            if (typeof cached !== 'string' || !cached.trim()) {
+                return text;
+            }
+
+            return cached;
+        };
+
+        if (hasNewApi) {
+            const originalGetMapActiveMessages = Game_Event.prototype.getMapActiveMessages;
+
+            Game_Event.prototype.getMapActiveMessages = function () {
+                const messages = originalGetMapActiveMessages.call(this);
+
+                if (!Array.isArray(messages)) {
                     return messages;
                 }
 
-                return messages.map((msg) => {
-                    if (!msg || typeof msg.text !== 'string' || !msg.text.trim()) {
-                        return msg;
-                    }
+                try {
+                    return messages.map((msg) => {
+                        if (!msg || typeof msg.text !== 'string' || !msg.text.trim()) {
+                            return msg;
+                        }
 
-                    const cacheKey = runtime.getCacheKey(msg.text, translator.getCacheType());
+                        const translatedText = translateTextFromCache(msg.text);
+                        if (translatedText === msg.text) {
+                            return msg;
+                        }
 
-                    if (typeof runtime.markCacheKeySeen === 'function') {
-                        runtime.markCacheKeySeen(cacheKey);
-                    }
+                        return { ...msg, text: translatedText };
+                    });
+                } catch (error) {
+                    console.warn(
+                        '[KmsMapActiveMessageTranslator] Failed to apply cached translation (new API)',
+                        error
+                    );
+                    return messages;
+                }
+            };
+        }
 
-                    if (!(runtime.translationCache instanceof Map)) {
-                        return msg;
-                    }
+        if (hasLegacyApi) {
+            const originalGetMapActiveMessage = Game_Event.prototype.getMapActiveMessage;
 
-                    if (!runtime.hasUsableCacheValue(cacheKey)) {
-                        return msg;
-                    }
+            Game_Event.prototype.getMapActiveMessage = function () {
+                const message = originalGetMapActiveMessage.call(this);
 
-                    const cached = runtime.translationCache.get(cacheKey);
-                    if (typeof cached !== 'string' || !cached.trim()) {
-                        return msg;
-                    }
-
-                    return { ...msg, text: cached };
-                });
-            } catch (error) {
-                console.warn(
-                    '[KmsMapActiveMessageTranslator] Failed to apply cached translation',
-                    error
-                );
-                return messages;
-            }
-        };
+                try {
+                    return translateTextFromCache(message);
+                } catch (error) {
+                    console.warn(
+                        '[KmsMapActiveMessageTranslator] Failed to apply cached translation (legacy API)',
+                        error
+                    );
+                    return message;
+                }
+            };
+        }
 
         window.__CHEAT_KMS_MAP_ACTIVE_MESSAGE_TRANSLATOR_HOOKED__ = true;
     }
