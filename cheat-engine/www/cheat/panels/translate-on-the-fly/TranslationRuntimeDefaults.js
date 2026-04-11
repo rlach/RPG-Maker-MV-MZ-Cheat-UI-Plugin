@@ -92,7 +92,8 @@ export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
     'enabledPluginTranslators',
     'nameProfilesByLangPair',
     'namePatternForEnforcing',
-    'enforceOfficialNamesInResponses',
+    'officialNameEnforcementMode',
+    'officialNameEnforcementIncludeAllText',
     'objectTranslationJob',
     'nonOtfTranslationProcess',
 ]);
@@ -118,7 +119,8 @@ export const PERSISTED_TRANSLATION_SETTINGS_KEYS = Object.freeze([
     'enabledPluginTranslators',
     'nameProfilesByLangPair',
     'namePatternForEnforcing',
-    'enforceOfficialNamesInResponses',
+    'officialNameEnforcementMode',
+    'officialNameEnforcementIncludeAllText',
 ]);
 
 export const UI_SYNC_STATE_KEYS = Object.freeze([
@@ -234,8 +236,9 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
         objectTranslationTypeOrder: [],
         enabledPluginTranslators: {},
         nameProfilesByLangPair: {},
-        namePatternForEnforcing: '\\\\N<(.*)>',
-        enforceOfficialNamesInResponses: false,
+        namePatternForEnforcing: '\\\\n\\<([^<>]+)\\>',
+        officialNameEnforcementMode: 'none',
+        officialNameEnforcementIncludeAllText: false,
         objectTranslationJob: {
             active: false,
             currentTypeLabel: '',
@@ -278,6 +281,19 @@ export function normalizePersistedTranslationSettings(rawData = {}) {
         normalized.engineSettings.openApi = normalized.engineSettings.gpt4all;
         delete normalized.engineSettings.gpt4all;
     }
+
+    const validOfficialNameModes = new Set([
+        'none',
+        'fix_matching_regex',
+        'fill_before_llm',
+    ]);
+    if (!validOfficialNameModes.has(normalized.officialNameEnforcementMode)) {
+        normalized.officialNameEnforcementMode = defaults.officialNameEnforcementMode;
+    }
+    normalized.officialNameEnforcementIncludeAllText =
+        typeof normalized.officialNameEnforcementIncludeAllText === 'boolean'
+            ? normalized.officialNameEnforcementIncludeAllText
+            : defaults.officialNameEnforcementIncludeAllText;
 
     return normalized;
 }

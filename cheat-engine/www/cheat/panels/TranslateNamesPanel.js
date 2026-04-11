@@ -45,6 +45,10 @@ export default {
                 @keydown.stop
                 style="max-width: 320px;">
             </v-text-field>
+            <v-btn small outlined color="secondary" class="ml-2" @click="openPatternPicker">
+                <v-icon small left>mdi-format-list-bulleted</v-icon>
+                Select pattern
+            </v-btn>
             <v-btn small outlined color="primary" class="ml-2" @click="lookForNamesInCache">
                 <v-icon small left>mdi-magnify</v-icon>
                 Look for names in cache
@@ -67,15 +71,68 @@ export default {
                 label="Only actors with original names">
             </v-checkbox>
         </div>
-            <div class="mt-2">
-                <v-checkbox
-                    v-model="enforceOfficialNamesInResponses"
-                    dense
-                    hide-details
-                    label="Enforce official names in responses with proper regex">
-                </v-checkbox>
-            </div>
+        <div class="mt-2 d-flex align-center">
+            <v-select
+                v-model="officialNameEnforcementMode"
+                :items="officialNameEnforcementOptions"
+                label="Official name enforcement"
+                item-text="text"
+                item-value="value"
+                dense
+                hide-details
+                style="max-width: 360px;">
+            </v-select>
+        </div>
+        <div v-if="officialNameEnforcementMode === 'fill_before_llm'" class="mt-2">
+            <v-checkbox
+                v-model="officialNameEnforcementIncludeAllText"
+                dense
+                hide-details
+                label="Include all text, not just regex">
+            </v-checkbox>
+        </div>
     </v-card-text>
+
+    <v-dialog v-model="patternPickerOpen" max-width="860">
+        <v-card>
+            <v-card-title class="subtitle-1 font-weight-bold">
+                Select name pattern
+            </v-card-title>
+            <v-card-text>
+                <div class="caption mb-3">
+                    Patterns are used case-insensitively. Capture group 1 must be the character name.
+                </div>
+                <v-simple-table dense>
+                    <thead>
+                        <tr>
+                            <th class="text-left caption" style="width: 40%;">Pattern</th>
+                            <th class="text-left caption">Example</th>
+                            <th class="text-right caption" style="width: 92px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="item in predefinedNamePatterns" :key="item.pattern">
+                            <td>
+                                <pre class="caption mb-0" style="white-space: pre-wrap;">{{ item.pattern }}</pre>
+                            </td>
+                            <td>
+                                <pre class="caption mb-0" style="white-space: pre-wrap;">{{ item.example }}</pre>
+                            </td>
+                            <td class="text-right">
+                                <v-btn x-small color="primary" @click="selectNamePattern(item.pattern)">
+                                    Use
+                                </v-btn>
+                            </td>
+                        </tr>
+                    </tbody>
+                </v-simple-table>
+            </v-card-text>
+            <v-card-actions>
+                <v-spacer></v-spacer>
+                <v-btn text @click="patternPickerOpen = false">Close</v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
 
     <v-card-text class="py-0">
         <div v-if="!loading && filteredEntries.length === 0" class="caption text--secondary mt-2">
@@ -168,9 +225,39 @@ export default {
             loading: false,
             translating: false,
             filter: '',
-            namePattern: '\\\\N<(.*)>',
-            enforceOfficialNamesInResponses: false,
+            namePattern: '\\\\n\\<([^<>]+)\\>',
+            officialNameEnforcementMode: 'none',
+            officialNameEnforcementIncludeAllText: false,
             applyOnlyActorsWithOriginalNames: true,
+            patternPickerOpen: false,
+            officialNameEnforcementOptions: [
+                {
+                    text: 'None',
+                    value: 'none',
+                },
+                {
+                    text: 'Fix responses with matching regex',
+                    value: 'fix_matching_regex',
+                },
+                {
+                    text: 'Fill in official names before sending to LLM',
+                    value: 'fill_before_llm',
+                },
+            ],
+            predefinedNamePatterns: [
+                {
+                    pattern: '\\\\n\\<([^<>]+)\\>',
+                    example: '\\\\n<Char Name>\\nThe text being spoken.',
+                },
+                {
+                    pattern: '^([^\\[「]+)\\n「',
+                    example: 'Char Name\\n「The text being spoken.',
+                },
+                {
+                    pattern: '\\\\nw\\[([^\\[\\]]+)\\]',
+                    example: '\\\\nw[Char Name]\\nThe text being spoken.',
+                },
+            ],
             entries: [],
         };
     },
@@ -182,8 +269,12 @@ export default {
             if (runtime.namePatternForEnforcing) {
                 this.namePattern = runtime.namePatternForEnforcing;
             }
-            if (typeof runtime.enforceOfficialNamesInResponses === 'boolean') {
-                this.enforceOfficialNamesInResponses = runtime.enforceOfficialNamesInResponses;
+            if (typeof runtime.officialNameEnforcementMode === 'string') {
+                this.officialNameEnforcementMode = runtime.officialNameEnforcementMode;
+            }
+            if (typeof runtime.officialNameEnforcementIncludeAllText === 'boolean') {
+                this.officialNameEnforcementIncludeAllText =
+                    runtime.officialNameEnforcementIncludeAllText;
             }
         }
     },
@@ -200,10 +291,17 @@ export default {
                 runtime.saveSettings();
             }
         },
-        enforceOfficialNamesInResponses(newVal) {
+        officialNameEnforcementMode(newVal) {
             const runtime = ensureTranslationRuntime();
             if (runtime) {
-                runtime.enforceOfficialNamesInResponses = newVal;
+                runtime.officialNameEnforcementMode = newVal;
+                runtime.saveSettings();
+            }
+        },
+        officialNameEnforcementIncludeAllText(newVal) {
+            const runtime = ensureTranslationRuntime();
+            if (runtime) {
+                runtime.officialNameEnforcementIncludeAllText = newVal;
                 runtime.saveSettings();
             }
         },
@@ -229,6 +327,15 @@ export default {
     },
 
     methods: {
+        openPatternPicker() {
+            this.patternPickerOpen = true;
+        },
+
+        selectNamePattern(pattern) {
+            this.namePattern = pattern;
+            this.patternPickerOpen = false;
+        },
+
         getCurrentPairKey() {
             const { sourceLang, targetLang } = this.getLanguagePair();
             return `${sourceLang}-${targetLang}`;
@@ -396,7 +503,7 @@ export default {
 
             let regex;
             try {
-                regex = new RegExp(this.namePattern, 'g');
+                regex = new RegExp(this.namePattern, 'gi');
             } catch (err) {
                 console.warn('[TranslateNamesPanel] Invalid regex:', this.namePattern, err);
                 if (window.Alert)

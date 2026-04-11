@@ -21,7 +21,7 @@ export default {
     <v-card-text class="pt-0 pb-1">
         <div class="d-flex align-center justify-space-between">
             <div class="caption grey--text text--lighten-1">
-                Active language pair: {{sourceLang}} -> {{targetLang}}
+          {{ activeLanguagePairLabel }}
             </div>
             <v-btn
                 small
@@ -284,6 +284,23 @@ export default {
   },
 
   computed: {
+    activeLanguagePairLabel() {
+      const totalCount = Array.isArray(this.entries) ? this.entries.length : 0;
+      const translatedCount = totalCount
+        ? this.entries.filter((entry) => {
+            const translation = this.normalizeCacheValue(
+              entry?.translation,
+            ).trim();
+            return translation.length > 0;
+          }).length
+        : 0;
+      const completion = totalCount
+        ? ((translatedCount / totalCount) * 100).toFixed(1)
+        : "0.0";
+
+      return `Active language pair: ${this.sourceLang} -> ${this.targetLang} (${completion}% complete)`;
+    },
+
     matchingFilterEntryCount() {
       return this.getEntriesMatchingFilter(
         this.searchInput,

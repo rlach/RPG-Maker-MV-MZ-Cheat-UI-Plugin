@@ -373,6 +373,126 @@ class AIEngine extends BaseTranslationEngine {
         );
     }
 
+    getOfficialNameEnforcementMode() {
+        const mode = this.panel?.officialNameEnforcementMode;
+        return typeof mode === 'string' ? mode : 'none';
+    }
+
+    getOfficialNameEnforcementPattern() {
+        const pattern = this.panel?.namePatternForEnforcing;
+        return typeof pattern === 'string' && pattern.trim() ? pattern : null;
+    }
+
+    collectRegexMatches(text, regex) {
+        const matches = [];
+        if (typeof text !== 'string' || !(regex instanceof RegExp)) {
+            return matches;
+        }
+
+        regex.lastIndex = 0;
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            matches.push(match);
+            if (match[0] === '') {
+                regex.lastIndex += 1;
+            }
+        }
+        return matches;
+    }
+
+    getOfficialNameMap() {
+        const sourceLang = this.panel?.sourceLang || 'ja';
+        const targetLang = this.panel?.targetLang || 'en';
+        const pairKey = `${sourceLang}-${targetLang}`;
+        const officialNameMap = new Map();
+
+        const pairProfiles =
+            this.panel?.nameProfilesByLangPair &&
+            typeof this.panel.nameProfilesByLangPair[pairKey] === 'object'
+                ? this.panel.nameProfilesByLangPair[pairKey]
+                : {};
+
+        Object.keys(pairProfiles).forEach((originalName) => {
+            const profile = pairProfiles[originalName];
+            const translation =
+                profile && typeof profile.translation === 'string'
+                    ? profile.translation.trim()
+                    : '';
+            if (originalName && translation) {
+                officialNameMap.set(originalName, translation);
+            }
+        });
+
+        if (this.panel?.translationCache instanceof Map) {
+            for (const [cacheKey, value] of this.panel.translationCache.entries()) {
+                const prefix = `actor_name:${sourceLang}-${targetLang}-`;
+                if (!cacheKey.startsWith(prefix)) {
+                    continue;
+                }
+
+                const originalName = cacheKey.slice(prefix.length);
+                const translation = typeof value === 'string' ? value.trim() : '';
+                if (originalName && translation && !officialNameMap.has(originalName)) {
+                    officialNameMap.set(originalName, translation);
+                }
+            }
+        }
+
+        return officialNameMap;
+    }
+
+    replaceFirstMatchedCapture(text, pattern, replacement) {
+        const singleMatchRegex = new RegExp(pattern, 'i');
+        return text.replace(singleMatchRegex, (fullMatch, captureGroup1) => {
+            if (typeof captureGroup1 !== 'string' || !captureGroup1) {
+                return fullMatch;
+            }
+            return fullMatch.replace(captureGroup1, replacement);
+        });
+    }
+
+    applyOfficialNamesBeforeSending(value) {
+        const pattern = this.getOfficialNameEnforcementPattern();
+        if (!pattern || typeof value !== 'string' || !value) {
+            return value;
+        }
+
+        try {
+            const regex = new RegExp(pattern, 'gi');
+            const matches = this.collectRegexMatches(value, regex);
+            if (matches.length !== 1) {
+                return value;
+            }
+
+            const originalName = matches[0] && typeof matches[0][1] === 'string' ? matches[0][1] : '';
+            if (!originalName) {
+                return value;
+            }
+
+            const officialNameMap = this.getOfficialNameMap();
+            const officialTranslation = officialNameMap.get(originalName);
+            if (!officialTranslation) {
+                return value;
+            }
+
+            let nextValue = this.replaceFirstMatchedCapture(value, pattern, officialTranslation);
+
+            if (this.panel?.officialNameEnforcementIncludeAllText) {
+                const replacementPairs = Array.from(officialNameMap.entries()).sort(
+                    (left, right) => right[0].length - left[0].length,
+                );
+                for (const [sourceName, translatedName] of replacementPairs) {
+                    nextValue = nextValue.split(sourceName).join(translatedName);
+                }
+            }
+
+            return nextValue;
+        } catch (error) {
+            console.warn('[AIEngine] Error filling official names before LLM:', error);
+            return value;
+        }
+    }
+
     /**
      * Main translation orchestrator
      * Coordinates: preprocessing → request → stream monitoring → validation → postprocessing
@@ -398,13 +518,20 @@ class AIEngine extends BaseTranslationEngine {
             this._jsonObjectIndexByType = new Map();
             this._jsonObjectSequenceByType = new Map();
             const itemData = items.map((item, i) => {
+                const originalValue = item.value || '';
+                const llmInputValue =
+                    this.getOfficialNameEnforcementMode() === 'fill_before_llm'
+                        ? this.applyOfficialNamesBeforeSending(originalValue)
+                        : originalValue;
                 const { preprocessedText, tagCounts, caseMap } = this.tagManager.preprocessTags(
-                    item.value || ''
+                    llmInputValue
                 );
                 return {
                     ...item,
                     index: i,
                     jsonKey: this.buildCompactJsonKey(item, i),
+                    value: originalValue,
+                    llmInputValue,
                     preprocessed: preprocessedText,
                     tagCounts,
                     caseMap,
@@ -979,9 +1106,8 @@ class AIEngine extends BaseTranslationEngine {
         // Enforce official names after tag restoration when regex matches exactly once
         if (
             item &&
-            this.panel &&
-            this.panel.enforceOfficialNamesInResponses &&
-            this.panel.namePatternForEnforcing
+            this.getOfficialNameEnforcementMode() === 'fix_matching_regex' &&
+            this.getOfficialNameEnforcementPattern()
         ) {
             try {
                 const originalValue = item.value;
@@ -991,33 +1117,16 @@ class AIEngine extends BaseTranslationEngine {
                     return baseProcessed;
                 }
 
-                // Build case-insensitive regex for tag names (RPG tags are case-insensitive).
-                const regex = new RegExp(this.panel.namePatternForEnforcing, 'gi');
+                const pattern = this.getOfficialNameEnforcementPattern();
+                const regex = new RegExp(pattern, 'gi');
 
                 // Find matches in original and translated
-                const originalMatches = [];
-                let match;
-                regex.lastIndex = 0;
-                while ((match = regex.exec(originalValue)) !== null) {
-                    originalMatches.push(match);
-                    if (match[0] === '') {
-                        regex.lastIndex += 1;
-                    }
-                }
-
-                const translatedMatches = [];
-                regex.lastIndex = 0;
-                while ((match = regex.exec(translatedValue)) !== null) {
-                    translatedMatches.push(match);
-                    if (match[0] === '') {
-                        regex.lastIndex += 1;
-                    }
-                }
+                const originalMatches = this.collectRegexMatches(originalValue, regex);
+                const translatedMatches = this.collectRegexMatches(translatedValue, regex);
 
                 // Only enforce if both have exactly 1 match
                 if (originalMatches.length === 1 && translatedMatches.length === 1) {
                     const origMatch = originalMatches[0];
-                    const translatedMatch = translatedMatches[0];
 
                     // Get the name from capture group 1 of original
                     const originalName = origMatch[1];
@@ -1025,50 +1134,13 @@ class AIEngine extends BaseTranslationEngine {
                         return baseProcessed;
                     }
 
-                    const sourceLang = this.panel.sourceLang || 'ja';
-                    const targetLang = this.panel.targetLang || 'en';
-                    const pairKey = `${sourceLang}-${targetLang}`;
-
-                    // 1) Try name profiles for current pair.
-                    const pairProfiles =
-                        this.panel.nameProfilesByLangPair &&
-                        this.panel.nameProfilesByLangPair[pairKey] &&
-                        typeof this.panel.nameProfilesByLangPair[pairKey] === 'object'
-                            ? this.panel.nameProfilesByLangPair[pairKey]
-                            : {};
-                    const profile = pairProfiles[originalName];
-
-                    // 2) Fallback to actor_name cache value.
-                    const fallbackCacheKey = `actor_name:${sourceLang}-${targetLang}-${originalName}`;
-                    const cacheValue =
-                        this.panel.translationCache && this.panel.translationCache instanceof Map
-                            ? this.panel.translationCache.get(fallbackCacheKey)
-                            : undefined;
-
-                    const officialTranslation =
-                        profile &&
-                        typeof profile.translation === 'string' &&
-                        profile.translation.trim()
-                            ? profile.translation.trim()
-                            : typeof cacheValue === 'string' && cacheValue.trim()
-                              ? cacheValue.trim()
-                              : null;
+                    const officialTranslation = this.getOfficialNameMap().get(originalName);
 
                     if (officialTranslation) {
-                        // Replace only first translated match capture-group content.
-                        const translatedCapturedName = translatedMatch[1];
-                        if (typeof translatedCapturedName !== 'string' || !translatedCapturedName) {
-                            return baseProcessed;
-                        }
-
-                        return translatedValue.replace(
-                            new RegExp(this.panel.namePatternForEnforcing, 'i'),
-                            (fullMatch) => {
-                                return fullMatch.replace(
-                                    translatedCapturedName,
-                                    officialTranslation
-                                );
-                            }
+                        return this.replaceFirstMatchedCapture(
+                            translatedValue,
+                            pattern,
+                            officialTranslation,
                         );
                     }
                 }
