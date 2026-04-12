@@ -11,6 +11,7 @@ import { MultipleWindowSkinSystemTranslator } from './translators/MultipleWindow
 import { OriginMenuStatusTranslator } from './translators/OriginMenuStatusTranslator.js';
 import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTextWindowTranslator.js';
 import { SceneGlossaryTranslator } from './translators/SceneGlossaryTranslator.js';
+import { SkillCPSystemTranslator } from './translators/SkillCPSystemTranslator.js';
 import { TextPictureTranslator } from './translators/TextPictureTranslator.js';
 import { TMMenuLabelTranslator } from './translators/TMMenuLabelTranslator.js';
 import { TMNamePopTranslator } from './translators/TMNamePopTranslator.js';
@@ -34,6 +35,7 @@ class PluginTranslatorRegistry {
             OriginMenuStatusTranslator,
             PandaProgressTextWindowTranslator,
             SceneGlossaryTranslator,
+            SkillCPSystemTranslator,
             TextPictureTranslator,
             TMMenuLabelTranslator,
             TMNamePopTranslator,
