@@ -17,12 +17,30 @@ function toSafeArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function isTextLabelParameterKey(rawKey) {
+  if (typeof rawKey !== "string") {
+    return false;
+  }
+
+  const normalized = rawKey
+    .replace(/[#＃_＿]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalized) {
+    return false;
+  }
+
+  return /(テキスト|text)\s*\d+/i.test(normalized);
+}
+
 export class CbrEroStatusMvTranslator extends BasePluginTranslator {
   constructor() {
     super();
     this._scanPrepared = false;
     this._scanEntries = [];
     this._scanPromise = null;
+    this._lastScanKey = "";
     this._originalSubjectMap = new WeakMap();
   }
 
@@ -70,11 +88,9 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
       return;
     }
 
-    for (let index = 1; index < 100; index++) {
-      const key = `txtSubject_${index}`;
-      const text = typeof parameters[key] === "string" ? parameters[key] : "";
+    const pushEntry = (text, rowNo, sourceKey) => {
       if (!isUsableText(text)) {
-        continue;
+        return;
       }
 
       output.push({
@@ -82,10 +98,103 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
         source: {
           scope,
           pageNo,
-          rowNo: index,
+          rowNo,
+          sourceKey,
         },
       });
+    };
+
+    for (let index = 1; index < 100; index++) {
+      const key = `txtSubject_${index}`;
+      const text = typeof parameters[key] === "string" ? parameters[key] : "";
+      pushEntry(text, index, key);
     }
+
+    const keys = Object.keys(parameters);
+    for (const key of keys) {
+      if (!isTextLabelParameterKey(key)) {
+        continue;
+      }
+
+      const value = typeof parameters[key] === "string" ? parameters[key] : "";
+      if (!isUsableText(value)) {
+        continue;
+      }
+
+      const match = key.match(/(\d+)/);
+      const rowNo = match ? Number(match[1]) || 0 : 0;
+      pushEntry(value, rowNo, key);
+    }
+  }
+
+  appendScanEntriesFromRuntimeState(output) {
+    if (!Array.isArray(output)) {
+      return;
+    }
+
+    const pages = toSafeArray(window.CBR_eroStatus);
+    for (let pageIdx = 0; pageIdx < pages.length; pageIdx++) {
+      const page = pages[pageIdx];
+      if (!page || !Array.isArray(page.t)) {
+        continue;
+      }
+
+      for (let rowIdx = 0; rowIdx < page.t.length; rowIdx++) {
+        const row = page.t[rowIdx];
+        const text = row && typeof row.subject === "string" ? row.subject : "";
+        if (!isUsableText(text)) {
+          continue;
+        }
+
+        output.push({
+          text,
+          source: {
+            scope: "runtimeCBR_eroStatus",
+            pageIdx,
+            rowNo: rowIdx + 1,
+          },
+        });
+      }
+    }
+  }
+
+  computeScanKey(entries) {
+    const normalized = Array.isArray(entries)
+      ? entries
+        .map((entry) => (typeof entry?.text === "string" ? entry.text.trim() : ""))
+        .filter((text) => text !== "")
+        .sort()
+      : [];
+
+    return normalized.join("\n");
+  }
+
+  refreshScanEntries(force = false) {
+    const entries = this.buildScanEntries();
+    const nextScanKey = this.computeScanKey(entries);
+
+    if (force || nextScanKey !== this._lastScanKey) {
+      this._scanEntries = Array.isArray(entries) ? entries : [];
+      this._lastScanKey = nextScanKey;
+    }
+
+    this._scanPrepared = true;
+  }
+
+  ensureRuntimeHook() {
+    if (window[RUNTIME_HOOK_GUARD]) {
+      return;
+    }
+
+    if (
+      !window.Window_EroStatus ||
+      !Window_EroStatus.prototype ||
+      typeof Window_EroStatus.prototype.update !== "function"
+    ) {
+      return;
+    }
+
+    this.enablePluginTranslation();
   }
 
   buildUniquePendingItems(panel) {
@@ -210,7 +319,10 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
       return;
     }
 
+    this.ensureRuntimeHook();
+
     if (this._scanPrepared) {
+      this.refreshScanEntries(false);
       return;
     }
 
@@ -218,10 +330,9 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
       return this._scanPromise;
     }
 
-    this._scanPromise = Promise.resolve(this.buildScanEntries())
-      .then((entries) => {
-        this._scanEntries = Array.isArray(entries) ? entries : [];
-        this._scanPrepared = true;
+    this._scanPromise = Promise.resolve()
+      .then(() => {
+        this.refreshScanEntries(true);
       })
       .catch((error) => {
         console.warn("[CbrEroStatusMvTranslator] Scan failed", error);
@@ -259,6 +370,8 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
       }
     }
 
+    this.appendScanEntriesFromRuntimeState(entries);
+
     return entries;
   }
 
@@ -266,6 +379,9 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
     if (!panel || typeof panel.getCacheKey !== "function") {
       return [];
     }
+
+    this.ensureRuntimeHook();
+    this.refreshScanEntries(false);
 
     const items = this.buildUniquePendingItems(panel);
     return items.filter((item) => !panel.hasUsableCacheValue(item.cacheKey));
@@ -275,6 +391,9 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
     if (!panel || typeof panel.getCacheKey !== "function") {
       return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
     }
+
+    this.ensureRuntimeHook();
+    this.refreshScanEntries(false);
 
     const items = this.buildUniquePendingItems(panel);
     const totalStrings = items.length;

@@ -78,6 +78,31 @@ export const translateOnTheFlyRuntimeMethods = {
             }
         };
 
+        const applyCurrentMapDisplayNameFromCache = () => {
+            if (!window.$dataMap || typeof $dataMap !== 'object') {
+                return;
+            }
+
+            if (typeof $dataMap._translateOriginalDisplayName !== 'string') {
+                $dataMap._translateOriginalDisplayName =
+                    typeof $dataMap.displayName === 'string' ? $dataMap.displayName : '';
+            }
+
+            const originalDisplayName = $dataMap._translateOriginalDisplayName;
+            if (typeof originalDisplayName !== 'string' || originalDisplayName.trim() === '') {
+                return;
+            }
+
+            const cacheKey = self.getCacheKey(originalDisplayName, 'map_name');
+            if (self.hasUsableCacheValue(cacheKey)) {
+                $dataMap.displayName = self.translationCache.get(cacheKey);
+                return;
+            }
+
+            self.trackCacheKeyUsage(cacheKey);
+            $dataMap.displayName = originalDisplayName;
+        };
+
         const resolveCommandNameFromCache = (name, symbol) => {
             if (!name || typeof name !== 'string' || name.trim() === '' || symbol === 'choice') {
                 return name;
@@ -785,6 +810,18 @@ export const translateOnTheFlyRuntimeMethods = {
             Scene_Load.prototype.helpWindowText = function () {
                 applyLifecycleTranslations('sceneLoadHelpWindowText');
                 return Scene_Load.prototype._translateOriginalHelpWindowText.call(this);
+            };
+        }
+
+        if (typeof Scene_Map !== 'undefined') {
+            if (!Scene_Map.prototype._translateOriginalOnMapLoaded) {
+                Scene_Map.prototype._translateOriginalOnMapLoaded = Scene_Map.prototype.onMapLoaded;
+            }
+
+            Scene_Map.prototype.onMapLoaded = function () {
+                applyLifecycleTranslations('sceneMapOnMapLoaded');
+                applyCurrentMapDisplayNameFromCache();
+                return Scene_Map.prototype._translateOriginalOnMapLoaded.call(this);
             };
         }
 
