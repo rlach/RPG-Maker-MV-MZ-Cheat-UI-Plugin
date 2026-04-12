@@ -2,6 +2,7 @@ import { BasePluginTranslator } from '../BasePluginTranslator.js';
 
 const ACHIEVEMENT_TEXT_FIELDS = ['title', 'description', 'hint'];
 const PARAMETER_TEXT_FIELDS = ['popupMessage', 'titleMenuText', 'achievementMenuHiddenTitle'];
+const PLUGIN_NAME_ALIASES = ['TorigoyaMZ_Achievement2', 'Torigoya_Achievement2'];
 
 function parseJsonSafely(value, fallback) {
     if (typeof value !== 'string') {
@@ -15,6 +16,23 @@ function parseJsonSafely(value, fallback) {
     }
 }
 
+function normalizePluginText(value) {
+    if (typeof value !== 'string') {
+        return value;
+    }
+
+    const parsed = parseJsonSafely(value, value);
+    return typeof parsed === 'string' ? parsed : value;
+}
+
+function escapeNewlinesForCache(text) {
+    if (typeof text !== 'string') {
+        return '';
+    }
+
+    return text.replace(/\r\n/g, '\n').replace(/\n/g, '\\n');
+}
+
 export class TorigoyaAchievement2Translator extends BasePluginTranslator {
     constructor() {
         super();
@@ -25,6 +43,10 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
 
     getPluginName() {
         return 'TorigoyaMZ_Achievement2';
+    }
+
+    getPluginNameAliases() {
+        return PLUGIN_NAME_ALIASES;
     }
 
     getPluginLabel() {
@@ -50,26 +72,72 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
             return text;
         }
 
-        const cacheKey = runtime.getCacheKey(text, this.getCacheType());
+        const normalized = normalizePluginText(text);
+        const newlineNormalized = text.replace(/\r\n/g, '\n');
+        const candidates = Array.from(
+            new Set(
+                [
+                    text,
+                    normalized,
+                    newlineNormalized,
+                    escapeNewlinesForCache(text),
+                    escapeNewlinesForCache(normalized),
+                    JSON.stringify(text),
+                    JSON.stringify(normalized),
+                    JSON.stringify(newlineNormalized),
+                ].filter((candidate) => typeof candidate === 'string' && candidate.trim())
+            )
+        );
 
-        if (typeof runtime.markCacheKeySeen === 'function') {
-            runtime.markCacheKeySeen(cacheKey);
+        for (const candidate of candidates) {
+            const cacheKey = runtime.getCacheKey(candidate, this.getCacheType());
+
+            if (typeof runtime.markCacheKeySeen === 'function') {
+                runtime.markCacheKeySeen(cacheKey);
+            }
+
+            if (
+                !(runtime.translationCache instanceof Map) ||
+                typeof runtime.hasUsableCacheValue !== 'function' ||
+                !runtime.hasUsableCacheValue(cacheKey)
+            ) {
+                continue;
+            }
+
+            const cached = runtime.translationCache.get(cacheKey);
+            if (typeof cached !== 'string' || !cached.trim()) {
+                continue;
+            }
+
+            return cached;
         }
 
-        if (
-            !(runtime.translationCache instanceof Map) ||
-            typeof runtime.hasUsableCacheValue !== 'function' ||
-            !runtime.hasUsableCacheValue(cacheKey)
-        ) {
+        return text;
+    }
+
+    postprocessDescriptionText(text, runtime) {
+        if (typeof text !== 'string' || !text) {
             return text;
         }
 
-        const cached = runtime.translationCache.get(cacheKey);
-        if (typeof cached !== 'string' || !cached.trim()) {
+        if (!runtime) {
             return text;
         }
 
-        return cached;
+        const cleaned =
+            typeof runtime.cleanTranslatedText === 'function'
+                ? runtime.cleanTranslatedText(text)
+                : text;
+
+        if (typeof runtime.wrapText !== 'function') {
+            return cleaned;
+        }
+
+        const maxWidth = Number(runtime.descriptionMaxLineWidth || runtime.maxLineWidth || 0) || 0;
+
+        return runtime.wrapText(cleaned, maxWidth, {
+            flattenExistingNewlines: true,
+        });
     }
 
     findPluginEntry() {
@@ -77,10 +145,10 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
             return null;
         }
 
-        const pluginName = String(this.getPluginName() || '')
-            .trim()
-            .toLowerCase();
-        if (!pluginName) {
+        const pluginNames = this.getPluginNameAliases()
+            .map((name) => String(name || '').trim().toLowerCase())
+            .filter(Boolean);
+        if (pluginNames.length <= 0) {
             return null;
         }
 
@@ -90,9 +158,30 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
                     return false;
                 }
 
-                return plugin.name.trim().toLowerCase() === pluginName;
+                return pluginNames.includes(plugin.name.trim().toLowerCase());
             }) || null
         );
+    }
+
+    detectPlugin() {
+        if (!Array.isArray(window.$plugins)) {
+            return false;
+        }
+
+        const pluginNames = this.getPluginNameAliases()
+            .map((name) => String(name || '').trim().toLowerCase())
+            .filter(Boolean);
+        if (pluginNames.length <= 0) {
+            return false;
+        }
+
+        return window.$plugins.some((plugin) => {
+            if (!plugin || typeof plugin.name !== 'string') {
+                return false;
+            }
+
+            return pluginNames.includes(plugin.name.trim().toLowerCase());
+        });
     }
 
     parseAchievementParameterArray(rawValue) {
@@ -107,7 +196,8 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
     }
 
     appendTextEntry(output, text, source) {
-        const normalized = typeof text === 'string' ? text : '';
+        const normalizedValue = normalizePluginText(text);
+        const normalized = typeof normalizedValue === 'string' ? normalizedValue : '';
         if (!normalized.trim()) {
             return;
         }
@@ -239,7 +329,11 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
         ) {
             popupWindowClass.prototype.drawMessage = function () {
                 const textWidth = this.windowWidth() - this.standardPadding() * 2 - 40;
-                const y = this.titleFontSize() + 5;
+                const titleFontSize =
+                    typeof this.titleFontSize === 'function'
+                        ? this.titleFontSize()
+                        : this.standardFontSize();
+                const y = titleFontSize + 5;
                 const runtime = translator.getRuntime();
                 const popupMessage = translator.translateRuntimeText(
                     namespace.parameter.popupMessage,
@@ -273,9 +367,19 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
                     return;
                 }
 
-                const rect = this.itemLineRect(index);
+                const rect =
+                    typeof this.itemLineRect === 'function'
+                        ? this.itemLineRect(index)
+                        : this.itemRect(index);
                 const runtime = translator.getRuntime();
-                const iconWidth = ImageManager.iconWidth + 8;
+                const iconWidth =
+                    (typeof ImageManager.iconWidth === 'number'
+                        ? ImageManager.iconWidth
+                        : Window_Base._iconWidth) + 8;
+                const iconHeight =
+                    typeof ImageManager.iconHeight === 'number'
+                        ? ImageManager.iconHeight
+                        : Window_Base._iconHeight;
 
                 this.resetTextColor();
 
@@ -284,7 +388,7 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
                     this.drawIcon(
                         item.achievement.icon,
                         rect.x,
-                        rect.y + (rect.height - ImageManager.iconHeight) / 2
+                        rect.y + (rect.height - iconHeight) / 2
                     );
                     this.drawText(
                         translator.translateRuntimeText(item.achievement.title, runtime),
@@ -326,9 +430,17 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
                 const description = item.unlockInfo
                     ? item.achievement.description
                     : item.achievement.hint || item.achievement.description;
+                const normalizedDescription = normalizePluginText(description);
+                const translatedDescription = translator.translateRuntimeText(
+                    normalizedDescription,
+                    runtime
+                );
 
                 this.setHelpWindowItem({
-                    description: translator.translateRuntimeText(description, runtime),
+                    description: translator.postprocessDescriptionText(
+                        translatedDescription,
+                        runtime
+                    ),
                 });
             };
         }
