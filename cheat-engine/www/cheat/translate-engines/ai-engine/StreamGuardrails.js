@@ -13,6 +13,66 @@ import {
 } from "./constants.js";
 
 export class StreamGuardrails {
+  static normalizeBannedPhrases(phrases) {
+    if (!Array.isArray(phrases)) {
+      return [];
+    }
+
+    const seen = new Set();
+    const normalized = [];
+    for (const entry of phrases) {
+      const phrase = typeof entry === "string" ? entry.trim() : "";
+      if (!phrase) {
+        continue;
+      }
+      const key = phrase.toLowerCase();
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      normalized.push({ phrase, key });
+    }
+
+    return normalized;
+  }
+
+  static findBannedPhraseInJsonText(jsonText, normalizedPhrases) {
+    if (
+      typeof jsonText !== "string" ||
+      !jsonText ||
+      !Array.isArray(normalizedPhrases) ||
+      normalizedPhrases.length === 0
+    ) {
+      return null;
+    }
+
+    const lowerJson = jsonText.toLowerCase();
+    for (const item of normalizedPhrases) {
+      if (item && item.key && lowerJson.includes(item.key)) {
+        return item.phrase;
+      }
+    }
+
+    return null;
+  }
+
+  static findBannedPhraseInScan(scan, normalizedPhrases) {
+    if (!scan || !Array.isArray(normalizedPhrases) || normalizedPhrases.length === 0) {
+      return null;
+    }
+
+    if (Array.isArray(scan.objects)) {
+      for (const obj of scan.objects) {
+        const hit = this.findBannedPhraseInJsonText(obj?.text, normalizedPhrases);
+        if (hit) {
+          return hit;
+        }
+      }
+    }
+
+    return this.findBannedPhraseInJsonText(scan.partialObjectText, normalizedPhrases);
+  }
+
   static extractInFlightTopLevelKey(partialObjectText) {
     if (typeof partialObjectText !== "string" || !partialObjectText) {
       return null;
@@ -127,10 +187,13 @@ export class StreamGuardrails {
    * @param {string[]} expectedKeys - Keys expected in JSON response
    * @returns {Object} Monitor state
    */
-  static createMonitorState(expectedKeys) {
+  static createMonitorState(expectedKeys, options = {}) {
+    const bannedPhrases = this.normalizeBannedPhrases(options.bannedPhrases);
+
     return {
       expectedKeys: Array.isArray(expectedKeys) ? expectedKeys : [],
       expectedKeySet: new Set(expectedKeys || []),
+      bannedPhrases,
       lastCheckedCharCount: 0,
       bestMap: null,
       bestScore: 0,
@@ -328,6 +391,20 @@ export class StreamGuardrails {
 
     // Analyze text for JSON structures
     const analysis = this.analyzeAndScan(rawText, state.expectedKeys);
+
+    const bannedPhrase = this.findBannedPhraseInScan(
+      analysis.scan,
+      state.bannedPhrases,
+    );
+    if (bannedPhrase) {
+      state.cancelReason = STREAM_CANCEL_REASON.BANNED_PHRASE;
+      state.cancelMeta = { phrase: bannedPhrase };
+      return {
+        shouldCancel: true,
+        cancelReason: state.cancelReason,
+        bestMap: state.bestMap,
+      };
+    }
 
     // Guardrail: trim-too-long in partial object must cancel immediately.
     if (analysis.scan.partialObjectText) {

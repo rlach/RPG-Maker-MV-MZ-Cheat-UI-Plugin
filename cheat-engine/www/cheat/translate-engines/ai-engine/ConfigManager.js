@@ -154,6 +154,19 @@ export class ConfigManager {
                class="mt-2"
              ></v-text-field>
 
+             <v-textarea
+               v-model="aiBannedPhrases"
+               label="Banned phrases (one per line)"
+               auto-grow
+               rows="2"
+               outlined
+               dense
+               hide-details
+               @keydown.stop
+               @change="onChangeAiBannedPhrases"
+               class="mt-2"
+             ></v-textarea>
+
              <v-checkbox
                v-model="useJsonFixer"
                label="Allow calls to json fixer (external API, don't send sensitive data)"
@@ -211,6 +224,7 @@ export class ConfigManager {
         { text: "Use JSON fixer API", value: "useJsonFixer" },
         { text: "None (fail)", value: "none" },
       ],
+      aiBannedPhrases: this.aiEngine.bannedPhrasesText,
       aiSystemPrompt: this.aiEngine.systemPrompt,
       aiFixRecursionMaxDepth: this.aiEngine._aiFixRecursionMaxDepth,
       useJsonFixer: this.aiEngine.useJsonFixer,
@@ -246,6 +260,12 @@ export class ConfigManager {
       },
       onChangeAiInvalidJsonHandlingStrategy: (v) => {
         this.aiEngine.invalidJsonHandlingStrategy = v;
+      },
+      onChangeAiBannedPhrases: (v) => {
+        this.aiEngine.bannedPhrasesText = this.aiEngine.normalizeBannedPhrasesText(v);
+        if (this.aiEngine.panel && typeof this.aiEngine.panel.saveSettings === "function") {
+          this.aiEngine.panel.saveSettings();
+        }
       },
       onChangeAiSystemPrompt: (v) => {
         this.aiEngine.systemPrompt = v;

@@ -1,4 +1,7 @@
-import { DEFAULT_SYSTEM_PROMPT } from '../../translate-engines/ai-engine/constants.js';
+import {
+    DEFAULT_SYSTEM_PROMPT,
+    DEFAULT_BANNED_PHRASES_TEXT,
+} from '../../translate-engines/ai-engine/constants.js';
 import { isRpgMakerMv } from '../../js/RpgMakerRuntime.js';
 
 export const LANGUAGE_OPTIONS = [
@@ -78,6 +81,7 @@ export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
     'aiAskIfTextTranslated',
     'aiInvalidJsonHandlingStrategy',
     'aiInvalidJsonHandlingStrategyOptions',
+    'aiBannedPhrases',
     'aiSystemPrompt',
     'currentMessageWindow',
     'currentGameMessage',
@@ -151,6 +155,7 @@ export const UI_SYNC_STATE_KEYS = Object.freeze([
     'aiAllowNewlineMismatch',
     'aiAskIfTextTranslated',
     'aiInvalidJsonHandlingStrategy',
+    'aiBannedPhrases',
     'aiSystemPrompt',
     'currentMessageWindow',
     'currentGameMessage',
@@ -223,6 +228,7 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
         aiInvalidJsonHandlingStrategyOptions: cloneOptions(
             AI_INVALID_JSON_HANDLING_STRATEGY_OPTIONS
         ),
+        aiBannedPhrases: DEFAULT_BANNED_PHRASES_TEXT,
         aiSystemPrompt: DEFAULT_SYSTEM_PROMPT,
         currentMessageWindow: null,
         currentGameMessage: null,

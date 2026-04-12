@@ -411,6 +411,10 @@ export default {
       return this.callRuntime("onChangeAiInvalidJsonHandlingStrategy", v);
     },
 
+    onChangeAiBannedPhrases(v) {
+      return this.callRuntime("onChangeAiBannedPhrases", v);
+    },
+
     onChangeAiSystemPrompt(v) {
       return this.callRuntime("onChangeAiSystemPrompt", v);
     },

@@ -141,6 +141,9 @@ export const TAG_CONFIGS = [
 export const DEFAULT_SYSTEM_PROMPT =
   "You are translating scripts that contain [b=tags] in the form [b=shortcode]. Altering contents or order of any such tags, removing or adding tags will break the script. DO NOT MODIFY TAGS OF THE FORM [b=...]. DO NOT CHANGE ORDER OF THE TAGS. EVER. PRESENT TAGS EXACTLY AS THEY ARE IN THE INPUT. Only translate the text between tags. Return only flat one-line JSON with exact same keys. No markdown, no comments, no code blocks, no pretty formatting. Keys with the same prefix+index are context-linked fields of one entity (for example i0n and i0d are one item), so they must stay semantically consistent.";
 
+export const DEFAULT_BANNED_PHRASES = Object.freeze(["tool_call", "JSON"]);
+export const DEFAULT_BANNED_PHRASES_TEXT = DEFAULT_BANNED_PHRASES.join("\n");
+
 export const TYPE_TO_TAG = { text: "m", speaker: "m", choice: "m" };
 
 export const REQUEST_SETTINGS = {
@@ -176,6 +179,7 @@ export const STREAM_CANCEL_REASON = Object.freeze({
   DUPLICATE_KEY: "duplicate_key",
   TRIM_TOO_LONG: "trim_too_long",
   COMPLETE_JSON_CONTINUED: "complete_json_continued",
+  BANNED_PHRASE: "banned_phrase",
 });
 
 export const REQUEST_CANCEL_REASON = Object.freeze({

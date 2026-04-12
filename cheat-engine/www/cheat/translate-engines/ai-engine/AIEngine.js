@@ -15,6 +15,7 @@ import { ApiClient } from './ApiClient.js';
 import { ConfigManager } from './ConfigManager.js';
 import {
     DEFAULT_SYSTEM_PROMPT,
+    DEFAULT_BANNED_PHRASES_TEXT,
     TYPE_TO_TAG,
     TAG_BRACKET_OPTIONS,
     TAG_TYPE_OPTIONS,
@@ -41,6 +42,7 @@ class AIEngine extends BaseTranslationEngine {
         this.invalidJsonHandlingStrategy = 'resendFirstHalf';
         this.systemPrompt = DEFAULT_SYSTEM_PROMPT;
         this.useJsonFixer = true;
+        this.bannedPhrasesText = DEFAULT_BANNED_PHRASES_TEXT;
         this._aiFixRecursionMaxDepth = 0;
         this.customTags = [];
         this.pluginTags = []; // auto-registered by plugin translators, not user-editable
@@ -133,6 +135,12 @@ class AIEngine extends BaseTranslationEngine {
                     this.systemPrompt = v || DEFAULT_SYSTEM_PROMPT;
                 },
             },
+            aiBannedPhrases: {
+                get: () => this.bannedPhrasesText,
+                set: (v) => {
+                    this.bannedPhrasesText = this.normalizeBannedPhrasesText(v);
+                },
+            },
             aiFixRecursionMaxDepth: {
                 get: () => this._aiFixRecursionMaxDepth,
                 set: (v) => {
@@ -163,6 +171,60 @@ class AIEngine extends BaseTranslationEngine {
         });
 
         this.tagManager.allowNewlineMismatch = this.allowNewlineMismatch;
+    }
+
+    normalizeBannedPhrasesText(input) {
+        if (input === undefined || input === null) {
+            return '';
+        }
+
+        const raw = Array.isArray(input) ? input.join('\n') : String(input);
+        const lines = raw
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean);
+        const deduped = [];
+        const seen = new Set();
+
+        for (const phrase of lines) {
+            const normalized = phrase.toLowerCase();
+            if (seen.has(normalized)) {
+                continue;
+            }
+            seen.add(normalized);
+            deduped.push(phrase);
+        }
+
+        return deduped.join('\n');
+    }
+
+    getBannedPhrasesList() {
+        return this.normalizeBannedPhrasesText(this.bannedPhrasesText)
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean);
+    }
+
+    findFirstBannedPhrase(text, bannedPhrases = this.getBannedPhrasesList()) {
+        if (typeof text !== 'string' || !text || !Array.isArray(bannedPhrases)) {
+            return null;
+        }
+
+        const lower = text.toLowerCase();
+        for (const phrase of bannedPhrases) {
+            if (typeof phrase !== 'string') {
+                continue;
+            }
+            const normalized = phrase.trim();
+            if (!normalized) {
+                continue;
+            }
+            if (lower.includes(normalized.toLowerCase())) {
+                return normalized;
+            }
+        }
+
+        return null;
     }
 
     normalizeCustomTagConfig(config = {}) {
@@ -894,6 +956,7 @@ class AIEngine extends BaseTranslationEngine {
             // 6. POSTPROCESS & WRAP
             const successes = [];
             const failures = [];
+            const bannedPhrases = this.getBannedPhrasesList();
 
             for (const itemD of itemData) {
                 const key =
@@ -916,6 +979,16 @@ class AIEngine extends BaseTranslationEngine {
                     failures.push({
                         ...itemD,
                         rejectReason: `Value for "${key}" is not a string`,
+                        cancelReason: shouldPreserveCancelReason ? cancelReason : null,
+                    });
+                    continue;
+                }
+
+                const bannedPhraseHit = this.findFirstBannedPhrase(rawSlice, bannedPhrases);
+                if (bannedPhraseHit) {
+                    failures.push({
+                        ...itemD,
+                        rejectReason: `Contains banned phrase: ${bannedPhraseHit}`,
                         cancelReason: shouldPreserveCancelReason ? cancelReason : null,
                     });
                     continue;
@@ -1024,7 +1097,9 @@ class AIEngine extends BaseTranslationEngine {
                 }
 
                 // Parse streaming response
-                const monitorState = StreamGuardrails.createMonitorState(expectedKeys);
+                const monitorState = StreamGuardrails.createMonitorState(expectedKeys, {
+                    bannedPhrases: this.getBannedPhrasesList(),
+                });
                 let contentText = ''; // accumulated assistant content only
                 let sseBuffer = ''; // buffer for partial SSE lines
 
