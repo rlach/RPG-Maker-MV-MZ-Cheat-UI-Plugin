@@ -473,7 +473,7 @@ export default {
                 // Add cache-only entries (not found in DB)
                 let cacheOnlyIndex = 0;
                 for (const [originalName, translation] of cacheNameMap.entries()) {
-                    if (!dbOriginalNames.has(originalName)) {
+                    if (!dbOriginalNames.has(originalName) && !dbOriginalNames.has(originalName.trim())) {
                         entries.push({
                             lp: 1001 + cacheOnlyIndex,
                             source: 'cache',
@@ -530,7 +530,8 @@ export default {
                 regex.lastIndex = 0;
                 let match;
                 while ((match = regex.exec(searchableContent)) !== null) {
-                    if (match[1]) foundNames.add(match[1]);
+                    const trimmedName = match[1] && match[1].trim();
+                    if (trimmedName) foundNames.add(trimmedName);
 
                     // Guard against zero-length regex matches causing infinite loops.
                     if (match[0] === '') {
