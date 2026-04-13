@@ -346,12 +346,15 @@ export class TagManager {
         const actualCounts = {};
         const usedMaskedIdsByTagKey = {};
         const maskedByTagKey = (caseMap && caseMap.maskedByTagKey) || {};
+        const processingEntries = [
+            ...this.tagEntries.filter((entry) => entry.type === TAG_TYPE.WITH_CUSTOM_PARAMETER),
+            ...this.tagEntries.filter((entry) => entry.type !== TAG_TYPE.WITH_CUSTOM_PARAMETER),
+        ];
 
-        for (const entry of this.tagEntries) {
-            const matches = result.match(entry.postPattern) || [];
-            actualCounts[entry.key] = matches.length;
-
+        for (const entry of processingEntries) {
             if (entry.type === TAG_TYPE.WITH_NUMERIC_PARAMETER) {
+                const matches = result.match(entry.postPattern) || [];
+                actualCounts[entry.key] = matches.length;
                 result = result.replace(entry.postPattern, (_, param) => {
                     if (entry.style === TAG_STYLE.XML) {
                         return `<${entry.tagSymbol}:${param}>`;
@@ -362,6 +365,8 @@ export class TagManager {
             }
 
             if (entry.type === TAG_TYPE.WITHOUT_PARAMETER) {
+                const matches = result.match(entry.postPattern) || [];
+                actualCounts[entry.key] = matches.length;
                 result = result.replace(entry.postPattern, () => {
                     if (entry.style === TAG_STYLE.XML) {
                         return `<${entry.tagSymbol}>`;
@@ -373,34 +378,42 @@ export class TagManager {
             }
 
             if (entry.type === TAG_TYPE.WITH_CUSTOM_PARAMETER) {
-                result = result.replace(entry.postPattern, (_, paramValue) => {
-                    let resolvedValue = paramValue;
+                const replacementResult = this.replaceEncodedCustomTags(
+                    result,
+                    entry,
+                    (paramValue) => {
+                        let resolvedValue = paramValue;
 
-                    if (entry.maskValue) {
-                        const maskedValues = maskedByTagKey[entry.key] || [];
-                        const maskId = Number(paramValue);
-                        if (!usedMaskedIdsByTagKey[entry.key]) {
-                            usedMaskedIdsByTagKey[entry.key] = new Set();
+                        if (entry.maskValue) {
+                            const maskedValues = maskedByTagKey[entry.key] || [];
+                            const maskId = Number(paramValue);
+                            if (!usedMaskedIdsByTagKey[entry.key]) {
+                                usedMaskedIdsByTagKey[entry.key] = new Set();
+                            }
+                            if (Number.isFinite(maskId)) {
+                                usedMaskedIdsByTagKey[entry.key].add(maskId);
+                            }
+                            resolvedValue =
+                                Number.isFinite(maskId) && maskedValues[maskId] !== undefined
+                                    ? maskedValues[maskId]
+                                    : paramValue;
                         }
-                        if (Number.isFinite(maskId)) {
-                            usedMaskedIdsByTagKey[entry.key].add(maskId);
-                        }
-                        resolvedValue =
-                            Number.isFinite(maskId) && maskedValues[maskId] !== undefined
-                                ? maskedValues[maskId]
-                                : paramValue;
-                    }
 
-                    if (entry.style === TAG_STYLE.XML) {
-                        return `<${entry.tagSymbol}:${resolvedValue}>`;
+                        if (entry.style === TAG_STYLE.XML) {
+                            return `<${entry.tagSymbol}:${resolvedValue}>`;
+                        }
+                        return `\\${entry.tagSymbol}${entry.bracket}${resolvedValue}${entry.bracketClose}`;
                     }
-                    return `\\${entry.tagSymbol}${entry.bracket}${resolvedValue}${entry.bracketClose}`;
-                });
+                );
+                result = replacementResult.text;
+                actualCounts[entry.key] = replacementResult.count;
                 continue;
             }
 
             // Legacy TAG_TYPE.XML — always restores as <symbol>
             if (entry.type === TAG_TYPE.XML) {
+                const matches = result.match(entry.postPattern) || [];
+                actualCounts[entry.key] = matches.length;
                 result = result.replace(entry.postPattern, () => `<${entry.tagSymbol}>`);
             }
         }
@@ -416,6 +429,10 @@ export class TagManager {
 
         const hasUnresolvedEscapedTag = /\[b=/i.test(result);
         if (hasUnresolvedEscapedTag) {
+            console.warn(
+                '[TagManager] Unresolved escaped tags found in postprocessed text:',
+                result
+            );
             return {
                 text: result,
                 valid: false,
@@ -517,6 +534,72 @@ export class TagManager {
         }
 
         return tag;
+    }
+
+    replaceEncodedCustomTags(text, entry, replacementFactory) {
+        if (typeof text !== 'string') {
+            return { text, count: 0 };
+        }
+
+        const tokenPrefix = `[b=${entry.tagId}${entry.bracket}`.toLowerCase();
+        const source = text;
+        const sourceLower = source.toLowerCase();
+        const open = entry.bracket;
+        const close = entry.bracketClose;
+        let cursor = 0;
+        let count = 0;
+        let output = '';
+
+        while (cursor < source.length) {
+            const tokenStart = sourceLower.indexOf(tokenPrefix, cursor);
+            if (tokenStart === -1) {
+                output += source.slice(cursor);
+                break;
+            }
+
+            output += source.slice(cursor, tokenStart);
+            const openIndex = tokenStart + tokenPrefix.length - 1;
+            const balanced = this.readBalancedValue(source, openIndex, open, close);
+
+            if (!balanced || source[balanced.closeIndex + 1] !== ']') {
+                // Leave malformed/mismatched token untouched and continue scanning.
+                output += source[tokenStart];
+                cursor = tokenStart + 1;
+                continue;
+            }
+
+            output += replacementFactory(balanced.value);
+            cursor = balanced.closeIndex + 2;
+            count += 1;
+        }
+
+        return { text: output, count };
+    }
+
+    readBalancedValue(text, openIndex, open, close) {
+        if (text[openIndex] !== open) {
+            return null;
+        }
+
+        let depth = 0;
+        for (let i = openIndex + 1; i < text.length; i++) {
+            const current = text[i];
+            if (current === open) {
+                depth += 1;
+                continue;
+            }
+            if (current === close) {
+                if (depth === 0) {
+                    return {
+                        value: text.slice(openIndex + 1, i),
+                        closeIndex: i,
+                    };
+                }
+                depth -= 1;
+            }
+        }
+
+        return null;
     }
 
     /**
