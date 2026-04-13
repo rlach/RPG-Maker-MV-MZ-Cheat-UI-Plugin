@@ -11,6 +11,7 @@ import { MppChoiceExTranslator } from './translators/MppChoiceExTranslator.js';
 import { MultipleWindowSkinSystemTranslator } from './translators/MultipleWindowSkinSystemTranslator.js';
 import { OriginMenuStatusTranslator } from './translators/OriginMenuStatusTranslator.js';
 import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTextWindowTranslator.js';
+import { QuestSystemTranslator } from './translators/QuestSystemTranslator.js';
 import { SceneGlossaryTranslator } from './translators/SceneGlossaryTranslator.js';
 import { SkillCPSystemTranslator } from './translators/SkillCPSystemTranslator.js';
 import { TextPictureTranslator } from './translators/TextPictureTranslator.js';
@@ -18,6 +19,7 @@ import { TMMenuLabelTranslator } from './translators/TMMenuLabelTranslator.js';
 import { TMNamePopTranslator } from './translators/TMNamePopTranslator.js';
 import { TorigoyaAchievement2Translator } from './translators/TorigoyaAchievement2Translator.js';
 import { TorigoyaAchievementTranslator } from './translators/TorigoyaAchievementTranslator.js';
+import { TorigoyaNotifyMessageTranslator } from './translators/TorigoyaNotifyMessageTranslator.js';
 import { YEPCoreEngineScriptTranslator } from './translators/YEPCoreEngineScriptTranslator.js';
 
 class PluginTranslatorRegistry {
@@ -36,6 +38,7 @@ class PluginTranslatorRegistry {
             MultipleWindowSkinSystemTranslator,
             OriginMenuStatusTranslator,
             PandaProgressTextWindowTranslator,
+            QuestSystemTranslator,
             SceneGlossaryTranslator,
             SkillCPSystemTranslator,
             TextPictureTranslator,
@@ -43,6 +46,7 @@ class PluginTranslatorRegistry {
             TMNamePopTranslator,
             TorigoyaAchievement2Translator,
             TorigoyaAchievementTranslator,
+            TorigoyaNotifyMessageTranslator,
             YEPCoreEngineScriptTranslator,
         ];
         this.translatorInstances = new Map();
