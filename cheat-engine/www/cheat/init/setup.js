@@ -6,6 +6,7 @@ import '../libs/vuetify.js';
 import MainComponent from '../MainComponent.js';
 import { ensureTranslationRuntime } from '../panels/translate-on-the-fly/TranslationRuntime.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../translate-engines/plugins/PluginTranslatorRegistry.js';
+import { ensureHacksRuntime } from '../js/HacksRuntime.js';
 
 // initialize vue
 const vuetify = new Vuetify();
@@ -31,6 +32,7 @@ window.__ensureTranslationRuntime = ensureTranslateOnTheFlyRuntime;
 
 // Boot translation runtime even if settings panel UI is never opened.
 ensureTranslateOnTheFlyRuntime();
+ensureHacksRuntime();
 
 setTimeout(() => {
     const runtime = ensureTranslateOnTheFlyRuntime();

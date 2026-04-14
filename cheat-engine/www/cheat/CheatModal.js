@@ -15,6 +15,7 @@ import TranslateOnTheFlyPanel from './panels/TranslateOnTheFlyPanel.js';
 import TranslateNamesPanel from './panels/TranslateNamesPanel.js';
 import TranslateCacheManagerPanel from './panels/TranslateCacheManagerPanel.js';
 import TranslateTagManagerPanel from './panels/TranslateTagManagerPanel.js';
+import HacksPanel from './panels/HacksPanel.js';
 import { CHEAT_WINDOW_MANAGER } from './js/CheatWindowManager.js';
 
 export default {
@@ -38,6 +39,7 @@ export default {
         TranslateNamesPanel,
         TranslateCacheManagerPanel,
         TranslateTagManagerPanel,
+        HacksPanel,
     },
 
     template: `
@@ -194,6 +196,11 @@ export default {
                             component: 'translate-settings-panel',
                         },
                     ],
+                },
+                {
+                    name: 'Hacks',
+                    icon: 'mdi-wrench-cog',
+                    component: 'hacks-panel',
                 },
             ],
             overlayWidth: 700,
