@@ -1,28 +1,24 @@
 - [RPG-Maker-MV-MZ-Cheat-UI-Plugin](#rpg-maker-mv-mz-cheat-ui-plugin)
 - [Intro](#intro)
-  * [UI Sample](#ui-sample)
-  * [Features](#features)
+    - [UI Sample](#ui-sample)
+    - [Features](#features)
 - [Set up](#set-up)
-  * [How to apply](#how-to-apply)
-  * [How to use](#how-to-use)
-  * [Apply same cheat settings from another game](#apply-same-cheat-settings-from-another-game)
+    - [How to apply](#how-to-apply)
+    - [How to use](#how-to-use)
+    - [Apply same cheat settings from another game](#apply-same-cheat-settings-from-another-game)
 - [Handling Errors](#handling-errors)
-  * [If embeded nwjs version of game is lower than 0.26.4](#if-embeded-nwjs-version-of-game-is-lower-than-0264)
-  * [If the error occurs after updating the cheat](#if-the-error-occurs-after-updating-the-cheat)
-
-
+    - [If embeded nwjs version of game is lower than 0.26.4](#if-embeded-nwjs-version-of-game-is-lower-than-0264)
+    - [If the error occurs after updating the cheat](#if-the-error-occurs-after-updating-the-cheat)
 
 # RPG-Maker-MV-MZ-Cheat-UI-Plugin
 
 - GUI based RPG Maker MV/MZ game cheat tool
 - [한국어 도움말](https://github.com/paramonos/RPG-Maker-MV-MZ-Cheat-UI-Plugin/blob/main/README_ko-kr.md)
 
-
-
 # Intro
 
-
 ## UI Sample
+
 <p float="left">
   <img src="https://user-images.githubusercontent.com/99193603/153754676-cee2b96e-c03a-491f-b71c-3c57d6dcc474.JPG" width="500"/>
   <img src="https://user-images.githubusercontent.com/99193603/153754683-4e7a09a5-2d31-436d-8546-7a5d658eb282.JPG" width="500"/>
@@ -31,8 +27,8 @@
   <img src="https://user-images.githubusercontent.com/99193603/153754696-0cbc76f9-99fa-47a7-a0d0-6510a2f76e01.JPG" width="500"/>
 </p>
 
-
 ## Features
+
 - Good usability based on GUI.
 - Supports both RPG MV/MZ games.
 - Editing stats, gold, speed, items, variables, switches ...
@@ -48,12 +44,10 @@
 - Translate variables, switches, maps. (Needs [ezTransWeb](https://github.com/HelloKS/ezTransWeb) : Only supports for Korean.)
 - **Maybe more features..?**
 
-
-
 # Set up
 
+## How to apply
 
-## How to apply 
 1. Unpack game if needed.
 2. Download latest version of `rpg-{mv|mz}-cheat-{version}.zip` from **[releases](https://github.com/paramonos/RPG-Maker-MV-Cheat-UI-Plugin/releases)** and unzip.
 3. Copy unziped directories to `{game directory}/www` (for MZ, just copy to `{game_directory}`).
@@ -64,19 +58,13 @@
     - Example for RPG MZ
       <br/><img src="https://user-images.githubusercontent.com/99193603/155840462-028771ef-580c-4b45-969a-85f26329fef0.png" width="500"/>
 
-
-
-
 ## How to use
+
 - Press `Ctrl + C` to toggle cheat window.
     - You can change shortcuts in "Shortcuts" tab.
-    
     - If you do not hover your mouse over the cheat window, you may not be able to see it well because it is a little bit transparent. Note that it appears in the upper-right corner of the game window.
-    
     - <img src="https://user-images.githubusercontent.com/99193603/153754676-cee2b96e-c03a-491f-b71c-3c57d6dcc474.JPG" width="400"/>
 - Just enjoy cheat!
-
-
 
 ## Apply same cheat settings from another game
 
@@ -84,9 +72,7 @@ If you want to apply same shortcut keys, move speed, game speed, translation, et
 
 Just copy the `www/cheat-settings` folder of the game that already has settings applied to the other game folder.
 
-
-
-# Handling Errors 
+# Handling Errors
 
 ## If embeded nwjs version of game is lower than 0.26.4
 
@@ -94,21 +80,46 @@ Just copy the `www/cheat-settings` folder of the game that already has settings 
 - In that case, you need to force update to the new nwjs version.
 
 1. Download latest version of [nwjs](https://dl.nwjs.io/v0.61.0/) and unzip. (`{version}/nwjs-symbol-v{version}-win-{ia32|x64}.7z`)
-   - If you need developer tools, download the sdk version.
+    - If you need developer tools, download the sdk version.
 2. Copy `www` directory and `package.json` file from the game directory to nwjs directory.
-   - <img src="https://user-images.githubusercontent.com/99193603/153755660-25da5b48-b542-443e-bd38-2e3e95e13a63.JPG" width="500"/>
+    - <img src="https://user-images.githubusercontent.com/99193603/153755660-25da5b48-b542-443e-bd38-2e3e95e13a63.JPG" width="500"/>
 3. Run `nw.exe` and play game.
-
-
 
 > If the game does not work properly after the nwjs update, cheats cannot be applied to the game.
 >
 > - In this case, please use [another cheat](https://github.com/emerladCoder/RPG-Maker-MV-Cheat-Menu-Plugin).
-
-
 
 ## If the error occurs after updating the cheat
 
 Settings files created from earlier versions of cheats may cause errors.
 
 Delete the `www/cheat-settings` folder from the game folder.
+
+## If the cheats modal doesn't appear or is messed up
+
+Check if `package.json` inside game directory has following line:
+
+```
+    "bg-script": "bg.js"
+```
+
+If it does remove it, along with comma at the end of previous line.
+
+Proper fir will look like this:
+
+```
+{
+    "name": "rmmz-game",
+    "main": "index.html",
+    "chromium-args": "--force-color-profile=srgb --disable-devtools",
+    "window": {
+        "title": "Example",
+        "width": 816,
+        "height": 624,
+        "position": "center",
+        "icon": "icon/icon.png"
+    }
+}
+```
+
+This will disable anti-malware guard that some games have, so do it on your own responsibility. The script blocks CSS styles downloads by cheat-engine and LLM requests.
