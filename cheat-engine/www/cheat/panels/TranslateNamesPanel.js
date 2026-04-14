@@ -257,6 +257,10 @@ export default {
                     pattern: '\\\\nw\\[([^\\[\\]]+)\\]',
                     example: '\\\\nw[Char Name]\\nThe text being spoken.',
                 },
+                {
+                    pattern: '^([^：]+)：\n',
+                    example: 'Char Name：\\nThe text being spoken.',
+                },
             ],
             entries: [],
         };
@@ -473,7 +477,10 @@ export default {
                 // Add cache-only entries (not found in DB)
                 let cacheOnlyIndex = 0;
                 for (const [originalName, translation] of cacheNameMap.entries()) {
-                    if (!dbOriginalNames.has(originalName) && !dbOriginalNames.has(originalName.trim())) {
+                    if (
+                        !dbOriginalNames.has(originalName) &&
+                        !dbOriginalNames.has(originalName.trim())
+                    ) {
                         entries.push({
                             lp: 1001 + cacheOnlyIndex,
                             source: 'cache',
@@ -732,9 +739,7 @@ export default {
             }
 
             if (window.Alert) {
-                const modeLabel = onlyOriginal
-                    ? 'only actors with original names'
-                    : 'all actors';
+                const modeLabel = onlyOriginal ? 'only actors with original names' : 'all actors';
                 window.Alert.info(
                     `Applied translated names to ${updatedCount} spawned actor(s) (${modeLabel}). Skipped: ${skippedCount}.`
                 );
