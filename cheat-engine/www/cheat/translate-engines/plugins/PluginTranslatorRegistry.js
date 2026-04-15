@@ -4,6 +4,7 @@ import { ExternMessageTranslator } from './translators/ExternMessageTranslator.j
 import { CbrEroStatusMvTranslator } from './translators/CbrEroStatusMvTranslator.js';
 import { DTextPictureTranslator } from './translators/DTextPictureTranslator.js';
 import { DynamicDatabaseTranslator } from './translators/DynamicDatabaseTranslator.js';
+import { GetInformationTranslator } from './translators/GetInformationTranslator.js';
 import { DestinationWindowTranslator } from './translators/DestinationWindowTranslator.js';
 import { KmsMapActiveMessageTranslator } from './translators/KmsMapActiveMessageTranslator.js';
 import { MgpExternChoicesTranslator } from './translators/MgpExternChoicesTranslator.js';
@@ -31,6 +32,7 @@ class PluginTranslatorRegistry {
             CbrEroStatusMvTranslator,
             DTextPictureTranslator,
             DynamicDatabaseTranslator,
+            GetInformationTranslator,
             DestinationWindowTranslator,
             KmsMapActiveMessageTranslator,
             MgpExternChoicesTranslator,
