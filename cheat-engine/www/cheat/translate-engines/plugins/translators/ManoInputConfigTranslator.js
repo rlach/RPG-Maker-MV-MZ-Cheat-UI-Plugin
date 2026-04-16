@@ -186,16 +186,183 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
 
     // ─── Runtime hooks ────────────────────────────────────────────────────────
 
+    _isMvVersion() {
+        const manoNs = window['Mano_InputConfig'];
+        // MV exports Window_GamepadConfig directly; MZ does not.
+        return !!(manoNs && manoNs['Window_GamepadConfig']);
+    }
+
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
             return;
         }
 
         this._hookOptionsCommandName();
-        this._hookKeyConfigDrawCommand();
-        this._hookGamepadConfigScene();
+
+        if (this._isMvVersion()) {
+            this._hookMV();
+        } else {
+            this._hookKeyConfigDrawCommand();
+            this._hookGamepadConfigScene();
+        }
 
         window[RUNTIME_HOOK_GUARD] = true;
+    }
+
+    /**
+     * Install all runtime translation hooks for the old MV-era version.
+     * In this version all relevant classes are exported on the Mano_InputConfig
+     * namespace, so we can hook them directly without scene interception.
+     */
+    _hookMV() {
+        const manoNs = window['Mano_InputConfig'];
+        if (!manoNs) {
+            return;
+        }
+
+        // ── Window_KeyConfig: drawCommand(commandName, rect) ─────────────────
+        // Also wraps drawApplyCommand / drawDefaultCommand / drawexitCommand /
+        // drawChangeLayoutCommand which call this.drawText(setting.commandText.*,…)
+        // directly without going through drawCommand.
+        const WindowKeyConfig = manoNs['Window_KeyConfig'];
+        if (WindowKeyConfig && WindowKeyConfig.prototype) {
+            const kcProto = WindowKeyConfig.prototype;
+
+            if (typeof kcProto.drawCommand === 'function') {
+                const origDrawCommand = kcProto.drawCommand;
+                kcProto.drawCommand = function (commandName, rect) {
+                    let translated = commandName;
+                    try {
+                        translated = resolveFromCache(commandName, getRuntime());
+                    } catch (_) { /* noop */ }
+                    return origDrawCommand.call(this, translated, rect);
+                };
+            }
+
+            // These helpers bypass drawCommand and write directly with drawText.
+            for (const methodName of [
+                'drawApplyCommand', 'drawDefaultCommand',
+                'drawexitCommand', 'drawChangeLayoutCommand',
+            ]) {
+                if (typeof kcProto[methodName] === 'function') {
+                    const origMethod = kcProto[methodName];
+                    kcProto[methodName] = function (...args) {
+                        const origDrawText = this.drawText;
+                        this.drawText = (text, ...rest) => {
+                            let translated = text;
+                            try { translated = resolveFromCache(text, getRuntime()); } catch (_) { /* noop */ }
+                            return origDrawText.call(this, translated, ...rest);
+                        };
+                        try {
+                            return origMethod.call(this, ...args);
+                        } finally {
+                            this.drawText = origDrawText;
+                        }
+                    };
+                }
+            }
+        }
+
+        // ── Window_GamepadConfig: symbolText(index) ──────────────────────────
+        // drawItem calls this.symbolText(index) to get the action name string.
+        const WindowGamepadConfig = manoNs['Window_GamepadConfig'];
+        if (WindowGamepadConfig && WindowGamepadConfig.prototype) {
+            const proto = WindowGamepadConfig.prototype;
+
+            if (typeof proto.symbolText === 'function') {
+                const origSymbolText = proto.symbolText;
+                proto.symbolText = function (index) {
+                    const text = origSymbolText.call(this, index);
+                    try {
+                        return resolveFromCache(text, getRuntime());
+                    } catch (_) {
+                        return text;
+                    }
+                };
+            }
+
+            // drawCommand(index) draws command list entries on initial refresh.
+            if (typeof proto.drawCommand === 'function') {
+                const origGpDrawCommand = proto.drawCommand;
+                proto.drawCommand = function (index) {
+                    const commandIndex = this.commandIndex(index);
+                    const command = this._command && this._command[commandIndex];
+                    if (!command) {
+                        return origGpDrawCommand.call(this, index);
+                    }
+                    const origName = command.name;
+                    try {
+                        command.name = resolveFromCache(origName, getRuntime());
+                    } catch (_) { /* noop */ }
+                    try {
+                        return origGpDrawCommand.call(this, index);
+                    } finally {
+                        command.name = origName;
+                    }
+                };
+            }
+
+            // drawApplyCommand / drawDefaultCommand / drawExitCommand bypass
+            // drawCommand(index) and read setting.commandText.* directly.
+            // Wrap drawText on the instance for the duration of each call.
+            for (const methodName of ['drawApplyCommand', 'drawDefaultCommand', 'drawExitCommand']) {
+                if (typeof proto[methodName] === 'function') {
+                    const origMethod = proto[methodName];
+                    proto[methodName] = function (...args) {
+                        const origDrawText = this.drawText;
+                        this.drawText = (text, ...rest) => {
+                            let translated = text;
+                            try { translated = resolveFromCache(text, getRuntime()); } catch (_) { /* noop */ }
+                            return origDrawText.call(this, translated, ...rest);
+                        };
+                        try {
+                            return origMethod.call(this, ...args);
+                        } finally {
+                            this.drawText = origDrawText;
+                        }
+                    };
+                }
+            }
+        }
+
+        // ── Scene_GamepadConfig: translate help window text ──────────────────
+        // createHelpWindow calls this._helpWindow.setText(createPadinfoText(pad))
+        // once. Hook the scene method to re-translate the text that was just set.
+        const SceneGamepadConfig = manoNs['Scene_GamepadConfig'];
+        if (SceneGamepadConfig && SceneGamepadConfig.prototype &&
+            typeof SceneGamepadConfig.prototype.createHelpWindow === 'function') {
+            const origCreateHelpWindow = SceneGamepadConfig.prototype.createHelpWindow;
+            SceneGamepadConfig.prototype.createHelpWindow = function () {
+                origCreateHelpWindow.call(this);
+                if (!this._helpWindow) { return; }
+                try {
+                    // After the original call, re-translate whatever text was set.
+                    const currentText = this._helpWindow._text || '';
+                    if (isUsableText(currentText)) {
+                        const translated = resolveFromCache(currentText, getRuntime());
+                        if (translated !== currentText) {
+                            this._helpWindow.setText(translated);
+                        }
+                    }
+                } catch (_) { /* noop */ }
+            };
+        }
+
+        // ── Window_InputSymbolList: symbolName(index) ────────────────────────
+        // drawItem calls this.symbolName(index) to get the display string.
+        const WindowInputSymbolList = manoNs['Window_InputSymbolList'];
+        if (WindowInputSymbolList && WindowInputSymbolList.prototype &&
+            typeof WindowInputSymbolList.prototype.symbolName === 'function') {
+            const origSymbolName = WindowInputSymbolList.prototype.symbolName;
+            WindowInputSymbolList.prototype.symbolName = function (index) {
+                const text = origSymbolName.call(this, index);
+                try {
+                    return resolveFromCache(text, getRuntime());
+                } catch (_) {
+                    return text;
+                }
+            };
+        }
     }
 
     /**
@@ -548,7 +715,69 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
     }
 
     /**
+     * Returns true if the parameters look like the old MV-era flat-string format
+     * (pre-2022, before the MZ rewrite that introduced struct<MultiLangString>).
+     *
+     * Detection heuristic: the MV version stores command texts as plain strings
+     * under keys like `textApply`, while the MZ version uses struct params like
+     * `apply` (a JSON object with `jp`/`en` fields).
+     *
+     * @param {object} params
+     * @returns {boolean}
+     */
+    _isMvStyleParams(params) {
+        if (!params || typeof params !== 'object') {
+            return false;
+        }
+        // MV has textApply as a plain non-JSON string
+        const textApply = params['textApply'];
+        if (typeof textApply === 'string' && textApply.trim() && !textApply.trim().startsWith('{')) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Collect translatable JP strings from the old MV-era flat-string parameters.
+     *
+     * @param {object} params
+     * @param {string} scope
+     * @param {Array}  output
+     */
+    _appendEntriesFromParametersMV(params, scope, output) {
+        // ── Plain string command/symbol texts ────────────────────────────────
+        const plainFields = [
+            'textApply', 'textRollback', 'textDefault', 'textChangeLayout', 'textExit',
+            'textEmpty',
+            'textOK', 'textCancel', 'textShift', 'textMenu',
+            'textPageup', 'textPagedown', 'textEscape',
+            'textSymbol6', 'textSymbol7', 'textSymbol8',
+            'textUp', 'textDown', 'textLeft', 'textRight',
+            'commandName', 'keyconfigCommandName',
+        ];
+
+        for (const field of plainFields) {
+            const value = params[field];
+            if (isUsableText(value)) {
+                output.push({ text: value, source: { scope, field } });
+            }
+        }
+
+        // ── Note-style params (outer-quoted) ─────────────────────────────────
+        for (const field of ['GamepadIsNotConnected', 'needButtonDetouch']) {
+            const raw = params[field];
+            if (typeof raw === 'string' && raw.trim()) {
+                const text = noteOrString(raw);
+                if (isUsableText(text)) {
+                    output.push({ text, source: { scope, field } });
+                }
+            }
+        }
+    }
+
+    /**
      * Collect translatable JP strings from a Mano_InputConfig parameters object.
+     * Automatically detects MV (pre-2022 flat strings) vs MZ (struct params).
      *
      * @param {object} params - Plugin parameters object (key→string).
      * @param {string} scope  - Label used in source metadata.
@@ -556,6 +785,11 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
      */
     appendEntriesFromParameters(params, scope, output) {
         if (!params || typeof params !== 'object' || !Array.isArray(output)) {
+            return;
+        }
+
+        if (this._isMvStyleParams(params)) {
+            this._appendEntriesFromParametersMV(params, scope, output);
             return;
         }
 
