@@ -1,4 +1,8 @@
 import { BasePhase } from "./BasePhase.js";
+import {
+  getSystemMessageCacheKey,
+  getSystemMessagesSource,
+} from "./SystemMessageCacheRules.js";
 
 export class SystemMessages extends BasePhase {
   static getInstance() {
@@ -16,12 +20,8 @@ export class SystemMessages extends BasePhase {
     return "systemMessages";
   }
 
-  getPrimaryCacheKey(panel, messageKey) {
-    if (!panel || typeof panel.getCacheKey !== "function") {
-      return null;
-    }
-
-    return panel.getCacheKey(messageKey, "system_message");
+  getPrimaryCacheKey(panel, messageKey, messageValue) {
+    return getSystemMessageCacheKey(panel, messageKey, messageValue);
   }
 
   async createEntries() {
@@ -43,18 +43,22 @@ export class SystemMessages extends BasePhase {
       return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
     }
 
-    const messages = $dataSystem.terms.messages;
-    const keys = Object.keys(messages || {});
+    const sourceMessages = getSystemMessagesSource();
+    if (!sourceMessages) {
+      return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
+    }
+
+    const keys = Object.keys(sourceMessages || {});
     let total = 0;
     let left = 0;
     for (const key of keys) {
-      const value = messages[key];
+      const value = sourceMessages[key];
       if (typeof value !== "string" || value.trim() === "") {
         continue;
       }
 
       total += 1;
-      const cacheKey = this.getPrimaryCacheKey(panel, key);
+      const cacheKey = this.getPrimaryCacheKey(panel, key, value);
       if (!cacheKey || !panel.hasUsableCacheValue(cacheKey)) {
         left += 1;
       }
@@ -75,16 +79,20 @@ export class SystemMessages extends BasePhase {
       return [];
     }
 
-    const messages = $dataSystem.terms.messages;
+    const sourceMessages = getSystemMessagesSource();
+    if (!sourceMessages) {
+      return [];
+    }
+
     const pending = [];
     
-    for (const key of Object.keys(messages || {})) {
-      const value = messages[key];
+    for (const key of Object.keys(sourceMessages || {})) {
+      const value = sourceMessages[key];
       if (typeof value !== "string" || value.trim() === "") {
         continue;
       }
 
-      const cacheKey = this.getPrimaryCacheKey(panel, key);
+      const cacheKey = this.getPrimaryCacheKey(panel, key, value);
       if (!cacheKey || !panel.hasUsableCacheValue(cacheKey)) {
         pending.push({
           type: "system_message",
@@ -150,18 +158,27 @@ export class SystemMessages extends BasePhase {
       return true;
     }
 
+    const sourceMessages = getSystemMessagesSource();
     const messages = $dataSystem.terms.messages;
+    if (!sourceMessages) {
+      return true;
+    }
+
     let applied = 0;
 
-    for (const key of Object.keys(messages || {})) {
-      const cacheKey = this.getPrimaryCacheKey(panel, key);
+    for (const key of Object.keys(sourceMessages || {})) {
+      const sourceValue = sourceMessages[key];
+      const cacheKey = this.getPrimaryCacheKey(panel, key, sourceValue);
       if (!cacheKey || !panel.hasUsableCacheValue(cacheKey)) {
         continue;
       }
 
       const translated = panel.translationCache.get(cacheKey);
-      if (translated !== undefined) {
-        $dataSystem.terms.messages[key] = translated;
+      if (
+        translated !== undefined &&
+        Object.prototype.hasOwnProperty.call(messages, key)
+      ) {
+        messages[key] = translated;
         applied += 1;
       }
     }

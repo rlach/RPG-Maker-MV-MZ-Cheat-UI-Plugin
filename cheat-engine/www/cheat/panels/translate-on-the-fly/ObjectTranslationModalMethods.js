@@ -2,6 +2,10 @@ import { TRANSLATE_SETTINGS, TRANSLATOR } from '../../js/TranslateHelper.js';
 import { countEventCommandEntries } from '../../js/EventCommandTraversal.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../../translate-engines/plugins/PluginTranslatorRegistry.js';
+import {
+    getSystemMessageCacheKey,
+    getSystemMessagesSource,
+} from '../../translate-engines/translation-phases/SystemMessageCacheRules.js';
 
 const DEFAULT_OBJECT_TRANSLATION_TYPE_DEFS = Object.freeze([
     { id: 'mapEvents', label: 'Map events' },
@@ -455,18 +459,22 @@ export const objectTranslationRuntimeMethods = {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 
-        const messages = $dataSystem.terms.messages;
-        const keys = Object.keys(messages || {});
+        const sourceMessages = getSystemMessagesSource();
+        if (!sourceMessages) {
+            return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
+        }
+
+        const keys = Object.keys(sourceMessages || {});
 
         let total = 0;
         let left = 0;
         for (const key of keys) {
-            const value = messages[key];
+            const value = sourceMessages[key];
             if (typeof value !== 'string' || value.trim() === '') {
                 continue;
             }
             total++;
-            const cacheKey = this.getCacheKey(key, 'system_message');
+            const cacheKey = getSystemMessageCacheKey(this, key, value);
             if (!this.hasUsableCacheValue(cacheKey)) {
                 left++;
             }
