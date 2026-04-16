@@ -7,6 +7,7 @@ import { DynamicDatabaseTranslator } from './translators/DynamicDatabaseTranslat
 import { GetInformationTranslator } from './translators/GetInformationTranslator.js';
 import { DestinationWindowTranslator } from './translators/DestinationWindowTranslator.js';
 import { KmsMapActiveMessageTranslator } from './translators/KmsMapActiveMessageTranslator.js';
+import { ManoInputConfigTranslator } from './translators/ManoInputConfigTranslator.js';
 import { LLStandingPictureTranslator } from './translators/LLStandingPictureTranslator.js';
 import { MgpExternChoicesTranslator } from './translators/MgpExternChoicesTranslator.js';
 import { MppChoiceExTranslator } from './translators/MppChoiceExTranslator.js';
@@ -37,6 +38,7 @@ class PluginTranslatorRegistry {
             DestinationWindowTranslator,
             KmsMapActiveMessageTranslator,
             LLStandingPictureTranslator,
+            ManoInputConfigTranslator,
             MgpExternChoicesTranslator,
             MppChoiceExTranslator,
             MultipleWindowSkinSystemTranslator,
