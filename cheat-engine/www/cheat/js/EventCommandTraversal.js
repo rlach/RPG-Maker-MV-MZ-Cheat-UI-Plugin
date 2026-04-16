@@ -125,6 +125,10 @@ export function collectEventCommandEntries(list) {
     return entries;
 }
 
+/**
+ * @param {Array} list
+ * @param {{ isUntranslated?: (entry: any) => boolean }} [options]
+ */
 export function countEventCommandEntries(list, { isUntranslated } = {}) {
     const entries = collectEventCommandEntries(list);
     let totalStrings = 0;

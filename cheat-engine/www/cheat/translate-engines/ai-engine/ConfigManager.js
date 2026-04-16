@@ -5,53 +5,53 @@
  */
 
 export class ConfigManager {
-  constructor(aiEngine) {
-    this.aiEngine = aiEngine;
-  }
-
-  _syncPanelEngineConfig() {
-    const panel = this.aiEngine && this.aiEngine.panel;
-    if (!panel) {
-      return;
+    constructor(aiEngine) {
+        this.aiEngine = aiEngine;
     }
 
-    if (typeof panel.bindEngineConfigTo === "function") {
-      panel.bindEngineConfigTo(panel);
-    }
-  }
+    _syncPanelEngineConfig() {
+        const panel = this.aiEngine && this.aiEngine.panel;
+        if (!panel) {
+            return;
+        }
 
-  _normalizeModelsResponse(data) {
-    const payload = data && typeof data === "object" ? data : {};
-    const candidates = Array.isArray(payload.data)
-      ? payload.data
-      : Array.isArray(payload.models)
-        ? payload.models
-        : Array.isArray(payload)
-          ? payload
-          : [];
-
-    const normalized = [];
-    for (const item of candidates) {
-      const raw =
-        typeof item === "string"
-          ? item
-          : item && typeof item.id === "string"
-            ? item.id
-            : item && typeof item.name === "string"
-              ? item.name
-              : "";
-      const model = raw.trim();
-      if (!model || normalized.includes(model)) {
-        continue;
-      }
-      normalized.push(model);
+        if (typeof panel.bindEngineConfigTo === 'function') {
+            panel.bindEngineConfigTo(panel);
+        }
     }
 
-    return normalized;
-  }
+    _normalizeModelsResponse(data) {
+        const payload = data && typeof data === 'object' ? data : {};
+        const candidates = Array.isArray(payload.data)
+            ? payload.data
+            : Array.isArray(payload.models)
+              ? payload.models
+              : Array.isArray(payload)
+                ? payload
+                : [];
 
-  static getTemplate() {
-  return `
+        const normalized = [];
+        for (const item of candidates) {
+            const raw =
+                typeof item === 'string'
+                    ? item
+                    : item && typeof item.id === 'string'
+                      ? item.id
+                      : item && typeof item.name === 'string'
+                        ? item.name
+                        : '';
+            const model = raw.trim();
+            if (!model || normalized.includes(model)) {
+                continue;
+            }
+            normalized.push(model);
+        }
+
+        return normalized;
+    }
+
+    static getTemplate() {
+        return `
        <div v-if="translationEngine === 'openApi' || translationEngine === 'gpt4all'" class="mt-3">
              <v-select
                v-model="aiProvider"
@@ -188,212 +188,209 @@ export class ConfigManager {
                class="mb-2"
              ></v-textarea>
     `;
-  }
-
-  /**
-   * Get Vue template for configuration UI
-   * @returns {string}
-   */
-  getTemplate() {
-  return ConfigManager.getTemplate();
-  }
-
-  /**
-   * Get configuration data object for panel binding
-   * @returns {Object}
-   */
-  getData() {
-    return {
-      aiProvider: this.aiEngine.provider,
-      aiProviderOptions: [
-        { text: "OpenAPI compatible", value: "openApi" },
-        { text: "Open WebUI", value: "openwebui" },
-      ],
-      aiHost: this.aiEngine.host,
-      aiApiKey: this.aiEngine.apiKey,
-      aiSelectedModel: this.aiEngine.selectedModel,
-      aiModels: this.aiEngine.models,
-      aiLoadingModels: this.aiEngine.loadingModels,
-      aiModelsError: this.aiEngine.modelsError,
-      aiAllowNewlineMismatch: this.aiEngine.allowNewlineMismatch,
-      aiAskIfTextTranslated: this.aiEngine.askAiIfTextTranslated,
-      aiInvalidJsonHandlingStrategy: this.aiEngine.invalidJsonHandlingStrategy,
-      aiInvalidJsonHandlingStrategyOptions: [
-        { text: "Resend first half of items", value: "resendFirstHalf" },
-        { text: "Ask AI to fix JSON", value: "askAIToFix" },
-        { text: "Use JSON fixer API", value: "useJsonFixer" },
-        { text: "None (fail)", value: "none" },
-      ],
-      aiBannedPhrases: this.aiEngine.bannedPhrasesText,
-      aiSystemPrompt: this.aiEngine.systemPrompt,
-      aiFixRecursionMaxDepth: this.aiEngine._aiFixRecursionMaxDepth,
-      useJsonFixer: this.aiEngine.useJsonFixer,
-      aiCustomTags: this.aiEngine.customTags,
-      aiCustomTagTypeOptions: this.aiEngine.customTagTypeOptions,
-      aiCustomTagBracketOptions: this.aiEngine.customTagBracketOptions,
-      aiCustomTagStyleOptions: this.aiEngine.customTagStyleOptions,
-    };
-  }
-
-  /**
-   * Get configuration methods (handlers)
-   * @returns {Object}
-   */
-  getMethods() {
-    return {
-      fetchAiModels: () => this._fetchAiModels(),
-      onChangeAiProvider: (v) => this._onChangeAiProvider(v),
-      onChangeAiHost: (v) => {
-        this.aiEngine.host = v;
-      },
-      onChangeAiApiKey: (v) => {
-        this.aiEngine.apiKey = v;
-      },
-      onChangeAiModel: (v) => {
-        this.aiEngine.selectedModel = v;
-      },
-      onChangeAiAllowNewlineMismatch: (v) => {
-        this.aiEngine.allowNewlineMismatch = v;
-      },
-      onChangeAiAskIfTextTranslated: (v) => {
-        this.aiEngine.askAiIfTextTranslated = v;
-      },
-      onChangeAiInvalidJsonHandlingStrategy: (v) => {
-        this.aiEngine.invalidJsonHandlingStrategy = v;
-      },
-      onChangeAiBannedPhrases: (v) => {
-        this.aiEngine.bannedPhrasesText = this.aiEngine.normalizeBannedPhrasesText(v);
-        if (this.aiEngine.panel && typeof this.aiEngine.panel.saveSettings === "function") {
-          this.aiEngine.panel.saveSettings();
-        }
-      },
-      onChangeAiSystemPrompt: (v) => {
-        this.aiEngine.systemPrompt = v;
-      },
-      onChangeAiFixRecursionMaxDepth: (v) => {
-        this.aiEngine._aiFixRecursionMaxDepth = v;
-      },
-      onChangeUseJsonFixer: (v) => {
-        this.aiEngine.useJsonFixer = v;
-      },
-      addAiCustomTag: (tagConfig) => {
-        this.aiEngine.addCustomTag(tagConfig);
-        if (typeof this.aiEngine.panel.bindEngineConfigTo === "function") {
-          this.aiEngine.panel.bindEngineConfigTo(this.aiEngine.panel);
-        }
-        this.aiEngine.panel.saveSettings();
-      },
-      updateAiCustomTag: (index, tagConfig) => {
-        this.aiEngine.updateCustomTag(index, tagConfig);
-        if (typeof this.aiEngine.panel.bindEngineConfigTo === "function") {
-          this.aiEngine.panel.bindEngineConfigTo(this.aiEngine.panel);
-        }
-        this.aiEngine.panel.saveSettings();
-      },
-      removeAiCustomTag: (index) => {
-        this.aiEngine.removeCustomTag(index);
-        if (typeof this.aiEngine.panel.bindEngineConfigTo === "function") {
-          this.aiEngine.panel.bindEngineConfigTo(this.aiEngine.panel);
-        }
-        this.aiEngine.panel.saveSettings();
-      },
-    };
-  }
-
-  /**
-   * Check if engine is fully configured
-   * @returns {boolean}
-   */
-  isReady() {
-    return !!this.aiEngine.selectedModel;
-  }
-
-  /**
-   * Fetch available models from API
-   * @returns {Promise<void>}
-   */
-  async _fetchAiModels() {
-    this.aiEngine.loadingModels = true;
-    this.aiEngine.modelsError = "";
-    this._syncPanelEngineConfig();
-
-    try {
-      const endpoint = this._getModelsUrl();
-      const headers = this._getAuthHeaders();
-      const response = await fetch(endpoint, { headers });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      const models = this._normalizeModelsResponse(data);
-
-      this.aiEngine.models = models;
-      if (
-        this.aiEngine.selectedModel &&
-        !models.includes(this.aiEngine.selectedModel)
-      ) {
-        this.aiEngine.selectedModel = "";
-      }
-      if (!this.aiEngine.selectedModel && models.length > 0) {
-        this.aiEngine.selectedModel = models[0];
-      }
-      console.log("[ConfigManager] Fetched models:", models);
-    } catch (error) {
-      this.aiEngine.modelsError = error.message;
-      console.error("[ConfigManager] Failed to fetch models:", error.message);
-    } finally {
-      this.aiEngine.loadingModels = false;
-      this._syncPanelEngineConfig();
-      if (this.aiEngine.panel && typeof this.aiEngine.panel.saveSettings === "function") {
-        this.aiEngine.panel.saveSettings();
-      }
-    }
-  }
-
-  /**
-   * Handle provider change
-   * @private
-   */
-  _onChangeAiProvider(provider) {
-    this.aiEngine.provider = provider === "gpt4all" ? "openApi" : provider;
-
-    // Reset models and selected model
-    this.aiEngine.models = [];
-    this.aiEngine.selectedModel = "";
-
-    // Adjust default host
-    if (provider === "openwebui") {
-      this.aiEngine.host = "http://localhost:8080";
-    } else {
-      this.aiEngine.host = "http://localhost:4891";
     }
 
-    this._syncPanelEngineConfig();
-  }
-
-  /**
-   * Get models endpoint
-   * @private
-   */
-  _getModelsUrl() {
-    const host = this.aiEngine.host || "http://localhost:4891";
-    if (this.aiEngine.provider === "openwebui") {
-      return `${host}/api/models`;
+    /**
+     * Get Vue template for configuration UI
+     * @returns {string}
+     */
+    getTemplate() {
+        return ConfigManager.getTemplate();
     }
-    return `${host}/v1/models`;
-  }
 
-  /**
-   * Get auth headers
-   * @private
-   */
-  _getAuthHeaders() {
-    const headers = { "Content-Type": "application/json" };
-    if (this.aiEngine.provider === "openwebui" && this.aiEngine.apiKey) {
-      headers["Authorization"] = `Bearer ${this.aiEngine.apiKey}`;
+    /**
+     * Get configuration data object for panel binding
+     * @returns {Object}
+     */
+    getData() {
+        return {
+            aiProvider: this.aiEngine.provider,
+            aiProviderOptions: [
+                { text: 'OpenAPI compatible', value: 'openApi' },
+                { text: 'Open WebUI', value: 'openwebui' },
+            ],
+            aiHost: this.aiEngine.host,
+            aiApiKey: this.aiEngine.apiKey,
+            aiSelectedModel: this.aiEngine.selectedModel,
+            aiModels: this.aiEngine.models,
+            aiLoadingModels: this.aiEngine.loadingModels,
+            aiModelsError: this.aiEngine.modelsError,
+            aiAllowNewlineMismatch: this.aiEngine.allowNewlineMismatch,
+            aiAskIfTextTranslated: this.aiEngine.askAiIfTextTranslated,
+            aiInvalidJsonHandlingStrategy: this.aiEngine.invalidJsonHandlingStrategy,
+            aiInvalidJsonHandlingStrategyOptions: [
+                { text: 'Split in half', value: 'resendFirstHalf' },
+                { text: 'Ask AI to fix JSON', value: 'askAIToFix' },
+                { text: 'Use JSON fixer API', value: 'useJsonFixer' },
+                { text: 'None (fail)', value: 'none' },
+            ],
+            aiBannedPhrases: this.aiEngine.bannedPhrasesText,
+            aiSystemPrompt: this.aiEngine.systemPrompt,
+            aiFixRecursionMaxDepth: this.aiEngine._aiFixRecursionMaxDepth,
+            useJsonFixer: this.aiEngine.useJsonFixer,
+            aiCustomTags: this.aiEngine.customTags,
+            aiCustomTagTypeOptions: this.aiEngine.customTagTypeOptions,
+            aiCustomTagBracketOptions: this.aiEngine.customTagBracketOptions,
+            aiCustomTagStyleOptions: this.aiEngine.customTagStyleOptions,
+        };
     }
-    return headers;
-  }
+
+    /**
+     * Get configuration methods (handlers)
+     * @returns {Object}
+     */
+    getMethods() {
+        return {
+            fetchAiModels: () => this._fetchAiModels(),
+            onChangeAiProvider: (v) => this._onChangeAiProvider(v),
+            onChangeAiHost: (v) => {
+                this.aiEngine.host = v;
+            },
+            onChangeAiApiKey: (v) => {
+                this.aiEngine.apiKey = v;
+            },
+            onChangeAiModel: (v) => {
+                this.aiEngine.selectedModel = v;
+            },
+            onChangeAiAllowNewlineMismatch: (v) => {
+                this.aiEngine.allowNewlineMismatch = v;
+            },
+            onChangeAiAskIfTextTranslated: (v) => {
+                this.aiEngine.askAiIfTextTranslated = v;
+            },
+            onChangeAiInvalidJsonHandlingStrategy: (v) => {
+                this.aiEngine.invalidJsonHandlingStrategy = v;
+            },
+            onChangeAiBannedPhrases: (v) => {
+                this.aiEngine.bannedPhrasesText = this.aiEngine.normalizeBannedPhrasesText(v);
+                if (this.aiEngine.panel && typeof this.aiEngine.panel.saveSettings === 'function') {
+                    this.aiEngine.panel.saveSettings();
+                }
+            },
+            onChangeAiSystemPrompt: (v) => {
+                this.aiEngine.systemPrompt = v;
+            },
+            onChangeAiFixRecursionMaxDepth: (v) => {
+                this.aiEngine._aiFixRecursionMaxDepth = v;
+            },
+            onChangeUseJsonFixer: (v) => {
+                this.aiEngine.useJsonFixer = v;
+            },
+            addAiCustomTag: (tagConfig) => {
+                this.aiEngine.addCustomTag(tagConfig);
+                if (typeof this.aiEngine.panel.bindEngineConfigTo === 'function') {
+                    this.aiEngine.panel.bindEngineConfigTo(this.aiEngine.panel);
+                }
+                this.aiEngine.panel.saveSettings();
+            },
+            updateAiCustomTag: (index, tagConfig) => {
+                this.aiEngine.updateCustomTag(index, tagConfig);
+                if (typeof this.aiEngine.panel.bindEngineConfigTo === 'function') {
+                    this.aiEngine.panel.bindEngineConfigTo(this.aiEngine.panel);
+                }
+                this.aiEngine.panel.saveSettings();
+            },
+            removeAiCustomTag: (index) => {
+                this.aiEngine.removeCustomTag(index);
+                if (typeof this.aiEngine.panel.bindEngineConfigTo === 'function') {
+                    this.aiEngine.panel.bindEngineConfigTo(this.aiEngine.panel);
+                }
+                this.aiEngine.panel.saveSettings();
+            },
+        };
+    }
+
+    /**
+     * Check if engine is fully configured
+     * @returns {boolean}
+     */
+    isReady() {
+        return !!this.aiEngine.selectedModel;
+    }
+
+    /**
+     * Fetch available models from API
+     * @returns {Promise<void>}
+     */
+    async _fetchAiModels() {
+        this.aiEngine.loadingModels = true;
+        this.aiEngine.modelsError = '';
+        this._syncPanelEngineConfig();
+
+        try {
+            const endpoint = this._getModelsUrl();
+            const headers = this._getAuthHeaders();
+            const response = await fetch(endpoint, { headers });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            const models = this._normalizeModelsResponse(data);
+
+            this.aiEngine.models = models;
+            if (this.aiEngine.selectedModel && !models.includes(this.aiEngine.selectedModel)) {
+                this.aiEngine.selectedModel = '';
+            }
+            if (!this.aiEngine.selectedModel && models.length > 0) {
+                this.aiEngine.selectedModel = models[0];
+            }
+            console.log('[ConfigManager] Fetched models:', models);
+        } catch (error) {
+            this.aiEngine.modelsError = error.message;
+            console.error('[ConfigManager] Failed to fetch models:', error.message);
+        } finally {
+            this.aiEngine.loadingModels = false;
+            this._syncPanelEngineConfig();
+            if (this.aiEngine.panel && typeof this.aiEngine.panel.saveSettings === 'function') {
+                this.aiEngine.panel.saveSettings();
+            }
+        }
+    }
+
+    /**
+     * Handle provider change
+     * @private
+     */
+    _onChangeAiProvider(provider) {
+        this.aiEngine.provider = provider === 'gpt4all' ? 'openApi' : provider;
+
+        // Reset models and selected model
+        this.aiEngine.models = [];
+        this.aiEngine.selectedModel = '';
+
+        // Adjust default host
+        if (provider === 'openwebui') {
+            this.aiEngine.host = 'http://localhost:8080';
+        } else {
+            this.aiEngine.host = 'http://localhost:4891';
+        }
+
+        this._syncPanelEngineConfig();
+    }
+
+    /**
+     * Get models endpoint
+     * @private
+     */
+    _getModelsUrl() {
+        const host = this.aiEngine.host || 'http://localhost:4891';
+        if (this.aiEngine.provider === 'openwebui') {
+            return `${host}/api/models`;
+        }
+        return `${host}/v1/models`;
+    }
+
+    /**
+     * Get auth headers
+     * @private
+     */
+    _getAuthHeaders() {
+        const headers = { 'Content-Type': 'application/json' };
+        if (this.aiEngine.provider === 'openwebui' && this.aiEngine.apiKey) {
+            headers['Authorization'] = `Bearer ${this.aiEngine.apiKey}`;
+        }
+        return headers;
+    }
 }
