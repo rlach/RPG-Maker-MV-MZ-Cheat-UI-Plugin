@@ -8,7 +8,6 @@ import { StreamJsonParser } from "./StreamJsonParser.js";
 import {
   STREAM_MONITOR_CHECK_INTERVAL,
   STREAM_OPEN_BRACE_MAX_CHARS,
-  STREAM_KEY_MAX_CHARS,
   STREAM_CANCEL_REASON,
 } from "./constants.js";
 
@@ -182,6 +181,201 @@ export class StreamGuardrails {
     return expectedKeys.some((expectedKey) => expectedKey.startsWith(key));
   }
 
+  static buildValueLengthSettings(expectedKeys, options = {}) {
+    const multiplierRaw = Number(options.lengthMultiplierForMaxLength);
+    const minimumRaw = Number(options.minimumMaxLength);
+
+    const lengthMultiplierForMaxLength =
+      Number.isFinite(multiplierRaw) && multiplierRaw > 0 ? multiplierRaw : 3;
+    const minimumMaxLength =
+      Number.isFinite(minimumRaw) && minimumRaw > 0
+        ? Math.max(1, Math.floor(minimumRaw))
+        : 30;
+
+    const sourceLengths =
+      options && typeof options.expectedValueLengthsByKey === "object"
+        ? options.expectedValueLengthsByKey
+        : {};
+
+    const limits = {};
+    let maxValueLengthLimit = minimumMaxLength;
+
+    for (const key of Array.isArray(expectedKeys) ? expectedKeys : []) {
+      const sourceLengthRaw = Number(sourceLengths[key]);
+      const sourceLength =
+        Number.isFinite(sourceLengthRaw) && sourceLengthRaw >= 0
+          ? sourceLengthRaw
+          : 0;
+
+      const dynamicLimit = Math.ceil(
+        sourceLength * lengthMultiplierForMaxLength,
+      );
+      const maxLength = Math.max(minimumMaxLength, dynamicLimit);
+      limits[key] = maxLength;
+      if (maxLength > maxValueLengthLimit) {
+        maxValueLengthLimit = maxLength;
+      }
+    }
+
+    return {
+      valueLengthLimitsByKey: limits,
+      lengthMultiplierForMaxLength,
+      minimumMaxLength,
+      maxValueLengthLimit,
+    };
+  }
+
+  static extractInFlightTopLevelValueString(partialObjectText) {
+    if (typeof partialObjectText !== "string" || !partialObjectText) {
+      return null;
+    }
+
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    let mode = null; // 'key' | 'value' | 'other'
+
+    let expectingKey = false;
+    let expectingValue = false;
+    let currentKey = null;
+
+    let keyBuffer = "";
+    let valueLength = 0;
+    let valueKey = null;
+
+    for (let i = 0; i < partialObjectText.length; i++) {
+      const ch = partialObjectText[i];
+
+      if (inString) {
+        if (mode === "key") {
+          if (escape) {
+            keyBuffer += ch;
+            escape = false;
+            continue;
+          }
+          if (ch === "\\") {
+            escape = true;
+            continue;
+          }
+          if (ch === '"') {
+            inString = false;
+            mode = null;
+            currentKey = keyBuffer;
+            expectingKey = false;
+            continue;
+          }
+          keyBuffer += ch;
+          continue;
+        }
+
+        if (mode === "value") {
+          if (escape) {
+            valueLength += 1;
+            escape = false;
+            continue;
+          }
+          if (ch === "\\") {
+            escape = true;
+            continue;
+          }
+          if (ch === '"') {
+            inString = false;
+            mode = null;
+            expectingValue = false;
+            currentKey = null;
+            valueKey = null;
+            continue;
+          }
+          valueLength += 1;
+          continue;
+        }
+
+        if (escape) {
+          escape = false;
+          continue;
+        }
+        if (ch === "\\") {
+          escape = true;
+          continue;
+        }
+        if (ch === '"') {
+          inString = false;
+          mode = null;
+        }
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = true;
+        escape = false;
+
+        if (depth === 1 && expectingKey) {
+          mode = "key";
+          keyBuffer = "";
+          continue;
+        }
+
+        if (depth === 1 && expectingValue) {
+          mode = "value";
+          valueLength = 0;
+          valueKey = currentKey;
+          continue;
+        }
+
+        mode = "other";
+        continue;
+      }
+
+      if (ch === "{") {
+        depth += 1;
+        if (depth === 1) {
+          expectingKey = true;
+          expectingValue = false;
+          currentKey = null;
+        }
+        continue;
+      }
+
+      if (ch === "}") {
+        if (depth > 0) {
+          depth -= 1;
+        }
+        continue;
+      }
+
+      if (depth !== 1) {
+        continue;
+      }
+
+      if (ch === ",") {
+        expectingKey = true;
+        expectingValue = false;
+        currentKey = null;
+        continue;
+      }
+
+      if (ch === ":" && currentKey !== null) {
+        expectingValue = true;
+        continue;
+      }
+
+      if (expectingValue && !/\s/.test(ch)) {
+        // Non-string value started; we only enforce string-value lengths.
+        expectingValue = false;
+        currentKey = null;
+      }
+    }
+
+    if (inString && mode === "value") {
+      return {
+        key: valueKey || currentKey || "",
+        valueLength,
+      };
+    }
+
+    return null;
+  }
+
   /**
    * Create initial stream monitor state
    * @param {string[]} expectedKeys - Keys expected in JSON response
@@ -189,11 +383,17 @@ export class StreamGuardrails {
    */
   static createMonitorState(expectedKeys, options = {}) {
     const bannedPhrases = this.normalizeBannedPhrases(options.bannedPhrases);
+    const valueLengthSettings = this.buildValueLengthSettings(expectedKeys, options);
 
     return {
       expectedKeys: Array.isArray(expectedKeys) ? expectedKeys : [],
       expectedKeySet: new Set(expectedKeys || []),
       bannedPhrases,
+      valueLengthLimitsByKey: valueLengthSettings.valueLengthLimitsByKey,
+      lengthMultiplierForMaxLength:
+        valueLengthSettings.lengthMultiplierForMaxLength,
+      minimumMaxLength: valueLengthSettings.minimumMaxLength,
+      maxValueLengthLimit: valueLengthSettings.maxValueLengthLimit,
       lastCheckedCharCount: 0,
       bestMap: null,
       bestScore: 0,
@@ -209,11 +409,18 @@ export class StreamGuardrails {
    * @param {string[]} expectedKeys - Expected JSON keys
    * @returns {Object} {candidateMap, analysis}
    */
-  static analyzeAndScan(sanitizedText, expectedKeys) {
+  static analyzeAndScan(sanitizedText, expectedKeys, options = {}) {
     const scan = StreamJsonParser.scanTopLevelObjects(sanitizedText);
+    const repairTrimLimit =
+      Number.isFinite(options.repairTrimLimit) && options.repairTrimLimit > 0
+        ? options.repairTrimLimit
+        : Number.POSITIVE_INFINITY;
+
+    /** @type {Array<{text: string, keyCount: number, duplicateKeys: string[]}>} */
+    const foundObjects = [];
     const analysis = {
       firstBraceIndex: scan.firstBraceIndex,
-      foundObjects: [],
+      foundObjects,
       partialObjectFound: !!scan.partialObjectText,
       partialObjectKeyCount: 0,
     };
@@ -262,12 +469,14 @@ export class StreamGuardrails {
       // Weak repair: only checks whether stream is still structurally recoverable.
       const repairResult = StreamJsonParser.tryRepairPartialObject(
         scan.partialObjectText,
+        repairTrimLimit,
       );
 
       if (repairResult.ok) {
         const strictBestMapResult =
           StreamJsonParser.tryRepairPartialObjectKeepingCompleteEntries(
             scan.partialObjectText,
+            repairTrimLimit,
           );
         if (strictBestMapResult.ok && strictBestMapResult.map) {
           const partialKeyParsing = StreamJsonParser.parseTopLevelKeys(
@@ -390,7 +599,9 @@ export class StreamGuardrails {
     }
 
     // Analyze text for JSON structures
-    const analysis = this.analyzeAndScan(rawText, state.expectedKeys);
+    const analysis = this.analyzeAndScan(rawText, state.expectedKeys, {
+      repairTrimLimit: state.maxValueLengthLimit,
+    });
 
     const bannedPhrase = this.findBannedPhraseInScan(
       analysis.scan,
@@ -410,6 +621,7 @@ export class StreamGuardrails {
     if (analysis.scan.partialObjectText) {
       const repairResult = StreamJsonParser.tryRepairPartialObject(
         analysis.scan.partialObjectText,
+        state.maxValueLengthLimit,
       );
       if (
         !repairResult.ok &&
@@ -427,6 +639,7 @@ export class StreamGuardrails {
       const strictRepairResult =
         StreamJsonParser.tryRepairPartialObjectKeepingCompleteEntries(
           analysis.scan.partialObjectText,
+          state.maxValueLengthLimit,
         );
       if (
         !strictRepairResult.ok &&
@@ -463,20 +676,6 @@ export class StreamGuardrails {
         analysis.scan.partialObjectText,
       );
       if (inFlightKey) {
-        if (inFlightKey.key.length > STREAM_KEY_MAX_CHARS) {
-          state.cancelReason = STREAM_CANCEL_REASON.UNKNOWN_KEY;
-          state.cancelMeta = {
-            key: inFlightKey.key,
-            isClosed: inFlightKey.isClosed,
-            reason: "key_too_long",
-          };
-          return {
-            shouldCancel: true,
-            cancelReason: state.cancelReason,
-            bestMap: state.bestMap,
-          };
-        }
-
         if (
           !this.isExpectedKeyProgress(
             state.expectedKeys,
@@ -499,6 +698,30 @@ export class StreamGuardrails {
           };
         }
       }
+
+      const inFlightValue = this.extractInFlightTopLevelValueString(
+        analysis.scan.partialObjectText,
+      );
+      if (inFlightValue && inFlightValue.key) {
+        const maxLengthForKey =
+          state.valueLengthLimitsByKey[inFlightValue.key] ||
+          state.minimumMaxLength;
+
+        if (inFlightValue.valueLength > maxLengthForKey) {
+          state.cancelReason = STREAM_CANCEL_REASON.TRIM_TOO_LONG;
+          state.cancelMeta = {
+            key: inFlightValue.key,
+            valueLength: inFlightValue.valueLength,
+            maxLength: maxLengthForKey,
+            reason: "value_too_long",
+          };
+          return {
+            shouldCancel: true,
+            cancelReason: state.cancelReason,
+            bestMap: state.bestMap,
+          };
+        }
+      }
     }
 
     // Update best candidate
@@ -507,13 +730,10 @@ export class StreamGuardrails {
 
       // Check: already found complete JSON, but stream continues
       if (state.bestIsComplete && analysis.scan.objects?.length > 0) {
-        const lastObject =
-          analysis.scan.objects[analysis.scan.objects.length - 1];
-        const afterLastObject = analysis.scan.trailingText?.length > 0;
-        if (afterLastObject && afterLastObject !== rawText.length) {
+        const trailingText = analysis.scan.trailingText || "";
+        if (trailingText.length > 0) {
           // Stream continued after complete JSON found
-          const trailingNonWhitespace =
-            analysis.scan.trailingText.trim().length > 0;
+          const trailingNonWhitespace = trailingText.trim().length > 0;
           if (trailingNonWhitespace) {
             state.cancelReason = STREAM_CANCEL_REASON.COMPLETE_JSON_CONTINUED;
             return {

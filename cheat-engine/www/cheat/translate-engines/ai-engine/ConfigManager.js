@@ -158,6 +158,33 @@ export class ConfigManager {
              ></v-select>
 
                          <v-text-field
+                             v-model.number="aiLengthMultiplierForMaxLength"
+                             label="Length multiplier for max length"
+                             outlined
+                             dense
+                             type="number"
+                             min="0.1"
+                             step="0.1"
+                             hide-details
+                             @keydown.stop
+                             @change="onChangeAiLengthMultiplierForMaxLength"
+                             class="mt-2"
+                         ></v-text-field>
+
+                         <v-text-field
+                             v-model.number="aiMinimumMaxLength"
+                             label="Minimum max length"
+                             outlined
+                             dense
+                             type="number"
+                             min="1"
+                             hide-details
+                             @keydown.stop
+                             @change="onChangeAiMinimumMaxLength"
+                             class="mt-2"
+                         ></v-text-field>
+
+                         <v-text-field
                              v-if="aiInvalidJsonHandlingStrategy === 'resendXTimes'"
                              v-model.number="aiInvalidJsonResendCount"
                              label="Resend retries per batch"
@@ -258,6 +285,8 @@ export class ConfigManager {
                 { text: 'None (fail)', value: 'none' },
             ],
             aiInvalidJsonResendCount: this.aiEngine.aiInvalidJsonResendCount,
+            aiLengthMultiplierForMaxLength: this.aiEngine.aiLengthMultiplierForMaxLength,
+            aiMinimumMaxLength: this.aiEngine.aiMinimumMaxLength,
             aiBannedPhrases: this.aiEngine.bannedPhrasesText,
             aiSystemPrompt: this.aiEngine.systemPrompt,
             aiFixRecursionMaxDepth: this.aiEngine._aiFixRecursionMaxDepth,
@@ -299,6 +328,12 @@ export class ConfigManager {
             }),
             onChangeAiInvalidJsonResendCount: this._createPersistedHandler((v) => {
                 this.aiEngine.aiInvalidJsonResendCount = v;
+            }),
+            onChangeAiLengthMultiplierForMaxLength: this._createPersistedHandler((v) => {
+                this.aiEngine.aiLengthMultiplierForMaxLength = v;
+            }),
+            onChangeAiMinimumMaxLength: this._createPersistedHandler((v) => {
+                this.aiEngine.aiMinimumMaxLength = v;
             }),
             onChangeAiBannedPhrases: this._createPersistedHandler((v) => {
                 this.aiEngine.bannedPhrasesText = this.aiEngine.normalizeBannedPhrasesText(v);

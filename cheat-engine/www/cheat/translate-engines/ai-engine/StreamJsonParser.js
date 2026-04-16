@@ -5,7 +5,7 @@
  */
 
 import { JsonParserState } from './JsonParserState.js';
-import { STREAM_CANCEL_REASON, STREAM_JSON_TRIM_MAX_CHARS } from './constants.js';
+import { STREAM_CANCEL_REASON } from './constants.js';
 
 export class StreamJsonParser {
     /**
@@ -448,7 +448,7 @@ export class StreamJsonParser {
      * @param {number} trimLimit - Maximum chars to trim
      * @returns {Object} {ok, map?, reason?, trimmedChars?, repairedText?}
      */
-    static tryRepairPartialObject(partialText, trimLimit = STREAM_JSON_TRIM_MAX_CHARS) {
+    static tryRepairPartialObject(partialText, trimLimit = Number.POSITIVE_INFINITY) {
         const closureState = this.getJsonClosureState(partialText);
 
         if (closureState.isInsideString()) {
@@ -535,7 +535,7 @@ export class StreamJsonParser {
      */
     static tryRepairPartialObjectKeepingCompleteEntries(
         partialText,
-        trimLimit = STREAM_JSON_TRIM_MAX_CHARS
+        trimLimit = Number.POSITIVE_INFINITY
     ) {
         if (typeof partialText !== 'string' || !partialText.trim()) {
             return {

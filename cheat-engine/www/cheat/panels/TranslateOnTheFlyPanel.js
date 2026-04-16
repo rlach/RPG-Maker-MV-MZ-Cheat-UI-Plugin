@@ -411,6 +411,14 @@ export default {
             return this.callRuntime('onChangeAiInvalidJsonResendCount', v);
         },
 
+        onChangeAiLengthMultiplierForMaxLength(v) {
+            return this.callRuntime("onChangeAiLengthMultiplierForMaxLength", v);
+        },
+
+        onChangeAiMinimumMaxLength(v) {
+            return this.callRuntime("onChangeAiMinimumMaxLength", v);
+        },
+
         onChangeAiBannedPhrases(v) {
             return this.callRuntime('onChangeAiBannedPhrases', v);
         },

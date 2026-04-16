@@ -41,6 +41,8 @@ class AIEngine extends BaseTranslationEngine {
         this.askAiIfTextTranslated = true;
         this.invalidJsonHandlingStrategy = 'resendFirstHalf';
         this._aiInvalidJsonResendCount = 3;
+        this.lengthMultiplierForMaxLength = 3;
+        this.minimumMaxLength = 30;
         this.systemPrompt = DEFAULT_SYSTEM_PROMPT;
         this.useJsonFixer = true;
         this.bannedPhrasesText = DEFAULT_BANNED_PHRASES_TEXT;
@@ -137,6 +139,24 @@ class AIEngine extends BaseTranslationEngine {
                     this._aiInvalidJsonResendCount = Number.isFinite(nextValue)
                         ? Math.max(1, Math.floor(nextValue))
                         : 3;
+                },
+            },
+            aiLengthMultiplierForMaxLength: {
+                get: () => this.lengthMultiplierForMaxLength,
+                set: (v) => {
+                    const nextValue = Number(v);
+                    this.lengthMultiplierForMaxLength =
+                        Number.isFinite(nextValue) && nextValue > 0 ? nextValue : 3;
+                },
+            },
+            aiMinimumMaxLength: {
+                get: () => this.minimumMaxLength,
+                set: (v) => {
+                    const nextValue = Number(v);
+                    this.minimumMaxLength =
+                        Number.isFinite(nextValue) && nextValue > 0
+                            ? Math.max(1, Math.floor(nextValue))
+                            : 30;
                 },
             },
             aiSystemPrompt: {
@@ -702,6 +722,11 @@ class AIEngine extends BaseTranslationEngine {
             const targetName = this.getLanguageName(this.panel.targetLang);
             const content = JSON.stringify(jsonMap);
             const expectedKeys = Object.keys(jsonMap);
+            const expectedValueLengthsByKey = {};
+            for (const item of itemData) {
+                expectedValueLengthsByKey[item.jsonKey] =
+                    typeof item.preprocessed === 'string' ? item.preprocessed.length : 0;
+            }
 
             console.log(
                 '[AIEngine] Batch translate items:',
@@ -741,6 +766,7 @@ class AIEngine extends BaseTranslationEngine {
             // 3. REQUEST & STREAM MONITORING
             const streamResult = await this.requestChatCompletion(payload, {
                 expectedKeys,
+                expectedValueLengthsByKey,
                 isBackgroundJob,
             });
 
@@ -1070,6 +1096,7 @@ class AIEngine extends BaseTranslationEngine {
     async requestChatCompletion(payload, options = {}) {
         return this.enqueueRequest(async () => {
             const expectedKeys = options.expectedKeys || [];
+            const expectedValueLengthsByKey = options.expectedValueLengthsByKey || {};
             const isBackgroundJob = !!options.isBackgroundJob;
 
             const controller = new AbortController();
@@ -1113,6 +1140,9 @@ class AIEngine extends BaseTranslationEngine {
                 // Parse streaming response
                 const monitorState = StreamGuardrails.createMonitorState(expectedKeys, {
                     bannedPhrases: this.getBannedPhrasesList(),
+                    expectedValueLengthsByKey,
+                    lengthMultiplierForMaxLength: this.lengthMultiplierForMaxLength,
+                    minimumMaxLength: this.minimumMaxLength,
                 });
                 let contentText = ''; // accumulated assistant content only
                 let sseBuffer = ''; // buffer for partial SSE lines
