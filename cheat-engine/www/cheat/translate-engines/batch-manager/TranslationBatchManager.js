@@ -55,6 +55,28 @@ export class TranslationBatchManager {
     });
   }
 
+  countBatchRequestedChars(batchItems) {
+    if (!Array.isArray(batchItems)) {
+      return 0;
+    }
+
+    let total = 0;
+    for (const item of batchItems) {
+      if (!item) {
+        continue;
+      }
+
+      const value = item.value;
+      if (typeof value === "string") {
+        total += value.length;
+      } else if (value !== null && value !== undefined) {
+        total += String(value).length;
+      }
+    }
+
+    return total;
+  }
+
   getCurrentMapEntryIndex(queueEntries, currentMapId) {
     if (!Array.isArray(queueEntries)) {
       return -1;
@@ -275,6 +297,8 @@ export class TranslationBatchManager {
         }
 
         const batch = batches[i];
+        const batchStartedAt = Date.now();
+        const batchRequestedChars = this.countBatchRequestedChars(batch);
         this.progressTracker.updateStep(
           translationPhaseLabel,
           processed,
@@ -391,6 +415,17 @@ export class TranslationBatchManager {
             },
             options: entryOptions,
           });
+        }
+
+        if (
+          !dryRun &&
+          this.panel &&
+          typeof this.panel.recordBatchThroughputSample === "function"
+        ) {
+          this.panel.recordBatchThroughputSample(
+            batchRequestedChars,
+            Date.now() - batchStartedAt,
+          );
         }
 
         if (this.isAbortBatchResult(failures, batch.length)) {

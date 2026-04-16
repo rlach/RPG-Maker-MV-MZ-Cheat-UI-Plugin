@@ -103,6 +103,7 @@ export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
     'officialNameEnforcementMode',
     'officialNameEnforcementIncludeAllText',
     'objectTranslationJob',
+    'batchThroughputSamples',
     'dryRunExecutedAtLeastOnce',
     'nonOtfTranslationProcess',
 ]);
@@ -266,6 +267,7 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
             totalTarget: 0,
             runErrors: 0,
         },
+        batchThroughputSamples: [],
         dryRunExecutedAtLeastOnce: false,
         nonOtfTranslationProcess: {
             active: false,

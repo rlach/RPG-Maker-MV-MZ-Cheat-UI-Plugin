@@ -6,6 +6,69 @@ import { createTranslationBatchManager } from "../../translate-engines/batch-man
 import { CurrentEvent } from "../../translate-engines/translation-phases/CurrentEvent.js";
 
 export const translateOnTheFlyFlowMethods = {
+  getBatchThroughputSamples() {
+    if (!Array.isArray(this.batchThroughputSamples)) {
+      this.batchThroughputSamples = [];
+    }
+
+    return this.batchThroughputSamples;
+  },
+
+  recordBatchThroughputSample(requestedChars, durationMs) {
+    const chars = Math.max(0, Number(requestedChars) || 0);
+    const elapsedMs = Math.max(0, Number(durationMs) || 0);
+    if (chars <= 0 || elapsedMs <= 0) {
+      return;
+    }
+
+    const charsPerSecond = chars / (elapsedMs / 1000);
+    if (!Number.isFinite(charsPerSecond) || charsPerSecond <= 0) {
+      return;
+    }
+
+    const samples = this.getBatchThroughputSamples();
+    samples.push(charsPerSecond);
+
+    const maxSamples = 10;
+    if (samples.length > maxSamples) {
+      samples.splice(0, samples.length - maxSamples);
+    }
+  },
+
+  getAverageBatchCharsPerSecond() {
+    const samples = this.getBatchThroughputSamples().filter(
+      (sample) => Number.isFinite(sample) && sample > 0,
+    );
+    if (samples.length === 0) {
+      return 0;
+    }
+
+    const sum = samples.reduce((acc, sample) => acc + sample, 0);
+    return sum / samples.length;
+  },
+
+  formatEtaFromSeconds(seconds) {
+    const safeSeconds = Math.max(0, Math.ceil(Number(seconds) || 0));
+    const days = Math.floor(safeSeconds / 86400);
+    const hours = Math.floor((safeSeconds % 86400) / 3600);
+    const minutes = Math.floor((safeSeconds % 3600) / 60);
+    const secs = safeSeconds % 60;
+
+    const parts = [];
+    if (days > 0) {
+      parts.push(`${days}d`);
+    }
+    if (hours > 0 || days > 0) {
+      parts.push(`${hours}h`);
+    }
+    if (minutes > 0 || hours > 0 || days > 0) {
+      parts.push(`${minutes}m`);
+    }
+    parts.push(`${secs}s`);
+
+    return parts.join(" ");
+  },
+
   markDryRunExecuted() {
     this.dryRunExecutedAtLeastOnce = true;
     if (typeof this.saveSettings === "function") {
@@ -27,6 +90,21 @@ export const translateOnTheFlyFlowMethods = {
     }
 
     const stats = this.getOverallTranslationCompletionStats();
+    const remainingChars = Math.max(
+      0,
+      Number(stats.totalKeyLength || 0) - Number(stats.translatedKeyLength || 0),
+    );
+    const avgCharsPerSecond = this.getAverageBatchCharsPerSecond();
+
+    if (remainingChars <= 0) {
+      return `total ${stats.completionPercent.toFixed(1)}% complete (ETA 0s)`;
+    }
+
+    if (avgCharsPerSecond > 0) {
+      const etaSeconds = remainingChars / avgCharsPerSecond;
+      return `total ${stats.completionPercent.toFixed(1)}% complete (ETA ${this.formatEtaFromSeconds(etaSeconds)})`;
+    }
+
     return `total ${stats.completionPercent.toFixed(1)}% complete`;
   },
 
