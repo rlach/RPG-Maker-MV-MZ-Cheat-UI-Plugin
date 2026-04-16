@@ -1,11 +1,12 @@
 import { ensureTranslationRuntime } from './translate-on-the-fly/TranslationRuntime.js';
 import { createTranslationBatchManager } from '../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
+import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
 
 export default {
     name: 'TranslateNamesPanel',
 
     template: `
-<v-card flat class="ma-0 pa-0">
+<v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
     <v-card-title class="subtitle-1 font-weight-bold">Actor Names</v-card-title>
     <v-card-text class="py-0">
         <div class="caption">
@@ -134,89 +135,92 @@ export default {
         </v-card>
     </v-dialog>
 
-    <v-card-text class="py-0">
-        <div v-if="!loading && filteredEntries.length === 0" class="caption text--secondary mt-2">
-            No actor names found.
-        </div>
+    <v-data-table
+        class="mt-2 table-with-sticky-footer"
+        :headers="tableHeaders"
+        :items="filteredEntries"
+        item-key="cacheKey"
+        :page.sync="page"
+        :sort-by.sync="sortBy"
+        :sort-desc.sync="sortDesc"
+        :items-per-page.sync="rowsPerPage">
+        <template v-slot:item.lp="{ item }">
+            <span class="caption white--text">{{ item.lp }}</span>
+        </template>
 
-        <v-simple-table v-else dense class="mt-2">
-            <thead>
-                <tr>
-                    <th class="text-left caption" style="width: 55px;">Lp.</th>
-                    <th class="text-left caption" style="width: 65px;">Source</th>
-                    <th class="text-left caption" style="width: 72px;">Gender</th>
-                    <th class="text-left caption" style="width: 30%;">Original Name</th>
-                    <th class="text-left caption">Translation</th>
-                    <th class="text-left caption" style="width: 92px;"></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr v-for="entry in filteredEntries" :key="entry.cacheKey">
-                    <td class="caption white--text">{{ entry.lp }}</td>
-                    <td>
-                        <v-chip
-                            x-small
-                            :color="entry.source === 'both' ? 'green darken-3' : entry.source === 'db' ? 'blue darken-3' : 'grey darken-2'">
-                            {{ entry.source }}
-                        </v-chip>
-                    </td>
-                    <td>
-                        <v-chip
-                            x-small
-                            :color="entry.gender === '?' ? 'grey darken-2' : entry.gender === 'male' ? 'blue darken-3' : 'pink darken-3'"
-                            style="cursor: pointer;"
-                            @click="cycleGender(entry)">
-                            {{ entry.gender }}
-                        </v-chip>
-                    </td>
-                    <td class="caption white--text">{{ entry.originalName }}</td>
-                    <td>
-                        <v-text-field
-                            :value="entry.translation"
-                            dense
-                            hide-details
-                            @change="onTranslationChange(entry, $event)"
-                            @keydown.stop
-                            class="mt-0 pt-0">
-                        </v-text-field>
-                    </td>
-                    <td>
-                          <div class="d-flex align-center justify-center">
-                            <v-tooltip bottom>
-                                <template v-slot:activator="{ on, attrs }">
-                                <v-btn
-                                  icon
-                                  x-small
-                                  color="primary"
-                                  v-bind="attrs"
-                                  v-on="on"
-                                  @click="copyOriginal(entry)">
-                                  <v-icon small>mdi-content-copy</v-icon>
-                                </v-btn>
-                                </template>
-                              <span>Copy original name</span>
-                            </v-tooltip>
+        <template v-slot:item.source="{ item }">
+            <v-chip
+                x-small
+                :color="item.source === 'both' ? 'green darken-3' : item.source === 'db' ? 'blue darken-3' : 'grey darken-2'">
+                {{ item.source }}
+            </v-chip>
+        </template>
 
-                            <v-tooltip bottom v-if="entry.source === 'cache'">
-                              <template v-slot:activator="{ on, attrs }">
-                                <v-btn
-                                  icon
-                                  x-small
-                                  color="error"
-                                  v-bind="attrs"
-                                  v-on="on"
-                                  @click="removeCacheOnlyEntry(entry)">
-                                  <v-icon small>mdi-trash-can-outline</v-icon>
-                                </v-btn>
-                              </template>
-                              <span>Remove cache-only name</span>
-                            </v-tooltip>
-                          </div>
-                    </td>
-                </tr>
-            </tbody>
-        </v-simple-table>
-    </v-card-text>
+        <template v-slot:item.gender="{ item }">
+            <v-chip
+                x-small
+                :color="item.gender === '?' ? 'grey darken-2' : item.gender === 'male' ? 'blue darken-3' : 'pink darken-3'"
+                style="cursor: pointer;"
+                @click="cycleGender(item)">
+                {{ item.gender }}
+            </v-chip>
+        </template>
+
+        <template v-slot:item.originalName="{ item }">
+            <span class="caption white--text">{{ item.originalName }}</span>
+        </template>
+
+        <template v-slot:item.translation="{ item }">
+            <v-text-field
+                :value="item.translation"
+                dense
+                hide-details
+                @change="onTranslationChange(item, $event)"
+                @keydown.stop
+                class="mt-0 pt-0">
+            </v-text-field>
+        </template>
+
+        <template v-slot:item.actions="{ item }">
+            <div class="d-flex align-center justify-center">
+                <v-tooltip bottom>
+                    <template v-slot:activator="{ on, attrs }">
+                        <v-btn
+                            icon
+                            x-small
+                            color="primary"
+                            v-bind="attrs"
+                            v-on="on"
+                            @click="copyOriginal(item)">
+                            <v-icon small>mdi-content-copy</v-icon>
+                        </v-btn>
+                    </template>
+                    <span>Copy original name</span>
+                </v-tooltip>
+
+                <v-tooltip bottom v-if="item.source === 'cache'">
+                    <template v-slot:activator="{ on, attrs }">
+                        <v-btn
+                            icon
+                            x-small
+                            color="error"
+                            v-bind="attrs"
+                            v-on="on"
+                            @click="removeCacheOnlyEntry(item)">
+                            <v-icon small>mdi-trash-can-outline</v-icon>
+                        </v-btn>
+                    </template>
+                    <span>Remove cache-only name</span>
+                </v-tooltip>
+            </div>
+        </template>
+
+        <template v-slot:no-data>
+            <div v-if="!loading" class="caption text--secondary mt-2">
+                No actor names found.
+            </div>
+        </template>
+    </v-data-table>
 </v-card>
     `,
 
@@ -225,6 +229,10 @@ export default {
             loading: false,
             translating: false,
             filter: '',
+            page: 1,
+            rowsPerPage: getRowsPerPage(),
+            sortBy: 'lp',
+            sortDesc: false,
             namePattern: '\\\\n\\<([^<>]+)\\>',
             officialNameEnforcementMode: 'none',
             officialNameEnforcementIncludeAllText: false,
@@ -262,6 +270,41 @@ export default {
                     example: 'Char Name：\\nThe text being spoken.',
                 },
             ],
+            tableHeaders: [
+                {
+                    text: 'Lp.',
+                    value: 'lp',
+                    width: 55,
+                },
+                {
+                    text: 'Source',
+                    value: 'source',
+                    sortable: false,
+                    width: 65,
+                },
+                {
+                    text: 'Gender',
+                    value: 'gender',
+                    sortable: false,
+                    width: 72,
+                },
+                {
+                    text: 'Original Name',
+                    value: 'originalName',
+                    width: '30%',
+                },
+                {
+                    text: 'Translation',
+                    value: 'translation',
+                    sortable: false,
+                },
+                {
+                    text: '',
+                    value: 'actions',
+                    sortable: false,
+                    width: 92,
+                },
+            ],
             entries: [],
         };
     },
@@ -288,6 +331,22 @@ export default {
     },
 
     watch: {
+        rowsPerPage(val) {
+            const parsed = Number(val);
+            if (!Number.isFinite(parsed) || parsed <= 0) {
+                return;
+            }
+
+            if (parsed !== val) {
+                this.rowsPerPage = parsed;
+                return;
+            }
+
+            setRowsPerPage(parsed);
+        },
+        filter() {
+            this.page = 1;
+        },
         namePattern(newVal) {
             const runtime = ensureTranslationRuntime();
             if (runtime) {

@@ -476,6 +476,14 @@ export class TranslationBatchManager {
     const safeQueueEntries = [...queueEntries];
     const dryRun = !!options.dryRun;
 
+    if (
+      dryRun &&
+      this.panel &&
+      typeof this.panel.markDryRunExecuted === "function"
+    ) {
+      this.panel.markDryRunExecuted();
+    }
+
     if (safeQueueEntries.length === 0) {
       const emptySummary = BatchSummaryReporter.buildSummary({
         batchLabel: options.translationPhaseLabel || "translation",

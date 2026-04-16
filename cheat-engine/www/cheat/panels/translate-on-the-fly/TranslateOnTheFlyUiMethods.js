@@ -61,6 +61,7 @@ export const translateOnTheFlyUiMethods = {
         "#tof-progress-box .tof-progress-line { color: #fff; font-size: 12px; line-height: 1.5; margin: 1px 0; white-space: nowrap; }",
         "#tof-progress-box .tof-progress-line.map-progress { font-weight: bold; color: #82d4f8; }",
         "#tof-progress-box .tof-progress-line.message-progress { color: #ccc; }",
+        "#tof-progress-box .tof-progress-line.total-completion-progress { color: #b0f3bf; }",
         "#tof-progress-box .tof-progress-line.current-errors-progress { color: #ffd9a3; }",
         "#tof-progress-box .tof-progress-line.total-errors-progress { color: #ffb3b3; }",
       ].join("");
@@ -75,7 +76,7 @@ export const translateOnTheFlyUiMethods = {
       const el = existingEl || hostDoc.createElement("div");
       el.id = "tof-progress-box";
       el.innerHTML =
-        '<div class="tof-progress-line map-progress" id="tof-map-progress"></div><div class="tof-progress-line message-progress" id="tof-message-progress"></div><div class="tof-progress-line current-errors-progress" id="tof-current-errors-progress"></div><div class="tof-progress-line total-errors-progress" id="tof-total-errors-progress"></div>';
+        '<div class="tof-progress-line map-progress" id="tof-map-progress"></div><div class="tof-progress-line message-progress" id="tof-message-progress"></div><div class="tof-progress-line total-completion-progress" id="tof-total-completion-progress"></div><div class="tof-progress-line current-errors-progress" id="tof-current-errors-progress"></div><div class="tof-progress-line total-errors-progress" id="tof-total-errors-progress"></div>';
       if (!existingEl) {
         hostDoc.body.appendChild(el);
       }
@@ -198,6 +199,7 @@ export const translateOnTheFlyUiMethods = {
   updateProgressBox(
     mapProgress = null,
     messageProgress = null,
+    totalCompletionProgress = null,
     currentErrorsProgress = null,
     totalErrorsProgress = null,
   ) {
@@ -208,6 +210,7 @@ export const translateOnTheFlyUiMethods = {
 
     const mapProgressEl = el.querySelector("#tof-map-progress");
     const messageProgressEl = el.querySelector("#tof-message-progress");
+    const totalCompletionEl = el.querySelector("#tof-total-completion-progress");
     const currentErrorsEl = el.querySelector("#tof-current-errors-progress");
     const totalErrorsEl = el.querySelector("#tof-total-errors-progress");
 
@@ -225,6 +228,14 @@ export const translateOnTheFlyUiMethods = {
     } else if (messageProgressEl) {
       messageProgressEl.textContent = "";
       messageProgressEl.style.display = "none";
+    }
+
+    if (totalCompletionProgress !== null && totalCompletionEl) {
+      totalCompletionEl.textContent = totalCompletionProgress;
+      totalCompletionEl.style.display = totalCompletionProgress ? "block" : "none";
+    } else if (totalCompletionEl) {
+      totalCompletionEl.textContent = "";
+      totalCompletionEl.style.display = "none";
     }
 
     if (currentErrorsProgress !== null && currentErrorsEl) {
@@ -247,6 +258,7 @@ export const translateOnTheFlyUiMethods = {
     const hasContent =
       (mapProgress && mapProgress.length > 0) ||
       (messageProgress && messageProgress.length > 0) ||
+      (totalCompletionProgress && totalCompletionProgress.length > 0) ||
       (currentErrorsProgress && currentErrorsProgress.length > 0) ||
       (totalErrorsProgress && totalErrorsProgress.length > 0);
     el.style.display = hasContent ? "block" : "none";

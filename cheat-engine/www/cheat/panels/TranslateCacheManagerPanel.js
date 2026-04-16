@@ -6,6 +6,7 @@ import {
   onTranslateCacheRuntimeChanged,
   parseCacheKeyForLangPair,
 } from "../js/TranslateCacheRuntime.js";
+import { computeLangPairCompletionByKeyLength } from "../js/TranslationCompletionMetrics.js";
 import { ConfirmDialog } from "../js/DialogHelper.js";
 import { ensureTranslationRuntime } from "./translate-on-the-fly/TranslationRuntime.js";
 
@@ -285,18 +286,11 @@ export default {
 
   computed: {
     activeLanguagePairLabel() {
-      const totalCount = Array.isArray(this.entries) ? this.entries.length : 0;
-      const translatedCount = totalCount
-        ? this.entries.filter((entry) => {
-            const translation = this.normalizeCacheValue(
-              entry?.translation,
-            ).trim();
-            return translation.length > 0;
-          }).length
-        : 0;
-      const completion = totalCount
-        ? ((translatedCount / totalCount) * 100).toFixed(1)
-        : "0.0";
+      const completion = computeLangPairCompletionByKeyLength({
+        translationCache: this.translationCache,
+        sourceLang: this.sourceLang,
+        targetLang: this.targetLang,
+      }).completionPercent.toFixed(1);
 
       return `Active language pair: ${this.sourceLang} -> ${this.targetLang} (${completion}% complete)`;
     },

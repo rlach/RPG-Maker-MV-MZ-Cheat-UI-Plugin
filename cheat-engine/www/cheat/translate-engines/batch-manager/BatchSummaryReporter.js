@@ -74,6 +74,7 @@ export class BatchSummaryReporter {
     totalErrors = 0,
     totalCumulativeErrors = 0,
     totalProcessed = 0,
+    totalCompletionLine = null,
     progressLabel = "translated",
   }) {
     const safeProcessed = Math.max(0, Number(processed) || 0);
@@ -119,6 +120,7 @@ export class BatchSummaryReporter {
     return {
       title: title || "translating",
       message,
+      totalCompletionLine,
       currentErrorsLine,
       totalErrorsLine,
     };

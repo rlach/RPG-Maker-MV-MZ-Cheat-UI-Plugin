@@ -1,13 +1,10 @@
 const SHOW_TEXT_CODE = 101;
 const SHOW_TEXT_LINE_CODE = 401;
 const SHOW_CHOICES_CODE = 102;
+const CHANGE_NAME_CODE = 320;
 
 function isNonEmptyString(value) {
     return typeof value === 'string' && value.trim() !== '';
-}
-
-function foobar() {
-    return 'foobar';
 }
 
 export function extractMessageEntryAt(list, messageCmdIndex) {
@@ -104,6 +101,24 @@ export function collectEventCommandEntries(list) {
                     command: cmd,
                 });
             }
+
+            continue;
+        }
+
+        // Change Name (RPG Maker command 320): actorId, newName
+        // Treat as speaker so cache keys are stored under actor_name namespace.
+        if (cmd.code === CHANGE_NAME_CODE) {
+            const changedName = cmd.parameters && cmd.parameters[1];
+            if (!isNonEmptyString(changedName)) {
+                continue;
+            }
+
+            entries.push({
+                type: 'speaker',
+                value: changedName,
+                cmdIndex: i,
+                command: cmd,
+            });
         }
     }
 

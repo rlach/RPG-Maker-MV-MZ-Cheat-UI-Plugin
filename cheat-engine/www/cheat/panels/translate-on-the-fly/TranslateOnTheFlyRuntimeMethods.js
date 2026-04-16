@@ -155,6 +155,50 @@ export const translateOnTheFlyRuntimeMethods = {
         );
         const shouldHookInterpreterCommands = !hasStrictMessageCore;
 
+        const applyCachedActorNameFromCommand320 = (params) => {
+            if (!Array.isArray(params) || !window.$gameActors) {
+                return;
+            }
+
+            const actorId = Number(params[0]);
+            const originalName = typeof params[1] === 'string' ? params[1].trim() : '';
+            if (!Number.isFinite(actorId) || actorId <= 0 || !originalName) {
+                return;
+            }
+
+            const actor =
+                typeof $gameActors.actor === 'function' ? $gameActors.actor(actorId) : null;
+            if (!actor) {
+                return;
+            }
+
+            const speakerKey = self.getCacheKey(originalName, 'speaker');
+
+            // Ensure the key exists so Names Manager can list it as cache-only actor_name.
+            if (
+                self.translationCache instanceof Map &&
+                !self.translationCache.has(speakerKey) &&
+                typeof self.setCacheValue === 'function'
+            ) {
+                self.setCacheValue(speakerKey, '');
+            }
+
+            if (typeof self.trackCacheKeyUsage === 'function') {
+                self.trackCacheKeyUsage(speakerKey);
+            }
+
+            if (!self.hasUsableCacheValue(speakerKey)) {
+                return;
+            }
+
+            const translated = self.translationCache.get(speakerKey);
+            if (typeof translated !== 'string' || !translated.trim()) {
+                return;
+            }
+
+            actor.setName(self.normalizeSpeakerNameCase(translated.trim()));
+        };
+
         // Store original canStart if not already stored
         if (!Window_Message.prototype._originalCanStart) {
             Window_Message.prototype._originalCanStart = Window_Message.prototype.canStart;
@@ -194,6 +238,28 @@ export const translateOnTheFlyRuntimeMethods = {
                 }
 
                 return Game_Interpreter.prototype._translateOriginalCommand102.apply(this, args);
+            };
+
+            if (!Game_Interpreter.prototype._translateOriginalCommand320) {
+                Game_Interpreter.prototype._translateOriginalCommand320 =
+                    Game_Interpreter.prototype.command320;
+            }
+
+            Game_Interpreter.prototype.command320 = function (...args) {
+                const result = Game_Interpreter.prototype._translateOriginalCommand320.apply(
+                    this,
+                    args
+                );
+
+                // MZ command signature is command320(params).
+                // Prefer explicit args[0], then fall back to current command parameters.
+                const params = Array.isArray(args[0])
+                    ? args[0]
+                    : this.currentCommand && this.currentCommand()
+                      ? this.currentCommand().parameters
+                      : null;
+                applyCachedActorNameFromCommand320(params);
+                return result;
             };
         }
 

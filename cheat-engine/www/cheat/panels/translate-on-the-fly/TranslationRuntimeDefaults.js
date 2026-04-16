@@ -99,6 +99,7 @@ export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
     'officialNameEnforcementMode',
     'officialNameEnforcementIncludeAllText',
     'objectTranslationJob',
+    'dryRunExecutedAtLeastOnce',
     'nonOtfTranslationProcess',
 ]);
 
@@ -125,6 +126,7 @@ export const PERSISTED_TRANSLATION_SETTINGS_KEYS = Object.freeze([
     'namePatternForEnforcing',
     'officialNameEnforcementMode',
     'officialNameEnforcementIncludeAllText',
+    'dryRunExecutedAtLeastOnce',
 ]);
 
 export const UI_SYNC_STATE_KEYS = Object.freeze([
@@ -254,6 +256,7 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
             totalTarget: 0,
             runErrors: 0,
         },
+        dryRunExecutedAtLeastOnce: false,
         nonOtfTranslationProcess: {
             active: false,
             label: '',

@@ -1,10 +1,35 @@
 import { Alert } from "../../js/AlertHelper.js";
 import { findNearestMessageEntry } from "../../js/EventCommandTraversal.js";
+import { computeLangPairCompletionByKeyLength } from "../../js/TranslationCompletionMetrics.js";
 import { BatchSummaryReporter } from "../../translate-engines/batch-manager/BatchSummaryReporter.js";
 import { createTranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManagerFactory.js";
 import { CurrentEvent } from "../../translate-engines/translation-phases/CurrentEvent.js";
 
 export const translateOnTheFlyFlowMethods = {
+  markDryRunExecuted() {
+    this.dryRunExecutedAtLeastOnce = true;
+    if (typeof this.saveSettings === "function") {
+      this.saveSettings();
+    }
+  },
+
+  getOverallTranslationCompletionStats() {
+    return computeLangPairCompletionByKeyLength({
+      translationCache: this.translationCache,
+      sourceLang: this.sourceLang,
+      targetLang: this.targetLang,
+    });
+  },
+
+  getOverallTranslationCompletionLine() {
+    if (!this.dryRunExecutedAtLeastOnce) {
+      return null;
+    }
+
+    const stats = this.getOverallTranslationCompletionStats();
+    return `total ${stats.completionPercent.toFixed(1)}% complete`;
+  },
+
   hasPendingDialogTranslation() {
     if (this.isForegroundDialogBatchActive()) {
       return true;
