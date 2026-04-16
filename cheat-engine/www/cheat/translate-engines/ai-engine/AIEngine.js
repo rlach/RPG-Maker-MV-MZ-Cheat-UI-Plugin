@@ -40,6 +40,7 @@ class AIEngine extends BaseTranslationEngine {
         this.allowNewlineMismatch = false;
         this.askAiIfTextTranslated = true;
         this.invalidJsonHandlingStrategy = 'resendFirstHalf';
+        this._aiInvalidJsonResendCount = 3;
         this.systemPrompt = DEFAULT_SYSTEM_PROMPT;
         this.useJsonFixer = true;
         this.bannedPhrasesText = DEFAULT_BANNED_PHRASES_TEXT;
@@ -127,6 +128,15 @@ class AIEngine extends BaseTranslationEngine {
                 get: () => this.invalidJsonHandlingStrategy,
                 set: (v) => {
                     this.invalidJsonHandlingStrategy = v || 'resendFirstHalf';
+                },
+            },
+            aiInvalidJsonResendCount: {
+                get: () => this._aiInvalidJsonResendCount,
+                set: (v) => {
+                    const nextValue = Number(v);
+                    this._aiInvalidJsonResendCount = Number.isFinite(nextValue)
+                        ? Math.max(1, Math.floor(nextValue))
+                        : 3;
                 },
             },
             aiSystemPrompt: {
@@ -607,7 +617,8 @@ class AIEngine extends BaseTranslationEngine {
                 return value;
             }
 
-            const originalName = matches[0] && typeof matches[0][1] === 'string' ? matches[0][1] : '';
+            const originalName =
+                matches[0] && typeof matches[0][1] === 'string' ? matches[0][1] : '';
             if (!originalName) {
                 return value;
             }
@@ -622,7 +633,7 @@ class AIEngine extends BaseTranslationEngine {
 
             if (this.panel?.officialNameEnforcementIncludeAllText) {
                 const replacementPairs = Array.from(officialNameMap.entries()).sort(
-                    (left, right) => right[0].length - left[0].length,
+                    (left, right) => right[0].length - left[0].length
                 );
                 for (const [sourceName, translatedName] of replacementPairs) {
                     nextValue = nextValue.split(sourceName).join(translatedName);
@@ -646,6 +657,7 @@ class AIEngine extends BaseTranslationEngine {
         }
 
         const isBackgroundJob = !!(options && options.backgroundJob);
+        const retryState = options && options.retryState ? options.retryState : null;
 
         if (!this.selectedModel) {
             console.warn('[AIEngine] No model selected');
@@ -666,9 +678,8 @@ class AIEngine extends BaseTranslationEngine {
                     this.getOfficialNameEnforcementMode() === 'fill_before_llm'
                         ? this.applyOfficialNamesBeforeSending(originalValue)
                         : originalValue;
-                const { preprocessedText, tagCounts, caseMap } = this.tagManager.preprocessTags(
-                    llmInputValue
-                );
+                const { preprocessedText, tagCounts, caseMap } =
+                    this.tagManager.preprocessTags(llmInputValue);
                 return {
                     ...item,
                     index: i,
@@ -801,6 +812,7 @@ class AIEngine extends BaseTranslationEngine {
                             previousResponse: rawTranslated,
                             itemData,
                             isBackgroundJob,
+                            retryState,
                         });
 
                         if (!retryResult.ok) {
@@ -876,6 +888,7 @@ class AIEngine extends BaseTranslationEngine {
                     previousResponse: rawTranslated,
                     itemData,
                     isBackgroundJob,
+                    retryState,
                 });
 
                 if (retryResult.ok) {
@@ -1030,6 +1043,7 @@ class AIEngine extends BaseTranslationEngine {
                     previousResponse: rawTranslated,
                     itemData,
                     isBackgroundJob,
+                    retryState,
                 });
 
                 if (retryResult.ok && retryResult.merged) {
@@ -1296,7 +1310,7 @@ class AIEngine extends BaseTranslationEngine {
                         return this.replaceFirstMatchedCapture(
                             translatedValue,
                             pattern,
-                            officialTranslation,
+                            officialTranslation
                         );
                     }
                 }

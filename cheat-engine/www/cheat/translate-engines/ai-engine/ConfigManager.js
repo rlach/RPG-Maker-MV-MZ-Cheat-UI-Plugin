@@ -20,6 +20,24 @@ export class ConfigManager {
         }
     }
 
+    _savePanelSettings() {
+        const panel = this.aiEngine && this.aiEngine.panel;
+        if (panel && typeof panel.saveSettings === 'function') {
+            panel.saveSettings();
+        }
+    }
+
+    _createPersistedHandler(handler, { syncPanel = false } = {}) {
+        return (...args) => {
+            const result = handler(...args);
+            if (syncPanel) {
+                this._syncPanelEngineConfig();
+            }
+            this._savePanelSettings();
+            return result;
+        };
+    }
+
     _normalizeModelsResponse(data) {
         const payload = data && typeof data === 'object' ? data : {};
         const candidates = Array.isArray(payload.data)
@@ -139,6 +157,20 @@ export class ConfigManager {
                class="mt-2"
              ></v-select>
 
+                         <v-text-field
+                             v-if="aiInvalidJsonHandlingStrategy === 'resendXTimes'"
+                             v-model.number="aiInvalidJsonResendCount"
+                             label="Resend retries per batch"
+                             outlined
+                             dense
+                             type="number"
+                             min="1"
+                             hide-details
+                             @keydown.stop
+                             @change="onChangeAiInvalidJsonResendCount"
+                             class="mt-2"
+                         ></v-text-field>
+
              <v-text-field
                v-if="aiInvalidJsonHandlingStrategy === 'askAIToFix'"
                v-model.number="aiFixRecursionMaxDepth"
@@ -220,10 +252,12 @@ export class ConfigManager {
             aiInvalidJsonHandlingStrategy: this.aiEngine.invalidJsonHandlingStrategy,
             aiInvalidJsonHandlingStrategyOptions: [
                 { text: 'Split in half', value: 'resendFirstHalf' },
+                { text: 'Resend X times', value: 'resendXTimes' },
                 { text: 'Ask AI to fix JSON', value: 'askAIToFix' },
                 { text: 'Use JSON fixer API', value: 'useJsonFixer' },
                 { text: 'None (fail)', value: 'none' },
             ],
+            aiInvalidJsonResendCount: this.aiEngine.aiInvalidJsonResendCount,
             aiBannedPhrases: this.aiEngine.bannedPhrasesText,
             aiSystemPrompt: this.aiEngine.systemPrompt,
             aiFixRecursionMaxDepth: this.aiEngine._aiFixRecursionMaxDepth,
@@ -242,61 +276,66 @@ export class ConfigManager {
     getMethods() {
         return {
             fetchAiModels: () => this._fetchAiModels(),
-            onChangeAiProvider: (v) => this._onChangeAiProvider(v),
-            onChangeAiHost: (v) => {
+            onChangeAiProvider: this._createPersistedHandler((v) => this._onChangeAiProvider(v), {
+                syncPanel: true,
+            }),
+            onChangeAiHost: this._createPersistedHandler((v) => {
                 this.aiEngine.host = v;
-            },
-            onChangeAiApiKey: (v) => {
+            }),
+            onChangeAiApiKey: this._createPersistedHandler((v) => {
                 this.aiEngine.apiKey = v;
-            },
-            onChangeAiModel: (v) => {
+            }),
+            onChangeAiModel: this._createPersistedHandler((v) => {
                 this.aiEngine.selectedModel = v;
-            },
-            onChangeAiAllowNewlineMismatch: (v) => {
+            }),
+            onChangeAiAllowNewlineMismatch: this._createPersistedHandler((v) => {
                 this.aiEngine.allowNewlineMismatch = v;
-            },
-            onChangeAiAskIfTextTranslated: (v) => {
+            }),
+            onChangeAiAskIfTextTranslated: this._createPersistedHandler((v) => {
                 this.aiEngine.askAiIfTextTranslated = v;
-            },
-            onChangeAiInvalidJsonHandlingStrategy: (v) => {
+            }),
+            onChangeAiInvalidJsonHandlingStrategy: this._createPersistedHandler((v) => {
                 this.aiEngine.invalidJsonHandlingStrategy = v;
-            },
-            onChangeAiBannedPhrases: (v) => {
+            }),
+            onChangeAiInvalidJsonResendCount: this._createPersistedHandler((v) => {
+                this.aiEngine.aiInvalidJsonResendCount = v;
+            }),
+            onChangeAiBannedPhrases: this._createPersistedHandler((v) => {
                 this.aiEngine.bannedPhrasesText = this.aiEngine.normalizeBannedPhrasesText(v);
-                if (this.aiEngine.panel && typeof this.aiEngine.panel.saveSettings === 'function') {
-                    this.aiEngine.panel.saveSettings();
-                }
-            },
-            onChangeAiSystemPrompt: (v) => {
+            }),
+            onChangeAiSystemPrompt: this._createPersistedHandler((v) => {
                 this.aiEngine.systemPrompt = v;
-            },
-            onChangeAiFixRecursionMaxDepth: (v) => {
+            }),
+            onChangeAiFixRecursionMaxDepth: this._createPersistedHandler((v) => {
                 this.aiEngine._aiFixRecursionMaxDepth = v;
-            },
-            onChangeUseJsonFixer: (v) => {
+            }),
+            onChangeUseJsonFixer: this._createPersistedHandler((v) => {
                 this.aiEngine.useJsonFixer = v;
-            },
-            addAiCustomTag: (tagConfig) => {
-                this.aiEngine.addCustomTag(tagConfig);
-                if (typeof this.aiEngine.panel.bindEngineConfigTo === 'function') {
-                    this.aiEngine.panel.bindEngineConfigTo(this.aiEngine.panel);
+            }),
+            addAiCustomTag: this._createPersistedHandler(
+                (tagConfig) => {
+                    this.aiEngine.addCustomTag(tagConfig);
+                },
+                {
+                    syncPanel: true,
                 }
-                this.aiEngine.panel.saveSettings();
-            },
-            updateAiCustomTag: (index, tagConfig) => {
-                this.aiEngine.updateCustomTag(index, tagConfig);
-                if (typeof this.aiEngine.panel.bindEngineConfigTo === 'function') {
-                    this.aiEngine.panel.bindEngineConfigTo(this.aiEngine.panel);
+            ),
+            updateAiCustomTag: this._createPersistedHandler(
+                (index, tagConfig) => {
+                    this.aiEngine.updateCustomTag(index, tagConfig);
+                },
+                {
+                    syncPanel: true,
                 }
-                this.aiEngine.panel.saveSettings();
-            },
-            removeAiCustomTag: (index) => {
-                this.aiEngine.removeCustomTag(index);
-                if (typeof this.aiEngine.panel.bindEngineConfigTo === 'function') {
-                    this.aiEngine.panel.bindEngineConfigTo(this.aiEngine.panel);
+            ),
+            removeAiCustomTag: this._createPersistedHandler(
+                (index) => {
+                    this.aiEngine.removeCustomTag(index);
+                },
+                {
+                    syncPanel: true,
                 }
-                this.aiEngine.panel.saveSettings();
-            },
+            ),
         };
     }
 
@@ -338,8 +377,9 @@ export class ConfigManager {
             }
             console.log('[ConfigManager] Fetched models:', models);
         } catch (error) {
-            this.aiEngine.modelsError = error.message;
-            console.error('[ConfigManager] Failed to fetch models:', error.message);
+            const message = error instanceof Error ? error.message : String(error);
+            this.aiEngine.modelsError = message;
+            console.error('[ConfigManager] Failed to fetch models:', message);
         } finally {
             this.aiEngine.loadingModels = false;
             this._syncPanelEngineConfig();
@@ -366,8 +406,6 @@ export class ConfigManager {
         } else {
             this.aiEngine.host = 'http://localhost:4891';
         }
-
-        this._syncPanelEngineConfig();
     }
 
     /**

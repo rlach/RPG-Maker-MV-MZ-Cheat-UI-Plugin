@@ -1,31 +1,28 @@
-import { Alert } from "../js/AlertHelper.js";
-import { MessageCheat, GeneralCheat } from "../js/CheatHelper.js";
-import { TranslateOnTheFlyState } from "../js/TranslateOnTheFlyState.js";
-import { AIEngine } from "../translate-engines/index.js";
-import { ensureTranslationRuntime } from "./translate-on-the-fly/TranslationRuntime.js";
-import { TRANSLATION_RUNTIME_STATE_KEYS } from "./translate-on-the-fly/TranslationRuntimeDefaults.js";
+import { Alert } from '../js/AlertHelper.js';
+import { MessageCheat, GeneralCheat } from '../js/CheatHelper.js';
+import { TranslateOnTheFlyState } from '../js/TranslateOnTheFlyState.js';
+import { AIEngine } from '../translate-engines/index.js';
+import { ensureTranslationRuntime } from './translate-on-the-fly/TranslationRuntime.js';
+import { TRANSLATION_RUNTIME_STATE_KEYS } from './translate-on-the-fly/TranslationRuntimeDefaults.js';
 
-const runtimeStateProxyComputed = TRANSLATION_RUNTIME_STATE_KEYS.reduce(
-  (acc, key) => {
+const runtimeStateProxyComputed = TRANSLATION_RUNTIME_STATE_KEYS.reduce((acc, key) => {
     acc[key] = {
-      get() {
-        return this.runtime ? this.runtime[key] : undefined;
-      },
-      set(value) {
-        if (this.runtime) {
-          this.runtime[key] = value;
-        }
-      },
+        get() {
+            return this.runtime ? this.runtime[key] : undefined;
+        },
+        set(value) {
+            if (this.runtime) {
+                this.runtime[key] = value;
+            }
+        },
     };
     return acc;
-  },
-  {},
-);
+}, {});
 
 export default {
-  name: "TranslateOnTheFlyPanel",
+    name: 'TranslateOnTheFlyPanel',
 
-  template: `
+    template: `
 <v-card flat class="ma-0 pa-0">
     <v-card-subtitle class="pb-0 font-weight-bold">Translate Messages</v-card-subtitle>
     <v-card-text class="pb-0">
@@ -260,196 +257,198 @@ export default {
 </v-card>
     `,
 
-  data() {
-    return {
-      runtime: null,
-      translationCache: null,
-      lastSeenByCacheKey: null,
-      pendingTranslations: null,
-      failedTranslations: null,
-      batchManager: null,
-    };
-  },
-
-  created() {
-    this.runtime = ensureTranslationRuntime();
-    this.syncRuntimeRefs();
-
-    this.stateUnsubscribe = TranslateOnTheFlyState.subscribe((enabled) => {
-      if (this.runtime) {
-        this.runtime.enabled = enabled;
-      }
-      this.syncRuntimeRefs();
-    });
-  },
-
-  beforeDestroy() {
-    if (this.stateUnsubscribe) {
-      this.stateUnsubscribe();
-      this.stateUnsubscribe = null;
-    }
-
-    if (this._spinnerEl && this._spinnerEl.parentNode) {
-      this._spinnerEl.parentNode.removeChild(this._spinnerEl);
-      this._spinnerEl = null;
-    }
-
-    if (this._spinnerStyle && this._spinnerStyle.parentNode) {
-      this._spinnerStyle.parentNode.removeChild(this._spinnerStyle);
-      this._spinnerStyle = null;
-    }
-  },
-
-  computed: {
-    ...runtimeStateProxyComputed,
-
-    cachedCount() {
-      return this.translationCache ? this.translationCache.size : 0;
+    data() {
+        return {
+            runtime: null,
+            translationCache: null,
+            lastSeenByCacheKey: null,
+            pendingTranslations: null,
+            failedTranslations: null,
+            batchManager: null,
+        };
     },
 
-  },
-
-  methods: {
-    syncRuntimeRefs() {
-      if (!this.runtime) {
-        return;
-      }
-
-      this.translationCache = this.runtime.translationCache;
-      this.lastSeenByCacheKey = this.runtime.lastSeenByCacheKey;
-      this.pendingTranslations = this.runtime.pendingTranslations;
-      this.failedTranslations = this.runtime.failedTranslations;
-      this.batchManager = this.runtime.batchManager;
-      this.engine = this.runtime.engine;
-    },
-
-    callRuntime(methodName, ...args) {
-      if (!this.runtime) {
+    created() {
         this.runtime = ensureTranslationRuntime();
-      }
+        this.syncRuntimeRefs();
 
-      if (!this.runtime || typeof this.runtime[methodName] !== "function") {
-        throw new Error(`Translation runtime method is missing: ${methodName}`);
-      }
-      const result = this.runtime[methodName](...args);
-
-      if (result && typeof result.then === "function") {
-        return result.finally(() => {
-          this.syncRuntimeRefs();
+        this.stateUnsubscribe = TranslateOnTheFlyState.subscribe((enabled) => {
+            if (this.runtime) {
+                this.runtime.enabled = enabled;
+            }
+            this.syncRuntimeRefs();
         });
-      }
-
-      this.syncRuntimeRefs();
-      return result;
     },
 
-    onChangeEnabled() {
-      return this.callRuntime("onChangeEnabled");
+    beforeDestroy() {
+        if (this.stateUnsubscribe) {
+            this.stateUnsubscribe();
+            this.stateUnsubscribe = null;
+        }
+
+        if (this._spinnerEl && this._spinnerEl.parentNode) {
+            this._spinnerEl.parentNode.removeChild(this._spinnerEl);
+            this._spinnerEl = null;
+        }
+
+        if (this._spinnerStyle && this._spinnerStyle.parentNode) {
+            this._spinnerStyle.parentNode.removeChild(this._spinnerStyle);
+            this._spinnerStyle = null;
+        }
     },
 
-    onChangeCacheOnly() {
-      return this.callRuntime("onChangeCacheOnly");
+    computed: {
+        ...runtimeStateProxyComputed,
+
+        cachedCount() {
+            return this.translationCache ? this.translationCache.size : 0;
+        },
     },
 
-    onChangeTryTranslateAhead() {
-      return this.callRuntime("onChangeTryTranslateAhead");
-    },
+    methods: {
+        syncRuntimeRefs() {
+            if (!this.runtime) {
+                return;
+            }
 
-    onChangeTranslateGameObjects() {
-      return this.callRuntime("onChangeTranslateGameObjects");
-    },
+            this.translationCache = this.runtime.translationCache;
+            this.lastSeenByCacheKey = this.runtime.lastSeenByCacheKey;
+            this.pendingTranslations = this.runtime.pendingTranslations;
+            this.failedTranslations = this.runtime.failedTranslations;
+            this.batchManager = this.runtime.batchManager;
+            this.engine = this.runtime.engine;
+        },
 
-    onChangeCancelBackgroundForOnTheFly() {
-      return this.callRuntime("onChangeCancelBackgroundForOnTheFly");
-    },
+        callRuntime(methodName, ...args) {
+            if (!this.runtime) {
+                this.runtime = ensureTranslationRuntime();
+            }
 
-    onChangeCurrentMapMidPhasePriority() {
-      return this.callRuntime("onChangeCurrentMapMidPhasePriority");
-    },
+            if (!this.runtime || typeof this.runtime[methodName] !== 'function') {
+                throw new Error(`Translation runtime method is missing: ${methodName}`);
+            }
+            const result = this.runtime[methodName](...args);
 
-    onChangeTranslationEngine() {
-      return this.callRuntime("onChangeTranslationEngine");
-    },
+            if (result && typeof result.then === 'function') {
+                return result.finally(() => {
+                    this.syncRuntimeRefs();
+                });
+            }
 
-    onChangeSourceLang() {
-      return this.callRuntime("onChangeSourceLang");
-    },
+            this.syncRuntimeRefs();
+            return result;
+        },
 
-    onChangeTargetLang() {
-      return this.callRuntime("onChangeTargetLang");
-    },
+        onChangeEnabled() {
+            return this.callRuntime('onChangeEnabled');
+        },
 
-    fetchAiModels() {
-      return this.callRuntime("fetchAiModels");
-    },
+        onChangeCacheOnly() {
+            return this.callRuntime('onChangeCacheOnly');
+        },
 
-    onChangeAiProvider(v) {
-      return this.callRuntime("onChangeAiProvider", v);
-    },
+        onChangeTryTranslateAhead() {
+            return this.callRuntime('onChangeTryTranslateAhead');
+        },
 
-    onChangeAiHost(v) {
-      return this.callRuntime("onChangeAiHost", v);
-    },
+        onChangeTranslateGameObjects() {
+            return this.callRuntime('onChangeTranslateGameObjects');
+        },
 
-    onChangeAiApiKey(v) {
-      return this.callRuntime("onChangeAiApiKey", v);
-    },
+        onChangeCancelBackgroundForOnTheFly() {
+            return this.callRuntime('onChangeCancelBackgroundForOnTheFly');
+        },
 
-    onChangeAiModel(v) {
-      return this.callRuntime("onChangeAiModel", v);
-    },
+        onChangeCurrentMapMidPhasePriority() {
+            return this.callRuntime('onChangeCurrentMapMidPhasePriority');
+        },
 
-    onChangeAiAllowNewlineMismatch(v) {
-      return this.callRuntime("onChangeAiAllowNewlineMismatch", v);
-    },
+        onChangeTranslationEngine() {
+            return this.callRuntime('onChangeTranslationEngine');
+        },
 
-    onChangeAiAskIfTextTranslated(v) {
-      return this.callRuntime("onChangeAiAskIfTextTranslated", v);
-    },
+        onChangeSourceLang() {
+            return this.callRuntime('onChangeSourceLang');
+        },
 
-    onChangeAiInvalidJsonHandlingStrategy(v) {
-      return this.callRuntime("onChangeAiInvalidJsonHandlingStrategy", v);
-    },
+        onChangeTargetLang() {
+            return this.callRuntime('onChangeTargetLang');
+        },
 
-    onChangeAiBannedPhrases(v) {
-      return this.callRuntime("onChangeAiBannedPhrases", v);
-    },
+        fetchAiModels() {
+            return this.callRuntime('fetchAiModels');
+        },
 
-    onChangeAiSystemPrompt(v) {
-      return this.callRuntime("onChangeAiSystemPrompt", v);
-    },
+        onChangeAiProvider(v) {
+            return this.callRuntime('onChangeAiProvider', v);
+        },
 
-    onChangeAiFixRecursionMaxDepth(v) {
-      return this.callRuntime("onChangeAiFixRecursionMaxDepth", v);
-    },
+        onChangeAiHost(v) {
+            return this.callRuntime('onChangeAiHost', v);
+        },
 
-    onChangeUseJsonFixer(v) {
-      return this.callRuntime("onChangeUseJsonFixer", v);
-    },
+        onChangeAiApiKey(v) {
+            return this.callRuntime('onChangeAiApiKey', v);
+        },
 
-    onChangeTextWrapping() {
-      return this.callRuntime("onChangeTextWrapping");
-    },
+        onChangeAiModel(v) {
+            return this.callRuntime('onChangeAiModel', v);
+        },
 
-    onChangeMaxWidth() {
-      return this.callRuntime("onChangeMaxWidth");
-    },
+        onChangeAiAllowNewlineMismatch(v) {
+            return this.callRuntime('onChangeAiAllowNewlineMismatch', v);
+        },
 
-    onChangeDescriptionMaxWidth() {
-      return this.callRuntime("onChangeDescriptionMaxWidth");
-    },
+        onChangeAiAskIfTextTranslated(v) {
+            return this.callRuntime('onChangeAiAskIfTextTranslated', v);
+        },
 
-    onChangeCharLimit() {
-      return this.callRuntime("onChangeCharLimit");
-    },
+        onChangeAiInvalidJsonHandlingStrategy(v) {
+            return this.callRuntime('onChangeAiInvalidJsonHandlingStrategy', v);
+        },
 
-    onChangeBatchItemsLimit() {
-      return this.callRuntime("onChangeBatchItemsLimit");
-    },
+        onChangeAiInvalidJsonResendCount(v) {
+            return this.callRuntime('onChangeAiInvalidJsonResendCount', v);
+        },
 
-    clearCache() {
-      return this.callRuntime("clearCache");
-    },
+        onChangeAiBannedPhrases(v) {
+            return this.callRuntime('onChangeAiBannedPhrases', v);
+        },
 
-  },
+        onChangeAiSystemPrompt(v) {
+            return this.callRuntime('onChangeAiSystemPrompt', v);
+        },
+
+        onChangeAiFixRecursionMaxDepth(v) {
+            return this.callRuntime('onChangeAiFixRecursionMaxDepth', v);
+        },
+
+        onChangeUseJsonFixer(v) {
+            return this.callRuntime('onChangeUseJsonFixer', v);
+        },
+
+        onChangeTextWrapping() {
+            return this.callRuntime('onChangeTextWrapping');
+        },
+
+        onChangeMaxWidth() {
+            return this.callRuntime('onChangeMaxWidth');
+        },
+
+        onChangeDescriptionMaxWidth() {
+            return this.callRuntime('onChangeDescriptionMaxWidth');
+        },
+
+        onChangeCharLimit() {
+            return this.callRuntime('onChangeCharLimit');
+        },
+
+        onChangeBatchItemsLimit() {
+            return this.callRuntime('onChangeBatchItemsLimit');
+        },
+
+        clearCache() {
+            return this.callRuntime('clearCache');
+        },
+    },
 };

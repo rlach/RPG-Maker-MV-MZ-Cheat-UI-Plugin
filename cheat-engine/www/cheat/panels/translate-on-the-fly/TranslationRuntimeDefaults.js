@@ -26,6 +26,7 @@ export const AI_PROVIDER_OPTIONS = [
 
 export const AI_INVALID_JSON_HANDLING_STRATEGY_OPTIONS = [
     { text: 'Split into two half-batches', value: 'resendFirstHalf' },
+    { text: 'Resend X times', value: 'resendXTimes' },
     { text: 'Ask AI to fix it', value: 'askAIToFix' },
     { text: 'Use JsonFixer', value: 'useJsonFixer' },
     { text: 'None', value: 'none' },
@@ -81,6 +82,7 @@ export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
     'aiAskIfTextTranslated',
     'aiInvalidJsonHandlingStrategy',
     'aiInvalidJsonHandlingStrategyOptions',
+    'aiInvalidJsonResendCount',
     'aiBannedPhrases',
     'aiSystemPrompt',
     'currentMessageWindow',
@@ -157,6 +159,7 @@ export const UI_SYNC_STATE_KEYS = Object.freeze([
     'aiAllowNewlineMismatch',
     'aiAskIfTextTranslated',
     'aiInvalidJsonHandlingStrategy',
+    'aiInvalidJsonResendCount',
     'aiBannedPhrases',
     'aiSystemPrompt',
     'currentMessageWindow',
@@ -230,6 +233,7 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
         aiInvalidJsonHandlingStrategyOptions: cloneOptions(
             AI_INVALID_JSON_HANDLING_STRATEGY_OPTIONS
         ),
+        aiInvalidJsonResendCount: 3,
         aiBannedPhrases: DEFAULT_BANNED_PHRASES_TEXT,
         aiSystemPrompt: DEFAULT_SYSTEM_PROMPT,
         currentMessageWindow: null,
@@ -291,11 +295,7 @@ export function normalizePersistedTranslationSettings(rawData = {}) {
         delete normalized.engineSettings.gpt4all;
     }
 
-    const validOfficialNameModes = new Set([
-        'none',
-        'fix_matching_regex',
-        'fill_before_llm',
-    ]);
+    const validOfficialNameModes = new Set(['none', 'fix_matching_regex', 'fill_before_llm']);
     if (!validOfficialNameModes.has(normalized.officialNameEnforcementMode)) {
         normalized.officialNameEnforcementMode = defaults.officialNameEnforcementMode;
     }
