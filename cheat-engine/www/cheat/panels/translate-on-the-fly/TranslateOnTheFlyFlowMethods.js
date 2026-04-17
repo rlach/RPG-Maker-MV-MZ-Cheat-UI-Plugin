@@ -47,15 +47,23 @@ export const translateOnTheFlyFlowMethods = {
       return;
     }
 
-    const scopedStats = computeLangPairCompletionByCacheTypes({
-      translationCache: this.translationCache,
-      sourceLang: this.sourceLang,
-      targetLang: this.targetLang,
-      cacheTypes: normalizedTypes,
-    });
+    const useAllTypes = normalizedTypes.includes("*");
+    const scopedStats = useAllTypes
+      ? computeLangPairCompletionByKeyLength({
+          translationCache: this.translationCache,
+          sourceLang: this.sourceLang,
+          targetLang: this.targetLang,
+        })
+      : computeLangPairCompletionByCacheTypes({
+          translationCache: this.translationCache,
+          sourceLang: this.sourceLang,
+          targetLang: this.targetLang,
+          cacheTypes: normalizedTypes,
+        });
 
     this.queueCompletionScope = {
       cacheTypes: normalizedTypes,
+      useAllTypes,
       totalKeyLength: Math.max(0, Number(scopedStats.totalKeyLength) || 0),
     };
   },
@@ -66,12 +74,18 @@ export const translateOnTheFlyFlowMethods = {
       return null;
     }
 
-    const scopedStats = computeLangPairCompletionByCacheTypes({
-      translationCache: this.translationCache,
-      sourceLang: this.sourceLang,
-      targetLang: this.targetLang,
-      cacheTypes: scope.cacheTypes,
-    });
+    const scopedStats = scope.useAllTypes
+      ? computeLangPairCompletionByKeyLength({
+          translationCache: this.translationCache,
+          sourceLang: this.sourceLang,
+          targetLang: this.targetLang,
+        })
+      : computeLangPairCompletionByCacheTypes({
+          translationCache: this.translationCache,
+          sourceLang: this.sourceLang,
+          targetLang: this.targetLang,
+          cacheTypes: scope.cacheTypes,
+        });
 
     const totalKeyLength = Math.max(
       0,
@@ -485,7 +499,12 @@ export const translateOnTheFlyFlowMethods = {
     );
     const requests = selectedStats
       .filter((stat) => stat.left > 0)
-      .map((stat) => ({ kind: stat.id }));
+      .map((stat) => ({
+        kind: stat.id,
+        ...(stat.id === 'cacheEmptyStrings' && {
+          repeatUntilSuccess: !!this.cacheEmptyStringsRepeatUntilSuccess,
+        }),
+      }));
 
     this.objectTranslationJob = {
       active: true,

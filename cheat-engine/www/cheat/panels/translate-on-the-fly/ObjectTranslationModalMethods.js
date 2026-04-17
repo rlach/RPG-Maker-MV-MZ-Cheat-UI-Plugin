@@ -24,6 +24,7 @@ const DEFAULT_OBJECT_TRANSLATION_TYPE_DEFS = Object.freeze([
     { id: 'gameArrays', label: 'game arrays (terms, types, elements)' },
     { id: 'troops', label: 'Troops' },
     { id: 'plugins', label: 'Plugins' },
+    { id: 'cacheEmptyStrings', label: 'Translate all empty strings in cache (including previous errors)', noDragDrop: true },
 ]);
 
 export function loadMapDataById(mapId) {
@@ -61,8 +62,9 @@ export const objectTranslationRuntimeMethods = {
 
     getObjectTranslationTypeOrder() {
         const defaults = this.getDefaultObjectTranslationTypeDefs();
-        const validIds = defaults.map((entry) => entry.id);
-        const validSet = new Set(validIds);
+        const draggableIds = defaults.filter((e) => !e.noDragDrop).map((e) => e.id);
+        const noDragDropIds = defaults.filter((e) => e.noDragDrop).map((e) => e.id);
+        const validSet = new Set(draggableIds);
 
         const requestedIds = Array.isArray(this.objectTranslationTypeOrder)
             ? this.objectTranslationTypeOrder
@@ -80,21 +82,26 @@ export const objectTranslationRuntimeMethods = {
             seen.add(id);
         }
 
-        for (const id of validIds) {
+        for (const id of draggableIds) {
             if (!seen.has(id)) {
                 ordered.push(id);
             }
         }
 
-        this.objectTranslationTypeOrder = ordered.slice();
+        // noDragDrop items always appended after draggable ones
+        for (const id of noDragDropIds) {
+            ordered.push(id);
+        }
+
+        this.objectTranslationTypeOrder = ordered.filter((id) => !noDragDropIds.includes(id));
         return ordered;
     },
 
     setObjectTranslationTypeOrder(orderIds = [], options = {}) {
         const persist = !options || options.persist !== false;
         const defaults = this.getDefaultObjectTranslationTypeDefs();
-        const validIds = defaults.map((entry) => entry.id);
-        const validSet = new Set(validIds);
+        const draggableIds = defaults.filter((e) => !e.noDragDrop).map((e) => e.id);
+        const validSet = new Set(draggableIds);
 
         const requestedIds = Array.isArray(orderIds) ? orderIds : [];
         const next = [];
@@ -109,7 +116,7 @@ export const objectTranslationRuntimeMethods = {
             seen.add(id);
         }
 
-        for (const id of validIds) {
+        for (const id of draggableIds) {
             if (!seen.has(id)) {
                 next.push(id);
             }

@@ -7,6 +7,7 @@ import { DirectItems } from "../translation-phases/DirectItems.js";
 import { GameArrays } from "../translation-phases/GameArrays.js";
 import { CurrentEvent } from "../translation-phases/CurrentEvent.js";
 import { DataObjects } from "../translation-phases/DataObjects.js";
+import { CacheEmptyStrings } from "../translation-phases/CacheEmptyStrings.js";
 import { EmptyStrings } from "../translation-phases/EmptyStrings.js";
 import { MapEvents } from "../translation-phases/MapEvents.js";
 import { OtherStrings } from "../translation-phases/OtherStrings.js";
@@ -33,6 +34,7 @@ function registerDefaultStrategies(manager) {
   manager.register(DataObjects.getInstance());
   manager.register(new DirectItems());
   manager.register(EmptyStrings.getInstance());
+  manager.register(CacheEmptyStrings.getInstance());
   manager.register(SystemMessages.getInstance());
   manager.register(SystemCommands.getInstance());
   manager.register(OtherStrings.getInstance());

@@ -15,6 +15,7 @@ class ObjectTranslationService {
       dialogVisible: false,
       modalStats: [],
       selection: {},
+      cacheEmptyStringsRepeatUntilSuccess: false,
       mapEventsDialogVisible: false,
       mapEventsLoading: false,
       mapEventsSearch: "",
@@ -156,7 +157,21 @@ class ObjectTranslationService {
       }
     }
 
+    this.state.cacheEmptyStringsRepeatUntilSuccess =
+      !!runtime.cacheEmptyStringsRepeatUntilSuccess;
+
     this.state.dialogVisible = true;
+  }
+
+  setCacheEmptyStringsRepeatUntilSuccess(value) {
+    this.state.cacheEmptyStringsRepeatUntilSuccess = !!value;
+    const runtime = this.ensureRuntime();
+    if (runtime) {
+      runtime.cacheEmptyStringsRepeatUntilSuccess = !!value;
+      if (typeof runtime.saveSettings === "function") {
+        runtime.saveSettings();
+      }
+    }
   }
 
   closeModal() {
@@ -388,6 +403,12 @@ class ObjectTranslationService {
       to >= this.state.modalStats.length ||
       from === to
     ) {
+      return;
+    }
+
+    const fromItem = this.state.modalStats[from];
+    const toItem = this.state.modalStats[to];
+    if ((fromItem && fromItem.noDragDrop) || (toItem && toItem.noDragDrop)) {
       return;
     }
 

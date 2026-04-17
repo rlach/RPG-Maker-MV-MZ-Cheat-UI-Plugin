@@ -106,6 +106,7 @@ export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
     'batchThroughputSamples',
     'queueCompletionScope',
     'dryRunExecutedAtLeastOnce',
+    'cacheEmptyStringsRepeatUntilSuccess',
     'nonOtfTranslationProcess',
 ]);
 
@@ -133,6 +134,7 @@ export const PERSISTED_TRANSLATION_SETTINGS_KEYS = Object.freeze([
     'officialNameEnforcementMode',
     'officialNameEnforcementIncludeAllText',
     'dryRunExecutedAtLeastOnce',
+    'cacheEmptyStringsRepeatUntilSuccess',
 ]);
 
 export const UI_SYNC_STATE_KEYS = Object.freeze([
@@ -271,6 +273,7 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
         batchThroughputSamples: [],
         queueCompletionScope: null,
         dryRunExecutedAtLeastOnce: false,
+        cacheEmptyStringsRepeatUntilSuccess: false,
         nonOtfTranslationProcess: {
             active: false,
             label: '',

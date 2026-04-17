@@ -19,47 +19,64 @@ export default {
       <v-card-title class="subtitle-1 font-weight-bold">Mass Translation</v-card-title>
       <v-card-text class="caption pb-1">Select what to translate. Counts show remaining objects and total.</v-card-text>
       <v-card-text class="pt-1">
-        <div
+        <template
           v-for="(item, index) in objectTranslationModalStats"
-          :key="item.id"
-          class="d-flex align-center justify-space-between py-1"
-          @dragover.prevent="onItemDragOver($event, index)"
-          @drop.prevent="onItemDrop($event, index)"
         >
-          <div class="d-flex align-center" style="min-width: 0; flex: 1;">
-            <div
-              class="mr-1 d-flex align-center"
-              draggable="true"
-              style="cursor: grab;"
-              title="Drag to reorder"
-              @dragstart="onItemDragStart($event, index)"
-              @dragend="onItemDragEnd"
-            >
-              <v-icon small color="grey lighten-1">mdi-drag-vertical</v-icon>
+          <div
+            :key="item.id"
+            class="d-flex align-center justify-space-between py-1"
+            @dragover.prevent="onItemDragOver($event, index)"
+            @drop.prevent="onItemDrop($event, index)"
+          >
+            <div class="d-flex align-center" style="min-width: 0; flex: 1;">
+              <div
+                class="mr-1 d-flex align-center"
+                :draggable="!item.noDragDrop"
+                :style="item.noDragDrop ? 'visibility: hidden;' : 'cursor: grab;'"
+                title="Drag to reorder"
+                @dragstart="onItemDragStart($event, index)"
+                @dragend="onItemDragEnd"
+              >
+                <v-icon small color="grey lighten-1">mdi-drag-vertical</v-icon>
+              </div>
+              <v-checkbox
+                v-model="objectTranslationSelection[item.id]"
+                :label="item.label"
+                :disabled="item.total <= 0"
+                hide-details
+                dense
+                class="ma-0 pa-0"
+              ></v-checkbox>
             </div>
+            <div class="d-flex align-center">
+              <span class="caption grey--text text--lighten-1 mr-2">{{item.metaText || ('left ' + item.left + ' of ' + item.total)}}</span>
+              <v-btn
+                v-if="item.id === 'mapEvents' || item.id === 'plugins'"
+                icon
+                x-small
+                color="grey lighten-1"
+                :disabled="item.total <= 0"
+                @click.stop="openObjectTranslationSubSelection(item.id)"
+              >
+                <v-icon small>mdi-cog</v-icon>
+              </v-btn>
+            </div>
+          </div>
+          <div
+            v-if="item.id === 'cacheEmptyStrings'"
+            :key="'repeat-' + item.id"
+            class="pl-8 pb-1"
+          >
             <v-checkbox
-              v-model="objectTranslationSelection[item.id]"
-              :label="item.label"
-              :disabled="item.total <= 0"
+              v-model="cacheEmptyStringsRepeatUntilSuccess"
+              label="Repeat until success"
+              :disabled="!objectTranslationSelection['cacheEmptyStrings']"
               hide-details
               dense
               class="ma-0 pa-0"
             ></v-checkbox>
           </div>
-          <div class="d-flex align-center">
-            <span class="caption grey--text text--lighten-1 mr-2">{{item.metaText || ('left ' + item.left + ' of ' + item.total)}}</span>
-            <v-btn
-              v-if="item.id === 'mapEvents' || item.id === 'plugins'"
-              icon
-              x-small
-              color="grey lighten-1"
-              :disabled="item.total <= 0"
-              @click.stop="openObjectTranslationSubSelection(item.id)"
-            >
-              <v-icon small>mdi-cog</v-icon>
-            </v-btn>
-          </div>
-        </div>
+        </template>
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
@@ -255,6 +272,15 @@ export default {
       return this.service.state.selection;
     },
 
+    cacheEmptyStringsRepeatUntilSuccess: {
+      get() {
+        return !!this.service.state.cacheEmptyStringsRepeatUntilSuccess;
+      },
+      set(v) {
+        this.service.setCacheEmptyStringsRepeatUntilSuccess(!!v);
+      },
+    },
+
     objectTranslationMapEventsLoading() {
       return this.service.state.mapEventsLoading;
     },
@@ -369,6 +395,13 @@ export default {
     },
 
     onItemDragStart(event, index) {
+      const item = this.objectTranslationModalStats[index];
+      if (item && item.noDragDrop) {
+        if (event) {
+          event.preventDefault();
+        }
+        return;
+      }
       this.dragSourceIndex = index;
       if (event && event.dataTransfer) {
         event.dataTransfer.effectAllowed = "move";

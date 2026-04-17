@@ -137,6 +137,11 @@ export class TranslationBatchManager {
       return;
     }
 
+    if (kind === "cacheEmptyStrings") {
+      targetSet.add("*");
+      return;
+    }
+
     if (kind === "systemMessages") {
       targetSet.add("system_message");
       return;
@@ -766,6 +771,13 @@ export class TranslationBatchManager {
         mergeStats(translated.stats);
 
         if (translated && translated.interruptedForCurrentMap) {
+          continue;
+        }
+
+        if (
+          typeof entry.shouldRepeat === "function" &&
+          entry.shouldRepeat(translated, { panel: this.panel })
+        ) {
           continue;
         }
 

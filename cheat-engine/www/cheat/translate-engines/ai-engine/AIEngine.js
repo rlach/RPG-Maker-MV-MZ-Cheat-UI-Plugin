@@ -31,7 +31,7 @@ class AIEngine extends BaseTranslationEngine {
 
         // Configuration properties
         this.provider = 'openApi';
-        this.host = 'http://localhost:4891';
+        this.host = 'http://localhost:5001';
         this.apiKey = '';
         this.selectedModel = '';
         this.models = [];
@@ -41,7 +41,7 @@ class AIEngine extends BaseTranslationEngine {
         this.askAiIfTextTranslated = true;
         this.invalidJsonHandlingStrategy = 'resendFirstHalf';
         this._aiInvalidJsonResendCount = 3;
-        this.lengthMultiplierForMaxLength = 3;
+        this.lengthMultiplierForMaxLength = 5;
         this.minimumMaxLength = 30;
         this.systemPrompt = DEFAULT_SYSTEM_PROMPT;
         this.useJsonFixer = true;
