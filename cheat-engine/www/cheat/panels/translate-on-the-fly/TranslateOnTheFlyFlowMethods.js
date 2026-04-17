@@ -1,11 +1,96 @@
 import { Alert } from "../../js/AlertHelper.js";
 import { findNearestMessageEntry } from "../../js/EventCommandTraversal.js";
-import { computeLangPairCompletionByKeyLength } from "../../js/TranslationCompletionMetrics.js";
+import {
+  computeLangPairCompletionByKeyLength,
+  computeLangPairCompletionByCacheTypes,
+} from "../../js/TranslationCompletionMetrics.js";
 import { BatchSummaryReporter } from "../../translate-engines/batch-manager/BatchSummaryReporter.js";
 import { createTranslationBatchManager } from "../../translate-engines/batch-manager/TranslationBatchManagerFactory.js";
 import { CurrentEvent } from "../../translate-engines/translation-phases/CurrentEvent.js";
 
 export const translateOnTheFlyFlowMethods = {
+  normalizeQueueScopeTypes(cacheTypes) {
+    const result = [];
+    const seen = new Set();
+    let safeTypes = [];
+    if (Array.isArray(cacheTypes)) {
+      safeTypes = cacheTypes;
+    } else if (cacheTypes instanceof Set) {
+      safeTypes = Array.from(cacheTypes);
+    }
+
+    for (const type of safeTypes) {
+      const normalized = String(type || "").trim();
+      if (!normalized || seen.has(normalized)) {
+        continue;
+      }
+      seen.add(normalized);
+      result.push(normalized);
+    }
+
+    return result;
+  },
+
+  clearQueueCompletionScope() {
+    this.queueCompletionScope = null;
+  },
+
+  startQueueCompletionScope(cacheTypes) {
+    this.clearQueueCompletionScope();
+
+    if (!this.dryRunExecutedAtLeastOnce) {
+      return;
+    }
+
+    const normalizedTypes = this.normalizeQueueScopeTypes(cacheTypes);
+    if (normalizedTypes.length === 0) {
+      return;
+    }
+
+    const scopedStats = computeLangPairCompletionByCacheTypes({
+      translationCache: this.translationCache,
+      sourceLang: this.sourceLang,
+      targetLang: this.targetLang,
+      cacheTypes: normalizedTypes,
+    });
+
+    this.queueCompletionScope = {
+      cacheTypes: normalizedTypes,
+      totalKeyLength: Math.max(0, Number(scopedStats.totalKeyLength) || 0),
+    };
+  },
+
+  getQueueScopedCompletionStats() {
+    const scope = this.queueCompletionScope;
+    if (!scope || !Array.isArray(scope.cacheTypes) || !scope.cacheTypes.length) {
+      return null;
+    }
+
+    const scopedStats = computeLangPairCompletionByCacheTypes({
+      translationCache: this.translationCache,
+      sourceLang: this.sourceLang,
+      targetLang: this.targetLang,
+      cacheTypes: scope.cacheTypes,
+    });
+
+    const totalKeyLength = Math.max(
+      0,
+      Number(scope.totalKeyLength) || Number(scopedStats.totalKeyLength) || 0,
+    );
+    const translatedKeyLength = Math.min(
+      totalKeyLength,
+      Math.max(0, Number(scopedStats.translatedKeyLength) || 0),
+    );
+    const completionPercent =
+      totalKeyLength > 0 ? (translatedKeyLength / totalKeyLength) * 100 : 0;
+
+    return {
+      totalKeyLength,
+      translatedKeyLength,
+      completionPercent,
+    };
+  },
+
   getBatchThroughputSamples() {
     if (!Array.isArray(this.batchThroughputSamples)) {
       this.batchThroughputSamples = [];
@@ -89,7 +174,9 @@ export const translateOnTheFlyFlowMethods = {
       return null;
     }
 
-    const stats = this.getOverallTranslationCompletionStats();
+    const stats =
+      this.getQueueScopedCompletionStats() ||
+      this.getOverallTranslationCompletionStats();
     const remainingChars = Math.max(
       0,
       Number(stats.totalKeyLength || 0) - Number(stats.translatedKeyLength || 0),

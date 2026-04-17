@@ -104,6 +104,7 @@ export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
     'officialNameEnforcementIncludeAllText',
     'objectTranslationJob',
     'batchThroughputSamples',
+    'queueCompletionScope',
     'dryRunExecutedAtLeastOnce',
     'nonOtfTranslationProcess',
 ]);
@@ -239,7 +240,7 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
             AI_INVALID_JSON_HANDLING_STRATEGY_OPTIONS
         ),
         aiInvalidJsonResendCount: 3,
-        aiLengthMultiplierForMaxLength: 3,
+        aiLengthMultiplierForMaxLength: 5,
         aiMinimumMaxLength: 30,
         aiBannedPhrases: DEFAULT_BANNED_PHRASES_TEXT,
         aiSystemPrompt: DEFAULT_SYSTEM_PROMPT,
@@ -268,6 +269,7 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
             runErrors: 0,
         },
         batchThroughputSamples: [],
+        queueCompletionScope: null,
         dryRunExecutedAtLeastOnce: false,
         nonOtfTranslationProcess: {
             active: false,

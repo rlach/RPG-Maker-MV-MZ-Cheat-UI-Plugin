@@ -66,7 +66,7 @@ export class TranslationBatchManager {
         continue;
       }
 
-      const value = item.value;
+      const value = item?.value;
       if (typeof value === "string") {
         total += value.length;
       } else if (value !== null && value !== undefined) {
@@ -75,6 +75,135 @@ export class TranslationBatchManager {
     }
 
     return total;
+  }
+
+  addCacheTypesFromItems(targetSet, items) {
+    if (!(targetSet instanceof Set) || !Array.isArray(items)) {
+      return;
+    }
+
+    for (const item of items) {
+      const type = item && item.type;
+      if (!type) {
+        continue;
+      }
+
+      const normalized = String(type).trim();
+      if (normalized) {
+        targetSet.add(normalized);
+      }
+    }
+  }
+
+  addCacheTypesFromStrategy(targetSet, strategy, request = null) {
+    if (!(targetSet instanceof Set) || !strategy) {
+      return;
+    }
+
+    if (typeof strategy.getQueueScopeCacheTypes === "function") {
+      const types = strategy.getQueueScopeCacheTypes({
+        panel: this.panel,
+        request,
+      });
+      this.addCacheTypesFromItems(
+        targetSet,
+        (Array.isArray(types) ? types : []).map((type) => ({ type })),
+      );
+    }
+
+    if (typeof strategy.getCacheType === "function") {
+      const type = strategy.getCacheType();
+      if (type) {
+        targetSet.add(String(type).trim());
+      }
+    }
+
+    if (
+      typeof strategy.cachePrefix === "string" &&
+      Array.isArray(strategy.fields)
+    ) {
+      for (const field of strategy.fields) {
+        const normalizedField = String(field || "").trim();
+        if (!normalizedField) {
+          continue;
+        }
+        targetSet.add(`${strategy.cachePrefix}_${normalizedField}`);
+      }
+    }
+  }
+
+  addKnownKindCacheTypes(targetSet, kind) {
+    if (!(targetSet instanceof Set) || !kind) {
+      return;
+    }
+
+    if (kind === "systemMessages") {
+      targetSet.add("system_message");
+      return;
+    }
+
+    if (kind === "systemCommands") {
+      targetSet.add("system_command");
+      return;
+    }
+
+    if (kind === "mapEvents") {
+      targetSet.add("text");
+      return;
+    }
+
+    if (
+      kind === "gameArrays" &&
+      this.panel &&
+      typeof this.panel.getGameArrayDefs === "function"
+    ) {
+      const defs = this.panel.getGameArrayDefs() || [];
+      for (const def of defs) {
+        const type = def?.type;
+        if (!type) {
+          continue;
+        }
+        targetSet.add(String(type).trim());
+      }
+    }
+  }
+
+  addCacheTypesFromRequestItems(targetSet, kind, request = {}) {
+    if (!(targetSet instanceof Set)) {
+      return;
+    }
+
+    if ((kind === "emptyStrings" || kind === "directItems") && Array.isArray(request.items)) {
+      this.addCacheTypesFromItems(targetSet, request.items);
+    }
+  }
+
+  addCacheTypesFromKindFallback(targetSet, request = {}, definition = null) {
+    if (!(targetSet instanceof Set)) {
+      return;
+    }
+
+    const kind = String(request?.kind || "").trim();
+    if (!kind) {
+      return;
+    }
+
+    if (
+      definition &&
+      typeof definition.cachePrefix === "string" &&
+      Array.isArray(definition.fields)
+    ) {
+      for (const field of definition.fields) {
+        const normalizedField = String(field || "").trim();
+        if (!normalizedField) {
+          continue;
+        }
+        targetSet.add(`${definition.cachePrefix}_${normalizedField}`);
+      }
+    }
+
+    this.addKnownKindCacheTypes(targetSet, kind);
+    this.addCacheTypesFromRequestItems(targetSet, kind, request);
   }
 
   getCurrentMapEntryIndex(queueEntries, currentMapId) {
@@ -166,7 +295,15 @@ export class TranslationBatchManager {
   }
 
   async runBatchedTranslation(items, options = {}) {
+    if (
+      this.panel &&
+      typeof this.panel.clearQueueCompletionScope === "function"
+    ) {
+      this.panel.clearQueueCompletionScope();
+    }
+
     const queueEntries = [];
+    const queueScopeCacheTypes = new Set();
     const safeRequests = Array.isArray(items) ? items : [];
     const hasOnlyKindRequests = safeRequests.every((item) => {
       return !!(
@@ -195,9 +332,24 @@ export class TranslationBatchManager {
           manager: this,
           panel: this.panel,
         })) || [];
+      this.addCacheTypesFromKindFallback(queueScopeCacheTypes, request, definition);
       const executionOptions = this.createExecutionOptions(request, options);
       for (const entry of entries) {
-        queueEntries.push({ ...entry, executionOptions });
+        this.addCacheTypesFromItems(queueScopeCacheTypes, entry?.items);
+        if (entry?.strategy) {
+          this.addCacheTypesFromStrategy(
+            queueScopeCacheTypes,
+            entry.strategy,
+            request,
+          );
+        }
+
+        queueEntries.push({
+          ...entry,
+          kind: request.kind,
+          definition,
+          executionOptions,
+        });
       }
     }
 
@@ -536,6 +688,13 @@ export class TranslationBatchManager {
       };
     }
 
+    if (
+      this.panel &&
+      typeof this.panel.startQueueCompletionScope === "function"
+    ) {
+      this.panel.startQueueCompletionScope(Array.from(queueScopeCacheTypes));
+    }
+
     this.progressTracker.beginQueue();
     try {
       while (safeQueueEntries.length > 0) {
@@ -614,6 +773,12 @@ export class TranslationBatchManager {
       }
     } finally {
       this.progressTracker.endQueue();
+      if (
+        this.panel &&
+        typeof this.panel.clearQueueCompletionScope === "function"
+      ) {
+        this.panel.clearQueueCompletionScope();
+      }
     }
 
     if (
