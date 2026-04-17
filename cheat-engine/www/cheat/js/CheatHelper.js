@@ -6,48 +6,6 @@ import { OBJECT_TRANSLATION_SERVICE } from '../panels/translate-on-the-fly/Objec
 import { ensureTranslationRuntime } from '../panels/translate-on-the-fly/TranslationRuntime.js';
 
 export class GeneralCheat {
-    // static saveCheatSettings () {
-    //     const saveData = {
-    //         godMode: {
-    //             actorIds: this.getGodModeOnActorIds()
-    //         },
-    //     }
-    //
-    //     localStorage.setItem('cheat.settings.general', JSON.stringify(saveData))
-    // }
-    //
-    // static initializeCheatSettings () {
-    //     if (this.initialized) {
-    //         return
-    //     }
-    //
-    //     // load save data from localStorage
-    //     let saveData = localStorage.getItem('cheat.settings.general')
-    //
-    //     if (!saveData) {
-    //         this.initialized = true
-    //         return
-    //     }
-    //
-    //     saveData = JSON.parse(saveData)
-    //     console.log(saveData)
-    //
-    //     // godMode
-    //     if (saveData.godMode) {
-    //         const godModeData = saveData.godMode
-    //         // actors
-    //         if (godModeData.actorIds) {
-    //             for (const actorId of godModeData.actorIds) {
-    //                 console.log('god mode on', actorId, $gameActors.actor(actorId))
-    //                 this.godModeOn($gameActors.actor(actorId))
-    //             }
-    //         }
-    //     }
-    //
-    //     this.initialized = true
-    // }
-
-    // will be replaced from main component
     static toggleCheatModal(componentName = null) {}
 
     static openCheatModal(componentName = null) {}

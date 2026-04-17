@@ -10,6 +10,14 @@ import { computeLangPairCompletionByKeyLength } from "../js/TranslationCompletio
 import { ConfirmDialog } from "../js/DialogHelper.js";
 import { ensureTranslationRuntime } from "./translate-on-the-fly/TranslationRuntime.js";
 
+const cacheManagerTableStateMemory = {
+  sortBy: "seenSort",
+  sortDesc: true,
+  page: 1,
+  searchInput: "",
+  selectedTypeFilter: "",
+};
+
 export default {
   name: "TranslateCacheManagerPanel",
 
@@ -475,54 +483,34 @@ export default {
     },
 
     loadTableState() {
-      try {
-        const raw = localStorage.getItem(
-          "cheat.translateCacheManager.tableState",
+      const state = cacheManagerTableStateMemory;
+      if (typeof state.sortBy === "string" && state.sortBy.trim() !== "") {
+        this.sortBy = state.sortBy;
+      }
+      if (typeof state.sortDesc === "boolean") {
+        this.sortDesc = state.sortDesc;
+      }
+      if (Number.isFinite(Number(state.page)) && Number(state.page) > 0) {
+        this.page = Number(state.page);
+      }
+      if (typeof state.searchInput === "string") {
+        this.searchInput = state.searchInput;
+        this.search = state.searchInput;
+      }
+      if (typeof state.selectedTypeFilter === "string") {
+        this.selectedTypeFilter = this.normalizeTypeFilterValue(
+          state.selectedTypeFilter,
         );
-        if (!raw) {
-          return;
-        }
-
-        const parsed = JSON.parse(raw);
-        if (typeof parsed.sortBy === "string" && parsed.sortBy.trim() !== "") {
-          this.sortBy = parsed.sortBy;
-        }
-        if (typeof parsed.sortDesc === "boolean") {
-          this.sortDesc = parsed.sortDesc;
-        }
-        if (Number.isFinite(Number(parsed.page)) && Number(parsed.page) > 0) {
-          this.page = Number(parsed.page);
-        }
-        if (typeof parsed.searchInput === "string") {
-          this.searchInput = parsed.searchInput;
-          this.search = parsed.searchInput;
-        }
-        if (typeof parsed.selectedTypeFilter === "string") {
-          this.selectedTypeFilter = this.normalizeTypeFilterValue(
-            parsed.selectedTypeFilter,
-          );
-        }
-      } catch (error) {
-        // Ignore malformed state and keep defaults.
       }
     },
 
     saveTableState() {
-      try {
-        const payload = {
-          sortBy: this.sortBy,
-          sortDesc: !!this.sortDesc,
-          page: this.page,
-          searchInput: this.searchInput,
-          selectedTypeFilter: this.selectedTypeFilter,
-        };
-        localStorage.setItem(
-          "cheat.translateCacheManager.tableState",
-          JSON.stringify(payload),
-        );
-      } catch (error) {
-        // Ignore persistence failures.
-      }
+      cacheManagerTableStateMemory.sortBy = this.sortBy;
+      cacheManagerTableStateMemory.sortDesc = !!this.sortDesc;
+      cacheManagerTableStateMemory.page = this.page;
+      cacheManagerTableStateMemory.searchInput = this.searchInput;
+      cacheManagerTableStateMemory.selectedTypeFilter =
+        this.selectedTypeFilter;
     },
 
     flushPendingCacheEdits(reason = "unknown") {

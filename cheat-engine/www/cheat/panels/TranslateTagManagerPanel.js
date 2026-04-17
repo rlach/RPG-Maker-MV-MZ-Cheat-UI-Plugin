@@ -2,8 +2,15 @@ import { getRowsPerPage, setRowsPerPage } from "../js/TableSettings.js";
 import { ensureTranslationRuntime } from "./translate-on-the-fly/TranslationRuntime.js";
 import { TAG_CONFIGS } from "../translate-engines/ai-engine/constants.js";
 
-const TABLE_STATE_KEY = "cheat.translateTagManager.tableState";
-const UNKNOWN_TAGS_STORAGE_KEY = "cheat.unknownTagsScan";
+const tagManagerTableStateMemory = {
+  sortBy: "description",
+  sortDesc: false,
+  page: 1,
+  searchInput: "",
+  selectedTypeFilter: "",
+};
+
+let unknownTagsMemory = [];
 
 export default {
   name: "TranslateTagManagerPanel",
@@ -477,28 +484,31 @@ export default {
     },
 
     loadTableState() {
-      try {
-        const raw = localStorage.getItem(TABLE_STATE_KEY);
-        if (!raw) return;
-        const parsed = JSON.parse(raw);
-        if (typeof parsed.sortBy === "string" && parsed.sortBy.trim()) this.sortBy = parsed.sortBy;
-        if (typeof parsed.sortDesc === "boolean") this.sortDesc = parsed.sortDesc;
-        if (Number.isFinite(Number(parsed.page)) && Number(parsed.page) > 0) this.page = Number(parsed.page);
-        if (typeof parsed.searchInput === "string") { this.searchInput = parsed.searchInput; this.search = parsed.searchInput; }
-        if (typeof parsed.selectedTypeFilter === "string") this.selectedTypeFilter = parsed.selectedTypeFilter;
-      } catch (_) { /* ignore */ }
+      const state = tagManagerTableStateMemory;
+      if (typeof state.sortBy === "string" && state.sortBy.trim()) {
+        this.sortBy = state.sortBy;
+      }
+      if (typeof state.sortDesc === "boolean") {
+        this.sortDesc = state.sortDesc;
+      }
+      if (Number.isFinite(Number(state.page)) && Number(state.page) > 0) {
+        this.page = Number(state.page);
+      }
+      if (typeof state.searchInput === "string") {
+        this.searchInput = state.searchInput;
+        this.search = state.searchInput;
+      }
+      if (typeof state.selectedTypeFilter === "string") {
+        this.selectedTypeFilter = state.selectedTypeFilter;
+      }
     },
 
     saveTableState() {
-      try {
-        localStorage.setItem(TABLE_STATE_KEY, JSON.stringify({
-          sortBy: this.sortBy,
-          sortDesc: !!this.sortDesc,
-          page: this.page,
-          searchInput: this.searchInput,
-          selectedTypeFilter: this.selectedTypeFilter,
-        }));
-      } catch (_) { /* ignore */ }
+      tagManagerTableStateMemory.sortBy = this.sortBy;
+      tagManagerTableStateMemory.sortDesc = !!this.sortDesc;
+      tagManagerTableStateMemory.page = this.page;
+      tagManagerTableStateMemory.searchInput = this.searchInput;
+      tagManagerTableStateMemory.selectedTypeFilter = this.selectedTypeFilter;
     },
 
     // ---- Custom Tag CRUD ----
@@ -579,20 +589,15 @@ export default {
     },
 
     loadUnknownTagsFromStorage() {
-      try {
-        const raw = localStorage.getItem(UNKNOWN_TAGS_STORAGE_KEY);
-        if (!raw) return [];
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch (_) {
-        return [];
-      }
+      return Array.isArray(unknownTagsMemory)
+        ? unknownTagsMemory.map((item) => ({ ...item }))
+        : [];
     },
 
     saveUnknownTagsToStorage(list) {
-      try {
-        localStorage.setItem(UNKNOWN_TAGS_STORAGE_KEY, JSON.stringify(list));
-      } catch (_) { /* ignore */ }
+      unknownTagsMemory = Array.isArray(list)
+        ? list.map((item) => ({ ...item }))
+        : [];
     },
 
     scanCacheForUnknownTags() {
