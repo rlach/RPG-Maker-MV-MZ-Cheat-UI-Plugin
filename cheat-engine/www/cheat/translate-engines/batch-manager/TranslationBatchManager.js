@@ -55,6 +55,14 @@ export class TranslationBatchManager {
     });
   }
 
+  isQueueAbortRequested() {
+    return !!(
+      this.panel &&
+      typeof this.panel.isBatchQueueAbortRequested === "function" &&
+      this.panel.isBatchQueueAbortRequested()
+    );
+  }
+
   countBatchRequestedChars(batchItems) {
     if (!Array.isArray(batchItems)) {
       return 0;
@@ -444,6 +452,40 @@ export class TranslationBatchManager {
       let interruptedForCurrentMap = false;
 
       for (let i = 0; i < batches.length; i++) {
+        if (this.isQueueAbortRequested()) {
+          const skippedFailures = [];
+          for (let r = i; r < batches.length; r++) {
+            for (const skippedItem of batches[r]) {
+              const skippedFailure = {
+                ...skippedItem,
+                rejectReason: "request_aborted",
+                cancelReason: "request_aborted",
+              };
+              allFailures.push(skippedFailure);
+              skippedFailures.push(skippedFailure);
+              this.errorRecovery.recordFailure(skippedFailure);
+            }
+          }
+
+          if (skippedFailures.length > 0) {
+            this.applyBatchTranslationResults([], skippedFailures);
+            phaseFailures += skippedFailures.length;
+            this.progressTracker.addTotalErrors(skippedFailures.length);
+          }
+
+          processed = safeItems.length;
+          this.progressTracker.updateStep(
+            `${translationPhaseLabel} (aborted)`,
+            processed,
+            safeItems.length,
+          );
+          this.progressTracker.updateCurrentStepErrors(
+            phaseFailures,
+            processed,
+          );
+          break;
+        }
+
         if (
           !!entryOptions.allowCurrentMapMidPhaseSwitch &&
           typeof entryOptions.shouldInterruptForCurrentMap === "function" &&
@@ -703,6 +745,10 @@ export class TranslationBatchManager {
     this.progressTracker.beginQueue();
     try {
       while (safeQueueEntries.length > 0) {
+        if (this.isQueueAbortRequested()) {
+          break;
+        }
+
         const currentMapId =
           typeof this.panel.getCurrentMapIdForPhasePriority === "function"
             ? this.panel.getCurrentMapIdForPhasePriority()
@@ -769,6 +815,10 @@ export class TranslationBatchManager {
           aggregatedFailures.push(failure);
         }
         mergeStats(translated.stats);
+
+        if (this.isQueueAbortRequested()) {
+          break;
+        }
 
         if (translated && translated.interruptedForCurrentMap) {
           continue;

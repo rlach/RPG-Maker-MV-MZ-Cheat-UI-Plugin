@@ -56,8 +56,10 @@ export const translateOnTheFlyUiMethods = {
       const style = existingStyle || hostDoc.createElement("style");
       style.id = "tof-progress-box-style";
       style.textContent = [
-        "#tof-progress-box { position: fixed; right: 12px; bottom: 72px; padding: 8px 12px; display: none; background: rgba(50, 50, 50, 0.75); border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); pointer-events: auto; z-index: 9998; font-family: Arial, sans-serif; text-align: right; cursor: move; user-select: none; }",
+        "#tof-progress-box { position: fixed; right: 12px; bottom: 72px; padding: 8px 24px 8px 12px; display: none; background: rgba(50, 50, 50, 0.75); border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); pointer-events: auto; z-index: 9998; font-family: Arial, sans-serif; text-align: right; cursor: move; user-select: none; }",
         "#tof-progress-box.tof-dragging { box-shadow: 0 6px 18px rgba(0,0,0,0.4); }",
+        "#tof-progress-box .tof-progress-close-btn { position: absolute; right: 6px; top: 4px; width: 14px; height: 14px; line-height: 12px; border: 0; border-radius: 3px; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.82); font-size: 11px; padding: 0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }",
+        "#tof-progress-box .tof-progress-close-btn:hover { background: rgba(255,255,255,0.2); color: rgba(255,255,255,1); }",
         "#tof-progress-box .tof-progress-line { color: #fff; font-size: 12px; line-height: 1.5; margin: 1px 0; white-space: nowrap; }",
         "#tof-progress-box .tof-progress-line.map-progress { font-weight: bold; color: #82d4f8; }",
         "#tof-progress-box .tof-progress-line.message-progress { color: #ccc; }",
@@ -76,11 +78,36 @@ export const translateOnTheFlyUiMethods = {
       const el = existingEl || hostDoc.createElement("div");
       el.id = "tof-progress-box";
       el.innerHTML =
-        '<div class="tof-progress-line map-progress" id="tof-map-progress"></div><div class="tof-progress-line message-progress" id="tof-message-progress"></div><div class="tof-progress-line total-completion-progress" id="tof-total-completion-progress"></div><div class="tof-progress-line current-errors-progress" id="tof-current-errors-progress"></div><div class="tof-progress-line total-errors-progress" id="tof-total-errors-progress"></div>';
+        '<button type="button" class="tof-progress-close-btn" id="tof-progress-close-btn" title="Abort queue">x</button><div class="tof-progress-line map-progress" id="tof-map-progress"></div><div class="tof-progress-line message-progress" id="tof-message-progress"></div><div class="tof-progress-line total-completion-progress" id="tof-total-completion-progress"></div><div class="tof-progress-line current-errors-progress" id="tof-current-errors-progress"></div><div class="tof-progress-line total-errors-progress" id="tof-total-errors-progress"></div>';
       if (!existingEl) {
         hostDoc.body.appendChild(el);
       }
       this._progressBoxEl = el;
+    }
+
+    if (!this._progressCloseBtnBound && this._progressBoxEl) {
+      const closeBtn = this._progressBoxEl.querySelector("#tof-progress-close-btn");
+      if (closeBtn) {
+        const stopDragPropagation = (event) => {
+          if (event) {
+            event.stopPropagation();
+          }
+        };
+        const onCloseClick = (event) => {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          if (typeof this.requestBatchQueueAbort === "function") {
+            this.requestBatchQueueAbort();
+          }
+        };
+
+        closeBtn.addEventListener("mousedown", stopDragPropagation);
+        closeBtn.addEventListener("mouseup", stopDragPropagation);
+        closeBtn.addEventListener("click", onCloseClick);
+        this._progressCloseBtnBound = true;
+      }
     }
 
     this.ensureProgressBoxDraggable(this._progressBoxEl, hostDoc);

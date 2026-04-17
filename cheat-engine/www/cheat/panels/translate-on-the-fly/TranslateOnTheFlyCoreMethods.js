@@ -6,6 +6,36 @@ import { createTranslationBatchManager } from '../../translate-engines/batch-man
 import { DATA_CONTAINER_TRANSLATION_DEFINITIONS } from '../../translate-engines/translation-phases/DataContainerDefinitions.js';
 
 export const translateOnTheFlyCoreMethods = {
+    isBatchQueueAbortRequested() {
+        return !!this._batchQueueAbortRequested;
+    },
+
+    clearBatchQueueAbortRequest() {
+        this._batchQueueAbortRequested = false;
+    },
+
+    requestBatchQueueAbort() {
+        if (!this.isNonOtfTranslationProcessActive()) {
+            return false;
+        }
+
+        this._batchQueueAbortRequested = true;
+        let cancelled = false;
+        if (this.engine && typeof this.engine.cancelActiveRequest === 'function') {
+            cancelled = this.engine.cancelActiveRequest('request_aborted');
+        } else if (
+            this.engine &&
+            typeof this.engine.cancelActiveBackgroundRequest === 'function'
+        ) {
+            cancelled = this.engine.cancelActiveBackgroundRequest();
+        }
+
+        console.log(
+            `[TranslateOnTheFly] Queue abort requested by user (${cancelled ? 'active request cancelled' : 'no active request'})`
+        );
+        return true;
+    },
+
     isTranslationEnabled() {
         const stateEnabled = TranslateOnTheFlyState.isEnabled();
         const localEnabled = this.enabled;
@@ -51,10 +81,12 @@ export const translateOnTheFlyCoreMethods = {
             label,
             startedAt: Date.now(),
         };
+        this.clearBatchQueueAbortRequest();
         return true;
     },
 
     endNonOtfTranslationProcess() {
+        this.clearBatchQueueAbortRequest();
         this.nonOtfTranslationProcess = {
             active: false,
             label: '',
