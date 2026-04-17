@@ -269,6 +269,10 @@ export default {
                     pattern: '^([^：]+)：\n',
                     example: 'Char Name：\\nThe text being spoken.',
                 },
+                {
+                    pattern: '^「([^」]+)」\n',
+                    example: '「Char Name」\\nThe text being spoken.',
+                },
             ],
             tableHeaders: [
                 {
