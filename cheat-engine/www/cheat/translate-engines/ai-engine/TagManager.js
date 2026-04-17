@@ -4,7 +4,13 @@
  * Handles preprocessing \V[5] -> [b=xy5] and postprocessing [b=xy5] -> \V[5]
  */
 
-import { TAG_BRACKET, TAG_CONFIGS, TAG_STYLE, TAG_TYPE } from './constants.js';
+import {
+    LLM_MAX_CONSECUTIVE_IDENTICAL_CHARS,
+    TAG_BRACKET,
+    TAG_CONFIGS,
+    TAG_STYLE,
+    TAG_TYPE,
+} from './constants.js';
 
 const BRACKET_CLOSE_BY_OPEN = Object.freeze({
     [TAG_BRACKET.ANGLE]: '>',
@@ -15,6 +21,7 @@ const BRACKET_CLOSE_BY_OPEN = Object.freeze({
 
 const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 const ESCAPE_PREFIX_PATTERN = '(?:\\\\|\\u001b)';
+const SPACE_RUN_TRIGGER_THRESHOLD = LLM_MAX_CONSECUTIVE_IDENTICAL_CHARS + 1;
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -73,6 +80,23 @@ export class TagManager {
             addSpace: false,
             prePattern: /\n/g,
             postPattern: new RegExp(`\\[b=${simpleNId}\\]`, 'g'),
+        };
+
+        const spaceRunId = this.generateUniqueTagId(
+            {
+                description: 'spaceRun',
+            },
+            usedTagIds
+        );
+        usedTagIds.add(spaceRunId);
+
+        this.spaceRunEntry = {
+            key: 'spaceRun',
+            description: 'spaceRun',
+            tagId: spaceRunId,
+            requiredConsistency: true,
+            prePattern: new RegExp(` {${SPACE_RUN_TRIGGER_THRESHOLD},}`, 'g'),
+            postPattern: new RegExp(`\\[b=${spaceRunId}(\\d+)\\]`, 'gi'),
         };
     }
 
@@ -328,6 +352,15 @@ export class TagManager {
         tagCounts[this.simpleNEntry.key] = newlineMatches.length;
         result = result.replace(this.simpleNEntry.prePattern, `[b=${this.simpleNEntry.tagId}]`);
 
+        const expectedSpaceRunLengths = [];
+        const spaceRunMatches = result.match(this.spaceRunEntry.prePattern) || [];
+        tagCounts[this.spaceRunEntry.key] = spaceRunMatches.length;
+        result = result.replace(this.spaceRunEntry.prePattern, (spaces) => {
+            expectedSpaceRunLengths.push(spaces.length);
+            return `[b=${this.spaceRunEntry.tagId}${spaces.length}]`;
+        });
+        caseMap.expectedSpaceRunLengths = expectedSpaceRunLengths;
+
         return { preprocessedText: result, tagCounts, caseMap };
     }
 
@@ -422,6 +455,21 @@ export class TagManager {
         actualCounts[this.simpleNEntry.key] = simpleNMatches.length;
         result = result.replace(this.simpleNEntry.postPattern, () => '\n');
 
+        const expectedSpaceRunLengths = (caseMap && caseMap.expectedSpaceRunLengths) || [];
+        const actualSpaceRunLengths = [];
+        const spaceRunMatches = result.match(this.spaceRunEntry.postPattern) || [];
+        actualCounts[this.spaceRunEntry.key] = spaceRunMatches.length;
+        result = result.replace(this.spaceRunEntry.postPattern, (match, runLengthText) => {
+            const runLength = Number(runLengthText);
+            actualSpaceRunLengths.push(runLength);
+
+            if (!Number.isSafeInteger(runLength) || runLength < 0) {
+                return match;
+            }
+
+            return ' '.repeat(runLength);
+        });
+
         const originalHadClosingBTag = !!(caseMap && caseMap.hasLiteralClosingBTag);
         if (!originalHadClosingBTag && /\[\/b\]/i.test(result)) {
             result = result.replace(/\[\/b\]/gi, '');
@@ -470,6 +518,16 @@ export class TagManager {
             valid = false;
         }
 
+        const spaceRunsValid =
+            expectedSpaceRunLengths.length === actualSpaceRunLengths.length &&
+            expectedSpaceRunLengths.every((length, index) => {
+                return actualSpaceRunLengths[index] === length;
+            });
+
+        if (!spaceRunsValid) {
+            valid = false;
+        }
+
         if (!valid) {
             const differences = {};
             const allKeys = new Set([
@@ -492,6 +550,8 @@ export class TagManager {
 
             console.warn('[TagManager] Tag count mismatch:', {
                 differences,
+                expectedSpaceRunLengths,
+                actualSpaceRunLengths,
             });
         }
 
