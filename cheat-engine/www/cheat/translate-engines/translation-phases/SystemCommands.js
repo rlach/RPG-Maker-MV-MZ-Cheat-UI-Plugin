@@ -64,13 +64,8 @@ export class SystemCommands extends BasePhase {
       return [];
     }
 
-    const hasCommandsOriginal = !!$dataSystem.terms.commandsOriginal;
-    const sourceCommands = hasCommandsOriginal
-      ? $dataSystem.terms.commandsOriginal
-      : $dataSystem.terms.commands;
-    if (!hasCommandsOriginal) {
-      $dataSystem.terms.commandsOriginal = [...$dataSystem.terms.commands];
-    }
+    const sourceCommands =
+      $dataSystem.terms.commandsOriginal || $dataSystem.terms.commands;
 
     const pending = [];
     for (let i = 0; i < sourceCommands.length; i++) {
@@ -96,20 +91,5 @@ export class SystemCommands extends BasePhase {
 
   setData({ panel, successes, failures, pendingItems }) {
     super.setData({ panel, successes, failures });
-
-    const pendingByCacheKey = new Map(
-      (pendingItems || []).map((item) => [item.cacheKey, item]),
-    );
-
-    for (const success of successes || []) {
-      if (!success || !success.cacheKey) {
-        continue;
-      }
-
-      const origin = pendingByCacheKey.get(success.cacheKey);
-      if (origin && $dataSystem.terms.commands[origin.index] !== undefined) {
-        $dataSystem.terms.commands[origin.index] = success.translated;
-      }
-    }
   }
 }

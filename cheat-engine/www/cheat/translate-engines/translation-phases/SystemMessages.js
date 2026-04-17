@@ -2,6 +2,7 @@ import { BasePhase } from "./BasePhase.js";
 import {
   getSystemMessageCacheKey,
   getSystemMessagesSource,
+  isCommandCacheSystemMessageKey,
 } from "./SystemMessageCacheRules.js";
 
 export class SystemMessages extends BasePhase {
@@ -135,6 +136,10 @@ export class SystemMessages extends BasePhase {
         continue;
       }
 
+      if (isCommandCacheSystemMessageKey(messageKey)) {
+        continue;
+      }
+
       if (
         $dataSystem.terms.messages &&
         Object.prototype.hasOwnProperty.call(
@@ -168,6 +173,11 @@ export class SystemMessages extends BasePhase {
 
     for (const key of Object.keys(sourceMessages || {})) {
       const sourceValue = sourceMessages[key];
+
+      if (isCommandCacheSystemMessageKey(key)) {
+        continue;
+      }
+
       const cacheKey = this.getPrimaryCacheKey(panel, key, sourceValue);
       if (!cacheKey || !panel.hasUsableCacheValue(cacheKey)) {
         continue;

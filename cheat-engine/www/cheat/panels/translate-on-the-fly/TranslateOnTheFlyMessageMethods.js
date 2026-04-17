@@ -201,10 +201,16 @@ export const translateOnTheFlyMessageMethods = {
                 return commandName;
             }
 
-            const commandKey = this.getCacheKey(cleanName, 'command');
+            const sourceName =
+                typeof this.getCanonicalSystemCommandName === 'function'
+                    ? this.getCanonicalSystemCommandName(cleanName)
+                    : cleanName;
+
+            const commandKey = this.getCacheKey(sourceName, 'command');
 
             // Check cache first
             if (this.hasUsableCacheValue(commandKey)) {
+                this.trackCacheKeyUsage(commandKey, { harvestMissing: false });
                 return this.translationCache.get(commandKey);
             }
 
@@ -223,7 +229,7 @@ export const translateOnTheFlyMessageMethods = {
                         {
                             type: 'command',
                             id: 'cmd_0',
-                            value: cleanName,
+                            value: sourceName,
                             cacheKey: commandKey,
                         },
                     ],
@@ -244,7 +250,7 @@ export const translateOnTheFlyMessageMethods = {
             if (result.failures.length > 0) {
                 console.warn(
                     '[TranslateOnTheFly] Failed to translate command:',
-                    cleanName,
+                    sourceName,
                     '→',
                     result.failures[0].rejectReason
                 );

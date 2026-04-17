@@ -108,9 +108,14 @@ export const translateOnTheFlyRuntimeMethods = {
                 return name;
             }
 
-            const commandKey = self.getCacheKey(name, 'command');
+            const canonicalName =
+                typeof self.getCanonicalSystemCommandName === 'function'
+                    ? self.getCanonicalSystemCommandName(name)
+                    : name;
+            const commandKey = self.getCacheKey(canonicalName, 'command');
 
             if (self.hasUsableCacheValue(commandKey)) {
+                self.trackCacheKeyUsage(commandKey, { harvestMissing: false });
                 return self.translationCache.get(commandKey);
             }
 
@@ -930,8 +935,7 @@ export const translateOnTheFlyRuntimeMethods = {
                 !self._systemCommandsCollected &&
                 $dataSystem &&
                 $dataSystem.terms &&
-                $dataSystem.terms.commands &&
-                !$dataSystem.terms.commandsOriginal
+                $dataSystem.terms.commands
             ) {
                 const systemCommands = $dataSystem.terms.commands.filter((cmd) => !!cmd);
                 for (const cmdName of systemCommands) {
@@ -956,35 +960,47 @@ export const translateOnTheFlyRuntimeMethods = {
             // Restore normal mode
             this._collectingCommands = false;
 
-            const commandsToTranslate = this._collectedCommands.filter((cmd) => {
-                // Skip choices - they are already translated during event processing
-                if (cmd.symbol === 'choice') {
-                    return false;
-                }
+            const commandsToTranslate = this._collectedCommands
+                .map((cmd) => {
+                    if (!cmd || cmd.symbol === 'choice') {
+                        return null;
+                    }
 
-                if (!cmd.name || typeof cmd.name !== 'string' || cmd.name.trim() === '') {
-                    return false;
-                }
+                    if (!cmd.name || typeof cmd.name !== 'string' || cmd.name.trim() === '') {
+                        return null;
+                    }
 
-                if (
-                    $dataSystem?.terms?.commandsOriginal &&
-                    $dataSystem.terms.commands.includes(cmd.name)
-                ) {
-                    // This is a system command already translated once - skip
-                    return false;
-                }
+                    const canonicalName =
+                        typeof self.getCanonicalSystemCommandName === 'function'
+                            ? self.getCanonicalSystemCommandName(cmd.name)
+                            : cmd.name;
+                    const cacheKey = self.getCacheKey(canonicalName, 'command');
 
-                const commandKey = self.getCacheKey(cmd.name, 'command');
-                // Only translate if not cached
-                return !self.hasUsableCacheValue(commandKey);
-            });
+                    return {
+                        ...cmd,
+                        sourceName: canonicalName,
+                        cacheKey,
+                    };
+                })
+                .filter((cmd) => {
+                    if (!cmd) {
+                        return false;
+                    }
+
+                    if (self.hasUsableCacheValue(cmd.cacheKey)) {
+                        self.trackCacheKeyUsage(cmd.cacheKey, { harvestMissing: false });
+                        return false;
+                    }
+
+                    return true;
+                });
 
             if (commandsToTranslate.length > 0) {
                 const items = commandsToTranslate.map((cmd, i) => ({
                     type: 'command',
                     id: `cmd_${i}`,
-                    value: cmd.name,
-                    cacheKey: self.getCacheKey(cmd.name, 'command'),
+                    value: cmd.sourceName,
+                    cacheKey: cmd.cacheKey,
                 }));
 
                 const harvestOnly =
@@ -1062,8 +1078,13 @@ export const translateOnTheFlyRuntimeMethods = {
                 let finalName = cmd.name;
 
                 if (cmd.name && typeof cmd.name === 'string' && cmd.name.trim() !== '') {
-                    const commandKey = self.getCacheKey(cmd.name, 'command');
+                    const canonicalName =
+                        typeof self.getCanonicalSystemCommandName === 'function'
+                            ? self.getCanonicalSystemCommandName(cmd.name)
+                            : cmd.name;
+                    const commandKey = self.getCacheKey(canonicalName, 'command');
                     if (self.hasUsableCacheValue(commandKey)) {
+                        self.trackCacheKeyUsage(commandKey, { harvestMissing: false });
                         finalName = self.translationCache.get(commandKey);
                     }
                 }

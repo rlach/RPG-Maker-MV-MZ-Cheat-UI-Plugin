@@ -19,10 +19,9 @@ export class CacheEmptyStrings extends BasePhase {
 
   collectUntranslated({ panel } = {}) {
     if (
-      !panel ||
-      !panel.translationCache ||
-      !panel.sourceLang ||
-      !panel.targetLang
+      !panel?.translationCache ||
+      !panel?.sourceLang ||
+      !panel?.targetLang
     ) {
       return [];
     }
@@ -75,20 +74,33 @@ export class CacheEmptyStrings extends BasePhase {
 
   async createEntries({ request }) {
     const repeatUntilSuccess = !!request.repeatUntilSuccess;
-    const self = this;
+    const dryRun = !!request.dryRun;
+    const countUntranslated = (panel) =>
+      this.collectUntranslated({ panel }).length;
 
     return [
       {
         priorityMapId: 0,
         strategy: this,
-        shouldRepeat(result, { panel }) {
+        shouldRepeat(result, { panel, executionOptions } = {}) {
           if (!repeatUntilSuccess) {
             return false;
           }
-          if ((result.successes || []).length === 0) {
+
+          const isDryRun = !!executionOptions?.dryRun;
+          if (dryRun || isDryRun) {
             return false;
           }
-          return self.collectUntranslated({ panel }).length > 0;
+
+          const failures = Array.isArray(result?.failures) ? result.failures : [];
+          if (
+            failures.length > 0 &&
+            failures.every((failure) => failure?.rejectReason === "dry_run")
+          ) {
+            return false;
+          }
+
+          return countUntranslated(panel) > 0;
         },
       },
     ];

@@ -84,6 +84,49 @@ export const translateOnTheFlyCoreMethods = {
         return `${cacheType}:${this.sourceLang}-${this.targetLang}-${text}`;
     },
 
+    getCanonicalSystemCommandName(commandName) {
+        let normalizedName = '';
+        if (typeof commandName === 'string') {
+            normalizedName = commandName.trim();
+        } else if (commandName !== null && commandName !== undefined) {
+            normalizedName = String(commandName).trim();
+        }
+
+        if (!normalizedName) {
+            return normalizedName;
+        }
+
+        const terms = window.$dataSystem?.terms;
+        const originalCommands = Array.isArray(terms?.commandsOriginal)
+            ? terms.commandsOriginal
+            : null;
+        if (!originalCommands) {
+            return normalizedName;
+        }
+
+        const currentCommands = Array.isArray(terms?.commands) ? terms.commands : [];
+
+        for (let i = 0; i < originalCommands.length; i++) {
+            const originalValue =
+                typeof originalCommands[i] === 'string' ? originalCommands[i].trim() : '';
+            if (!originalValue) {
+                continue;
+            }
+
+            if (normalizedName === originalValue) {
+                return originalValue;
+            }
+
+            const currentValue =
+                typeof currentCommands[i] === 'string' ? currentCommands[i].trim() : '';
+            if (currentValue && normalizedName === currentValue) {
+                return originalValue;
+            }
+        }
+
+        return normalizedName;
+    },
+
     setCacheValue(key, value, options = {}) {
         const normalizedValue =
             typeof value === 'string'

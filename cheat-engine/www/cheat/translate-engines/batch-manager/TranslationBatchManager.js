@@ -776,7 +776,10 @@ export class TranslationBatchManager {
 
         if (
           typeof entry.shouldRepeat === "function" &&
-          entry.shouldRepeat(translated, { panel: this.panel })
+          entry.shouldRepeat(translated, {
+            panel: this.panel,
+            executionOptions: entry.executionOptions || {},
+          })
         ) {
           continue;
         }
