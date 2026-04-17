@@ -471,9 +471,27 @@ export class TagManager {
         }
 
         if (!valid) {
+            const differences = {};
+            const allKeys = new Set([
+                ...Object.keys(tagCounts || {}),
+                ...Object.keys(actualCounts || {}),
+            ]);
+
+            for (const key of allKeys) {
+                const expected = Number((tagCounts && tagCounts[key]) || 0);
+                const got = Number((actualCounts && actualCounts[key]) || 0);
+                if (expected === got) {
+                    continue;
+                }
+
+                differences[key] = {
+                    expected,
+                    got,
+                };
+            }
+
             console.warn('[TagManager] Tag count mismatch:', {
-                expected: tagCounts,
-                actual: actualCounts,
+                differences,
             });
         }
 
