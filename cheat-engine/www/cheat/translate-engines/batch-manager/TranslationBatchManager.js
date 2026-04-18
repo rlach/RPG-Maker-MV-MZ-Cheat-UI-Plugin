@@ -179,6 +179,11 @@ export class TranslationBatchManager {
         targetSet.add(String(type).trim());
       }
     }
+
+    if (kind === "variables") {
+      targetSet.add("variable_value");
+    }
+
   }
 
   addCacheTypesFromRequestItems(targetSet, kind, request = {}) {

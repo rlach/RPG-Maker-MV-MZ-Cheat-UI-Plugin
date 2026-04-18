@@ -254,6 +254,7 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
         aiCustomTagTypeOptions: [],
         aiCustomTagBracketOptions: [],
         aiCustomTagStyleOptions: [],
+        safeVariableTranslationIds: [],
         objectTranslationSelectedMapIds: null,
         objectTranslationTypeOrder: [],
         enabledPluginTranslators: {},

@@ -78,6 +78,15 @@ export const translateOnTheFlyRuntimeMethods = {
             }
         };
 
+        const shouldReturnTranslatedVariableValue = () => {
+            return (
+                self.isTranslationEnabled() ||
+                !!self.translateCacheWhenDisabled ||
+                (typeof self.isNonOtfTranslationProcessActive === 'function' &&
+                    self.isNonOtfTranslationProcessActive())
+            );
+        };
+
         const applyCurrentMapDisplayNameFromCache = () => {
             if (!window.$dataMap || typeof $dataMap !== 'object') {
                 return;
@@ -216,6 +225,47 @@ export const translateOnTheFlyRuntimeMethods = {
         Game_Message.prototype.clear = function () {
             Game_Message.prototype._translateOriginalClear.call(this);
             delete this._translateMessageOrigin;
+        };
+
+        if (!Game_Variables.prototype._translateOriginalValue) {
+            Game_Variables.prototype._translateOriginalValue = Game_Variables.prototype.value;
+        }
+
+        Game_Variables.prototype.value = function (variableId) {
+            const originalValue = Game_Variables.prototype._translateOriginalValue.call(
+                this,
+                variableId
+            );
+            const safeVariableId = Number(variableId) || 0;
+
+            if (
+                safeVariableId <= 0 ||
+                !shouldReturnTranslatedVariableValue() ||
+                !self.isVariableSafeForTranslation(safeVariableId) ||
+                typeof originalValue !== 'string' ||
+                originalValue.trim() === ''
+            ) {
+                return originalValue;
+            }
+
+            const cacheKey = self.getCacheKey(originalValue, 'variable_value');
+            if (self.hasUsableCacheValue(cacheKey)) {
+                if (typeof self.trackCacheKeyUsage === 'function') {
+                    self.trackCacheKeyUsage(cacheKey, { harvestMissing: false });
+                }
+
+                console.log('Original vs cached variable value for ID', variableId, {
+                    originalValue,
+                    cachedValue: self.translationCache.get(cacheKey),
+                });
+                return self.translationCache.get(cacheKey);
+            }
+
+            if (typeof self.trackCacheKeyUsage === 'function') {
+                self.trackCacheKeyUsage(cacheKey);
+            }
+
+            return originalValue;
         };
 
         if (shouldHookInterpreterCommands) {

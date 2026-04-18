@@ -10,6 +10,7 @@ import {
 const DEFAULT_OBJECT_TRANSLATION_TYPE_DEFS = Object.freeze([
     { id: 'mapEvents', label: 'Map events' },
     { id: 'commonEvents', label: 'CommonEvents' },
+    { id: 'variables', label: 'Variables (setup in variables panel)' },
     { id: 'items', label: 'items' },
     { id: 'skills', label: 'skills' },
     { id: 'classes', label: 'classes' },

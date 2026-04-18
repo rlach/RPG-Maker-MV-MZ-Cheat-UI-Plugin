@@ -190,6 +190,14 @@ export const translateOnTheFlyCoreMethods = {
         return path.join(parsed.dir, 'translate-cache');
     },
 
+    getVariableTranslationSettingsFilePath() {
+        const path = require('path');
+        return path.join(
+            this.getSplitCacheDirectoryPath(),
+            'variable-translation-settings.json'
+        );
+    },
+
     ensureSplitCacheDirectorySync() {
         const fs = this.getCacheFileSystem();
         const directoryPath = this.getSplitCacheDirectoryPath();
@@ -384,6 +392,110 @@ export const translateOnTheFlyCoreMethods = {
         return `${JSON.stringify(sorted, null, 2)}\n`;
     },
 
+    normalizeSafeVariableTranslationIds(ids) {
+        const safeIds = Array.isArray(ids) ? ids : [];
+        return Array.from(
+            new Set(
+                safeIds
+                    .map((id) => Number(id))
+                    .filter((id) => Number.isInteger(id) && id > 0)
+            )
+        ).sort((a, b) => a - b);
+    },
+
+    loadVariableTranslationSettingsFromDisk() {
+        const fs = this.getCacheFileSystem();
+        const filePath = this.getVariableTranslationSettingsFilePath();
+        this.safeVariableTranslationIds = [];
+        this.safeVariableTranslationIdSet = new Set();
+
+        if (!fs.existsSync(filePath)) {
+            return;
+        }
+
+        try {
+            const payload = this.readJsonFileSync(filePath);
+            const safeIds = this.normalizeSafeVariableTranslationIds(
+                payload && payload.safeVariableIds
+            );
+            this.safeVariableTranslationIds = safeIds;
+            this.safeVariableTranslationIdSet = new Set(safeIds);
+        } catch (error) {
+            console.warn(
+                '[TranslateOnTheFly] Failed to load variable translation settings',
+                error
+            );
+        }
+    },
+
+    persistVariableTranslationSettings() {
+        this.ensureSplitCacheDirectorySync();
+        this.writeJsonFileAtomicSync(this.getVariableTranslationSettingsFilePath(), {
+            safeVariableIds: this.getSafeVariableTranslationIds(),
+        });
+    },
+
+    getSafeVariableTranslationIds() {
+        if (!Array.isArray(this.safeVariableTranslationIds)) {
+            this.safeVariableTranslationIds = this.normalizeSafeVariableTranslationIds(
+                this.safeVariableTranslationIds
+            );
+        }
+
+        if (!(this.safeVariableTranslationIdSet instanceof Set)) {
+            this.safeVariableTranslationIdSet = new Set(this.safeVariableTranslationIds);
+        }
+
+        return this.safeVariableTranslationIds.slice();
+    },
+
+    isVariableSafeForTranslation(variableId) {
+        const safeId = Number(variableId) || 0;
+        if (safeId <= 0) {
+            return false;
+        }
+
+        this.getSafeVariableTranslationIds();
+        return this.safeVariableTranslationIdSet.has(safeId);
+    },
+
+    setVariableSafeForTranslation(variableId, enabled, options = {}) {
+        const safeId = Number(variableId) || 0;
+        if (safeId <= 0) {
+            return this.getSafeVariableTranslationIds();
+        }
+
+        const nextSet = new Set(this.getSafeVariableTranslationIds());
+        if (enabled) {
+            nextSet.add(safeId);
+        } else {
+            nextSet.delete(safeId);
+        }
+
+        const nextIds = this.normalizeSafeVariableTranslationIds(Array.from(nextSet));
+        this.safeVariableTranslationIds = nextIds;
+        this.safeVariableTranslationIdSet = new Set(nextIds);
+
+        if (!options || options.persist !== false) {
+            this.persistVariableTranslationSettings();
+        }
+
+        return nextIds.slice();
+    },
+
+    getRawGameVariableValue(variableId) {
+        const safeId = Number(variableId) || 0;
+        if (
+            safeId < 0 ||
+            !window.$gameVariables ||
+            !Array.isArray($gameVariables._data)
+        ) {
+            return 0;
+        }
+
+        return $gameVariables._data[safeId] ?? 0;
+    },
+
     rememberCacheBucketForKey(cacheKey, explicitBucketId = null) {
         if (!this.cacheBucketByCompositeKey) {
             this.cacheBucketByCompositeKey = new Map();
@@ -463,6 +575,7 @@ export const translateOnTheFlyCoreMethods = {
             this.translationCache.clear();
             this.cacheBucketByCompositeKey = new Map();
             this.loadSplitCacheFromDisk();
+            this.loadVariableTranslationSettingsFromDisk();
 
             this.notifyCacheRuntime('cache-loaded');
         } catch (error) {
@@ -471,6 +584,8 @@ export const translateOnTheFlyCoreMethods = {
             this.translationCache = runtime.cache;
             this.lastSeenByCacheKey = runtime.lastSeenByCacheKey;
             this.cacheBucketByCompositeKey = new Map();
+            this.safeVariableTranslationIds = [];
+            this.safeVariableTranslationIdSet = new Set();
             this.notifyCacheRuntime('cache-load-failed-reset');
         }
     },
