@@ -22,6 +22,7 @@ const BRACKET_CLOSE_BY_OPEN = Object.freeze({
 const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 const ESCAPE_PREFIX_PATTERN = '(?:\\\\|\\u001b)';
 const SPACE_RUN_TRIGGER_THRESHOLD = LLM_MAX_CONSECUTIVE_IDENTICAL_CHARS + 1;
+const ESCAPE_TAG_SYMBOL_START_CLASS = 'A-Za-z${}|.!><^';
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -451,6 +452,11 @@ export class TagManager {
             }
         }
 
+        // LLMs sometimes insert raw line wraps inside escape-command chains
+        // (e.g. "\\AA[FFF]\n\\FH[OFF]"). Remove only those literal wraps;
+        // intended newlines are still encoded as [b=..] at this stage.
+        result = this.repairLiteralLineWrapsAroundEscapeTags(result);
+
         const simpleNMatches = result.match(this.simpleNEntry.postPattern) || [];
         actualCounts[this.simpleNEntry.key] = simpleNMatches.length;
         result = result.replace(this.simpleNEntry.postPattern, () => '\n');
@@ -652,6 +658,28 @@ export class TagManager {
         }
 
         return { text: output, count };
+    }
+
+    repairLiteralLineWrapsAroundEscapeTags(text) {
+        if (typeof text !== 'string' || text.length === 0) {
+            return text;
+        }
+
+        // Case 1: line wrap between commands, e.g. "... ]\n\\FH[...]"
+        const newlineBeforeEscapeCommand = new RegExp(
+            `\\r?\\n(?=\\\\[${ESCAPE_TAG_SYMBOL_START_CLASS}])`,
+            'g'
+        );
+        let repaired = text.replace(newlineBeforeEscapeCommand, '');
+
+        // Case 2: line wrap after backslash, e.g. "\\\nFH[...]"
+        const newlineAfterEscapeSlash = new RegExp(
+            `\\\\\\r?\\n(?=[${ESCAPE_TAG_SYMBOL_START_CLASS}])`,
+            'g'
+        );
+        repaired = repaired.replace(newlineAfterEscapeSlash, '\\');
+
+        return repaired;
     }
 
     readBalancedValue(text, openIndex, open, close) {
