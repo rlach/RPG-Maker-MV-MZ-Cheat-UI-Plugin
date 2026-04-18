@@ -133,12 +133,16 @@ export default class BaseTranslationEngine {
     const { isDescription, maxWidth, wrapOptions } =
       this.getWrapConfigForType(itemType);
 
-    if (itemType === "text" || itemType === "choice" || isDescription) {
+    if (itemType === "text" || isDescription) {
       return this.wrapText(
         this.cleanTranslatedText(value),
         maxWidth,
         wrapOptions,
       );
+    }
+
+    if (itemType === "choice") {
+      return this.cleanTranslatedText(value);
     }
 
     if (itemType === "speaker") {

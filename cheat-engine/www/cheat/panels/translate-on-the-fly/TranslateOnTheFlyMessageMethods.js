@@ -123,71 +123,70 @@ export const translateOnTheFlyMessageMethods = {
                 .trim();
         }
 
-        // Function to calculate visible length (excluding escape sequences)
-        const getVisibleLength = (str) => {
-            // Remove all RPG Maker escape sequences: \n[N], \v[N], \c[N], \p[N], \g, etc.
-            const withoutEscapes = str
-                .replace(/\\[nvcpgif]\[\d+\]/gi, '')
-                .replace(/\\[nvcpgif]/gi, '')
-                .replace(/\\[!.^<>]/g, '');
-            return withoutEscapes.length;
+        // Strip RPG Maker escape sequences for visible-length calculation.
+        // Covers: \c[N], \n[N], \v[N], \i[N], \{, \}, \!, \., \|, \<, \>, etc.
+        const TAG_RE = /\\[A-Za-z${}|.!><^]\[\d+\]|\\[A-Za-z${}|.!><^]/g;
+        const getVisibleLength = (str) => str.replace(TAG_RE, '').length;
+
+        // A token is a "follow-up" when its visible content has no word characters
+        // (pure punctuation, or pure tags with 0 visible width).
+        // Follow-ups must travel with the preceding word — never start a new line alone.
+        const isFollowUp = (token) => {
+            const visible = token.replace(TAG_RE, '');
+            return visible.length === 0 || !/\w/.test(visible);
         };
 
         const lines = sourceText.split('\n');
         const wrappedLines = [];
 
         for (const line of lines) {
-            const visibleLength = getVisibleLength(line);
-
-            if (visibleLength <= maxWidth) {
+            if (getVisibleLength(line) <= maxWidth) {
                 wrappedLines.push(line);
                 continue;
             }
 
-            // Line is too long, need to wrap
-            const words = line.split(' ');
-            let currentLine = '';
+            // Split by spaces, discard empty tokens from consecutive spaces.
+            const rawTokens = line.split(' ').filter((t) => t !== '');
 
-            for (const word of words) {
-                const wordVisibleLength = getVisibleLength(word);
-
-                // If word itself is longer than maxWidth, split it
-                if (wordVisibleLength > maxWidth) {
-                    if (currentLine) {
-                        wrappedLines.push(currentLine.trim());
-                        currentLine = '';
-                    }
-                    // Split long word into chunks based on visible length
-                    let remainingWord = word;
-                    while (getVisibleLength(remainingWord) > maxWidth) {
-                        // This is a simplified approach - just break at maxWidth
-                        wrappedLines.push(remainingWord.substring(0, maxWidth));
-                        remainingWord = remainingWord.substring(maxWidth);
-                    }
-                    if (remainingWord) {
-                        wrappedLines.push(remainingWord);
-                    }
-                    continue;
-                }
-
-                // Check if adding this word would exceed maxWidth
-                const testLine = currentLine ? currentLine + ' ' + word : word;
-                const testVisibleLength = getVisibleLength(testLine);
-
-                if (testVisibleLength <= maxWidth) {
-                    currentLine = testLine;
+            // Build wrap units: punctuation/tag-only tokens attach to the preceding
+            // unit (preserving the space), so they always wrap with their word.
+            const units = [];
+            for (const token of rawTokens) {
+                if (units.length > 0 && isFollowUp(token)) {
+                    units[units.length - 1] += ' ' + token;
                 } else {
-                    // Adding word would exceed limit, start new line
-                    if (currentLine) {
-                        wrappedLines.push(currentLine.trim());
-                    }
-                    currentLine = word;
+                    units.push(token);
                 }
             }
 
-            // Add remaining text
+            let currentLine = '';
+
+            for (const unit of units) {
+                const unitLen = getVisibleLength(unit);
+
+                if (unitLen > maxWidth) {
+                    // Unit is wider than the whole line — push as-is, no splitting
+                    if (currentLine) {
+                        wrappedLines.push(currentLine);
+                        currentLine = '';
+                    }
+                    wrappedLines.push(unit);
+                    continue;
+                }
+
+                const testLine = currentLine ? currentLine + ' ' + unit : unit;
+                if (getVisibleLength(testLine) <= maxWidth) {
+                    currentLine = testLine;
+                } else {
+                    if (currentLine) {
+                        wrappedLines.push(currentLine);
+                    }
+                    currentLine = unit;
+                }
+            }
+
             if (currentLine) {
-                wrappedLines.push(currentLine.trim());
+                wrappedLines.push(currentLine);
             }
         }
 
@@ -277,7 +276,7 @@ export const translateOnTheFlyMessageMethods = {
             if (translatedRaw) {
                 let translated = this.restoreSpecialSequences(translatedRaw, protectedSequences);
                 translated = this.cleanTranslatedText(translated);
-                translated = this.wrapText(translated, this.maxLineWidth);
+                // choices are not wrapped — they display in a fixed-size window
                 return translated;
             }
 

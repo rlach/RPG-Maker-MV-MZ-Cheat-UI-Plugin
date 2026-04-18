@@ -294,10 +294,14 @@ export class TranslationBatchManager {
           : true,
       itemLimit: hasOwn(request, "itemLimit")
         ? request.itemLimit
-        : options.itemLimit,
+        : hasOwn(options, "itemLimit")
+          ? options.itemLimit
+          : this.panel && this.panel.batchItemsLimit,
       charLimit: hasOwn(request, "charLimit")
         ? request.charLimit
-        : options.charLimit,
+        : hasOwn(options, "charLimit")
+          ? options.charLimit
+          : this.panel && this.panel.charLimit,
       dryRun: hasOwn(request, "dryRun")
         ? !!request.dryRun
         : hasOwn(options, "dryRun")

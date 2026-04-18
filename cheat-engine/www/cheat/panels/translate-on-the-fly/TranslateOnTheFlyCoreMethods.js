@@ -23,10 +23,7 @@ export const translateOnTheFlyCoreMethods = {
         let cancelled = false;
         if (this.engine && typeof this.engine.cancelActiveRequest === 'function') {
             cancelled = this.engine.cancelActiveRequest('request_aborted');
-        } else if (
-            this.engine &&
-            typeof this.engine.cancelActiveBackgroundRequest === 'function'
-        ) {
+        } else if (this.engine && typeof this.engine.cancelActiveBackgroundRequest === 'function') {
             cancelled = this.engine.cancelActiveBackgroundRequest();
         }
 
@@ -192,10 +189,7 @@ export const translateOnTheFlyCoreMethods = {
 
     getVariableTranslationSettingsFilePath() {
         const path = require('path');
-        return path.join(
-            this.getSplitCacheDirectoryPath(),
-            'variable-translation-settings.json'
-        );
+        return path.join(this.getSplitCacheDirectoryPath(), 'variable-translation-settings.json');
     },
 
     ensureSplitCacheDirectorySync() {
@@ -395,11 +389,7 @@ export const translateOnTheFlyCoreMethods = {
     normalizeSafeVariableTranslationIds(ids) {
         const safeIds = Array.isArray(ids) ? ids : [];
         return Array.from(
-            new Set(
-                safeIds
-                    .map((id) => Number(id))
-                    .filter((id) => Number.isInteger(id) && id > 0)
-            )
+            new Set(safeIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))
         ).sort((a, b) => a - b);
     },
 
@@ -421,10 +411,7 @@ export const translateOnTheFlyCoreMethods = {
             this.safeVariableTranslationIds = safeIds;
             this.safeVariableTranslationIdSet = new Set(safeIds);
         } catch (error) {
-            console.warn(
-                '[TranslateOnTheFly] Failed to load variable translation settings',
-                error
-            );
+            console.warn('[TranslateOnTheFly] Failed to load variable translation settings', error);
         }
     },
 
@@ -485,11 +472,7 @@ export const translateOnTheFlyCoreMethods = {
 
     getRawGameVariableValue(variableId) {
         const safeId = Number(variableId) || 0;
-        if (
-            safeId < 0 ||
-            !window.$gameVariables ||
-            !Array.isArray($gameVariables._data)
-        ) {
+        if (safeId < 0 || !window.$gameVariables || !Array.isArray($gameVariables._data)) {
             return 0;
         }
 
