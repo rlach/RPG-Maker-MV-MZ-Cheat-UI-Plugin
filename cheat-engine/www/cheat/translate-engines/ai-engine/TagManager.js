@@ -457,6 +457,10 @@ export class TagManager {
         // intended newlines are still encoded as [b=..] at this stage.
         result = this.repairLiteralLineWrapsAroundEscapeTags(result);
 
+        // Keep only newlines that were explicitly preserved as safe tags.
+        // Any literal line breaks returned by the LLM are removed before unpacking.
+        result = result.replace(/\r?\n/g, '');
+
         const simpleNMatches = result.match(this.simpleNEntry.postPattern) || [];
         actualCounts[this.simpleNEntry.key] = simpleNMatches.length;
         result = result.replace(this.simpleNEntry.postPattern, () => '\n');
