@@ -11,6 +11,7 @@ import { KmsMapActiveMessageTranslator } from './translators/KmsMapActiveMessage
 import { ManoInputConfigTranslator } from './translators/ManoInputConfigTranslator.js';
 import { LLStandingPictureTranslator } from './translators/LLStandingPictureTranslator.js';
 import { MgpExternChoicesTranslator } from './translators/MgpExternChoicesTranslator.js';
+import { MogBattleCommandsTranslator } from './translators/MogBattleCommandsTranslator.js';
 import { MppChoiceExTranslator } from './translators/MppChoiceExTranslator.js';
 import { MultipleWindowSkinSystemTranslator } from './translators/MultipleWindowSkinSystemTranslator.js';
 import { OriginMenuStatusTranslator } from './translators/OriginMenuStatusTranslator.js';
@@ -43,6 +44,7 @@ class PluginTranslatorRegistry {
             LLStandingPictureTranslator,
             ManoInputConfigTranslator,
             MgpExternChoicesTranslator,
+            MogBattleCommandsTranslator,
             MppChoiceExTranslator,
             MultipleWindowSkinSystemTranslator,
             OriginMenuStatusTranslator,
