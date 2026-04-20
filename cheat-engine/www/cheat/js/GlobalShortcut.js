@@ -100,6 +100,10 @@ const defaultShortcutSettings = {
     shortcut: "alt r",
   },
 
+  replaceCurrentMessageWithWidthPreview: {
+    shortcut: "alt shift r",
+  },
+
   translateCurrentMap: {
     shortcut: "alt m",
   },
@@ -341,6 +345,14 @@ const shortcutConfig = {
     desc: "Translate the currently displayed message and choices",
     enterAction() {
       MessageCheat.translateCurrentMessage();
+    },
+  },
+
+  replaceCurrentMessageWithWidthPreview: {
+    name: "Replace current message with width preview",
+    desc: "Replace the current message text with a fixed width preview line",
+    enterAction() {
+      MessageCheat.replaceCurrentMessageWithWidthPreview();
     },
   },
 

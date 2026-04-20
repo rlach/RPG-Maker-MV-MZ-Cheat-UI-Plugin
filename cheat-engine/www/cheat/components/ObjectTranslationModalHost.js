@@ -42,7 +42,7 @@ export default {
               <v-checkbox
                 v-model="objectTranslationSelection[item.id]"
                 :label="item.label"
-                :disabled="item.total <= 0"
+                :disabled="item.id !== 'cacheEmptyStrings' && item.total <= 0"
                 hide-details
                 dense
                 class="ma-0 pa-0"

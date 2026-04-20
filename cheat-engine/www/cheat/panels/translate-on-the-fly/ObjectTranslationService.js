@@ -151,11 +151,15 @@ class ObjectTranslationService {
       })
       .filter((item) => item.id !== "plugins" || pluginDetails.length > 0);
 
+    const nextSelection = {};
     for (const item of this.state.modalStats) {
-      if (this.state.selection[item.id] === undefined) {
-        this.state.selection[item.id] = item.left > 0;
+      if (typeof this.state.selection[item.id] === "boolean") {
+        nextSelection[item.id] = this.state.selection[item.id];
+      } else {
+        nextSelection[item.id] = item.left > 0;
       }
     }
+    this.state.selection = nextSelection;
 
     this.state.cacheEmptyStringsRepeatUntilSuccess =
       !!runtime.cacheEmptyStringsRepeatUntilSuccess;

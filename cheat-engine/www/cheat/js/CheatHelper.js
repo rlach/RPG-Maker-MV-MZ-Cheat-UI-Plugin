@@ -669,6 +669,36 @@ export class MessageCheat {
         }
     }
 
+    static replaceCurrentMessageWithWidthPreview() {
+        try {
+            const runtime = ensureTranslationRuntime();
+            const gameMessage = runtime?.currentGameMessage || $gameMessage;
+
+            if (!gameMessage || typeof gameMessage.allText !== 'function') {
+                Alert.warn('No message to replace');
+                return;
+            }
+
+            const previewLine = '1234567890'.repeat(10);
+
+            if (runtime && typeof runtime.replaceMessageText === 'function') {
+                runtime.replaceMessageText(previewLine);
+            } else if (Array.isArray(gameMessage._texts)) {
+                gameMessage._texts.length = 0;
+                gameMessage._texts.push(previewLine);
+            } else {
+                Alert.warn('No message to replace');
+                return;
+            }
+
+            Alert.success('Replaced current message with width preview line');
+        } catch (err) {
+            console.error('[MessageCheat] Failed to replace current message text', err);
+            const message = err instanceof Error ? err.message : String(err);
+            Alert.error('Failed to replace current message: ' + message);
+        }
+    }
+
     static translateCurrentMap() {
         try {
             const runtime = ensureTranslationRuntime();
