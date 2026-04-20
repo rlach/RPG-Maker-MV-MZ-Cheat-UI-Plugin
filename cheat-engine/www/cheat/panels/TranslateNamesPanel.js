@@ -255,23 +255,27 @@ export default {
             predefinedNamePatterns: [
                 {
                     pattern: '\\\\n\\<([^<>]+)\\>',
-                    example: '\\\\n<Char Name>\\nThe text being spoken.',
+                    example: '\\N<Char Name>\nThe text being spoken.',
                 },
                 {
                     pattern: '^([^\\[「]+)\\n「',
-                    example: 'Char Name\\n「The text being spoken.',
+                    example: 'Char Name\n「The text being spoken.',
                 },
                 {
                     pattern: '\\\\nw\\[([^\\[\\]]+)\\]',
-                    example: '\\\\nw[Char Name]\\nThe text being spoken.',
+                    example: '\\nw[Char Name]\nThe text being spoken.',
                 },
                 {
                     pattern: '^([^：]+)：\n',
-                    example: 'Char Name：\\nThe text being spoken.',
+                    example: 'Char Name：\nThe text being spoken.',
                 },
                 {
                     pattern: '^「([^」]+)」\n',
-                    example: '「Char Name」\\nThe text being spoken.',
+                    example: '「Char Name」\nThe text being spoken.',
+                },
+                {
+                    pattern: '^【([^【】]+)】\n',
+                    example: '【Char Name】\nThe text being spoken.',
                 },
             ],
             tableHeaders: [
