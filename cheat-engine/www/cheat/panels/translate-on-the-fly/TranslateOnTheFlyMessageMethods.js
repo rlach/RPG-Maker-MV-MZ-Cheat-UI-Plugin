@@ -6,8 +6,10 @@ export const translateOnTheFlyMessageMethods = {
         // Do NOT extract \n<...> as speaker - these are RPG Maker script elements/plugin commands
         // Speaker name comes from $gameMessage._speakerName, not from text
 
+        const safeText = String(translatedText || '');
+
         // Split translated text into lines
-        const lines = String(translatedText || '').split('\n');
+        const lines = safeText.split('\n');
 
         // Clear current message texts
         $gameMessage._texts.length = 0;
@@ -18,6 +20,53 @@ export const translateOnTheFlyMessageMethods = {
                 // Keep empty lines if they're intentional
                 $gameMessage._texts.push(line);
             }
+        }
+
+        // After modifying $gameMessage._texts we must also reset the message window's
+        // _textState, because startMessage() already copied the old text into _textState.text
+        // and the window renders exclusively from that — it never re-reads $gameMessage._texts.
+        const msgWindow = this.currentMessageWindow;
+        if (!msgWindow) {
+            return;
+        }
+
+        // Build a proper textState. MZ uses createTextState() which sets rtl/buffer/drawing etc.
+        // MV uses a plain object — the plain fallback is fine there.
+        const makeTextState = (text) => {
+            if (typeof msgWindow.createTextState === 'function') {
+                // MZ path: createTextState already calls convertEscapeCharacters internally
+                const ts = msgWindow.createTextState(text, 0, 0, 0);
+                ts.x = typeof msgWindow.newLineX === 'function' ? msgWindow.newLineX(ts) : 0;
+                ts.startX = ts.x;
+                return ts;
+            }
+            // MV path: plain object, convertEscapeCharacters called separately
+            const converted =
+                typeof msgWindow.convertEscapeCharacters === 'function'
+                    ? msgWindow.convertEscapeCharacters(text)
+                    : text;
+            return { index: 0, text: converted };
+        };
+
+        if (msgWindow._textState) {
+            // Message is currently scrolling — replace the live textState.
+            msgWindow._textState = makeTextState(safeText);
+            if (typeof msgWindow.newPage === 'function') {
+                msgWindow.newPage(msgWindow._textState);
+            }
+        } else if (msgWindow.pause) {
+            // Message finished scrolling and is waiting for player input (pause state).
+            // _textState is null here; updateInput() blocks updateMessage() while pause=true,
+            // so we must clear pause before injecting _textState, otherwise the canvas stays
+            // blank until the player presses the action button.
+            msgWindow._textState = makeTextState(safeText);
+            if (typeof msgWindow.newPage === 'function') {
+                msgWindow.newPage(msgWindow._textState);
+            }
+            // Show the new text instantly — no character-by-character scrolling needed.
+            msgWindow._showFast = true;
+            msgWindow.pause = false;
+            msgWindow._waitCount = 0;
         }
     },
 

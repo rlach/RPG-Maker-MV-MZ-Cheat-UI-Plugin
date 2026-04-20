@@ -672,26 +672,59 @@ export class MessageCheat {
     static replaceCurrentMessageWithWidthPreview() {
         try {
             const runtime = ensureTranslationRuntime();
-            const gameMessage = runtime?.currentGameMessage || $gameMessage;
+            const msgWindow = runtime?.currentMessageWindow;
 
-            if (!gameMessage || typeof gameMessage.allText !== 'function') {
-                Alert.warn('No message to replace');
+            // A message window must be active
+            if (!msgWindow) {
+                Alert.warn('No active message window');
                 return;
             }
 
             const previewLine = '1234567890'.repeat(10);
 
-            if (runtime && typeof runtime.replaceMessageText === 'function') {
+            if (typeof runtime.replaceMessageText === 'function') {
+                // replaceMessageText also resets the window's _textState
                 runtime.replaceMessageText(previewLine);
-            } else if (Array.isArray(gameMessage._texts)) {
-                gameMessage._texts.length = 0;
-                gameMessage._texts.push(previewLine);
             } else {
-                Alert.warn('No message to replace');
-                return;
+                // Fallback: update $gameMessage directly and reset window state manually
+                const gameMessage = runtime?.currentGameMessage || $gameMessage;
+                if (gameMessage && Array.isArray(gameMessage._texts)) {
+                    gameMessage._texts.length = 0;
+                    gameMessage._texts.push(previewLine);
+                }
+                const makeTextState = (text) => {
+                    if (typeof msgWindow.createTextState === 'function') {
+                        const ts = msgWindow.createTextState(text, 0, 0, 0);
+                        ts.x = typeof msgWindow.newLineX === 'function' ? msgWindow.newLineX(ts) : 0;
+                        ts.startX = ts.x;
+                        return ts;
+                    }
+                    const converted =
+                        typeof msgWindow.convertEscapeCharacters === 'function'
+                            ? msgWindow.convertEscapeCharacters(text)
+                            : text;
+                    return { index: 0, text: converted };
+                };
+                if (msgWindow._textState) {
+                    msgWindow._textState = makeTextState(previewLine);
+                    if (typeof msgWindow.newPage === 'function') {
+                        msgWindow.newPage(msgWindow._textState);
+                    }
+                } else if (msgWindow.pause) {
+                    msgWindow._textState = makeTextState(previewLine);
+                    if (typeof msgWindow.newPage === 'function') {
+                        msgWindow.newPage(msgWindow._textState);
+                    }
+                    msgWindow._showFast = true;
+                    msgWindow.pause = false;
+                    msgWindow._waitCount = 0;
+                } else {
+                    Alert.warn('No active message to replace');
+                    return;
+                }
             }
 
-            Alert.success('Replaced current message with width preview line');
+            Alert.success('Width preview applied');
         } catch (err) {
             console.error('[MessageCheat] Failed to replace current message text', err);
             const message = err instanceof Error ? err.message : String(err);
