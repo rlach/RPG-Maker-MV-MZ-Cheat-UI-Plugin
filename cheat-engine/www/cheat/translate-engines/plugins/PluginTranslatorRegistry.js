@@ -13,6 +13,7 @@ import { LLStandingPictureTranslator } from './translators/LLStandingPictureTran
 import { MgpExternChoicesTranslator } from './translators/MgpExternChoicesTranslator.js';
 import { MogBattleCommandsTranslator } from './translators/MogBattleCommandsTranslator.js';
 import { MppChoiceExTranslator } from './translators/MppChoiceExTranslator.js';
+import { MppMessageExTranslator } from './translators/MppMessageExTranslator.js';
 import { MultipleWindowSkinSystemTranslator } from './translators/MultipleWindowSkinSystemTranslator.js';
 import { OriginMenuStatusTranslator } from './translators/OriginMenuStatusTranslator.js';
 import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTextWindowTranslator.js';
@@ -46,6 +47,7 @@ class PluginTranslatorRegistry {
             MgpExternChoicesTranslator,
             MogBattleCommandsTranslator,
             MppChoiceExTranslator,
+            MppMessageExTranslator,
             MultipleWindowSkinSystemTranslator,
             OriginMenuStatusTranslator,
             PandaProgressTextWindowTranslator,
