@@ -2,15 +2,23 @@ import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../panels/translate-on-the-fly/ObjectTranslationModalMethods.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_MPP_CHOICE_EX_TRANSLATOR_HOOKED__';
+const DEFAULT_CHOICE_HELP_COMMANDS = [
+    'ChoiceHelp',
+    '<ChoiceHelp>',
+    '選択肢ヘルプ',
+    '<選択肢ヘルプ>',
+];
+
+const runtimeGlobal = /** @type {any} */ (globalThis);
 
 function isUsableText(value) {
     return typeof value === 'string' && value.trim() !== '';
 }
 
 function getRuntime() {
-    return typeof window.__ensureTranslationRuntime === 'function'
-        ? window.__ensureTranslationRuntime()
-        : window.__TranslationRuntime || null;
+    return typeof runtimeGlobal.__ensureTranslationRuntime === 'function'
+        ? runtimeGlobal.__ensureTranslationRuntime()
+        : runtimeGlobal.__TranslationRuntime || null;
 }
 
 function splitChoiceConditionPrefix(choiceText) {
@@ -37,12 +45,44 @@ function splitChoiceConditionPrefix(choiceText) {
     };
 }
 
+function toStringArray(value) {
+    return Array.isArray(value) ? value.map((entry) => String(entry ?? '')) : [];
+}
+
+function joinHelpTextLines(lines) {
+    return toStringArray(lines).join('\n');
+}
+
+function splitHelpTextBlock(text) {
+    return String(text ?? '').split('\n');
+}
+
+function normalizeAsDialogueText(text, runtime) {
+    const value = String(text ?? '');
+    if (!value) {
+        return value;
+    }
+
+    const cleaned =
+        runtime && typeof runtime.cleanTranslatedText === 'function'
+            ? runtime.cleanTranslatedText(value)
+            : value;
+
+    const maxWidth = Number(runtime?.maxLineWidth) || 0;
+    if (runtime && typeof runtime.wrapText === 'function' && maxWidth > 0) {
+        return runtime.wrapText(cleaned, maxWidth);
+    }
+
+    return cleaned;
+}
+
 export class MppChoiceExTranslator extends BasePluginTranslator {
     constructor() {
         super();
         this._scanPrepared = false;
         this._scanEntries = [];
         this._scanPromise = null;
+        this._choiceHelpCommands = null;
     }
 
     getPluginName() {
@@ -54,16 +94,24 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
     }
 
     getCacheType() {
+        return 'plugin_mpp_choice_ex';
+    }
+
+    getChoiceCacheType() {
         return 'choice';
     }
 
+    getChoiceHelpCacheType() {
+        return this.getCacheType();
+    }
+
     enablePluginTranslation() {
-        if (window[RUNTIME_HOOK_GUARD]) {
+        if (runtimeGlobal[RUNTIME_HOOK_GUARD]) {
             return;
         }
 
         if (
-            !window.Game_Interpreter ||
+            !runtimeGlobal.Game_Interpreter ||
             !Game_Interpreter.prototype ||
             typeof Game_Interpreter.prototype.checkChoiceConditions !== 'function'
         ) {
@@ -71,7 +119,12 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
         }
 
         const originalCheckChoiceConditions = Game_Interpreter.prototype.checkChoiceConditions;
-        const translator = this;
+        const originalSetupChoices =
+            typeof Game_Interpreter.prototype.setupChoices === 'function'
+                ? Game_Interpreter.prototype.setupChoices
+                : null;
+        const applyChoiceTranslations = this.applyRuntimeChoiceTranslations.bind(this);
+        const applyChoiceHelpTranslations = this.applyRuntimeChoiceHelpTranslations.bind(this);
 
         Game_Interpreter.prototype.checkChoiceConditions = function (choices, data, d) {
             const existingChoiceCount =
@@ -80,7 +133,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
             const result = originalCheckChoiceConditions.apply(this, arguments);
 
             try {
-                translator.applyRuntimeChoiceTranslations(data, existingChoiceCount);
+                applyChoiceTranslations(data, existingChoiceCount);
             } catch (error) {
                 console.warn(
                     '[MppChoiceExTranslator] Failed to apply runtime choice translation',
@@ -91,7 +144,24 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
             return result;
         };
 
-        window[RUNTIME_HOOK_GUARD] = true;
+        if (originalSetupChoices) {
+            Game_Interpreter.prototype.setupChoices = function () {
+                const result = originalSetupChoices.apply(this, arguments);
+
+                try {
+                    applyChoiceHelpTranslations();
+                } catch (error) {
+                    console.warn(
+                        '[MppChoiceExTranslator] Failed to apply runtime choice help translation',
+                        error
+                    );
+                }
+
+                return result;
+            };
+        }
+
+        runtimeGlobal[RUNTIME_HOOK_GUARD] = true;
     }
 
     applyRuntimeChoiceTranslations(data, startIndex) {
@@ -115,7 +185,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            const cacheKey = runtime.getCacheKey(originalText, this.getCacheType());
+            const cacheKey = runtime.getCacheKey(originalText, this.getChoiceCacheType());
             if (typeof runtime.markCacheKeySeen === 'function') {
                 runtime.markCacheKeySeen(cacheKey);
             }
@@ -131,6 +201,143 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
 
             data.choices[i] = cached;
         }
+    }
+
+    applyRuntimeChoiceHelpTranslations() {
+        const runtime = getRuntime();
+        const gameMessage = runtimeGlobal.$gameMessage;
+        if (
+            !runtime ||
+            typeof runtime.getCacheKey !== 'function' ||
+            typeof runtime.hasUsableCacheValue !== 'function' ||
+            !(runtime.translationCache instanceof Map) ||
+            !gameMessage ||
+            typeof gameMessage.helpTexts !== 'function' ||
+            typeof gameMessage.setChoiceHelpTexts !== 'function'
+        ) {
+            return;
+        }
+
+        const helpTexts = gameMessage.helpTexts();
+        if (!Array.isArray(helpTexts) || helpTexts.length === 0) {
+            return;
+        }
+
+        let changed = false;
+        const translatedHelpTexts = helpTexts.map((entry) => {
+            if (!Array.isArray(entry)) {
+                return entry;
+            }
+
+            const originalBlock = joinHelpTextLines(entry);
+            if (!isUsableText(originalBlock)) {
+                return entry;
+            }
+
+            const cacheKey = runtime.getCacheKey(
+                originalBlock,
+                this.getChoiceHelpCacheType()
+            );
+            if (typeof runtime.markCacheKeySeen === 'function') {
+                runtime.markCacheKeySeen(cacheKey);
+            }
+
+            if (!runtime.hasUsableCacheValue(cacheKey)) {
+                return entry;
+            }
+
+            const cached = runtime.translationCache.get(cacheKey);
+            if (!isUsableText(cached)) {
+                return entry;
+            }
+
+            const normalized = normalizeAsDialogueText(cached, runtime);
+            const translatedLines = splitHelpTextBlock(normalized);
+            if (joinHelpTextLines(translatedLines) !== originalBlock) {
+                changed = true;
+            }
+            return translatedLines;
+        });
+
+        if (changed) {
+            gameMessage.setChoiceHelpTexts(translatedHelpTexts);
+        }
+    }
+
+    getChoiceHelpCommands() {
+        if (this._choiceHelpCommands instanceof Set) {
+            return this._choiceHelpCommands;
+        }
+
+        const commands = new Set(DEFAULT_CHOICE_HELP_COMMANDS);
+        for (const item of this.readConfiguredChoiceHelpCommands()) {
+            commands.add(item);
+        }
+
+        this._choiceHelpCommands = commands;
+        return commands;
+    }
+
+    readConfiguredChoiceHelpCommands() {
+        try {
+            if (
+                runtimeGlobal.PluginManager &&
+                typeof PluginManager.parameters === 'function'
+            ) {
+                const parameters = PluginManager.parameters(this.getPluginName()) || {};
+                const raw = parameters['Choice Help Commands'];
+                if (typeof raw === 'string' && raw.trim()) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) {
+                        return parsed.filter(
+                            (item) => typeof item === 'string' && item.trim()
+                        );
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn('[MppChoiceExTranslator] Failed to parse Choice Help Commands', error);
+        }
+
+        return [];
+    }
+
+    isChoiceHelpCommand(commandText) {
+        return this.getChoiceHelpCommands().has(String(commandText || ''));
+    }
+
+    extractChoiceHelpBlock(list, startIndex) {
+        const lines = [];
+        let lastIndex = startIndex;
+
+        for (let i = startIndex + 1; i < list.length; i++) {
+            const command = list[i];
+            if (!command || Number(command.code) !== 408) {
+                break;
+            }
+
+            const lineText =
+                Array.isArray(command.parameters) && typeof command.parameters[0] === 'string'
+                    ? command.parameters[0]
+                    : '';
+            lines.push(lineText);
+            lastIndex = i;
+        }
+
+        if (lines.length === 0) {
+            return null;
+        }
+
+        const block = joinHelpTextLines(lines);
+        if (!isUsableText(block)) {
+            return null;
+        }
+
+        return {
+            text: block,
+            lineCount: lines.length,
+            lastIndex,
+        };
     }
 
     async prepareTranslator() {
@@ -164,67 +371,85 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
     async buildScanEntries() {
         const entries = [];
 
-        if (Array.isArray(window.$dataCommonEvents)) {
-            for (let commonEventId = 0; commonEventId < $dataCommonEvents.length; commonEventId++) {
-                const commonEvent = $dataCommonEvents[commonEventId];
-                if (!commonEvent || !Array.isArray(commonEvent.list)) {
-                    continue;
-                }
+        this.scanCommonEvents(entries);
+        await this.scanMapEvents(entries);
 
-                this.collectChoiceTextsFromList(
-                    commonEvent.list,
-                    {
-                        scope: 'commonEvent',
-                        commonEventId,
-                    },
-                    entries
-                );
-            }
+        return entries;
+    }
+
+    scanCommonEvents(entries) {
+        const commonEvents = Array.isArray(runtimeGlobal.$dataCommonEvents)
+            ? runtimeGlobal.$dataCommonEvents
+            : [];
+        if (commonEvents.length === 0) {
+            return;
         }
 
-        const mapInfos = Array.isArray(window.$dataMapInfos) ? window.$dataMapInfos : [];
+        for (let commonEventId = 0; commonEventId < commonEvents.length; commonEventId++) {
+            const commonEvent = commonEvents[commonEventId];
+            if (!commonEvent || !Array.isArray(commonEvent.list)) {
+                continue;
+            }
+
+            this.collectChoiceTextsFromList(
+                commonEvent.list,
+                {
+                    scope: 'commonEvent',
+                    commonEventId,
+                },
+                entries
+            );
+        }
+    }
+
+    async scanMapEvents(entries) {
+        const mapInfos = Array.isArray(runtimeGlobal.$dataMapInfos)
+            ? runtimeGlobal.$dataMapInfos
+            : [];
         for (const mapInfo of mapInfos) {
-            const mapId = Number(mapInfo && mapInfo.id);
+            const mapId = Number(mapInfo?.id);
             if (!mapId) {
                 continue;
             }
 
             try {
                 const mapData = await loadMapDataById(mapId);
-                if (!mapData || !Array.isArray(mapData.events)) {
-                    continue;
-                }
-
-                for (let eventIdx = 0; eventIdx < mapData.events.length; eventIdx++) {
-                    const event = mapData.events[eventIdx];
-                    if (!event || !Array.isArray(event.pages)) {
-                        continue;
-                    }
-
-                    for (let pageIdx = 0; pageIdx < event.pages.length; pageIdx++) {
-                        const page = event.pages[pageIdx];
-                        if (!page || !Array.isArray(page.list)) {
-                            continue;
-                        }
-
-                        this.collectChoiceTextsFromList(
-                            page.list,
-                            {
-                                scope: 'mapEvent',
-                                mapId,
-                                eventIdx,
-                                pageIdx,
-                            },
-                            entries
-                        );
-                    }
-                }
+                this.scanMapDataEvents(mapData, mapId, entries);
             } catch (error) {
                 console.warn(`[MppChoiceExTranslator] Failed to scan map ${mapId}`, error);
             }
         }
+    }
 
-        return entries;
+    scanMapDataEvents(mapData, mapId, entries) {
+        if (!mapData || !Array.isArray(mapData.events)) {
+            return;
+        }
+
+        for (let eventIdx = 0; eventIdx < mapData.events.length; eventIdx++) {
+            const event = mapData.events[eventIdx];
+            if (!event || !Array.isArray(event.pages)) {
+                continue;
+            }
+
+            for (let pageIdx = 0; pageIdx < event.pages.length; pageIdx++) {
+                const page = event.pages[pageIdx];
+                if (!page || !Array.isArray(page.list)) {
+                    continue;
+                }
+
+                this.collectChoiceTextsFromList(
+                    page.list,
+                    {
+                        scope: 'mapEvent',
+                        mapId,
+                        eventIdx,
+                        pageIdx,
+                    },
+                    entries
+                );
+            }
+        }
     }
 
     collectChoiceTextsFromList(list, baseMeta, output) {
@@ -240,46 +465,84 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
 
             const code = Number(cmd.code);
             if (code === 102) {
-                const choices =
-                    Array.isArray(cmd.parameters) && Array.isArray(cmd.parameters[0])
-                        ? cmd.parameters[0]
-                        : [];
-                for (let choiceIdx = 0; choiceIdx < choices.length; choiceIdx++) {
-                    const parsed = splitChoiceConditionPrefix(choices[choiceIdx]);
-                    if (!isUsableText(parsed.text)) {
-                        continue;
-                    }
-
-                    output.push({
-                        text: parsed.text,
-                        source: {
-                            ...baseMeta,
-                            cmdIdx,
-                            code,
-                            choiceIdx,
-                        },
-                    });
-                }
+                this.collectShowChoiceItems(cmd, baseMeta, output, cmdIdx, code);
             } else if (code === 402) {
-                const choiceBranchText =
-                    Array.isArray(cmd.parameters) && typeof cmd.parameters[1] === 'string'
-                        ? cmd.parameters[1]
-                        : '';
-                const parsed = splitChoiceConditionPrefix(choiceBranchText);
-                if (!isUsableText(parsed.text)) {
-                    continue;
-                }
-
-                output.push({
-                    text: parsed.text,
-                    source: {
-                        ...baseMeta,
-                        cmdIdx,
-                        code,
-                    },
-                });
+                this.collectChoiceBranchItem(cmd, baseMeta, output, cmdIdx, code);
+            } else if (code === 108) {
+                this.collectChoiceHelpItem(list, cmd, baseMeta, output, cmdIdx, code);
             }
         }
+    }
+
+    collectShowChoiceItems(cmd, baseMeta, output, cmdIdx, code) {
+        const choices =
+            Array.isArray(cmd.parameters) && Array.isArray(cmd.parameters[0])
+                ? cmd.parameters[0]
+                : [];
+        for (let choiceIdx = 0; choiceIdx < choices.length; choiceIdx++) {
+            const parsed = splitChoiceConditionPrefix(choices[choiceIdx]);
+            if (!isUsableText(parsed.text)) {
+                continue;
+            }
+
+            output.push({
+                text: parsed.text,
+                        cacheType: this.getChoiceCacheType(),
+                source: {
+                    ...baseMeta,
+                    cmdIdx,
+                    code,
+                    choiceIdx,
+                },
+            });
+        }
+    }
+
+    collectChoiceBranchItem(cmd, baseMeta, output, cmdIdx, code) {
+        const choiceBranchText =
+            Array.isArray(cmd.parameters) && typeof cmd.parameters[1] === 'string'
+                ? cmd.parameters[1]
+                : '';
+        const parsed = splitChoiceConditionPrefix(choiceBranchText);
+        if (!isUsableText(parsed.text)) {
+            return;
+        }
+
+        output.push({
+            text: parsed.text,
+            cacheType: this.getChoiceCacheType(),
+            source: {
+                ...baseMeta,
+                cmdIdx,
+                code,
+            },
+        });
+    }
+
+    collectChoiceHelpItem(list, cmd, baseMeta, output, cmdIdx, code) {
+        const commandText =
+            Array.isArray(cmd.parameters) && typeof cmd.parameters[0] === 'string'
+                ? cmd.parameters[0]
+                : '';
+        if (!this.isChoiceHelpCommand(commandText)) {
+            return;
+        }
+
+        const helpBlock = this.extractChoiceHelpBlock(list, cmdIdx);
+        if (!helpBlock) {
+            return;
+        }
+
+        output.push({
+            text: helpBlock.text,
+            cacheType: this.getChoiceHelpCacheType(),
+            source: {
+                ...baseMeta,
+                cmdIdx,
+                code,
+                helpLineCount: helpBlock.lineCount,
+            },
+        });
     }
 
     buildUniquePendingItems(panel) {
@@ -291,10 +554,14 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            const cacheKey = panel.getCacheKey(text, this.getCacheType());
+            const entryType =
+                typeof entry.cacheType === 'string' && entry.cacheType
+                    ? entry.cacheType
+                    : this.getCacheType();
+            const cacheKey = panel.getCacheKey(text, entryType);
             if (!byCacheKey.has(cacheKey)) {
                 byCacheKey.set(cacheKey, {
-                    type: this.getCacheType(),
+                    type: entryType,
                     id: `plugin_mpp_choice_ex_${byCacheKey.size}`,
                     value: text,
                     cacheKey,
