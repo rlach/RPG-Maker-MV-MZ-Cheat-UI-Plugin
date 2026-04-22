@@ -54,7 +54,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
     }
 
     getCacheType() {
-        return 'plugin_mpp_choice_ex';
+        return 'choice';
     }
 
     enablePluginTranslation() {
