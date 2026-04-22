@@ -4,6 +4,11 @@ import { TranslateOnTheFlyState } from '../../js/TranslateOnTheFlyState.js';
 import { ensureTranslateCacheRuntime } from '../../js/TranslateCacheRuntime.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { DATA_CONTAINER_TRANSLATION_DEFINITIONS } from '../../translate-engines/translation-phases/DataContainerDefinitions.js';
+import {
+    runCacheMigrationsIfNeeded,
+    writeCacheSettings,
+    CURRENT_CACHE_VERSION,
+} from './TranslateCacheMigrations.js';
 
 export const translateOnTheFlyCoreMethods = {
     isBatchQueueAbortRequested() {
@@ -110,7 +115,8 @@ export const translateOnTheFlyCoreMethods = {
 
     getCacheKey(text, type = 'text') {
         const cacheType = type === 'speaker' ? 'actor_name' : type;
-        return `${cacheType}:${this.sourceLang}-${this.targetLang}-${text}`;
+        const normalizedText = typeof text === 'string' ? text.replace(/\n+$/, '') : text;
+        return `${cacheType}:${this.sourceLang}-${this.targetLang}-${normalizedText}`;
     },
 
     getCanonicalSystemCommandName(commandName) {
@@ -197,6 +203,8 @@ export const translateOnTheFlyCoreMethods = {
         const directoryPath = this.getSplitCacheDirectoryPath();
         if (!fs.existsSync(directoryPath)) {
             fs.mkdirSync(directoryPath, { recursive: true });
+            // Brand-new cache directory – write settings so version is known from the start.
+            writeCacheSettings(this, { version: CURRENT_CACHE_VERSION });
         }
     },
 
@@ -558,6 +566,7 @@ export const translateOnTheFlyCoreMethods = {
             this.translationCache.clear();
             this.cacheBucketByCompositeKey = new Map();
             this.loadSplitCacheFromDisk();
+            runCacheMigrationsIfNeeded(this);
             this.loadVariableTranslationSettingsFromDisk();
 
             this.notifyCacheRuntime('cache-loaded');
