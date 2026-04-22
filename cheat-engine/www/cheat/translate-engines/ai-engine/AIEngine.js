@@ -466,7 +466,13 @@ class AIEngine extends BaseTranslationEngine {
         const rawType = String(safeItem.type || '').toLowerCase();
 
         // Keep message/speaker/choice compact and sequential as before.
-        if (rawType === 'text' || rawType === 'speaker' || rawType === 'choice') {
+        if (
+            rawType === 'text' ||
+            rawType === 'message' ||
+            rawType === 'message_portrait' ||
+            rawType === 'speaker' ||
+            rawType === 'choice'
+        ) {
             return `${TYPE_TO_TAG[rawType] || 'm'}${fallbackIndex}`;
         }
 

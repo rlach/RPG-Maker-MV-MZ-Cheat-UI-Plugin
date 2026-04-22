@@ -119,6 +119,88 @@ export const translateOnTheFlyCoreMethods = {
         return `${cacheType}:${this.sourceLang}-${this.targetLang}-${normalizedText}`;
     },
 
+    isMessageCacheType(type) {
+        return type === 'message' || type === 'message_portrait' || type === 'text';
+    },
+
+    getCurrentMessageFaceName(gameMessage = null) {
+        const currentGameMessage = gameMessage || window.$gameMessage;
+        if (!currentGameMessage) {
+            return '';
+        }
+
+        if (typeof currentGameMessage.faceName === 'function') {
+            try {
+                const faceName = currentGameMessage.faceName();
+                if (typeof faceName === 'string') {
+                    return faceName;
+                }
+
+                if (faceName !== null && faceName !== undefined) {
+                    return String(faceName);
+                }
+
+                return '';
+            } catch (error) {
+                console.warn('[TranslateOnTheFly] Failed to read message faceName()', error);
+            }
+        }
+
+        if (typeof currentGameMessage._faceName === 'string') {
+            return currentGameMessage._faceName;
+        }
+
+        return '';
+    },
+
+    hasCurrentMessagePortrait(gameMessage = null) {
+        return this.getCurrentMessageFaceName(gameMessage).trim().length > 0;
+    },
+
+    getMessageCacheType(options = {}) {
+        return options?.hasPortrait ? 'message_portrait' : 'message';
+    },
+
+    getMessageCacheKey(text, options = {}) {
+        return this.getCacheKey(text, this.getMessageCacheType(options));
+    },
+
+    getMessageCacheLookupKeys(text, options = {}) {
+        const keys = options?.hasPortrait
+            ? [
+                  this.getCacheKey(text, 'message_portrait'),
+                  this.getCacheKey(text, 'message'),
+                  this.getCacheKey(text, 'text'),
+              ]
+            : [
+                  this.getCacheKey(text, 'message'),
+                  // Backward compatibility with older caches that stored event messages as "text".
+                  this.getCacheKey(text, 'text'),
+              ];
+
+        return Array.from(new Set(keys));
+    },
+
+    getPreferredMessageCacheEntry(text, options = {}) {
+        if (typeof text !== 'string' || !text.trim()) {
+            return null;
+        }
+
+        const lookupKeys = this.getMessageCacheLookupKeys(text, options);
+        for (const cacheKey of lookupKeys) {
+            if (!this.hasUsableCacheValue(cacheKey)) {
+                continue;
+            }
+
+            return {
+                cacheKey,
+                value: this.translationCache.get(cacheKey),
+            };
+        }
+
+        return null;
+    },
+
     getCanonicalSystemCommandName(commandName) {
         let normalizedName = '';
         if (typeof commandName === 'string') {

@@ -161,6 +161,47 @@ export const translateOnTheFlyRuntimeMethods = {
             return texts.join('\n');
         };
 
+        const resolveMessageTextCacheState = (originalText, hasPortrait) => {
+            if (!originalText || !originalText.trim()) {
+                return {
+                    activeKey: null,
+                    lookupKeys: [],
+                    ready: true,
+                    translated: null,
+                    resolvedKey: null,
+                };
+            }
+
+            const activeKey = self.getMessageCacheKey(originalText, {
+                hasPortrait: !!hasPortrait,
+            });
+            const lookupKeys = self.getMessageCacheLookupKeys(originalText, {
+                hasPortrait: !!hasPortrait,
+            });
+
+            for (const key of lookupKeys) {
+                if (!self.hasUsableCacheValue(key)) {
+                    continue;
+                }
+
+                return {
+                    activeKey,
+                    lookupKeys,
+                    ready: true,
+                    translated: self.translationCache.get(key),
+                    resolvedKey: key,
+                };
+            }
+
+            return {
+                activeKey,
+                lookupKeys,
+                ready: false,
+                translated: null,
+                resolvedKey: null,
+            };
+        };
+
         const imported = typeof Imported === 'object' && Imported ? Imported : {};
         const hasStrictMessageCore = !!(
             imported.VisuMZ_1_MessageCore ||
@@ -355,7 +396,17 @@ export const translateOnTheFlyRuntimeMethods = {
                 $gameMessage._translateOriginalText = originalText || '';
             }
 
-            const cacheKey = hasText ? self.getCacheKey(originalText, 'text') : null;
+            const messageHasPortrait = self.hasCurrentMessagePortrait($gameMessage);
+            const textCacheState = hasText
+                ? resolveMessageTextCacheState(originalText, messageHasPortrait)
+                : {
+                      activeKey: null,
+                      lookupKeys: [],
+                      ready: true,
+                      translated: null,
+                      resolvedKey: null,
+                  };
+            const cacheKey = textCacheState.activeKey;
             const choices = ($gameMessage.choices && $gameMessage.choices()) || [];
             const originalChoices = $gameMessage._translateOriginalChoices || choices;
             const hasChoices = Array.isArray(originalChoices) && originalChoices.length > 0;
@@ -368,6 +419,9 @@ export const translateOnTheFlyRuntimeMethods = {
             const hasSpeakerName = !!(originalSpeakerName && originalSpeakerName.trim().length > 0);
             const speakerKey = hasSpeakerName
                 ? self.getCacheKey(originalSpeakerName, 'speaker')
+                : null;
+            const legacySpeakerKey = hasSpeakerName
+                ? `speaker:${self.sourceLang}-${self.targetLang}-${originalSpeakerName.replace(/\n+$/, '')}`
                 : null;
             if (hasSpeakerName) {
                 $gameMessage._translateOriginalSpeaker = originalSpeakerName;
@@ -382,14 +436,14 @@ export const translateOnTheFlyRuntimeMethods = {
                 }
             }
 
-            const textReady = !hasText || (cacheKey && self.hasUsableCacheValue(cacheKey));
+            const textReady = !hasText || textCacheState.ready;
             const choicesReady =
                 !hasChoices || choiceCacheKeys.every((key) => self.hasUsableCacheValue(key));
             const speakerReady = !hasSpeakerName || self.hasUsableCacheValue(speakerKey);
 
             if (useCacheOnly) {
                 if (!this._translationApplied && hasText && textReady) {
-                    const translatedText = self.translationCache.get(cacheKey);
+                    const translatedText = textCacheState.translated;
                     if (translatedText !== undefined) {
                         self.replaceMessageText(translatedText);
                         this._translationApplied = true;
@@ -417,9 +471,7 @@ export const translateOnTheFlyRuntimeMethods = {
                 // If we have cached translation, apply it now (text + choices + speaker)
                 if (allowTranslation && textReady && choicesReady && speakerReady) {
                     if (hasText) {
-                        const translatedText = cacheKey
-                            ? self.translationCache.get(cacheKey)
-                            : null;
+                        const translatedText = textCacheState.translated;
                         if (translatedText !== undefined && translatedText !== null) {
                             self.replaceMessageText(translatedText);
                         }
@@ -485,6 +537,7 @@ export const translateOnTheFlyRuntimeMethods = {
                         currentText: originalText,
                         currentSpeakerName: originalSpeakerName,
                         cacheKey,
+                        hasPortrait: messageHasPortrait,
                         maxDepth,
                         sourceTrigger: 'Starting 01',
                     });
@@ -507,9 +560,7 @@ export const translateOnTheFlyRuntimeMethods = {
                         // Still apply cached text/speaker if available so dialog is translated
                         if (!this._translationApplied) {
                             if (hasText && textReady) {
-                                const translatedText = cacheKey
-                                    ? self.translationCache.get(cacheKey)
-                                    : null;
+                                const translatedText = textCacheState.translated;
                                 if (translatedText !== undefined && translatedText !== null) {
                                     self.replaceMessageText(translatedText);
                                 }
@@ -550,7 +601,12 @@ export const translateOnTheFlyRuntimeMethods = {
                     self.requestForegroundDialogBatch({
                         currentText: originalText || '',
                         currentSpeakerName: originalSpeakerName,
-                        cacheKey: cacheKey || self.getCacheKey(originalText || '', 'text'),
+                        cacheKey:
+                            cacheKey ||
+                            self.getMessageCacheKey(originalText || '', {
+                                hasPortrait: messageHasPortrait,
+                            }),
+                        hasPortrait: messageHasPortrait,
                         maxDepth,
                         sourceTrigger: 'Starting 02',
                     });
@@ -591,7 +647,12 @@ export const translateOnTheFlyRuntimeMethods = {
                     self.requestForegroundDialogBatch({
                         currentText: originalText || '',
                         currentSpeakerName: originalSpeakerName,
-                        cacheKey: cacheKey || self.getCacheKey(originalText || '', 'text'),
+                        cacheKey:
+                            cacheKey ||
+                            self.getMessageCacheKey(originalText || '', {
+                                hasPortrait: messageHasPortrait,
+                            }),
+                        hasPortrait: messageHasPortrait,
                         maxDepth,
                         sourceTrigger: 'speaker',
                     });
@@ -758,7 +819,17 @@ export const translateOnTheFlyRuntimeMethods = {
 
             const originalText = getSafeCurrentMessageText();
             const hasText = !!(originalText && originalText.trim().length > 0);
-            const textKey = hasText ? self.getCacheKey(originalText, 'text') : null;
+            const messageHasPortrait = self.hasCurrentMessagePortrait($gameMessage);
+            const textCacheState = hasText
+                ? resolveMessageTextCacheState(originalText, messageHasPortrait)
+                : {
+                      activeKey: null,
+                      lookupKeys: [],
+                      ready: true,
+                      translated: null,
+                      resolvedKey: null,
+                  };
+            const textKey = textCacheState.activeKey;
             const originalSpeakerName =
                 $gameMessage._translateOriginalSpeaker || $gameMessage._speakerName || '';
 
@@ -774,7 +845,7 @@ export const translateOnTheFlyRuntimeMethods = {
                     }
 
                     // If translation already applied on this window, allow
-                    if (!this._translationApplied && !self.hasUsableCacheValue(textKey)) {
+                    if (!this._translationApplied && !textCacheState.ready) {
                         return false; // text not translated/applied yet
                     }
                 }
@@ -846,7 +917,12 @@ export const translateOnTheFlyRuntimeMethods = {
                         self.requestForegroundDialogBatch({
                             currentText: originalText || '',
                             currentSpeakerName: originalSpeakerName,
-                            cacheKey: textKey || self.getCacheKey(originalText || '', 'text'),
+                            cacheKey:
+                                textKey ||
+                                self.getMessageCacheKey(originalText || '', {
+                                    hasPortrait: messageHasPortrait,
+                                }),
+                            hasPortrait: messageHasPortrait,
                             maxDepth,
                             sourceTrigger: 'Starting 03',
                         });

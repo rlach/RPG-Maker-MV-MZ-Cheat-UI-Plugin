@@ -133,6 +133,12 @@ export function extractMessageEntryAt(list, messageCmdIndex) {
         return null;
     }
 
+    const faceName =
+        cmd.parameters && cmd.parameters[0] !== undefined && cmd.parameters[0] !== null
+            ? String(cmd.parameters[0])
+            : '';
+    const hasPortrait = faceName.trim() !== '';
+
     const speaker = (cmd.parameters && cmd.parameters[4]) || '';
     const lines = [];
     let nextIndex = messageCmdIndex + 1;
@@ -149,6 +155,7 @@ export function extractMessageEntryAt(list, messageCmdIndex) {
         cmdIndex: messageCmdIndex,
         nextIndex,
         command: cmd,
+        hasPortrait,
         speaker,
         lines,
         text: lines.join('\n'),
@@ -174,6 +181,8 @@ export function collectEventCommandEntries(list) {
                 continue;
             }
 
+            const messageType = messageEntry.hasPortrait ? 'message_portrait' : 'message';
+
             if (isNonEmptyString(messageEntry.speaker)) {
                 entries.push({
                     type: 'speaker',
@@ -186,7 +195,7 @@ export function collectEventCommandEntries(list) {
 
             if (isNonEmptyString(messageEntry.text)) {
                 entries.push({
-                    type: 'text',
+                    type: messageType,
                     value: messageEntry.text,
                     cmdIndex: i,
                     nextIndex: messageEntry.nextIndex,

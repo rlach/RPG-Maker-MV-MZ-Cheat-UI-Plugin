@@ -34,6 +34,8 @@ export const AI_INVALID_JSON_HANDLING_STRATEGY_OPTIONS = [
 
 export const DEFAULT_DIALOG_MAX_LINE_WIDTH_MV = 52;
 export const DEFAULT_DIALOG_MAX_LINE_WIDTH_MZ = 60;
+export const DEFAULT_DIALOG_MAX_LINE_WIDTH_WITH_PORTRAIT_MV = 44;
+export const DEFAULT_DIALOG_MAX_LINE_WIDTH_WITH_PORTRAIT_MZ = 50;
 export const DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MV = 53;
 export const DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MZ = 59;
 
@@ -47,6 +49,12 @@ export function getDefaultDescriptionMaxLineWidth() {
         : DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MZ;
 }
 
+export function getDefaultDialogMaxLineWidthWithPortrait() {
+    return isRpgMakerMv()
+        ? DEFAULT_DIALOG_MAX_LINE_WIDTH_WITH_PORTRAIT_MV
+        : DEFAULT_DIALOG_MAX_LINE_WIDTH_WITH_PORTRAIT_MZ;
+}
+
 export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
     'enabled',
     'sourceLang',
@@ -54,6 +62,7 @@ export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
     'translationCount',
     'enableTextWrapping',
     'maxLineWidth',
+    'maxLineWidthWithPortrait',
     'descriptionMaxLineWidth',
     'translationEngine',
     'translateCacheWhenDisabled',
@@ -118,6 +127,7 @@ export const PERSISTED_TRANSLATION_SETTINGS_KEYS = Object.freeze([
     'translationCount',
     'enableTextWrapping',
     'maxLineWidth',
+    'maxLineWidthWithPortrait',
     'descriptionMaxLineWidth',
     'charLimit',
     'batchItemsLimit',
@@ -146,6 +156,7 @@ export const UI_SYNC_STATE_KEYS = Object.freeze([
     'translationCount',
     'enableTextWrapping',
     'maxLineWidth',
+    'maxLineWidthWithPortrait',
     'descriptionMaxLineWidth',
     'translationEngine',
     'translateCacheWhenDisabled',
@@ -214,6 +225,7 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
         translationCount: 0,
         enableTextWrapping: true,
         maxLineWidth: getDefaultDialogMaxLineWidth(),
+        maxLineWidthWithPortrait: getDefaultDialogMaxLineWidthWithPortrait(),
         descriptionMaxLineWidth: getDefaultDescriptionMaxLineWidth(),
         translationEngine: 'mymemory',
         translateCacheWhenDisabled: false,

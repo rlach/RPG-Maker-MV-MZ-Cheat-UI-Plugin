@@ -189,6 +189,21 @@ export default {
         </v-text-field>
 
         <v-text-field
+            v-model.number="maxLineWidthWithPortrait"
+            label="Maximum line width for dialogue with portrait"
+            outlined
+            dense
+            type="number"
+            min="20"
+            max="200"
+            hide-details
+            :disabled="!enableTextWrapping"
+            @keydown.self.stop
+            @change="onChangeMaxWidthWithPortrait"
+            @focus="$event.target.select()">
+        </v-text-field>
+
+        <v-text-field
             v-model.number="descriptionMaxLineWidth"
             label="Maximum line width for descriptions (items, skills etc.)"
             outlined
@@ -425,11 +440,11 @@ export default {
         },
 
         onChangeAiLengthMultiplierForMaxLength(v) {
-            return this.callRuntime("onChangeAiLengthMultiplierForMaxLength", v);
+            return this.callRuntime('onChangeAiLengthMultiplierForMaxLength', v);
         },
 
         onChangeAiMinimumMaxLength(v) {
-            return this.callRuntime("onChangeAiMinimumMaxLength", v);
+            return this.callRuntime('onChangeAiMinimumMaxLength', v);
         },
 
         onChangeAiBannedPhrases(v) {
@@ -454,6 +469,10 @@ export default {
 
         onChangeMaxWidth() {
             return this.callRuntime('onChangeMaxWidth');
+        },
+
+        onChangeMaxWidthWithPortrait() {
+            return this.callRuntime('onChangeMaxWidthWithPortrait');
         },
 
         onChangeDescriptionMaxWidth() {

@@ -311,7 +311,12 @@ export const translateOnTheFlyFlowMethods = {
             : 0;
     },
 
-    buildForegroundOperationKey({ currentText, currentSpeakerName, maxDepth }) {
+    buildForegroundOperationKey({
+        currentText,
+        currentSpeakerName,
+        maxDepth,
+        messageHasPortrait = false,
+    }) {
         const interpreter = this.findMessageInterpreter();
         const normalized = this.resolveOriginalMessageContext(
             currentText,
@@ -342,7 +347,9 @@ export const translateOnTheFlyFlowMethods = {
             eventId,
             index,
             depth,
-            this.getCacheKey(normalizedText, 'text'),
+            this.getMessageCacheKey(normalizedText, {
+                hasPortrait: !!messageHasPortrait,
+            }),
             this.getCacheKey(normalizedSpeaker, 'speaker'),
             choiceKeyPart,
         ].join('::');
@@ -383,6 +390,7 @@ export const translateOnTheFlyFlowMethods = {
         currentText,
         currentSpeakerName,
         cacheKey,
+        hasPortrait = false,
         maxDepth,
         sourceTrigger = 'unknown',
     }) {
@@ -401,6 +409,7 @@ export const translateOnTheFlyFlowMethods = {
             currentText,
             currentSpeakerName,
             maxDepth,
+            messageHasPortrait: !!hasPortrait,
         });
 
         if (state.active && state.promise) {
@@ -414,6 +423,7 @@ export const translateOnTheFlyFlowMethods = {
                 currentText,
                 currentSpeakerName,
                 cacheKey,
+                hasPortrait: !!hasPortrait,
                 maxDepth,
             })
         );

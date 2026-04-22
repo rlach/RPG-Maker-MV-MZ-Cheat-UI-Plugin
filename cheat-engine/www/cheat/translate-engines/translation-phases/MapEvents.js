@@ -139,27 +139,6 @@ export class MapEvents extends BasePhase {
         const itemsToTranslate = [];
         let runningCounter = 0;
 
-        const pushMapTextItem = (rawText, eventIdx, pageIdx, cmdIdx) => {
-            if (typeof rawText !== 'string' || rawText.trim() === '') {
-                return;
-            }
-
-            const cacheKey = panel.getCacheKey(rawText, 'text');
-            if (panel.hasUsableCacheValue(cacheKey)) {
-                return;
-            }
-
-            itemsToTranslate.push({
-                type: 'text',
-                id: `map_${eventIdx}_${pageIdx}_text_${runningCounter++}`,
-                value: rawText,
-                cacheKey,
-                eventIdx,
-                pageIdx,
-                cmdIdx,
-            });
-        };
-
         for (let eventIdx = 0; eventIdx < dataMap.events.length; eventIdx++) {
             const event = dataMap.events[eventIdx];
             if (!event || !Array.isArray(event.pages)) {
@@ -174,11 +153,6 @@ export class MapEvents extends BasePhase {
 
                 const entries = collectEventCommandEntries(page.list);
                 for (const entry of entries) {
-                    if (entry.type === 'text') {
-                        pushMapTextItem(entry.value, eventIdx, pageIdx, entry.cmdIndex);
-                        continue;
-                    }
-
                     const cacheKey = panel.getCacheKey(entry.value, entry.type);
                     if (panel.hasUsableCacheValue(cacheKey)) {
                         continue;

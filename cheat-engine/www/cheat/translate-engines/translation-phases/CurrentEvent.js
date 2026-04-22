@@ -1,467 +1,483 @@
-import { BasePhase } from "./BasePhase.js";
-import { collectEventCommandEntries } from "../../js/EventCommandTraversal.js";
+import { BasePhase } from './BasePhase.js';
+import { collectEventCommandEntries } from '../../js/EventCommandTraversal.js';
+
+function isMessageTextType(type) {
+    return type === 'message' || type === 'message_portrait' || type === 'text';
+}
 
 export class CurrentEvent extends BasePhase {
-  static getInstance() {
-    if (!CurrentEvent._instance) {
-      CurrentEvent._instance = new CurrentEvent();
-    }
-    return CurrentEvent._instance;
-  }
-
-  constructor(options = {}) {
-    super();
-    this.configure(options);
-  }
-
-  configure(options = {}) {
-    this.currentText = options.currentText || "";
-    this.currentSpeakerName = options.currentSpeakerName || "";
-    this.cacheKey = options.cacheKey || "";
-    this.maxDepth = options.maxDepth;
-    this._state = {
-      items: [],
-      normalizedCurrentText: this.currentText || "",
-      pendingKeys: new Set(),
-      textSuccesses: 0,
-    };
-    return this;
-  }
-
-  getTranslationPhaseLabel() {
-    return "OTF - translating event";
-  }
-
-  getKind() {
-    return "currentEvent";
-  }
-
-  async createEntries({ request, panel }) {
-    const gameMessage = panel.currentGameMessage || window.$gameMessage;
-    if (!gameMessage || typeof gameMessage.allText !== "function") {
-      return [];
-    }
-
-    const originalText =
-      request.currentText ||
-      gameMessage._translateOriginalText ||
-      gameMessage.allText() ||
-      "";
-    const originalSpeakerName =
-      request.currentSpeakerName ||
-      gameMessage._translateOriginalSpeaker ||
-      gameMessage._speakerName ||
-      "";
-    const fullEvent = !!request.fullEvent;
-    const maxDepth = fullEvent ? request.maxDepth : 0;
-
-    if (!!request.forceRefreshCache) {
-      const refreshKeys = [];
-      if (originalText && originalText.trim()) {
-        refreshKeys.push(panel.getCacheKey(originalText, "text"));
-      }
-      if (originalSpeakerName && originalSpeakerName.trim()) {
-        refreshKeys.push(panel.getCacheKey(originalSpeakerName, "speaker"));
-      }
-      const choices = gameMessage.choices ? gameMessage.choices() : [];
-      const originalChoices = gameMessage._translateOriginalChoices || choices;
-      for (const choice of originalChoices || []) {
-        if (choice && String(choice).trim()) {
-          refreshKeys.push(panel.getCacheKey(choice, "choice"));
+    static getInstance() {
+        if (!CurrentEvent._instance) {
+            CurrentEvent._instance = new CurrentEvent();
         }
-      }
+        return CurrentEvent._instance;
+    }
 
-      for (const key of refreshKeys) {
-        panel.deleteCacheValue(key, {
-          persist: false,
-          notify: false,
-          deleteSeen: false,
+    constructor(options = {}) {
+        super();
+        this.configure(options);
+    }
+
+    configure(options = {}) {
+        this.currentText = options.currentText || '';
+        this.currentSpeakerName = options.currentSpeakerName || '';
+        this.cacheKey = options.cacheKey || '';
+        this.maxDepth = options.maxDepth;
+        this.messageHasPortrait = !!options.messageHasPortrait;
+        this._state = {
+            items: [],
+            normalizedCurrentText: this.currentText || '',
+            messageHasPortrait: this.messageHasPortrait,
+            pendingKeys: new Set(),
+            textSuccesses: 0,
+        };
+        return this;
+    }
+
+    getTranslationPhaseLabel() {
+        return 'OTF - translating event';
+    }
+
+    getKind() {
+        return 'currentEvent';
+    }
+
+    async createEntries({ request, panel }) {
+        const gameMessage = panel.currentGameMessage || window.$gameMessage;
+        if (!gameMessage || typeof gameMessage.allText !== 'function') {
+            return [];
+        }
+
+        const originalText =
+            request.currentText ||
+            gameMessage._translateOriginalText ||
+            gameMessage.allText() ||
+            '';
+        const originalSpeakerName =
+            request.currentSpeakerName ||
+            gameMessage._translateOriginalSpeaker ||
+            gameMessage._speakerName ||
+            '';
+        const messageHasPortrait =
+            typeof request.hasPortrait === 'boolean'
+                ? request.hasPortrait
+                : typeof panel.hasCurrentMessagePortrait === 'function'
+                  ? panel.hasCurrentMessagePortrait(gameMessage)
+                  : false;
+        const fullEvent = !!request.fullEvent;
+        const maxDepth = fullEvent ? request.maxDepth : 0;
+
+        if (!!request.forceRefreshCache) {
+            const refreshKeys = [];
+            if (originalText && originalText.trim()) {
+                refreshKeys.push(
+                    ...panel.getMessageCacheLookupKeys(originalText, {
+                        hasPortrait: messageHasPortrait,
+                    })
+                );
+            }
+            if (originalSpeakerName && originalSpeakerName.trim()) {
+                refreshKeys.push(panel.getCacheKey(originalSpeakerName, 'speaker'));
+            }
+            const choices = gameMessage.choices ? gameMessage.choices() : [];
+            const originalChoices = gameMessage._translateOriginalChoices || choices;
+            for (const choice of originalChoices || []) {
+                if (choice && String(choice).trim()) {
+                    refreshKeys.push(panel.getCacheKey(choice, 'choice'));
+                }
+            }
+
+            for (const key of refreshKeys) {
+                panel.deleteCacheValue(key, {
+                    persist: false,
+                    notify: false,
+                    deleteSeen: false,
+                });
+            }
+            panel.persistCache(refreshKeys);
+            panel.notifyCacheRuntime('cache-force-retranslate');
+        }
+
+        return [
+            {
+                strategy: this.configure({
+                    currentText: originalText,
+                    currentSpeakerName: originalSpeakerName,
+                    cacheKey: request.cacheKey || '',
+                    maxDepth,
+                    messageHasPortrait,
+                }),
+                priorityMapId: panel.getCurrentMapIdForPhasePriority
+                    ? panel.getCurrentMapIdForPhasePriority()
+                    : 0,
+            },
+        ];
+    }
+
+    countAmountSync() {
+        return { total: 1, left: 1, totalStrings: 1, leftStrings: 1 };
+    }
+
+    collectAheadItems(panel, currentText, currentSpeaker, interpreter, options = {}) {
+        const charLimit = options.charLimit || panel.charLimit;
+        const maxItems = options.maxItems || panel.batchItemsLimit || 20;
+        const maxDepth = options.maxDepth !== undefined ? options.maxDepth : 999;
+        const messageType = panel.getMessageCacheType({
+            hasPortrait: !!options.messageHasPortrait,
         });
-      }
-      panel.persistCache(refreshKeys);
-      panel.notifyCacheRuntime("cache-force-retranslate");
-    }
 
-    return [
-      {
-        strategy: this.configure({
-          currentText: originalText,
-          currentSpeakerName: originalSpeakerName,
-          cacheKey: request.cacheKey || "",
-          maxDepth,
-        }),
-        priorityMapId: panel.getCurrentMapIdForPhasePriority
-          ? panel.getCurrentMapIdForPhasePriority()
-          : 0,
-      },
-    ];
-  }
+        console.log('[Lookahead] Starting collection', {
+            charLimit,
+            maxItems,
+            maxDepth,
+            currentText,
+            currentSpeaker,
+        });
 
-  countAmountSync() {
-    return { total: 1, left: 1, totalStrings: 1, leftStrings: 1 };
-  }
+        const items = [];
+        let totalChars = 0;
+        let itemIdCounter = 0;
+        let stopReason = '';
+        const seenCacheKeys = new Set();
 
-  collectAheadItems(
-    panel,
-    currentText,
-    currentSpeaker,
-    interpreter,
-    options = {},
-  ) {
-    const charLimit = options.charLimit || panel.charLimit;
-    const maxItems = options.maxItems || panel.batchItemsLimit || 20;
-    const maxDepth = options.maxDepth !== undefined ? options.maxDepth : 999;
+        const pushItem = (type, value, force = false) => {
+            if (value == null || typeof value !== 'string' || value.trim() === '') {
+                return true;
+            }
 
-    console.log("[Lookahead] Starting collection", {
-      charLimit,
-      maxItems,
-      maxDepth,
-      currentText,
-      currentSpeaker,
-    });
+            const cacheKey = panel.getCacheKey(value, type);
+            if (!force && panel.hasUsableCacheValue(cacheKey)) {
+                return true;
+            }
 
-    const items = [];
-    let totalChars = 0;
-    let itemIdCounter = 0;
-    let stopReason = "";
-    const seenCacheKeys = new Set();
+            if (seenCacheKeys.has(cacheKey)) {
+                return true;
+            }
 
-    const pushItem = (type, value, force = false) => {
-      if (value == null || typeof value !== "string" || value.trim() === "") {
-        return true;
-      }
+            if (!force && items.length >= maxItems) {
+                stopReason = 'items limit reached';
+                return false;
+            }
 
-      const cacheKey = panel.getCacheKey(value, type);
-      if (!force && panel.hasUsableCacheValue(cacheKey)) {
-        return true;
-      }
+            if (!force && totalChars + value.length > charLimit) {
+                stopReason = 'charLimit reached';
+                return false;
+            }
 
-      if (seenCacheKeys.has(cacheKey)) {
-        return true;
-      }
+            const id = `${type}_${itemIdCounter++}`;
+            items.push({ type, id, value, cacheKey });
+            totalChars += value.length;
+            seenCacheKeys.add(cacheKey);
 
-      if (!force && items.length >= maxItems) {
-        stopReason = "items limit reached";
-        return false;
-      }
+            return true;
+        };
 
-      if (!force && totalChars + value.length > charLimit) {
-        stopReason = "charLimit reached";
-        return false;
-      }
+        if (currentText) pushItem(messageType, currentText, true);
+        if (currentSpeaker) pushItem('speaker', currentSpeaker, true);
 
-      const id = `${type}_${itemIdCounter++}`;
-      items.push({ type, id, value, cacheKey });
-      totalChars += value.length;
-      seenCacheKeys.add(cacheKey);
-
-      return true;
-    };
-
-    if (currentText) pushItem("text", currentText, true);
-    if (currentSpeaker) pushItem("speaker", currentSpeaker, true);
-
-    if (maxDepth === 0 || !interpreter || !Array.isArray(interpreter._list)) {
-      console.log("[Lookahead] Stopped: early return", {
-        reason:
-          maxDepth === 0
-            ? "maxDepth is 0"
-            : !interpreter
-              ? "no interpreter"
-              : "interpreter._list not array",
-        maxDepth,
-        hasInterpreter: !!interpreter,
-        isListArray: interpreter && Array.isArray(interpreter._list),
-        totalItems: items.length,
-      });
-      return items;
-    }
-
-    const list = interpreter._list;
-    const entries = collectEventCommandEntries(list);
-
-    if (!entries.length) {
-      return items;
-    }
-
-    const startCmdIndex = Math.max(0, Number(interpreter._index) || 0);
-    let pivot = entries.findIndex(
-      (entry) =>
-        entry.cmdIndex >= startCmdIndex &&
-        entry.type === "text" &&
-        entry.value === currentText,
-    );
-    if (pivot < 0) {
-      pivot = entries.findIndex(
-        (entry) => entry.type === "text" && entry.value === currentText,
-      );
-    }
-    if (pivot < 0) {
-      pivot = entries.findIndex((entry) => entry.cmdIndex >= startCmdIndex);
-    }
-    if (pivot < 0) {
-      pivot = 0;
-    }
-
-    for (let k = 0; k < entries.length; k++) {
-      const idx = (pivot + k) % entries.length;
-      const entry = entries[idx];
-      if (!pushItem(entry.type, entry.value)) {
-        break;
-      }
-    }
-
-    console.log("[Lookahead] Scan completed", {
-      totalCandidates: entries.length,
-      listLength: list.length,
-      totalItems: items.length,
-      totalChars,
-      reason: stopReason || "loop ended",
-    });
-
-    return items;
-  }
-
-  collectMandatoryChoiceCacheKeys(panel) {
-    const mandatoryChoiceCacheKeys = [];
-    if (
-      window.$gameMessage &&
-      $gameMessage.isChoice &&
-      $gameMessage.isChoice()
-    ) {
-      const currentChoices =
-        $gameMessage._translateOriginalChoices || $gameMessage.choices();
-      if (Array.isArray(currentChoices)) {
-        for (const choice of currentChoices) {
-          mandatoryChoiceCacheKeys.push(panel.getCacheKey(choice, "choice"));
+        if (maxDepth === 0 || !interpreter || !Array.isArray(interpreter._list)) {
+            console.log('[Lookahead] Stopped: early return', {
+                reason:
+                    maxDepth === 0
+                        ? 'maxDepth is 0'
+                        : !interpreter
+                          ? 'no interpreter'
+                          : 'interpreter._list not array',
+                maxDepth,
+                hasInterpreter: !!interpreter,
+                isListArray: interpreter && Array.isArray(interpreter._list),
+                totalItems: items.length,
+            });
+            return items;
         }
-      }
-    }
-    return mandatoryChoiceCacheKeys;
-  }
 
-  appendCurrentChoiceItems(panel, items) {
-    if (
-      !(window.$gameMessage && $gameMessage.isChoice && $gameMessage.isChoice())
-    ) {
-      return;
-    }
+        const list = interpreter._list;
+        const entries = collectEventCommandEntries(list);
 
-    const currentChoices =
-      $gameMessage._translateOriginalChoices || $gameMessage.choices();
-    if (!Array.isArray(currentChoices)) {
-      return;
-    }
+        if (!entries.length) {
+            return items;
+        }
 
-    for (let i = 0; i < currentChoices.length; i++) {
-      const choice = currentChoices[i];
-      const choiceCacheKey = panel.getCacheKey(choice, "choice");
-      if (panel.hasUsableCacheValue(choiceCacheKey)) {
-        continue;
-      }
+        const startCmdIndex = Math.max(0, Number(interpreter._index) || 0);
+        let pivot = entries.findIndex(
+            (entry) =>
+                entry.cmdIndex >= startCmdIndex &&
+                isMessageTextType(entry.type) &&
+                entry.value === currentText
+        );
+        if (pivot < 0) {
+            pivot = entries.findIndex(
+                (entry) => isMessageTextType(entry.type) && entry.value === currentText
+            );
+        }
+        if (pivot < 0) {
+            pivot = entries.findIndex((entry) => entry.cmdIndex >= startCmdIndex);
+        }
+        if (pivot < 0) {
+            pivot = 0;
+        }
 
-      if (items.some((item) => item.cacheKey === choiceCacheKey)) {
-        continue;
-      }
+        for (let k = 0; k < entries.length; k++) {
+            const idx = (pivot + k) % entries.length;
+            const entry = entries[idx];
+            if (!pushItem(entry.type, entry.value)) {
+                break;
+            }
+        }
 
-      items.push({
-        type: "choice",
-        id: `current_choice_${i}`,
-        value: choice,
-        cacheKey: choiceCacheKey,
-        mandatory: true,
-      });
-    }
-  }
+        console.log('[Lookahead] Scan completed', {
+            totalCandidates: entries.length,
+            listLength: list.length,
+            totalItems: items.length,
+            totalChars,
+            reason: stopReason || 'loop ended',
+        });
 
-  applyCurrentText(panel, items, fallbackText, textSuccesses = 0) {
-    const firstTextItem = items.find((item) => item.type === "text");
-    if (!firstTextItem) {
-      return;
-    }
-
-    const translated = panel.translationCache.get(firstTextItem.cacheKey);
-    if (translated) {
-      panel.replaceMessageText(translated);
-      panel._translationApplied = true;
-
-      panel.translationCount += Math.max(0, Number(textSuccesses) || 0);
-      panel.saveSettings();
-      return;
+        return items;
     }
 
-    panel.replaceMessageText(fallbackText || "");
-    panel._translationApplied = true;
-  }
-
-  applyCurrentChoices(panel) {
-    if (
-      !(window.$gameMessage && $gameMessage.isChoice && $gameMessage.isChoice())
-    ) {
-      return;
+    collectMandatoryChoiceCacheKeys(panel) {
+        const mandatoryChoiceCacheKeys = [];
+        if (window.$gameMessage && $gameMessage.isChoice && $gameMessage.isChoice()) {
+            const currentChoices = $gameMessage._translateOriginalChoices || $gameMessage.choices();
+            if (Array.isArray(currentChoices)) {
+                for (const choice of currentChoices) {
+                    mandatoryChoiceCacheKeys.push(panel.getCacheKey(choice, 'choice'));
+                }
+            }
+        }
+        return mandatoryChoiceCacheKeys;
     }
 
-    const originalChoices =
-      $gameMessage._translateOriginalChoices || $gameMessage.choices();
-    const translatedChoices = originalChoices.map((choice) => {
-      const choiceCacheKey = panel.getCacheKey(choice, "choice");
-      return panel.translationCache.get(choiceCacheKey) || choice;
-    });
+    appendCurrentChoiceItems(panel, items) {
+        if (!(window.$gameMessage && $gameMessage.isChoice && $gameMessage.isChoice())) {
+            return;
+        }
 
-    panel.replaceChoiceText(translatedChoices);
-  }
+        const currentChoices = $gameMessage._translateOriginalChoices || $gameMessage.choices();
+        if (!Array.isArray(currentChoices)) {
+            return;
+        }
 
-  collectUntranslated({ panel }) {
-    const interpreter = panel.findMessageInterpreter();
-    const normalized = panel.resolveOriginalMessageContext(
-      this.currentText,
-      this.currentSpeakerName,
-      interpreter,
-    );
-    const normalizedCurrentText = normalized.text || this.currentText || "";
-    const normalizedCurrentSpeaker =
-      normalized.speaker || this.currentSpeakerName || "";
+        for (let i = 0; i < currentChoices.length; i++) {
+            const choice = currentChoices[i];
+            const choiceCacheKey = panel.getCacheKey(choice, 'choice');
+            if (panel.hasUsableCacheValue(choiceCacheKey)) {
+                continue;
+            }
 
-    const items = this.collectAheadItems(
-      panel,
-      normalizedCurrentText,
-      normalizedCurrentSpeaker,
-      interpreter,
-      {
-        charLimit: Number.MAX_SAFE_INTEGER,
-        maxItems: Number.MAX_SAFE_INTEGER,
-        maxDepth: this.maxDepth,
-      },
-    );
+            if (items.some((item) => item.cacheKey === choiceCacheKey)) {
+                continue;
+            }
 
-    this.appendCurrentChoiceItems(panel, items);
-    this._state.items = items;
-    this._state.normalizedCurrentText = normalizedCurrentText;
-
-    if (!items.length) {
-      return [];
+            items.push({
+                type: 'choice',
+                id: `current_choice_${i}`,
+                value: choice,
+                cacheKey: choiceCacheKey,
+                mandatory: true,
+            });
+        }
     }
 
-    const mandatoryCacheKeys = new Set();
-    if (normalizedCurrentText) {
-      mandatoryCacheKeys.add(panel.getCacheKey(normalizedCurrentText, "text"));
-    }
-    if (normalizedCurrentSpeaker) {
-      mandatoryCacheKeys.add(
-        panel.getCacheKey(normalizedCurrentSpeaker, "speaker"),
-      );
-    }
-    for (const choiceCacheKey of this.collectMandatoryChoiceCacheKeys(panel)) {
-      mandatoryCacheKeys.add(choiceCacheKey);
-    }
+    applyCurrentText(panel, items, fallbackText, textSuccesses = 0) {
+        const firstTextItem = items.find((item) => isMessageTextType(item.type));
+        if (!firstTextItem) {
+            return;
+        }
 
-    const uncached = items.filter((item) => {
-      if (!item || !item.cacheKey) {
-        return false;
-      }
+        let translated = panel.translationCache.get(firstTextItem.cacheKey);
+        if (!translated && typeof panel.getPreferredMessageCacheEntry === 'function') {
+            const preferred = panel.getPreferredMessageCacheEntry(
+                firstTextItem.value || fallbackText || '',
+                {
+                    hasPortrait: !!this._state.messageHasPortrait,
+                }
+            );
+            translated = preferred ? preferred.value : translated;
+        }
 
-      if (panel.hasUsableCacheValue(item.cacheKey)) {
-        return false;
-      }
+        if (translated) {
+            panel.replaceMessageText(translated);
+            panel._translationApplied = true;
 
-      if (
-        panel.failedTranslations.has(item.cacheKey) &&
-        !item.mandatory &&
-        !mandatoryCacheKeys.has(item.cacheKey)
-      ) {
-        return false;
-      }
+            panel.translationCount += Math.max(0, Number(textSuccesses) || 0);
+            panel.saveSettings();
+            return;
+        }
 
-      return true;
-    });
-
-    if (uncached.length === 0) {
-      return [];
+        panel.replaceMessageText(fallbackText || '');
+        panel._translationApplied = true;
     }
 
-    const uniqueMap = new Map();
-    for (const item of uncached) {
-      if (!uniqueMap.has(item.cacheKey)) {
-        uniqueMap.set(item.cacheKey, item);
-      }
-    }
-    const uniqueItemsRaw = Array.from(uniqueMap.values());
+    applyCurrentChoices(panel) {
+        if (!(window.$gameMessage && $gameMessage.isChoice && $gameMessage.isChoice())) {
+            return;
+        }
 
-    const mandatoryItems = [];
-    const optionalItems = [];
-    for (const item of uniqueItemsRaw) {
-      if (item.mandatory || mandatoryCacheKeys.has(item.cacheKey)) {
-        mandatoryItems.push(item);
-      } else {
-        optionalItems.push(item);
-      }
+        const originalChoices = $gameMessage._translateOriginalChoices || $gameMessage.choices();
+        const translatedChoices = originalChoices.map((choice) => {
+            const choiceCacheKey = panel.getCacheKey(choice, 'choice');
+            return panel.translationCache.get(choiceCacheKey) || choice;
+        });
+
+        panel.replaceChoiceText(translatedChoices);
     }
 
-    const uniqueItems = [...mandatoryItems, ...optionalItems];
-    this._state.pendingKeys = new Set();
-    this._state.textSuccesses = 0;
+    collectUntranslated({ panel }) {
+        const interpreter = panel.findMessageInterpreter();
+        const normalized = panel.resolveOriginalMessageContext(
+            this.currentText,
+            this.currentSpeakerName,
+            interpreter
+        );
+        const normalizedCurrentText = normalized.text || this.currentText || '';
+        const normalizedCurrentSpeaker = normalized.speaker || this.currentSpeakerName || '';
 
-    for (const item of uniqueItems) {
-      panel.pendingTranslations.set(item.cacheKey, true);
-      this._state.pendingKeys.add(item.cacheKey);
+        const items = this.collectAheadItems(
+            panel,
+            normalizedCurrentText,
+            normalizedCurrentSpeaker,
+            interpreter,
+            {
+                charLimit: Number.MAX_SAFE_INTEGER,
+                maxItems: Number.MAX_SAFE_INTEGER,
+                maxDepth: this.maxDepth,
+                messageHasPortrait: this.messageHasPortrait,
+            }
+        );
+
+        this.appendCurrentChoiceItems(panel, items);
+        this._state.items = items;
+        this._state.normalizedCurrentText = normalizedCurrentText;
+        this._state.messageHasPortrait = this.messageHasPortrait;
+
+        if (!items.length) {
+            return [];
+        }
+
+        const mandatoryCacheKeys = new Set();
+        if (normalizedCurrentText) {
+            mandatoryCacheKeys.add(
+                panel.getMessageCacheKey(normalizedCurrentText, {
+                    hasPortrait: !!this._state.messageHasPortrait,
+                })
+            );
+        }
+        if (normalizedCurrentSpeaker) {
+            mandatoryCacheKeys.add(panel.getCacheKey(normalizedCurrentSpeaker, 'speaker'));
+        }
+        for (const choiceCacheKey of this.collectMandatoryChoiceCacheKeys(panel)) {
+            mandatoryCacheKeys.add(choiceCacheKey);
+        }
+
+        const uncached = items.filter((item) => {
+            if (!item || !item.cacheKey) {
+                return false;
+            }
+
+            if (panel.hasUsableCacheValue(item.cacheKey)) {
+                return false;
+            }
+
+            if (
+                panel.failedTranslations.has(item.cacheKey) &&
+                !item.mandatory &&
+                !mandatoryCacheKeys.has(item.cacheKey)
+            ) {
+                return false;
+            }
+
+            return true;
+        });
+
+        if (uncached.length === 0) {
+            return [];
+        }
+
+        const uniqueMap = new Map();
+        for (const item of uncached) {
+            if (!uniqueMap.has(item.cacheKey)) {
+                uniqueMap.set(item.cacheKey, item);
+            }
+        }
+        const uniqueItemsRaw = Array.from(uniqueMap.values());
+
+        const mandatoryItems = [];
+        const optionalItems = [];
+        for (const item of uniqueItemsRaw) {
+            if (item.mandatory || mandatoryCacheKeys.has(item.cacheKey)) {
+                mandatoryItems.push(item);
+            } else {
+                optionalItems.push(item);
+            }
+        }
+
+        const uniqueItems = [...mandatoryItems, ...optionalItems];
+        this._state.pendingKeys = new Set();
+        this._state.textSuccesses = 0;
+
+        for (const item of uniqueItems) {
+            panel.pendingTranslations.set(item.cacheKey, true);
+            this._state.pendingKeys.add(item.cacheKey);
+        }
+
+        console.log(
+            `[TranslateOnTheFly] Batch translating ${uniqueItems.length} items (${uniqueItems.filter((item) => isMessageTextType(item.type)).length} texts, ${uniqueItems.filter((item) => item.type === 'speaker').length} speakers, ${uniqueItems.filter((item) => item.type === 'choice').length} choices)`
+        );
+
+        return uniqueItems;
     }
 
-    console.log(
-      `[TranslateOnTheFly] Batch translating ${uniqueItems.length} items (${uniqueItems.filter((item) => item.type === "text").length} texts, ${uniqueItems.filter((item) => item.type === "speaker").length} speakers, ${uniqueItems.filter((item) => item.type === "choice").length} choices)`,
-    );
+    setData({ panel, successes, failures }) {
+        super.setData({ panel, successes, failures });
 
-    return uniqueItems;
-  }
+        for (const success of successes || []) {
+            if (success && isMessageTextType(success.type)) {
+                this._state.textSuccesses += 1;
+            }
+        }
 
-  setData({ panel, successes, failures }) {
-    super.setData({ panel, successes, failures });
+        for (const failure of failures || []) {
+            if (!failure || !failure.cacheKey) {
+                continue;
+            }
+            panel.setCacheValue(failure.cacheKey, '');
+        }
 
-    for (const success of successes || []) {
-      if (success && success.type === "text") {
-        this._state.textSuccesses += 1;
-      }
+        for (const failure of failures || []) {
+            console.warn(
+                `[TranslateOnTheFly] Failed to translate ${failure.type}:`,
+                failure.value,
+                '->',
+                failure.rejectReason
+            );
+        }
     }
 
-    for (const failure of failures || []) {
-      if (!failure || !failure.cacheKey) {
-        continue;
-      }
-      panel.setCacheValue(failure.cacheKey, "");
+    finalizePhase({ panel }) {
+        try {
+            this.applyCurrentText(
+                panel,
+                this._state.items,
+                this._state.normalizedCurrentText || this.currentText || '',
+                this._state.textSuccesses
+            );
+            this.applyCurrentChoices(panel);
+        } finally {
+            for (const key of this._state.pendingKeys || []) {
+                panel.pendingTranslations.delete(key);
+            }
+        }
     }
 
-    for (const failure of failures || []) {
-      console.warn(
-        `[TranslateOnTheFly] Failed to translate ${failure.type}:`,
-        failure.value,
-        "->",
-        failure.rejectReason,
-      );
+    handleFatalError({ panel, error }) {
+        console.error('[TranslateOnTheFly] Ahead translation error:', error);
+        for (const key of this._state.pendingKeys || []) {
+            panel.failedTranslations.set(key, Date.now());
+            panel.pendingTranslations.delete(key);
+        }
+        panel.replaceMessageText(this.currentText || '');
+        panel._translationApplied = true;
     }
-  }
-
-  finalizePhase({ panel }) {
-    try {
-      this.applyCurrentText(
-        panel,
-        this._state.items,
-        this._state.normalizedCurrentText || this.currentText || "",
-        this._state.textSuccesses,
-      );
-      this.applyCurrentChoices(panel);
-    } finally {
-      for (const key of this._state.pendingKeys || []) {
-        panel.pendingTranslations.delete(key);
-      }
-    }
-  }
-
-  handleFatalError({ panel, error }) {
-    console.error("[TranslateOnTheFly] Ahead translation error:", error);
-    for (const key of this._state.pendingKeys || []) {
-      panel.failedTranslations.set(key, Date.now());
-      panel.pendingTranslations.delete(key);
-    }
-    panel.replaceMessageText(this.currentText || "");
-    panel._translationApplied = true;
-  }
 }
