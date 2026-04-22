@@ -15,9 +15,25 @@ export const translateOnTheFlyMessageMethods = {
         $gameMessage._texts.length = 0;
 
         // Add translated lines (preserving all RPG Maker tags)
-        for (const line of lines) {
-            if (line || lines.length === 1) {
-                // Keep empty lines if they're intentional
+        // Keep leading/internal empty lines, but skip trailing empty-only padding.
+        const lastNonEmptyIndex = (() => {
+            for (let i = lines.length - 1; i >= 0; i--) {
+                if (lines[i] !== '') {
+                    return i;
+                }
+            }
+            return -1;
+        })();
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            if (lines.length === 1) {
+                $gameMessage._texts.push(line);
+                continue;
+            }
+
+            const isLeadingOrInternalEmpty = line === '' && i <= lastNonEmptyIndex;
+            if (line !== '' || isLeadingOrInternalEmpty) {
                 $gameMessage._texts.push(line);
             }
         }
@@ -427,9 +443,9 @@ export const translateOnTheFlyMessageMethods = {
     async translateWithSelectedEngine(text, options = {}) {
         const sourceLang = this.sourceLang || 'auto';
         const targetLang = this.targetLang || 'en';
-        const payload = (text || '').trim();
+        const payload = text === null || text === undefined ? '' : String(text);
 
-        if (!payload) {
+        if (!payload.trim()) {
             return text;
         }
 
