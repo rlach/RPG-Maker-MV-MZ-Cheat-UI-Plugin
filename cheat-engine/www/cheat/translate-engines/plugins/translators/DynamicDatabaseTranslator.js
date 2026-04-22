@@ -33,6 +33,16 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
     return "plugin_dynamic_database";
   }
 
+  resolveMappedCacheType(cachePrefix, field) {
+    const normalizedPrefix = String(cachePrefix || "").trim();
+    const normalizedField = String(field || "").trim();
+    if (!normalizedPrefix || !normalizedField) {
+      return "";
+    }
+
+    return `${normalizedPrefix}_${normalizedField}`;
+  }
+
   getDataTypeByObject(dataObject) {
     if (!dataObject || typeof dataObject !== "object") {
       return "";
@@ -288,17 +298,21 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
         continue;
       }
 
-      const cacheKey = panel.getCacheKey(text, this.getCacheType());
-      const fallbackType = `${entry.cachePrefix}_${entry.field}`;
-      const fallbackCacheKey = panel.getCacheKey(text, fallbackType);
+      const mappedType = this.resolveMappedCacheType(entry.cachePrefix, entry.field);
+      if (!mappedType) {
+        continue;
+      }
+
+      const cacheKey = panel.getCacheKey(text, mappedType);
+      const legacyCacheKey = panel.getCacheKey(text, this.getCacheType());
 
       if (!byCacheKey.has(cacheKey)) {
         byCacheKey.set(cacheKey, {
-          type: this.getCacheType(),
+          type: mappedType,
           id: `plugin_dynamic_database_${byCacheKey.size}`,
           value: text,
           cacheKey,
-          fallbackCacheKey,
+          legacyCacheKey,
         });
       }
     }
@@ -315,7 +329,7 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
       return true;
     }
 
-    if (item.fallbackCacheKey && panel.hasUsableCacheValue(item.fallbackCacheKey)) {
+    if (item.legacyCacheKey && panel.hasUsableCacheValue(item.legacyCacheKey)) {
       return true;
     }
 
