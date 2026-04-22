@@ -83,6 +83,15 @@ export default {
           @click.self.stop
           @change="onChangeCurrentMapMidPhasePriority">
         </v-switch>
+
+                <v-switch
+                        v-model="flatProgressWindow"
+                        label="Flat progress window"
+                        dense
+                        hide-details
+                        @click.self.stop
+                        @change="onChangeFlatProgressWindow">
+                </v-switch>
     </v-card-text>
 
     <v-card-subtitle class="pb-0 mt-4 font-weight-bold">Language Settings</v-card-subtitle>
@@ -361,6 +370,10 @@ export default {
 
         onChangeCurrentMapMidPhasePriority() {
             return this.callRuntime('onChangeCurrentMapMidPhasePriority');
+        },
+
+        onChangeFlatProgressWindow() {
+            return this.callRuntime('onChangeFlatProgressWindow');
         },
 
         onChangeTranslationEngine() {

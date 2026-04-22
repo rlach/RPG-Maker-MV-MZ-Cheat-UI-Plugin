@@ -83,6 +83,16 @@ export const translateOnTheFlySettingsMethods = {
     this.saveSettings();
   },
 
+  onChangeFlatProgressWindow() {
+    if (typeof this.resetProgressBoxPositionToDefault === "function") {
+      this.resetProgressBoxPositionToDefault();
+    }
+    if (typeof this.ensureProgressBoxElements === "function") {
+      this.ensureProgressBoxElements();
+    }
+    this.saveSettings();
+  },
+
   onChangeEnabled() {
     TranslateOnTheFlyState.setEnabled(this.enabled);
     this.saveSettings();
