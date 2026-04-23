@@ -408,7 +408,16 @@ export const translateOnTheFlyRuntimeMethods = {
                   };
             const cacheKey = textCacheState.activeKey;
             const choices = ($gameMessage.choices && $gameMessage.choices()) || [];
-            const originalChoices = $gameMessage._translateOriginalChoices || choices;
+            // Freeze source choices once so translated replacements never become cache keys.
+            if (
+                !Array.isArray($gameMessage._translateOriginalChoices) &&
+                Array.isArray(choices) &&
+                choices.length > 0
+            ) {
+                $gameMessage._translateOriginalChoices = choices.slice();
+            }
+            const originalChoices =
+                $gameMessage._translateOriginalChoices || (Array.isArray(choices) ? choices : []);
             const hasChoices = Array.isArray(originalChoices) && originalChoices.length > 0;
             const choiceCacheKeys = hasChoices
                 ? originalChoices.map((choice) => self.getCacheKey(choice, 'choice'))
@@ -698,8 +707,14 @@ export const translateOnTheFlyRuntimeMethods = {
         Game_Message.prototype.setChoices = function (choices, defaultType, cancelType) {
             Game_Message.prototype._originalSetChoices.call(this, choices, defaultType, cancelType);
 
-            // Store original choices for stable cache keys (they may be mutated later)
-            this._translateOriginalChoices = (choices || []).slice();
+            // Store original choices for stable cache keys (they may be mutated later).
+            // If a plugin translator already preserved the original source values,
+            // use that snapshot instead of the potentially translated array.
+            if (Array.isArray(choices) && Array.isArray(choices._translateOriginalChoices)) {
+                this._translateOriginalChoices = choices._translateOriginalChoices.slice();
+            } else {
+                this._translateOriginalChoices = (choices || []).slice();
+            }
 
             const translationEnabled = self.isTranslationEnabled();
             const skipping = self.isSkippingMessages();
@@ -853,7 +868,17 @@ export const translateOnTheFlyRuntimeMethods = {
 
             if ((translationEnabled || useCacheOnly) && $gameMessage.isChoice()) {
                 const choices = $gameMessage.choices();
-                const originalChoices = $gameMessage._translateOriginalChoices || choices;
+                // Keep a stable source snapshot to avoid using translated choices as keys.
+                if (
+                    !Array.isArray($gameMessage._translateOriginalChoices) &&
+                    Array.isArray(choices) &&
+                    choices.length > 0
+                ) {
+                    $gameMessage._translateOriginalChoices = choices.slice();
+                }
+                const originalChoices =
+                    $gameMessage._translateOriginalChoices ||
+                    (Array.isArray(choices) ? choices : []);
                 const choiceKeys = originalChoices.map((choice) =>
                     self.getCacheKey(choice, 'choice')
                 );

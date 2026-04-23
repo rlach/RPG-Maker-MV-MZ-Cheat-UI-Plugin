@@ -179,8 +179,23 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
             return;
         }
 
+        if (!Array.isArray(data.choices)) {
+            return;
+        }
+
+        if (!Array.isArray(data.choices._translateOriginalChoices)) {
+            Object.defineProperty(data.choices, '_translateOriginalChoices', {
+                value: data.choices.slice(),
+                enumerable: false,
+                writable: true,
+                configurable: true,
+            });
+        }
+
         for (let i = Math.max(0, Number(startIndex) || 0); i < data.choices.length; i++) {
-            const originalText = String(data.choices[i] || '');
+            const originalText = String(
+                data.choices._translateOriginalChoices[i] || data.choices[i] || ''
+            );
             if (!isUsableText(originalText)) {
                 continue;
             }
@@ -234,10 +249,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
                 return entry;
             }
 
-            const cacheKey = runtime.getCacheKey(
-                originalBlock,
-                this.getChoiceHelpCacheType()
-            );
+            const cacheKey = runtime.getCacheKey(originalBlock, this.getChoiceHelpCacheType());
             if (typeof runtime.markCacheKeySeen === 'function') {
                 runtime.markCacheKeySeen(cacheKey);
             }
@@ -280,18 +292,13 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
 
     readConfiguredChoiceHelpCommands() {
         try {
-            if (
-                runtimeGlobal.PluginManager &&
-                typeof PluginManager.parameters === 'function'
-            ) {
+            if (runtimeGlobal.PluginManager && typeof PluginManager.parameters === 'function') {
                 const parameters = PluginManager.parameters(this.getPluginName()) || {};
                 const raw = parameters['Choice Help Commands'];
                 if (typeof raw === 'string' && raw.trim()) {
                     const parsed = JSON.parse(raw);
                     if (Array.isArray(parsed)) {
-                        return parsed.filter(
-                            (item) => typeof item === 'string' && item.trim()
-                        );
+                        return parsed.filter((item) => typeof item === 'string' && item.trim());
                     }
                 }
             }
@@ -487,7 +494,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
 
             output.push({
                 text: parsed.text,
-                        cacheType: this.getChoiceCacheType(),
+                cacheType: this.getChoiceCacheType(),
                 source: {
                     ...baseMeta,
                     cmdIdx,
