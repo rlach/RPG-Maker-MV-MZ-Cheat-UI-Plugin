@@ -437,7 +437,12 @@ export const translateOnTheFlyRuntimeMethods = {
             }
 
             if (hasText) {
-                self.trackCacheKeyUsage(cacheKey);
+                const seenTextKey = textCacheState.resolvedKey || cacheKey;
+                // On cache hit, track the exact key that resolved the translation so Seen
+                // reflects the real source key (e.g. message_portrait fallback).
+                self.trackCacheKeyUsage(seenTextKey, {
+                    harvestMissing: !textCacheState.resolvedKey,
+                });
             }
             if (hasChoices) {
                 for (const choice of originalChoices) {
