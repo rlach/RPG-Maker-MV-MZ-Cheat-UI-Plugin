@@ -1,6 +1,7 @@
 import { ensureTranslationRuntime } from './translate-on-the-fly/TranslationRuntime.js';
 import { createTranslationBatchManager } from '../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
+import { ConfirmDialog } from '../js/DialogHelper.js';
 
 export default {
     name: 'TranslateNamesPanel',
@@ -53,6 +54,16 @@ export default {
             <v-btn small outlined color="primary" class="ml-2" @click="lookForNamesInCache">
                 <v-icon small left>mdi-magnify</v-icon>
                 Look for names in cache
+            </v-btn>
+            <v-btn
+                small
+                outlined
+                color="error"
+                class="ml-2"
+                :disabled="cacheOnlyCount === 0"
+                @click="confirmRemoveAllCacheOnlyEntries">
+                <v-icon small left>mdi-trash-can-outline</v-icon>
+                Remove all cache names ({{ cacheOnlyCount }})
             </v-btn>
         </div>
         <div class="mt-2 d-flex align-center">
@@ -139,7 +150,7 @@ export default {
         class="mt-2 table-with-sticky-footer"
         :headers="tableHeaders"
         :items="filteredEntries"
-        item-key="cacheKey"
+        item-key="rowKey"
         :page.sync="page"
         :sort-by.sync="sortBy"
         :sort-desc.sync="sortDesc"
@@ -395,6 +406,10 @@ export default {
         untranslatedCount() {
             return this.entries.filter((e) => !e.translation || !e.translation.trim()).length;
         },
+
+        cacheOnlyCount() {
+            return this.entries.filter((entry) => entry.source === 'cache').length;
+        },
     },
 
     methods: {
@@ -536,6 +551,7 @@ export default {
                             translation: inCache ? cacheNameMap.get(originalName) : '',
                             gender: this.resolveGender(originalName),
                             cacheKey,
+                            rowKey: `db:${i}:${originalName}`,
                             actorId: i,
                         });
                     }
@@ -555,6 +571,7 @@ export default {
                             translation,
                             gender: this.resolveGender(originalName),
                             cacheKey: this.buildCacheKey(originalName, sourceLang, targetLang),
+                            rowKey: `cache:${cacheOnlyIndex}:${originalName}`,
                             actorId: null,
                         });
                         cacheOnlyIndex++;
@@ -735,6 +752,61 @@ export default {
             }
 
             this.refresh();
+        },
+
+        removeAllCacheOnlyEntries() {
+            const cacheOnlyEntries = this.entries.filter(
+                (entry) => entry && entry.source === 'cache' && entry.cacheKey
+            );
+            if (cacheOnlyEntries.length === 0) {
+                return;
+            }
+
+            const runtime = ensureTranslationRuntime();
+            const uniqueKeys = Array.from(new Set(cacheOnlyEntries.map((entry) => entry.cacheKey)));
+
+            for (const cacheKey of uniqueKeys) {
+                runtime.translationCache.delete(cacheKey);
+            }
+
+            for (const entry of cacheOnlyEntries) {
+                if (entry.originalName) {
+                    this.saveNameProfile(entry.originalName, null);
+                }
+            }
+
+            runtime.persistCache(uniqueKeys);
+            runtime.notifyCacheRuntime('names-panel-remove-all-cache-only');
+            this.refresh();
+        },
+
+        confirmRemoveAllCacheOnlyEntries() {
+            if (this.cacheOnlyCount <= 0) {
+                return;
+            }
+
+            ConfirmDialog.show({
+                width: 420,
+                message:
+                    'Remove all cache-only names?\nThis cannot be undone and keeps DB/both names unchanged.',
+                actions: [
+                    {
+                        icon: 'mdi-close',
+                        label: 'No',
+                        color: 'white',
+                        action: ConfirmDialog.close,
+                    },
+                    {
+                        icon: 'mdi-check',
+                        label: 'Yes',
+                        color: 'green',
+                        action: () => {
+                            this.removeAllCacheOnlyEntries();
+                            ConfirmDialog.close();
+                        },
+                    },
+                ],
+            });
         },
 
         getSpawnedGameActor(actorId) {
