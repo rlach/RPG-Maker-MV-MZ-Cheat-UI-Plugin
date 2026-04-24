@@ -51,7 +51,7 @@ export class ApiClient {
       "Content-Type": "application/json",
     };
 
-    if (isAuth && this.provider === "openwebui" && this.apiKey) {
+    if (isAuth && this.apiKey) {
       headers["Authorization"] = `Bearer ${this.apiKey}`;
     }
 
