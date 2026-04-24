@@ -373,19 +373,20 @@ class AIEngine extends BaseTranslationEngine {
         };
 
         const recordEsc = (sym, numVal, sqVal, angVal, roundVal, curlyVal) => {
+            const normalizedSym = String(sym || '').toUpperCase();
             let pattern;
             if (numVal !== undefined) {
-                pattern = `\\${sym}[N]`;
+                pattern = `\\${normalizedSym}[N]`;
             } else if (sqVal !== undefined) {
-                pattern = `\\${sym}[…]`;
+                pattern = `\\${normalizedSym}[…]`;
             } else if (angVal !== undefined) {
-                pattern = `\\${sym}<…>`;
+                pattern = `\\${normalizedSym}<…>`;
             } else if (roundVal !== undefined) {
-                pattern = `\\${sym}(…)`;
+                pattern = `\\${normalizedSym}(…)`;
             } else if (curlyVal !== undefined) {
-                pattern = `\\${sym}{…}`;
+                pattern = `\\${normalizedSym}{…}`;
             } else {
-                pattern = `\\${sym}`;
+                pattern = `\\${normalizedSym}`;
             }
             counts.set(pattern, (counts.get(pattern) || 0) + 1);
         };
