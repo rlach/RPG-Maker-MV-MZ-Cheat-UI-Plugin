@@ -1361,7 +1361,7 @@ class AIEngine extends BaseTranslationEngine {
 
     getRequestHeaders() {
         const headers = { 'Content-Type': 'application/json' };
-        if (this.provider === 'openwebui' && this.apiKey) {
+        if (this.apiKey) {
             headers['Authorization'] = `Bearer ${this.apiKey}`;
         }
         return headers;

@@ -1,4 +1,6 @@
 import { KeyValueStorage } from "../../js/KeyValueStorage.js";
+import { createSecureSecretStorage } from '../../js/SecureSecretStorage.js';
+import { ensureSettingsMigration } from '../../js/UnifiedSettings.js';
 import { TranslateOnTheFlyState } from "../../js/TranslateOnTheFlyState.js";
 import { ensureTranslateCacheRuntime } from "../../js/TranslateCacheRuntime.js";
 import {
@@ -51,9 +53,12 @@ class TranslationRuntime {
       return this;
     }
 
+    ensureSettingsMigration();
+
     this.kvStorage = new KeyValueStorage(
       "./www/cheat-settings/translate-on-the-fly.json",
     );
+    this.secureSecretStorage = createSecureSecretStorage();
     this.cacheStorage = new KeyValueStorage(
       "./www/cheat-settings/translate-cache.json",
     );
@@ -89,6 +94,9 @@ class TranslationRuntime {
     }
 
     this.bindEngineConfigTo(this);
+    this.loadAiApiKeyFromSecureStore().catch((error) => {
+      console.warn('[TranslateOnTheFly] Failed to load AI API key from secure storage:', error);
+    });
     this.deferHookInitialization();
 
     this.stateUnsubscribe = TranslateOnTheFlyState.subscribe((enabled) => {

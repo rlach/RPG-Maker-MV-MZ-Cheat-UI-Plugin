@@ -365,15 +365,20 @@ export default {
       }
 
       try {
-        const json = this.settingsStorage.getItem("data");
-        if (!json) {
+        const raw = this.settingsStorage.getAll();
+        if (!raw || typeof raw !== "object") {
           return {
             sourceLang: "ja",
             targetLang: "en",
           };
         }
 
-        const data = JSON.parse(json);
+        const data =
+          typeof raw.data === "string"
+            ? JSON.parse(raw.data)
+            : raw && typeof raw.data === "object"
+              ? raw.data
+              : raw;
         return {
           sourceLang: data.sourceLang || "ja",
           targetLang: data.targetLang || "en",

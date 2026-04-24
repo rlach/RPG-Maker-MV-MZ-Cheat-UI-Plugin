@@ -3,6 +3,7 @@ export class KeyValueStorage {
         this.filePath = filePath
         this.fileEncoding = 'utf-8'
         this.fileSystem = require('fs')
+        this.jsonIndent = 2
     }
 
     getAll() {
@@ -64,13 +65,21 @@ export class KeyValueStorage {
 
     __writeFileAtomicSync(data) {
         const normalizedData = this.__normalizeFileData(data)
-        this.fileSystem.writeFileSync(`${this.filePath}.tmp`, JSON.stringify(normalizedData), this.fileEncoding)
+        this.fileSystem.writeFileSync(
+            `${this.filePath}.tmp`,
+            JSON.stringify(normalizedData, null, this.jsonIndent),
+            this.fileEncoding
+        )
         this.fileSystem.renameSync(`${this.filePath}.tmp`, this.filePath)
     }
 
     async __writeFileAtomicAsync(data) {
         const normalizedData = this.__normalizeFileData(data)
-        await this.fileSystem.promises.writeFile(`${this.filePath}.tmp`, JSON.stringify(normalizedData), this.fileEncoding)
+        await this.fileSystem.promises.writeFile(
+            `${this.filePath}.tmp`,
+            JSON.stringify(normalizedData, null, this.jsonIndent),
+            this.fileEncoding
+        )
         await this.fileSystem.promises.rename(`${this.filePath}.tmp`, this.filePath)
     }
 

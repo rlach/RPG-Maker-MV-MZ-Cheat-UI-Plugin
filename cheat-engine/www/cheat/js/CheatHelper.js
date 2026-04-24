@@ -4,6 +4,7 @@ import { TranslateOnTheFlyState } from './TranslateOnTheFlyState.js';
 import { MESSAGE_LOG } from './MessageLogStore.js';
 import { OBJECT_TRANSLATION_SERVICE } from '../panels/translate-on-the-fly/ObjectTranslationService.js';
 import { ensureTranslationRuntime } from '../panels/translate-on-the-fly/TranslationRuntime.js';
+import { ensureSettingsMigration, getUnifiedSetting, setUnifiedSetting } from './UnifiedSettings.js';
 
 export class GeneralCheat {
     static toggleCheatModal(componentName = null) {}
@@ -267,22 +268,18 @@ export class GameSpeedCheat {
         const sceneOptionKey = Object.keys(GameSpeedCheat.sceneOptions()).find(
             (key) => options[key] === sceneOption
         );
-
-        const storage = new KeyValueStorage('./www/cheat-settings/gameSpeed.json');
-
-        storage.setItem('data', JSON.stringify({ rate: rate, sceneOption: sceneOptionKey }));
+        setUnifiedSetting('gameSpeed', {
+            rate: rate,
+            sceneOption: sceneOptionKey,
+        });
     }
 
     static __readSettings() {
-        const storage = new KeyValueStorage('./www/cheat-settings/gameSpeed.json');
+        const data = getUnifiedSetting('gameSpeed', null);
 
-        const json = storage.getItem('data');
-
-        if (!json) {
+        if (!data || typeof data !== 'object') {
             return;
         }
-
-        const data = JSON.parse(json);
 
         GameSpeedCheat.setGameSpeed(data.rate, GameSpeedCheat.sceneOptions()[data.sceneOption]);
     }
@@ -551,20 +548,17 @@ export class AlwaysDashCheat {
     }
 
     static __writeSettings(alwaysDash) {
-        const storage = new KeyValueStorage('./www/cheat-settings/alwaysdash.json');
-        storage.setItem('data', JSON.stringify({ alwaysDash: alwaysDash }));
+        setUnifiedSetting('alwaysDash', !!alwaysDash);
     }
 
     static __readSettings() {
-        const storage = new KeyValueStorage('./www/cheat-settings/alwaysdash.json');
-        const json = storage.getItem('data');
+        const alwaysDash = getUnifiedSetting('alwaysDash', undefined);
 
-        if (!json) {
+        if (alwaysDash === undefined) {
             return;
         }
 
-        const data = JSON.parse(json);
-        this.setAlwaysDash(data.alwaysDash);
+        this.setAlwaysDash(alwaysDash);
     }
 }
 
@@ -597,20 +591,17 @@ export class TextSpeedCheat {
     }
 
     static __writeSettings(textSpeed) {
-        const storage = new KeyValueStorage('./www/cheat-settings/textspeed.json');
-        storage.setItem('data', JSON.stringify({ textSpeed: textSpeed }));
+        setUnifiedSetting('textSpeed', textSpeed);
     }
 
     static __readSettings() {
-        const storage = new KeyValueStorage('./www/cheat-settings/textspeed.json');
-        const json = storage.getItem('data');
+        const textSpeed = getUnifiedSetting('textSpeed', undefined);
 
-        if (!json) {
+        if (textSpeed === undefined) {
             return;
         }
 
-        const data = JSON.parse(json);
-        this.setTextSpeed(data.textSpeed);
+        this.setTextSpeed(textSpeed);
     }
 }
 
@@ -974,6 +965,8 @@ async function multiRetryAction(action, intervalTimeout, maxTryCount) {
 }
 
 function initialize() {
+    ensureSettingsMigration();
+
     const intervalTimeout = 500;
     const maxTryCount = 100;
 

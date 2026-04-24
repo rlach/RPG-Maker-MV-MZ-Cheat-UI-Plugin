@@ -320,6 +320,17 @@ export function normalizePersistedTranslationSettings(rawData = {}) {
     if (!normalized.engineSettings || typeof normalized.engineSettings !== 'object') {
         normalized.engineSettings = {};
     }
+
+    Object.keys(normalized.engineSettings).forEach((engineId) => {
+        const engineConfig = normalized.engineSettings[engineId];
+        if (!engineConfig || typeof engineConfig !== 'object') {
+            return;
+        }
+        if (Object.prototype.hasOwnProperty.call(engineConfig, 'aiApiKey')) {
+            delete engineConfig.aiApiKey;
+        }
+    });
+
     if (normalized.engineSettings.gpt4all && !normalized.engineSettings.openApi) {
         normalized.engineSettings.openApi = normalized.engineSettings.gpt4all;
         delete normalized.engineSettings.gpt4all;

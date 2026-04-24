@@ -1,7 +1,9 @@
 import { KeyValueStorage } from "./KeyValueStorage.js";
+import { ensureSettingsMigration } from './UnifiedSettings.js';
 
 class TranslateOnTheFlyStateManager {
   constructor() {
+    ensureSettingsMigration();
     this.storage = new KeyValueStorage(
       "./www/cheat-settings/translate-on-the-fly.json",
     );
@@ -12,12 +14,17 @@ class TranslateOnTheFlyStateManager {
 
   loadEnabled() {
     try {
-      const json = this.storage.getItem("data");
-      if (!json) {
+      const raw = this.storage.getAll();
+      if (!raw || typeof raw !== "object") {
         return this.enabled;
       }
 
-      const data = JSON.parse(json);
+      const data =
+        typeof raw.data === "string"
+          ? JSON.parse(raw.data)
+          : raw && typeof raw.data === "object"
+            ? raw.data
+            : raw;
       if (Object.prototype.hasOwnProperty.call(data, "enabled")) {
         this.enabled = !!data.enabled;
       }
@@ -30,17 +37,18 @@ class TranslateOnTheFlyStateManager {
 
   persistEnabled() {
     try {
-      const defaults = {
-        enabled: this.enabled,
-      };
-      let data = {};
-      const json = this.storage.getItem("data");
-      if (json) {
-        data = JSON.parse(json);
+      const raw = this.storage.getAll();
+      const data =
+        raw && typeof raw === "object"
+          ? { ...raw }
+          : {};
+
+      if (Object.prototype.hasOwnProperty.call(data, "data")) {
+        delete data.data;
       }
 
-      data = Object.assign({}, defaults, data, { enabled: this.enabled });
-      this.storage.setItem("data", JSON.stringify(data));
+      data.enabled = this.enabled;
+      this.storage.setAll(data);
     } catch (err) {
       console.warn(
         "[TranslateOnTheFlyState] Failed to persist enabled flag",

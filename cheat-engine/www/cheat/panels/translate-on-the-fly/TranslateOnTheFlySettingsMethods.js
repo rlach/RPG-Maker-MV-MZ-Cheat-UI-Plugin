@@ -9,7 +9,7 @@ import {
 const sanitizeEngineConfigForPersistence = (engineConfig = {}) => {
     const sanitized = {};
     for (const [key, value] of Object.entries(engineConfig)) {
-        if (/Options$/i.test(key)) {
+        if (/Options$/i.test(key) || key === 'aiApiKey') {
             continue;
         }
         sanitized[key] = value;
@@ -17,16 +17,29 @@ const sanitizeEngineConfigForPersistence = (engineConfig = {}) => {
     return sanitized;
 };
 
+const AI_API_KEY_SECRET_NAMESPACE = 'translate-on-the-fly:ai-api-key';
+
+const normalizeAiProvider = (provider) => {
+    const normalized = String(provider || 'openApi').trim();
+    return normalized === 'gpt4all' ? 'openApi' : normalized;
+};
+
 export const translateOnTheFlySettingsMethods = {
     loadSettings() {
-        const json = this.kvStorage.getItem('data');
+        const rawData = this.kvStorage.getAll();
 
         let normalized;
-        if (!json) {
+        if (!rawData || typeof rawData !== 'object' || Object.keys(rawData).length === 0) {
             normalized = createPersistedTranslationSettingsDefaults();
         } else {
             try {
-                normalized = normalizePersistedTranslationSettings(JSON.parse(json));
+                const candidate =
+                    typeof rawData.data === 'string'
+                        ? JSON.parse(rawData.data)
+                        : rawData && typeof rawData.data === 'object'
+                          ? rawData.data
+                          : rawData;
+                normalized = normalizePersistedTranslationSettings(candidate);
             } catch (error) {
                 console.warn(
                     '[TranslateOnTheFly] Failed to parse settings JSON, using defaults:',
@@ -39,6 +52,42 @@ export const translateOnTheFlySettingsMethods = {
         Object.assign(this, normalized);
 
         TranslateOnTheFlyState.setEnabled(this.enabled, { notify: false });
+    },
+
+    /** @this {any} */
+    getAiApiKeySecretId(provider) {
+        const resolvedProvider = provider || this.aiProvider;
+        return `${AI_API_KEY_SECRET_NAMESPACE}:${normalizeAiProvider(resolvedProvider)}`;
+    },
+
+    /** @this {any} */
+    async saveAiApiKeyToSecureStore(apiKey, provider) {
+        if (!this.secureSecretStorage) {
+            return false;
+        }
+
+        const secretId = this.getAiApiKeySecretId(provider || this.aiProvider);
+        const normalizedApiKey = typeof apiKey === 'string' ? apiKey : this.aiApiKey || '';
+        return this.secureSecretStorage.setSecret(secretId, normalizedApiKey);
+    },
+
+    /** @this {any} */
+    async loadAiApiKeyFromSecureStore(provider) {
+        if (!this.secureSecretStorage) {
+            this.aiApiKey = '';
+            if (this.engine) {
+                this.engine.aiApiKey = '';
+            }
+            return '';
+        }
+
+        const secretId = this.getAiApiKeySecretId(provider || this.aiProvider);
+        const apiKey = (await this.secureSecretStorage.getSecret(secretId)) || '';
+        this.aiApiKey = apiKey;
+        if (this.engine) {
+            this.engine.aiApiKey = apiKey;
+        }
+        return apiKey;
     },
 
     saveSettings() {
@@ -58,7 +107,7 @@ export const translateOnTheFlySettingsMethods = {
             enabled: TranslateOnTheFlyState.isEnabled(),
             engineSettings: this.engineSettings || {},
         });
-        this.kvStorage.setItem('data', JSON.stringify(data));
+        this.kvStorage.setAll(data);
     },
 
     onChangeCacheOnly() {
@@ -149,6 +198,15 @@ export const translateOnTheFlySettingsMethods = {
         Object.keys(engineConfigMethods).forEach((methodName) => {
             this[methodName] = engineConfigMethods[methodName].bind(this.engine);
         });
+
+        if (this.translationEngine === 'openApi' || this.translationEngine === 'gpt4all') {
+            this.loadAiApiKeyFromSecureStore().catch((error) => {
+                console.warn(
+                    '[TranslateOnTheFly] Failed to load AI API key after engine change:',
+                    error
+                );
+            });
+        }
 
         // Don't clear cache - keys contain engine name, so they don't conflict
         this.saveSettings();

@@ -28,8 +28,8 @@ export class ConfigManager {
     }
 
     _createPersistedHandler(handler, { syncPanel = false } = {}) {
-        return (...args) => {
-            const result = handler(...args);
+        return async (...args) => {
+            const result = await Promise.resolve(handler(...args));
             if (syncPanel) {
                 this._syncPanelEngineConfig();
             }
@@ -93,9 +93,9 @@ export class ConfigManager {
                class="mb-2"
              ></v-text-field>
              <v-text-field
-               v-if="aiProvider === 'openwebui'"
+                             v-if="aiProvider === 'openwebui' || aiProvider === 'openApi'"
                v-model="aiApiKey"
-               label="Open WebUI API Key"
+                             :label="aiProvider === 'openwebui' ? 'Open WebUI API Key' : 'OpenAPI compatible API Key'"
                outlined
                dense
                hide-details
@@ -311,8 +311,12 @@ export class ConfigManager {
             onChangeAiHost: this._createPersistedHandler((v) => {
                 this.aiEngine.host = v;
             }),
-            onChangeAiApiKey: this._createPersistedHandler((v) => {
+            onChangeAiApiKey: this._createPersistedHandler(async (v) => {
                 this.aiEngine.apiKey = v;
+                const panel = this.aiEngine.panel;
+                if (panel && typeof panel.saveAiApiKeyToSecureStore === 'function') {
+                    await panel.saveAiApiKeyToSecureStore(v, this.aiEngine.provider);
+                }
             }),
             onChangeAiModel: this._createPersistedHandler((v) => {
                 this.aiEngine.selectedModel = v;
@@ -428,7 +432,7 @@ export class ConfigManager {
      * Handle provider change
      * @private
      */
-    _onChangeAiProvider(provider) {
+    async _onChangeAiProvider(provider) {
         this.aiEngine.provider = provider === 'gpt4all' ? 'openApi' : provider;
 
         // Reset models and selected model
@@ -440,6 +444,11 @@ export class ConfigManager {
             this.aiEngine.host = 'http://localhost:8080';
         } else {
             this.aiEngine.host = 'http://localhost:4891';
+        }
+
+        const panel = this.aiEngine.panel;
+        if (panel && typeof panel.loadAiApiKeyFromSecureStore === 'function') {
+            await panel.loadAiApiKeyFromSecureStore(this.aiEngine.provider);
         }
     }
 
@@ -461,7 +470,7 @@ export class ConfigManager {
      */
     _getAuthHeaders() {
         const headers = { 'Content-Type': 'application/json' };
-        if (this.aiEngine.provider === 'openwebui' && this.aiEngine.apiKey) {
+        if (this.aiEngine.apiKey) {
             headers['Authorization'] = `Bearer ${this.aiEngine.apiKey}`;
         }
         return headers;
