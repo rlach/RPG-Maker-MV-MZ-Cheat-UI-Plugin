@@ -26,14 +26,20 @@ const normalizeAiProvider = (provider) => {
 
 export const translateOnTheFlySettingsMethods = {
     loadSettings() {
-        const json = this.kvStorage.getItem('data');
+        const rawData = this.kvStorage.getAll();
 
         let normalized;
-        if (!json) {
+        if (!rawData || typeof rawData !== 'object' || Object.keys(rawData).length === 0) {
             normalized = createPersistedTranslationSettingsDefaults();
         } else {
             try {
-                normalized = normalizePersistedTranslationSettings(JSON.parse(json));
+                const candidate =
+                    typeof rawData.data === 'string'
+                        ? JSON.parse(rawData.data)
+                        : rawData && typeof rawData.data === 'object'
+                          ? rawData.data
+                          : rawData;
+                normalized = normalizePersistedTranslationSettings(candidate);
             } catch (error) {
                 console.warn(
                     '[TranslateOnTheFly] Failed to parse settings JSON, using defaults:',
@@ -101,7 +107,7 @@ export const translateOnTheFlySettingsMethods = {
             enabled: TranslateOnTheFlyState.isEnabled(),
             engineSettings: this.engineSettings || {},
         });
-        this.kvStorage.setItem('data', JSON.stringify(data));
+        this.kvStorage.setAll(data);
     },
 
     onChangeCacheOnly() {

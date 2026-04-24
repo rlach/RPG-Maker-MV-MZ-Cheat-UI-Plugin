@@ -1,9 +1,9 @@
-import {KeyValueStorage} from './KeyValueStorage.js'
+import { ensureSettingsMigration, getUnifiedSetting, setUnifiedSetting } from './UnifiedSettings.js'
 import { isRpgMakerMv } from './RpgMakerRuntime.js'
 
 class CheatWindowManager {
     constructor () {
-        this.storage = new KeyValueStorage('./www/cheat-settings/ui.json')
+        ensureSettingsMigration()
         this.useSeparateWindow = false
         this.externalWindow = null
         this.mainComponent = null
@@ -24,12 +24,7 @@ class CheatWindowManager {
 
     __load () {
         try {
-            const json = this.storage.getItem('data')
-            if (!json) {
-                return
-            }
-
-            const data = JSON.parse(json)
+            const data = getUnifiedSetting('ui', {}) || {}
             if (Object.prototype.hasOwnProperty.call(data, 'openInSeparateWindow')) {
                 this.useSeparateWindow = !!data.openInSeparateWindow
             }
@@ -47,11 +42,11 @@ class CheatWindowManager {
 
     __save () {
         try {
-            const data = { 
+            const data = {
                 openInSeparateWindow: this.useSeparateWindow,
                 overlaySize: this.overlaySize
             }
-            this.storage.setItem('data', JSON.stringify(data))
+            setUnifiedSetting('ui', data)
         } catch (err) {
             console.warn('[CheatWindowManager] Failed to save settings', err)
         }

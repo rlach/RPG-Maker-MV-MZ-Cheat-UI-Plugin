@@ -1,5 +1,6 @@
 import { KeyValueStorage } from "../../js/KeyValueStorage.js";
 import { createSecureSecretStorage } from '../../js/SecureSecretStorage.js';
+import { ensureSettingsMigration } from '../../js/UnifiedSettings.js';
 import { TranslateOnTheFlyState } from "../../js/TranslateOnTheFlyState.js";
 import { ensureTranslateCacheRuntime } from "../../js/TranslateCacheRuntime.js";
 import {
@@ -51,6 +52,8 @@ class TranslationRuntime {
     if (this._initialized) {
       return this;
     }
+
+    ensureSettingsMigration();
 
     this.kvStorage = new KeyValueStorage(
       "./www/cheat-settings/translate-on-the-fly.json",
