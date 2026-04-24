@@ -527,6 +527,93 @@ export class BattleCheat {
     }
 }
 
+export class AlwaysDashCheat {
+    static getAlwaysDash() {
+        if (typeof ConfigManager !== 'undefined' && ConfigManager.alwaysDash !== undefined) {
+            return ConfigManager.alwaysDash;
+        }
+        return false;
+    }
+
+    static setAlwaysDash(value) {
+        if (typeof ConfigManager !== 'undefined') {
+            ConfigManager.alwaysDash = !!value;
+            if (typeof ConfigManager.save === 'function') {
+                ConfigManager.save();
+            }
+        }
+    }
+
+    static toggleAlwaysDash() {
+        const current = this.getAlwaysDash();
+        this.setAlwaysDash(!current);
+        return !current;
+    }
+
+    static __writeSettings(alwaysDash) {
+        const storage = new KeyValueStorage('./www/cheat-settings/alwaysdash.json');
+        storage.setItem('data', JSON.stringify({ alwaysDash: alwaysDash }));
+    }
+
+    static __readSettings() {
+        const storage = new KeyValueStorage('./www/cheat-settings/alwaysdash.json');
+        const json = storage.getItem('data');
+
+        if (!json) {
+            return;
+        }
+
+        const data = JSON.parse(json);
+        this.setAlwaysDash(data.alwaysDash);
+    }
+}
+
+export class TextSpeedCheat {
+    static getTextSpeed() {
+        if (typeof $gameSystem !== 'undefined' && $gameSystem._textSpeed !== undefined) {
+            return $gameSystem._textSpeed;
+        }
+        return 1; // default is normal speed
+    }
+
+    static setTextSpeed(speed) {
+        // Clamp speed between 0.1 and 10
+        const clampedSpeed = Math.max(0.1, Math.min(10, speed));
+        
+        if (typeof $gameSystem !== 'undefined') {
+            if (!$gameSystem._textSpeed) {
+                $gameSystem._textSpeed = 1;
+            }
+            $gameSystem._textSpeed = clampedSpeed;
+        }
+    }
+
+    static getCharacterWaitTime() {
+        // Calculate wait frames based on text speed
+        // Speed 1 = 4 frames (default), Speed 10 = 0.4 frames
+        const baseWait = 4;
+        const speed = this.getTextSpeed();
+        return Math.max(1, Math.round(baseWait / speed));
+    }
+
+    static __writeSettings(textSpeed) {
+        const storage = new KeyValueStorage('./www/cheat-settings/textspeed.json');
+        storage.setItem('data', JSON.stringify({ textSpeed: textSpeed }));
+    }
+
+    static __readSettings() {
+        const storage = new KeyValueStorage('./www/cheat-settings/textspeed.json');
+        const json = storage.getItem('data');
+
+        if (!json) {
+            return;
+        }
+
+        const data = JSON.parse(json);
+        this.setTextSpeed(data.textSpeed);
+    }
+}
+
 export class MessageCheat {
     static initialize() {
         this.skip = false;
@@ -861,6 +948,8 @@ try {
     window.SpeedCheat = SpeedCheat;
     window.SceneCheat = SceneCheat;
     window.MessageCheat = MessageCheat;
+    window.AlwaysDashCheat = AlwaysDashCheat;
+    window.TextSpeedCheat = TextSpeedCheat;
 } catch (err) {
     // Non-fatal: best-effort exposure only
 }
@@ -888,7 +977,12 @@ function initialize() {
     const intervalTimeout = 500;
     const maxTryCount = 100;
 
-    const initializeActions = [SpeedCheat.__readSettings, GameSpeedCheat.__readSettings];
+    const initializeActions = [
+        SpeedCheat.__readSettings,
+        GameSpeedCheat.__readSettings,
+        AlwaysDashCheat.__readSettings,
+        TextSpeedCheat.__readSettings,
+    ];
 
     initializeActions.forEach((action) => multiRetryAction(action, intervalTimeout, maxTryCount));
 }

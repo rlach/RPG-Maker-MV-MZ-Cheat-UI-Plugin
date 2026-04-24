@@ -3,6 +3,8 @@ import {
   GameSpeedCheat,
   SpeedCheat,
   SceneCheat,
+  AlwaysDashCheat,
+  TextSpeedCheat,
 } from "../js/CheatHelper.js";
 import { CHEAT_WINDOW_MANAGER } from "../js/CheatWindowManager.js";
 import { getRpgMakerName } from "../js/RpgMakerRuntime.js";
@@ -75,6 +77,35 @@ export default {
             label="Fixed"
             @change="onSpeedChange">
         </v-checkbox>
+
+        <v-checkbox
+            v-model="alwaysDash"
+            class="pt-2"
+            hide-details
+            dense
+            label="Always Dash"
+            @change="onAlwaysDashChange">
+        </v-checkbox>
+        
+        <v-slider
+            v-model="textSpeed"
+            :min="minTextSpeed"
+            :max="maxTextSpeed"
+            :step="stepTextSpeed"
+            class="mt-3"
+            thumb-label
+            thumb-color="red"
+            hide-details
+            @change="onTextSpeedChange">
+            <template v-slot:prepend>
+                <span class="grey--text text--lighten-1 align-self-center mr-2 body-2" style="white-space: nowrap;">Text Speed</span>
+                <v-icon color="grey lighten-3" @click="addTextSpeed(-stepTextSpeed)">mdi-chevron-left</v-icon>
+            </template>
+            <template v-slot:append>
+                <v-icon color="grey lighten-3" @click="addTextSpeed(stepTextSpeed)">mdi-chevron-right</v-icon>
+                <span class="grey--text text--lighten-1 align-self-center ml-2">{{textSpeed.toFixed(1)}}</span>
+            </template>
+        </v-slider>
         
         <v-slider
             v-model="gameSpeed"
@@ -169,6 +200,8 @@ export default {
       gold: 0,
       speed: 0,
       fixSpeed: false,
+      alwaysDash: false,
+      textSpeed: 1,
 
       rootWindow: null,
       rootWindowManager: null,
@@ -179,6 +212,8 @@ export default {
         GameSpeedCheat,
         SpeedCheat,
         SceneCheat,
+        AlwaysDashCheat,
+        TextSpeedCheat,
       },
 
       openInSeparateWindow: CHEAT_WINDOW_MANAGER.isSeparateWindowEnabled(),
@@ -186,6 +221,10 @@ export default {
       minSpeed: 1,
       maxSpeed: 10,
       stepSpeed: 0.5,
+
+      minTextSpeed: 0.1,
+      maxTextSpeed: 10,
+      stepTextSpeed: 0.1,
 
       gameSpeed: 1,
       minGameSpeed: 0.1,
@@ -215,6 +254,8 @@ export default {
       GameSpeedCheat: root.GameSpeedCheat || GameSpeedCheat,
       SpeedCheat: root.SpeedCheat || SpeedCheat,
       SceneCheat: root.SceneCheat || SceneCheat,
+      AlwaysDashCheat: root.AlwaysDashCheat || AlwaysDashCheat,
+      TextSpeedCheat: root.TextSpeedCheat || TextSpeedCheat,
     };
 
     this.refreshRuntimeInfo();
@@ -266,6 +307,8 @@ export default {
       const gameParty = root.$gameParty;
       const speedCheat = this.cheatApi.SpeedCheat;
       const gameSpeedCheat = this.cheatApi.GameSpeedCheat || GameSpeedCheat;
+      const alwaysDashCheat = this.cheatApi.AlwaysDashCheat;
+      const textSpeedCheat = this.cheatApi.TextSpeedCheat;
 
       this.noClip = gamePlayer ? gamePlayer._through : false;
       this.speed =
@@ -275,6 +318,8 @@ export default {
       this.fixSpeed =
         speedCheat && speedCheat.isFixed ? speedCheat.isFixed() : false;
       this.gold = gameParty ? gameParty._gold : 0;
+      this.alwaysDash = alwaysDashCheat ? alwaysDashCheat.getAlwaysDash() : false;
+      this.textSpeed = textSpeedCheat ? textSpeedCheat.getTextSpeed() : 1;
 
       const manager = this.rootWindowManager || CHEAT_WINDOW_MANAGER;
       this.openInSeparateWindow = manager.isSeparateWindowEnabled();
@@ -454,6 +499,36 @@ export default {
       }
 
       this.onGameSpeedChange();
+    },
+
+    onAlwaysDashChange() {
+      const alwaysDashCheat = this.cheatApi.AlwaysDashCheat;
+      if (alwaysDashCheat && alwaysDashCheat.setAlwaysDash) {
+        alwaysDashCheat.setAlwaysDash(this.alwaysDash);
+      }
+      if (alwaysDashCheat && alwaysDashCheat.__writeSettings) {
+        alwaysDashCheat.__writeSettings(this.alwaysDash);
+      }
+      this.initializeVariables();
+    },
+
+    onTextSpeedChange() {
+      const textSpeedCheat = this.cheatApi.TextSpeedCheat;
+      if (textSpeedCheat && textSpeedCheat.setTextSpeed) {
+        textSpeedCheat.setTextSpeed(this.textSpeed);
+      }
+      if (textSpeedCheat && textSpeedCheat.__writeSettings) {
+        textSpeedCheat.__writeSettings(this.textSpeed);
+      }
+      this.initializeVariables();
+    },
+
+    addTextSpeed(amount) {
+      this.textSpeed = Math.min(
+        Math.max(this.textSpeed + amount, this.minTextSpeed),
+        this.maxTextSpeed,
+      );
+      this.onTextSpeedChange();
     },
   },
 };
