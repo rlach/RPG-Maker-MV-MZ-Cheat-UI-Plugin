@@ -129,7 +129,7 @@ export const translateOnTheFlyRuntimeMethods = {
 
             if (
                 relativeImageFolder.includes('..') ||
-                normalizedFilename.includes('/') ||
+                normalizedFilename.startsWith('/') ||
                 normalizedFilename.includes('..')
             ) {
                 return null;
@@ -356,13 +356,45 @@ export const translateOnTheFlyRuntimeMethods = {
                         path.extname(translatedImagePath)
                     );
 
-                    return ImageManager._translateOriginalLoadBitmap.call(
-                        this,
-                        translatedFolder,
-                        translatedFilename,
-                        hue,
-                        smooth
-                    );
+                    let restoreMZEncryptedImages = null;
+                    let restoreMVEncryptedImages = null;
+
+                    // For translated cache PNG files, force plain PNG load even if the game uses
+                    // encrypted images globally. This keeps cache assets usable on MZ (.png_) and MV (.rpgmvp).
+                    if (typeof Utils === 'object' && Utils && typeof Utils.hasEncryptedImages === 'function') {
+                        const wasEncrypted = !!Utils.hasEncryptedImages();
+                        if (wasEncrypted && Object.prototype.hasOwnProperty.call(Utils, '_hasEncryptedImages')) {
+                            restoreMZEncryptedImages = Utils._hasEncryptedImages;
+                            Utils._hasEncryptedImages = false;
+                        }
+                    }
+
+                    if (
+                        typeof Decrypter === 'object' &&
+                        Decrypter &&
+                        typeof Decrypter.hasEncryptedImages === 'boolean' &&
+                        Decrypter.hasEncryptedImages
+                    ) {
+                        restoreMVEncryptedImages = Decrypter.hasEncryptedImages;
+                        Decrypter.hasEncryptedImages = false;
+                    }
+
+                    try {
+                        return ImageManager._translateOriginalLoadBitmap.call(
+                            this,
+                            translatedFolder,
+                            translatedFilename,
+                            hue,
+                            smooth
+                        );
+                    } finally {
+                        if (restoreMZEncryptedImages !== null) {
+                            Utils._hasEncryptedImages = restoreMZEncryptedImages;
+                        }
+                        if (restoreMVEncryptedImages !== null) {
+                            Decrypter.hasEncryptedImages = restoreMVEncryptedImages;
+                        }
+                    }
                 } catch (_error) {
                     return ImageManager._translateOriginalLoadBitmap.call(
                         this,
