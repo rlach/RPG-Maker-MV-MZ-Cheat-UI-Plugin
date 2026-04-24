@@ -49,6 +49,15 @@ export default {
         </v-switch>
 
         <v-switch
+            v-model="translateImagesInCacheIfAny"
+            label="Replace images from cache if available"
+            dense
+            hide-details
+            @click.self.stop
+            @change="onChangeTranslateImagesInCacheIfAny">
+        </v-switch>
+
+        <v-switch
             v-model="tryTranslateAhead"
             label="Translate full event instead of single message"
             dense
@@ -369,6 +378,10 @@ export default {
 
         onChangeCacheOnly() {
             return this.callRuntime('onChangeCacheOnly');
+        },
+
+        onChangeTranslateImagesInCacheIfAny() {
+            return this.callRuntime('onChangeTranslateImagesInCacheIfAny');
         },
 
         onChangeTryTranslateAhead() {

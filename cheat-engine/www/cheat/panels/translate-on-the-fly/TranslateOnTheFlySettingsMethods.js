@@ -116,6 +116,11 @@ export const translateOnTheFlySettingsMethods = {
         this.notifyCacheRuntime('settings-cache-only');
     },
 
+    onChangeTranslateImagesInCacheIfAny() {
+        this.saveSettings();
+        this.notifyCacheRuntime('settings-image-cache-toggle');
+    },
+
     onChangeTryTranslateAhead() {
         this.saveSettings();
     },

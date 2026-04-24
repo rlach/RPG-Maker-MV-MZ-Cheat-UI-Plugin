@@ -87,6 +87,81 @@ export const translateOnTheFlyRuntimeMethods = {
             );
         };
 
+        const shouldUseImageCacheTranslation = () => {
+            return (
+                !!self.translateImagesInCacheIfAny &&
+                typeof self.targetLang === 'string' &&
+                self.targetLang.trim() !== ''
+            );
+        };
+
+        const resolveTranslatedImagePath = (folder, filename) => {
+            if (!shouldUseImageCacheTranslation()) {
+                return null;
+            }
+
+            if (typeof require !== 'function') {
+                return null;
+            }
+
+            const safeFolder = typeof folder === 'string' ? folder : '';
+            const safeFilename = typeof filename === 'string' ? filename.trim() : '';
+            if (!safeFolder || !safeFilename) {
+                return null;
+            }
+
+            let fs;
+            let path;
+            try {
+                fs = require('fs');
+                path = require('path');
+            } catch (_error) {
+                return null;
+            }
+
+            if (!safeFolder.startsWith('img/')) {
+                return null;
+            }
+
+            const normalizedFolder = safeFolder.replace(/\\/g, '/');
+            const relativeImageFolder = normalizedFolder.replace(/^img\//, '').replace(/\/$/, '');
+            const normalizedFilename = safeFilename.replace(/\\/g, '/');
+
+            if (
+                relativeImageFolder.includes('..') ||
+                normalizedFilename.includes('/') ||
+                normalizedFilename.includes('..')
+            ) {
+                return null;
+            }
+
+            const splitCacheDirectory =
+                typeof self.getSplitCacheDirectoryPath === 'function'
+                    ? self.getSplitCacheDirectoryPath()
+                    : '';
+            if (!splitCacheDirectory || typeof splitCacheDirectory !== 'string') {
+                return null;
+            }
+
+            const translatedImagePath = path.resolve(
+                splitCacheDirectory,
+                'img',
+                self.targetLang,
+                relativeImageFolder,
+                `${normalizedFilename}.png`
+            );
+
+            try {
+                if (!fs.existsSync(translatedImagePath)) {
+                    return null;
+                }
+            } catch (_error) {
+                return null;
+            }
+
+            return translatedImagePath;
+        };
+
         const applyCurrentMapDisplayNameFromCache = () => {
             if (!window.$dataMap || typeof $dataMap !== 'object') {
                 return;
@@ -253,6 +328,52 @@ export const translateOnTheFlyRuntimeMethods = {
 
             actor.setName(self.normalizeSpeakerNameCase(translated.trim()));
         };
+
+        if (typeof ImageManager === 'object' && ImageManager) {
+            if (!ImageManager._translateOriginalLoadBitmap) {
+                ImageManager._translateOriginalLoadBitmap = ImageManager.loadBitmap;
+            }
+
+            ImageManager.loadBitmap = function (folder, filename, hue, smooth) {
+                const translatedImagePath = resolveTranslatedImagePath(folder, filename);
+                if (!translatedImagePath || typeof require !== 'function') {
+                    return ImageManager._translateOriginalLoadBitmap.call(
+                        this,
+                        folder,
+                        filename,
+                        hue,
+                        smooth
+                    );
+                }
+
+                try {
+                    const path = require('path');
+                    const translatedFolder = `${path
+                        .dirname(translatedImagePath)
+                        .replace(/\\/g, '/')}/`;
+                    const translatedFilename = path.basename(
+                        translatedImagePath,
+                        path.extname(translatedImagePath)
+                    );
+
+                    return ImageManager._translateOriginalLoadBitmap.call(
+                        this,
+                        translatedFolder,
+                        translatedFilename,
+                        hue,
+                        smooth
+                    );
+                } catch (_error) {
+                    return ImageManager._translateOriginalLoadBitmap.call(
+                        this,
+                        folder,
+                        filename,
+                        hue,
+                        smooth
+                    );
+                }
+            };
+        }
 
         // Store original canStart if not already stored
         if (!Window_Message.prototype._originalCanStart) {

@@ -64,6 +64,10 @@
     - You can change shortcuts in "Shortcuts" tab.
     - If you do not hover your mouse over the cheat window, you may not be able to see it well because it is a little bit transparent. Note that it appears in the upper-right corner of the game window.
     - <img src="https://user-images.githubusercontent.com/99193603/153754676-cee2b96e-c03a-491f-b71c-3c57d6dcc474.JPG" width="400"/>
+- Translate On The Fly can replace images from cache even without text translation.
+    - Enable `Replace images from cache if available` in Translate On The Fly.
+    - Put files in `www/cheat-settings/translate-cache/img/{targetLang}/...` with mirrored `img` subfolders.
+    - Example: `www/img/pictures/main-title.rpgmvp` -> `www/cheat-settings/translate-cache/img/en/pictures/main-title.png`.
 - Just enjoy cheat!
 
 ## Apply same cheat settings from another game
