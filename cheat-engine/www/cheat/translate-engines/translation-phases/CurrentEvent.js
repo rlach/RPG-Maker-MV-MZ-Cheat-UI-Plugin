@@ -146,8 +146,24 @@ export class CurrentEvent extends BasePhase {
             }
 
             const cacheKey = panel.getCacheKey(value, type);
-            if (!force && panel.hasUsableCacheValue(cacheKey)) {
-                return true;
+            if (!force) {
+                // For message types check all variants so that a text already cached as
+                // message_portrait is not re-harvested and stored again as message (or vice
+                // versa), which would cause cache duplication and translation mismatches.
+                const isMessageType =
+                    typeof panel.isMessageCacheType === 'function' &&
+                    panel.isMessageCacheType(type);
+                const hasUsable =
+                    isMessageType && typeof panel.getMessageCacheLookupKeys === 'function'
+                        ? panel
+                              .getMessageCacheLookupKeys(value, {
+                                  hasPortrait: type === 'message_portrait',
+                              })
+                              .some((k) => panel.hasUsableCacheValue(k))
+                        : panel.hasUsableCacheValue(cacheKey);
+                if (hasUsable) {
+                    return true;
+                }
             }
 
             if (seenCacheKeys.has(cacheKey)) {

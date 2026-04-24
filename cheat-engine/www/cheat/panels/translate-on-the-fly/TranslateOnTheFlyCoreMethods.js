@@ -174,6 +174,9 @@ export const translateOnTheFlyCoreMethods = {
               ]
             : [
                   this.getCacheKey(text, 'message'),
+                  // Fallback: text may have been harvested as message_portrait when the event
+                  // data had a faceName but the runtime $gameMessage had it cleared by a plugin.
+                  this.getCacheKey(text, 'message_portrait'),
                   // Backward compatibility with older caches that stored event messages as "text".
                   this.getCacheKey(text, 'text'),
               ];
