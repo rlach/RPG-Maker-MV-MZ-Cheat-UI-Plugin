@@ -30,12 +30,39 @@ function ensureTranslateOnTheFlyRuntime() {
 window.__ensureTranslateOnTheFlyRuntime = ensureTranslateOnTheFlyRuntime;
 window.__ensureTranslationRuntime = ensureTranslateOnTheFlyRuntime;
 
+function ensureTranslateOnTheFlyRuntimeWithRetry(options = {}) {
+    const maxAttempts = Number(options.maxAttempts) > 0 ? Number(options.maxAttempts) : 20;
+    const delayMs = Number(options.delayMs) > 0 ? Number(options.delayMs) : 500;
+
+    let attempt = 0;
+    const tryEnsure = () => {
+        attempt += 1;
+        const runtime = ensureTranslateOnTheFlyRuntime();
+        if (runtime) {
+            console.log(`[TranslateOnTheFly] Runtime bootstrap ready (attempt ${attempt})`);
+            return runtime;
+        }
+
+        if (attempt >= maxAttempts) {
+            console.warn(
+                `[TranslateOnTheFly] Runtime bootstrap failed after ${attempt} attempts`
+            );
+            return null;
+        }
+
+        setTimeout(tryEnsure, delayMs);
+        return null;
+    };
+
+    return tryEnsure();
+}
+
 // Boot translation runtime even if settings panel UI is never opened.
-ensureTranslateOnTheFlyRuntime();
+ensureTranslateOnTheFlyRuntimeWithRetry({ maxAttempts: 30, delayMs: 500 });
 ensureHacksRuntime();
 
 setTimeout(() => {
-    const runtime = ensureTranslateOnTheFlyRuntime();
+    const runtime = ensureTranslateOnTheFlyRuntimeWithRetry({ maxAttempts: 10, delayMs: 500 });
     PLUGIN_TRANSLATOR_REGISTRY.ensureDetectionStarted({ runtime });
 }, 2000);
 

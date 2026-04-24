@@ -329,7 +329,19 @@ export const translateOnTheFlyRuntimeMethods = {
             actor.setName(self.normalizeSpeakerNameCase(translated.trim()));
         };
 
-        if (typeof ImageManager === 'object' && ImageManager) {
+        const installImageManagerBitmapHook = () => {
+            if (
+                (typeof ImageManager !== 'object' && typeof ImageManager !== 'function') ||
+                !ImageManager ||
+                typeof ImageManager.loadBitmap !== 'function'
+            ) {
+                return false;
+            }
+
+            if (ImageManager._translateImageCacheHookInstalled) {
+                return true;
+            }
+
             if (!ImageManager._translateOriginalLoadBitmap) {
                 ImageManager._translateOriginalLoadBitmap = ImageManager.loadBitmap;
             }
@@ -361,16 +373,23 @@ export const translateOnTheFlyRuntimeMethods = {
 
                     // For translated cache PNG files, force plain PNG load even if the game uses
                     // encrypted images globally. This keeps cache assets usable on MZ (.png_) and MV (.rpgmvp).
-                    if (typeof Utils === 'object' && Utils && typeof Utils.hasEncryptedImages === 'function') {
+                    if (
+                        (typeof Utils === 'object' || typeof Utils === 'function') &&
+                        Utils &&
+                        typeof Utils.hasEncryptedImages === 'function'
+                    ) {
                         const wasEncrypted = !!Utils.hasEncryptedImages();
-                        if (wasEncrypted && Object.prototype.hasOwnProperty.call(Utils, '_hasEncryptedImages')) {
+                        if (
+                            wasEncrypted &&
+                            Object.prototype.hasOwnProperty.call(Utils, '_hasEncryptedImages')
+                        ) {
                             restoreMZEncryptedImages = Utils._hasEncryptedImages;
                             Utils._hasEncryptedImages = false;
                         }
                     }
 
                     if (
-                        typeof Decrypter === 'object' &&
+                        (typeof Decrypter === 'object' || typeof Decrypter === 'function') &&
                         Decrypter &&
                         typeof Decrypter.hasEncryptedImages === 'boolean' &&
                         Decrypter.hasEncryptedImages
@@ -405,6 +424,27 @@ export const translateOnTheFlyRuntimeMethods = {
                     );
                 }
             };
+
+            ImageManager._translateImageCacheHookInstalled = true;
+            console.log('[TranslateOnTheFly] ImageManager image-cache hook installed');
+            return true;
+        };
+
+        if (!installImageManagerBitmapHook()) {
+            let imageManagerHookRetryCount = 0;
+            const maxImageManagerHookRetries = 20;
+            const imageManagerRetryTimer = setInterval(() => {
+                imageManagerHookRetryCount += 1;
+                if (installImageManagerBitmapHook()) {
+                    clearInterval(imageManagerRetryTimer);
+                    return;
+                }
+
+                if (imageManagerHookRetryCount >= maxImageManagerHookRetries) {
+                    clearInterval(imageManagerRetryTimer);
+                    console.warn('[TranslateOnTheFly] Failed to install ImageManager image-cache hook');
+                }
+            }, 500);
         }
 
         // Store original canStart if not already stored
