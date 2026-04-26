@@ -4,6 +4,17 @@ import { cloneObject } from './Tools.js';
 import { SpeedCheat, SceneCheat, GeneralCheat, BattleCheat, MessageCheat } from './CheatHelper.js';
 import { ShortcutMap } from './ShortcutHelper.js';
 
+function isNwjsEnvironment() {
+    const utils = globalThis.Utils;
+    if (utils && typeof utils.isNwjs === 'function') {
+        try {
+            return Boolean(utils.isNwjs());
+        } catch (err) {}
+    }
+
+    return Boolean(typeof process !== 'undefined' && process.versions && process.versions.nw);
+}
+
 // default shortcut settings
 const defaultShortcutSettings = {
     toggleCheatModal: {
@@ -409,7 +420,7 @@ const shortcutConfig = {
                 );
                 return;
             }
-            if (Utils?.isNwjs()) {
+            if (isNwjsEnvironment()) {
                 require('nw.gui').Window.get().showDevTools();
             }
         },
@@ -643,7 +654,7 @@ class GlobalShortcut {
      */
     readRawShortcutSettings() {
         // if nwjs environment, read shortcut settings from file
-        if (Utils?.isNwjs()) {
+        if (isNwjsEnvironment()) {
             const fs = require('fs');
             const path = require('path');
 
@@ -699,7 +710,7 @@ class GlobalShortcut {
     }
 
     writeRawShortcutSettings(shortcutSettings) {
-        if (Utils?.isNwjs()) {
+        if (isNwjsEnvironment()) {
             const fs = require('fs');
             const path = require('path');
 
@@ -725,7 +736,7 @@ class GlobalShortcut {
     }
 
     restoreDefaultSettings() {
-        if (Utils?.isNwjs()) {
+        if (isNwjsEnvironment()) {
             // remove settings file
             try {
                 require('fs').unlinkSync(this.shortcutSettingsFile);
