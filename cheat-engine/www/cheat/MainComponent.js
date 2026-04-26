@@ -76,6 +76,10 @@ export default {
     this.checkVersion();
   },
 
+  mounted() {
+    this.notifyCheatInitialized();
+  },
+
   beforeDestroy() {
     window.removeEventListener("keydown", this.onGlobalKeyDown);
     window.removeEventListener("keyup", this.onGlobalKeyUp);
@@ -280,6 +284,42 @@ export default {
           );
         }
       } catch (err) {}
+    },
+
+    escapeHtml(text) {
+      if (typeof text !== "string") {
+        return String(text);
+      }
+
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    },
+
+    notifyCheatInitialized() {
+      if (window.__CHEAT_EXTERNAL_WINDOW__) {
+        return;
+      }
+
+      const toggleShortcut =
+        GLOBAL_SHORTCUT && typeof GLOBAL_SHORTCUT.getShortcut === "function"
+          ? GLOBAL_SHORTCUT.getShortcut("toggleCheatModal")
+          : null;
+
+      const shortcutLabel =
+        toggleShortcut && typeof toggleShortcut.asDisplayString === "function"
+          ? toggleShortcut.asDisplayString()
+          : "Ctrl + C";
+
+      const highlightedShortcut = `<span style="color:#ffd54f">${this.escapeHtml(shortcutLabel)}</span>`;
+      Alert.infoHtml(
+        `Cheat engine initialized, press ${highlightedShortcut} to open menu`,
+        null,
+        5000,
+      );
     },
 
     getCurrentCheatVersion() {

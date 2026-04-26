@@ -1,14 +1,19 @@
 export class Alert {
-    static alertInternal (level, msg, err = null, timeout = 1500) {
-        const normalizedMsg = typeof msg === 'string'
+    static normalizeMsg (msg) {
+        return typeof msg === 'string'
             ? msg
             : (msg && typeof msg.text === 'string' ? msg.text : String(msg))
+    }
 
+
+    static alertInternal (level, msg, err = null, timeout = 1500) {
+        const normalizedMsg = this.normalizeMsg(msg)
         if (err) {
             alert(`[cheat plugin ${level}] ${normalizedMsg}\n\n[cause] ${err}`)
-        } else {
-            alert(`[cheat plugin ${level}] ${normalizedMsg}`)
+            return
         }
+
+        alert(`[cheat plugin ${level}] ${normalizedMsg}`)
     }
 
     static success (msg, err = null, timeout = 1500) {
