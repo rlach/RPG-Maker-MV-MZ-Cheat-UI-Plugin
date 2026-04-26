@@ -5,7 +5,7 @@ import { SpeedCheat, SceneCheat, GeneralCheat, BattleCheat, MessageCheat } from 
 import { ShortcutMap } from './ShortcutHelper.js';
 
 function isNwjsEnvironment() {
-    const utils = globalThis.Utils;
+    const utils = globalThis['Utils'];
     if (utils && typeof utils.isNwjs === 'function') {
         try {
             return Boolean(utils.isNwjs());
@@ -13,6 +13,19 @@ function isNwjsEnvironment() {
     }
 
     return Boolean(typeof process !== 'undefined' && process.versions && process.versions.nw);
+}
+
+function escapeHtml(text) {
+    if (typeof text !== 'string') {
+        return String(text);
+    }
+
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 // default shortcut settings
@@ -541,6 +554,22 @@ class GlobalShortcut {
         // initialize shortcut map
         this.shortcutMap = new ShortcutMap();
         this.initializeShortcutMap();
+
+        this.notifyInitialized();
+    }
+
+    notifyInitialized() {
+        const toggleShortcut = this.getShortcut('toggleCheatModal');
+        const shortcutLabel = toggleShortcut
+            ? toggleShortcut.asDisplayString()
+            : Key.fromString(defaultShortcutSettings.toggleCheatModal.shortcut).asDisplayString();
+
+        const highlightedShortcut = `<span style="color:#ffd54f">${escapeHtml(shortcutLabel)}</span>`;
+        Alert.infoHtml(
+            `Cheat engine initialized, press ${highlightedShortcut} to open menu`,
+            null,
+            5000
+        );
     }
 
     initializeShortcutConfig() {

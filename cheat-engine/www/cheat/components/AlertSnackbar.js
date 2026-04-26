@@ -16,7 +16,8 @@ export default {
         v-for="(line, idx) in text"
         :key="idx"
         class="font-weight-bold caption d-block">
-        {{ line }}
+        <span v-if="line.html" v-html="line.value"></span>
+        <span v-else>{{ line.value }}</span>
     </span>
     <template v-slot:action="{ attrs }">
     <v-btn
@@ -35,7 +36,7 @@ export default {
     data () {
         return {
             showSnackbar: false,
-            text: '',
+            text: [],
             timeout: 1000,
             color: 'black'
         }
@@ -74,10 +75,31 @@ export default {
     },
 
     methods : {
+        normalizeText (text) {
+            if (typeof text === 'string') {
+                return text.split('\n').map(line => ({
+                    value: line,
+                    html: false,
+                }))
+            }
+
+            if (text && typeof text.text === 'string') {
+                return text.text.split('\n').map(line => ({
+                    value: line,
+                    html: !!text.html,
+                }))
+            }
+
+            return [{
+                value: String(text),
+                html: false,
+            }]
+        },
+
         show (options) {
             this.showSnackbar = false
 
-            this.text = options.text.split('\n')
+            this.text = this.normalizeText(options.text)
             this.timeout = options.timeout
             if (options.color) {
                 this.color = options.color
