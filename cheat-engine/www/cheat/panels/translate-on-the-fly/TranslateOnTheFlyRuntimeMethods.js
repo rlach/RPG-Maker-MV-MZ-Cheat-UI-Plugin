@@ -1,7 +1,5 @@
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 
-import { isMapLike } from '../../js/TranslateCacheRuntime.js';
-
 export const translateOnTheFlyRuntimeMethods = {
     setupTranslationHook() {
         const self = this;
@@ -80,7 +78,7 @@ export const translateOnTheFlyRuntimeMethods = {
             }
         };
 
-        const shouldRunTranslationLifecycleHooks = () => {
+        const shouldReturnTranslatedVariableValue = () => {
             return (
                 self.isTranslationEnabled() ||
                 !!self.translateCacheWhenDisabled ||
@@ -89,90 +87,7 @@ export const translateOnTheFlyRuntimeMethods = {
             );
         };
 
-        const shouldReturnTranslatedVariableValue = () => {
-            return shouldRunTranslationLifecycleHooks();
-        };
-
-        const shouldUseImageCacheTranslation = () => {
-            return (
-                !!self.translateImagesInCacheIfAny &&
-                typeof self.targetLang === 'string' &&
-                self.targetLang.trim() !== ''
-            );
-        };
-
-        const resolveTranslatedImagePath = (folder, filename) => {
-            if (!shouldUseImageCacheTranslation()) {
-                return null;
-            }
-
-            if (typeof require !== 'function') {
-                return null;
-            }
-
-            const safeFolder = typeof folder === 'string' ? folder : '';
-            const safeFilename = typeof filename === 'string' ? filename.trim() : '';
-            if (!safeFolder || !safeFilename) {
-                return null;
-            }
-
-            let fs;
-            let path;
-            try {
-                fs = require('fs');
-                path = require('path');
-            } catch (_error) {
-                return null;
-            }
-
-            if (!safeFolder.startsWith('img/')) {
-                return null;
-            }
-
-            const normalizedFolder = safeFolder.replace(/\\/g, '/');
-            const relativeImageFolder = normalizedFolder.replace(/^img\//, '').replace(/\/$/, '');
-            const normalizedFilename = safeFilename.replace(/\\/g, '/');
-
-            if (
-                relativeImageFolder.includes('..') ||
-                normalizedFilename.startsWith('/') ||
-                normalizedFilename.includes('..')
-            ) {
-                return null;
-            }
-
-            const splitCacheDirectory =
-                typeof self.getSplitCacheDirectoryPath === 'function'
-                    ? self.getSplitCacheDirectoryPath()
-                    : '';
-            if (!splitCacheDirectory || typeof splitCacheDirectory !== 'string') {
-                return null;
-            }
-
-            const translatedImagePath = path.resolve(
-                splitCacheDirectory,
-                'img',
-                self.targetLang,
-                relativeImageFolder,
-                `${normalizedFilename}.png`
-            );
-
-            try {
-                if (!fs.existsSync(translatedImagePath)) {
-                    return null;
-                }
-            } catch (_error) {
-                return null;
-            }
-
-            return translatedImagePath;
-        };
-
         const applyCurrentMapDisplayNameFromCache = () => {
-            if (!shouldRunTranslationLifecycleHooks()) {
-                return;
-            }
-
             if (!window.$dataMap || typeof $dataMap !== 'object') {
                 return;
             }
@@ -316,7 +231,7 @@ export const translateOnTheFlyRuntimeMethods = {
 
             // Ensure the key exists so Names Manager can list it as cache-only actor_name.
             if (
-                isMapLike(self.translationCache) &&
+                self.translationCache instanceof Map &&
                 !self.translationCache.has(speakerKey) &&
                 typeof self.setCacheValue === 'function'
             ) {
@@ -338,124 +253,6 @@ export const translateOnTheFlyRuntimeMethods = {
 
             actor.setName(self.normalizeSpeakerNameCase(translated.trim()));
         };
-
-        const installImageManagerBitmapHook = () => {
-            if (
-                (typeof ImageManager !== 'object' && typeof ImageManager !== 'function') ||
-                !ImageManager ||
-                typeof ImageManager.loadBitmap !== 'function'
-            ) {
-                return false;
-            }
-
-            if (ImageManager._translateImageCacheHookInstalled) {
-                return true;
-            }
-
-            if (!ImageManager._translateOriginalLoadBitmap) {
-                ImageManager._translateOriginalLoadBitmap = ImageManager.loadBitmap;
-            }
-
-            ImageManager.loadBitmap = function (folder, filename, hue, smooth) {
-                const translatedImagePath = resolveTranslatedImagePath(folder, filename);
-                if (!translatedImagePath || typeof require !== 'function') {
-                    return ImageManager._translateOriginalLoadBitmap.call(
-                        this,
-                        folder,
-                        filename,
-                        hue,
-                        smooth
-                    );
-                }
-
-                try {
-                    const path = require('path');
-                    const translatedFolder = `${path
-                        .dirname(translatedImagePath)
-                        .replace(/\\/g, '/')}/`;
-                    const translatedFilename = path.basename(
-                        translatedImagePath,
-                        path.extname(translatedImagePath)
-                    );
-
-                    let restoreMZEncryptedImages = null;
-                    let restoreMVEncryptedImages = null;
-
-                    // For translated cache PNG files, force plain PNG load even if the game uses
-                    // encrypted images globally. This keeps cache assets usable on MZ (.png_) and MV (.rpgmvp).
-                    if (
-                        (typeof Utils === 'object' || typeof Utils === 'function') &&
-                        Utils &&
-                        typeof Utils.hasEncryptedImages === 'function'
-                    ) {
-                        const wasEncrypted = !!Utils.hasEncryptedImages();
-                        if (
-                            wasEncrypted &&
-                            Object.prototype.hasOwnProperty.call(Utils, '_hasEncryptedImages')
-                        ) {
-                            restoreMZEncryptedImages = Utils._hasEncryptedImages;
-                            Utils._hasEncryptedImages = false;
-                        }
-                    }
-
-                    if (
-                        (typeof Decrypter === 'object' || typeof Decrypter === 'function') &&
-                        Decrypter &&
-                        typeof Decrypter.hasEncryptedImages === 'boolean' &&
-                        Decrypter.hasEncryptedImages
-                    ) {
-                        restoreMVEncryptedImages = Decrypter.hasEncryptedImages;
-                        Decrypter.hasEncryptedImages = false;
-                    }
-
-                    try {
-                        return ImageManager._translateOriginalLoadBitmap.call(
-                            this,
-                            translatedFolder,
-                            translatedFilename,
-                            hue,
-                            smooth
-                        );
-                    } finally {
-                        if (restoreMZEncryptedImages !== null) {
-                            Utils._hasEncryptedImages = restoreMZEncryptedImages;
-                        }
-                        if (restoreMVEncryptedImages !== null) {
-                            Decrypter.hasEncryptedImages = restoreMVEncryptedImages;
-                        }
-                    }
-                } catch (_error) {
-                    return ImageManager._translateOriginalLoadBitmap.call(
-                        this,
-                        folder,
-                        filename,
-                        hue,
-                        smooth
-                    );
-                }
-            };
-
-            ImageManager._translateImageCacheHookInstalled = true;
-            console.log('[TranslateOnTheFly] ImageManager image-cache hook installed');
-            return true;
-        };
-
-        if (!installImageManagerBitmapHook()) {
-            let imageManagerHookRetryCount = 0;
-            const maxImageManagerHookRetries = 20;
-            const imageManagerRetryTimer = setInterval(() => {
-                imageManagerHookRetryCount += 1;
-                if (installImageManagerBitmapHook()) {
-                    clearInterval(imageManagerRetryTimer);
-                    return;
-                }
-
-                if (imageManagerHookRetryCount >= maxImageManagerHookRetries) {
-                    clearInterval(imageManagerRetryTimer);
-                    console.warn('[TranslateOnTheFly] Failed to install ImageManager image-cache hook');
-                }
-            }, 500);
-        }
 
         // Store original canStart if not already stored
         if (!Window_Message.prototype._originalCanStart) {
@@ -1183,12 +980,9 @@ export const translateOnTheFlyRuntimeMethods = {
 
         DataManager.extractSaveContents = function (contents) {
             DataManager._extractSaveContents(contents);
-
-            if (!shouldRunTranslationLifecycleHooks()) {
-                return;
-            }
-
-            console.log('[TranslateOnTheFly] Extracted save contents, applying cached translations if any');
+            console.log(
+                '[TranslateOnTheFly] Extracted save contents, applying cached translations if any'
+            );
 
             applyLifecycleTranslations('extractSaveContents');
             console.log(
@@ -1202,12 +996,9 @@ export const translateOnTheFlyRuntimeMethods = {
 
         DataManager.createGameObjects = function () {
             DataManager._createGameObjects();
-
-            if (!shouldRunTranslationLifecycleHooks()) {
-                return;
-            }
-
-            console.log('[TranslateOnTheFly] Created game objects, applying cached translations if any');
+            console.log(
+                '[TranslateOnTheFly] Created game objects, applying cached translations if any'
+            );
             applyLifecycleTranslations('createGameObjects');
             console.log('[TranslateOnTheFly] Applied cached translations to data containers');
         };
@@ -1218,12 +1009,9 @@ export const translateOnTheFlyRuntimeMethods = {
 
         DataManager.loadDatabase = function () {
             DataManager._loadDatabase();
-
-            if (!shouldRunTranslationLifecycleHooks()) {
-                return;
-            }
-
-            console.log('[TranslateOnTheFly] Loaded database, applying cached system message translations if any');
+            console.log(
+                '[TranslateOnTheFly] Loaded database, applying cached system message translations if any'
+            );
             applyLifecycleTranslations('loadDatabase');
             console.log('[TranslateOnTheFly] Applied cached translations to system messages');
         };
@@ -1235,9 +1023,7 @@ export const translateOnTheFlyRuntimeMethods = {
             }
 
             Scene_Title.prototype.createCommandWindow = function () {
-                if (shouldRunTranslationLifecycleHooks()) {
-                    applyLifecycleTranslations('sceneTitleCreateCommandWindow');
-                }
+                applyLifecycleTranslations('sceneTitleCreateCommandWindow');
                 return Scene_Title.prototype._translateOriginalCreateCommandWindow.call(this);
             };
         }
@@ -1249,9 +1035,7 @@ export const translateOnTheFlyRuntimeMethods = {
             }
 
             Scene_Load.prototype.helpWindowText = function () {
-                if (shouldRunTranslationLifecycleHooks()) {
-                    applyLifecycleTranslations('sceneLoadHelpWindowText');
-                }
+                applyLifecycleTranslations('sceneLoadHelpWindowText');
                 return Scene_Load.prototype._translateOriginalHelpWindowText.call(this);
             };
         }
@@ -1262,10 +1046,8 @@ export const translateOnTheFlyRuntimeMethods = {
             }
 
             Scene_Map.prototype.onMapLoaded = function () {
-                if (shouldRunTranslationLifecycleHooks()) {
-                    applyLifecycleTranslations('sceneMapOnMapLoaded');
-                    applyCurrentMapDisplayNameFromCache();
-                }
+                applyLifecycleTranslations('sceneMapOnMapLoaded');
+                applyCurrentMapDisplayNameFromCache();
                 return Scene_Map.prototype._translateOriginalOnMapLoaded.call(this);
             };
         }
@@ -1451,7 +1233,12 @@ export const translateOnTheFlyRuntimeMethods = {
             for (const cmd of this._collectedCommands) {
                 let finalName = cmd.name;
 
-                if (cmd.name && typeof cmd.name === 'string' && cmd.name.trim() !== '') {
+                if (
+                    cmd.symbol !== 'choice' &&
+                    cmd.name &&
+                    typeof cmd.name === 'string' &&
+                    cmd.name.trim() !== ''
+                ) {
                     const canonicalName =
                         typeof self.getCanonicalSystemCommandName === 'function'
                             ? self.getCanonicalSystemCommandName(cmd.name)
@@ -1460,6 +1247,8 @@ export const translateOnTheFlyRuntimeMethods = {
                     if (self.hasUsableCacheValue(commandKey)) {
                         self.trackCacheKeyUsage(commandKey, { harvestMissing: false });
                         finalName = self.translationCache.get(commandKey);
+                    } else {
+                        self.trackCacheKeyUsage(commandKey);
                     }
                 }
 
