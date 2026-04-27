@@ -25,10 +25,6 @@ export default {
                 style="max-width: 220px;">
             </v-text-field>
             <v-spacer></v-spacer>
-            <v-btn small outlined color="primary" class="ml-2" @click="refresh" :loading="loading">
-                <v-icon small left>mdi-refresh</v-icon>
-                Refresh
-            </v-btn>
             <v-btn
                 small outlined color="green" class="ml-2"
                 :loading="translating"
@@ -47,11 +43,13 @@ export default {
                 @keydown.stop
                 style="max-width: 320px;">
             </v-text-field>
-            <v-btn small outlined color="secondary" class="ml-2" @click="openPatternPicker">
+            <v-btn small color="primary" class="ml-2" @click="openPatternPicker">
                 <v-icon small left>mdi-format-list-bulleted</v-icon>
                 Select pattern
             </v-btn>
-            <v-btn small outlined color="primary" class="ml-2" @click="lookForNamesInCache">
+        </div>
+        <div class="mt-2 d-flex align-center">
+            <v-btn small outlined color="primary" @click="lookForNamesInCache">
                 <v-icon small left>mdi-magnify</v-icon>
                 Look for names in cache
             </v-btn>
