@@ -16,6 +16,18 @@ export function customizeRPGMakerFunctions(mainComponent) {
     return;
   }
 
+  if (
+    !window.TouchInput ||
+    typeof TouchInput._onWheel !== "function" ||
+    typeof TouchInput._onMouseDown !== "function"
+  ) {
+    console.log(
+      "TouchInput not ready yet, retrying customizeRPGMakerFunctions in 500ms...",
+    );
+    setTimeout(() => customizeRPGMakerFunctions(mainComponent), 500);
+    return;
+  }
+
   const getUiInputBlocks = () => {
     const blocks = [
       document.querySelector("#cheat-modal"),
@@ -59,7 +71,11 @@ export function customizeRPGMakerFunctions(mainComponent) {
   if (isRpgMakerMv()) {
     // WARN: directly changing engine code can be dangerous
     // remove preventDefault
-    TouchInput._onWheel = function () {
+    TouchInput._onWheel = function (event) {
+      if (!event || isMouseInsideUiInputBlock(event)) {
+        return;
+      }
+
       this._events.wheelX += event.deltaX;
       this._events.wheelY += event.deltaY;
     };
@@ -77,7 +93,11 @@ export function customizeRPGMakerFunctions(mainComponent) {
     // MZ Settings
     // WARN: directly changing engine code can be dangerous
     // remove preventDefault
-    TouchInput._onWheel = function () {
+    TouchInput._onWheel = function (event) {
+      if (!event || isMouseInsideUiInputBlock(event)) {
+        return;
+      }
+
       this._newState.wheelX += event.deltaX;
       this._newState.wheelY += event.deltaY;
     };
