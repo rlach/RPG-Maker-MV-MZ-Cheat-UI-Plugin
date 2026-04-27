@@ -16,6 +16,7 @@ import { MessageWindowPopupTranslator } from './translators/MessageWindowPopupTr
 import { MppChoiceExTranslator } from './translators/MppChoiceExTranslator.js';
 import { MppMessageExTranslator } from './translators/MppMessageExTranslator.js';
 import { MultipleWindowSkinSystemTranslator } from './translators/MultipleWindowSkinSystemTranslator.js';
+import { NrpMapTravelTranslator } from './translators/NrpMapTravelTranslator.js';
 import { OriginMenuStatusTranslator } from './translators/OriginMenuStatusTranslator.js';
 import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTextWindowTranslator.js';
 import { QuestSystemTranslator } from './translators/QuestSystemTranslator.js';
@@ -52,6 +53,7 @@ class PluginTranslatorRegistry {
             MppChoiceExTranslator,
             MppMessageExTranslator,
             MultipleWindowSkinSystemTranslator,
+            NrpMapTravelTranslator,
             OriginMenuStatusTranslator,
             PandaProgressTextWindowTranslator,
             QuestSystemTranslator,
