@@ -46,6 +46,25 @@ function tokenizeByBrTag(text) {
     return tokens;
 }
 
+function wrapSegmentTextByBrOnly(runtimeContext, originalWrapText, text, maxWidth, options) {
+    const segments = String(text || '').split('\n');
+    let rebuilt = '';
+
+    for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i];
+        const wrappedSegment = originalWrapText.call(runtimeContext, segment, maxWidth, options);
+        const wrappedLines = String(wrappedSegment || '').split('\n');
+        rebuilt += wrappedLines.join('<br>');
+
+        // Keep original newlines untouched.
+        if (i < segments.length - 1) {
+            rebuilt += '\n';
+        }
+    }
+
+    return rebuilt;
+}
+
 export class YedWordWrapTranslator extends BasePluginTranslator {
     getPluginName() {
         return 'YED_WordWrap';
@@ -110,8 +129,13 @@ export class YedWordWrapTranslator extends BasePluginTranslator {
                             return token.value;
                         }
 
-                        const wrapped = originalWrapText.call(this, token.value, maxWidth, options);
-                        return String(wrapped || '').replace(/\n/g, '<br>');
+                        return wrapSegmentTextByBrOnly(
+                            this,
+                            originalWrapText,
+                            token.value,
+                            maxWidth,
+                            options
+                        );
                     })
                     .join('');
 
