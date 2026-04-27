@@ -137,37 +137,68 @@ class CheatWindowManager {
     }
 
     openExternalWindow (componentName = null) {
-        this.setLastComponent(componentName || this.lastComponent)
+        const openNow = () => {
+            this.setLastComponent(componentName || this.lastComponent)
 
-        if (this.lastComponent) {
-            window.__CHEAT_DEFAULT_COMPONENT__ = this.lastComponent
-        }
+            if (this.lastComponent) {
+                window.__CHEAT_DEFAULT_COMPONENT__ = this.lastComponent
+            }
 
-        if (this.externalWindow && !this.externalWindow.closed) {
+            if (this.externalWindow && !this.externalWindow.closed) {
+                try {
+                    this.externalWindow.focus()
+                    return
+                } catch (err) {
+                    // fall through to reopen
+                }
+            }
+
             try {
-                this.externalWindow.focus()
-                return
+                const targetPath = this.getExternalWindowPath()
+                console.log('[CheatWindowManager] Opening external window:', targetPath)
+                nw.Window.open(targetPath, {}, (newWin) => {
+                    this.externalWindow = newWin;
+                    console.log('[CheatWindowManager] External window opened callback:', newWin);
+
+                    if (this.externalWindow) {
+                        this.attachExternalWindowLifecycle(this.externalWindow)
+                    } else {
+                        console.error('[CheatWindowManager] Failed to create external window')
+                    }
+                })
             } catch (err) {
-                // fall through to reopen
+                console.error('[CheatWindowManager] Exception opening external window:', err)
             }
         }
 
-        try {
-            const targetPath = this.getExternalWindowPath()
-            console.log('[CheatWindowManager] Opening external window:', targetPath)
-            nw.Window.open(targetPath, {}, (newWin) => {
-                this.externalWindow = newWin;
-                console.log('[CheatWindowManager] External window opened callback:', newWin);
-
-                if (this.externalWindow) {
-                    this.attachExternalWindowLifecycle(this.externalWindow)
-                } else {
-                    console.error('[CheatWindowManager] Failed to create external window')
+        const ensureRuntimeReady = () => {
+            const ensureRuntime = window.__ensureTranslationRuntime
+            if (typeof ensureRuntime === 'function') {
+                try {
+                    ensureRuntime()
+                } catch (error) {
+                    console.warn('[CheatWindowManager] Failed to pre-bootstrap translation runtime', error)
                 }
-            })
-        } catch (err) {
-            console.error('[CheatWindowManager] Exception opening external window:', err)
+            }
         }
+
+        const ensureDepsWithRetry = window.__ensureEveryDependencyReadyWithRetry
+        if (typeof ensureDepsWithRetry === 'function') {
+            ensureDepsWithRetry({ delayMs: 100, logEvery: 20 })
+                .then(() => {
+                    ensureRuntimeReady()
+                    openNow()
+                })
+                .catch((error) => {
+                    console.warn('[CheatWindowManager] Dependency pre-bootstrap failed, opening anyway', error)
+                    ensureRuntimeReady()
+                    openNow()
+                })
+            return
+        }
+
+        ensureRuntimeReady()
+        openNow()
     }
 
     closeExternalWindow () {

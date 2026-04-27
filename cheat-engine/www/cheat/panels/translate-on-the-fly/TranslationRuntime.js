@@ -62,9 +62,7 @@ class TranslationRuntime {
     this.cacheStorage = new KeyValueStorage(
       "./www/cheat-settings/translate-cache.json",
     );
-    const runtime = ensureTranslateCacheRuntime(
-      window.__TranslateOnTheFlyCache || new Map(),
-    );
+    const runtime = ensureTranslateCacheRuntime();
     this.translationCache = runtime.cache;
     this.lastSeenByCacheKey = runtime.lastSeenByCacheKey;
     this.pendingTranslations = new Map();
@@ -120,6 +118,15 @@ class TranslationRuntime {
     const host = getHostWindow();
     host.__TranslationRuntime = this;
     host.__TranslateRuntime = this;
+    host.__ensureTranslationRuntime = ensureTranslationRuntime;
+    host.__ensureTranslateOnTheFlyRuntime = ensureTranslationRuntime;
+
+    if (host !== window) {
+      window.__TranslationRuntime = this;
+      window.__TranslateRuntime = this;
+      window.__ensureTranslationRuntime = ensureTranslationRuntime;
+      window.__ensureTranslateOnTheFlyRuntime = ensureTranslationRuntime;
+    }
   }
 
   deferHookInitialization() {
@@ -232,6 +239,47 @@ export function getTranslationRuntime() {
 }
 
 export function ensureTranslationRuntime() {
+  if (
+    window.__CHEAT_EXTERNAL_WINDOW__ &&
+    window.opener &&
+    !window.opener.closed
+  ) {
+    const existingRootRuntime =
+      window.opener.__TranslationRuntime || window.opener.__TranslateRuntime;
+
+    if (existingRootRuntime) {
+      window.__TranslationRuntime = existingRootRuntime;
+      window.__TranslateRuntime = existingRootRuntime;
+      window.__ensureTranslationRuntime = ensureTranslationRuntime;
+      window.__ensureTranslateOnTheFlyRuntime = ensureTranslationRuntime;
+      return existingRootRuntime.initialize
+        ? existingRootRuntime.initialize()
+        : existingRootRuntime;
+    }
+
+    const ensureOnRoot =
+      window.opener.__ensureTranslationRuntime ||
+      window.opener.__ensureTranslateOnTheFlyRuntime;
+
+    if (
+      typeof ensureOnRoot === "function" &&
+      ensureOnRoot !== ensureTranslationRuntime
+    ) {
+      const rootRuntime = ensureOnRoot();
+      if (rootRuntime) {
+        window.__TranslationRuntime = rootRuntime;
+        window.__TranslateRuntime = rootRuntime;
+        window.__ensureTranslationRuntime = ensureTranslationRuntime;
+        window.__ensureTranslateOnTheFlyRuntime = ensureTranslationRuntime;
+        return rootRuntime;
+      }
+    }
+
+    // Never bootstrap a local runtime from external window when root runtime is not ready yet.
+    // Local-first bootstrap can clear shared cache state for the whole session.
+    return LOCAL_TRANSLATION_RUNTIME;
+  }
+
   const runtime = getTranslationRuntime();
   return runtime.initialize ? runtime.initialize() : runtime;
 }

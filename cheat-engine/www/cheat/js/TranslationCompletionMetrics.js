@@ -1,4 +1,4 @@
-import { parseCacheKeyForLangPair } from "./TranslateCacheRuntime.js";
+import { isMapLike, parseCacheKeyForLangPair } from "./TranslateCacheRuntime.js";
 
 function normalizeText(value) {
   if (typeof value === "string") {
@@ -40,7 +40,7 @@ export function computeLangPairCompletionByKeyLength({
   let totalKeyLength = 0;
   let translatedKeyLength = 0;
 
-  if (!(translationCache instanceof Map)) {
+  if (!isMapLike(translationCache)) {
     return {
       totalKeyLength,
       translatedKeyLength,
@@ -83,7 +83,7 @@ export function computeLangPairCompletionByCacheTypes({
   let totalKeyLength = 0;
   let translatedKeyLength = 0;
 
-  if (!(translationCache instanceof Map)) {
+  if (!isMapLike(translationCache)) {
     return {
       totalKeyLength,
       translatedKeyLength,

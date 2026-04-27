@@ -639,14 +639,26 @@ export const translateOnTheFlyCoreMethods = {
     },
 
     loadCacheFromDisk() {
+        let existingEntries = [];
+        let existingLastSeenEntries = [];
+
         try {
             this.migrateLegacyCacheDataToSplitFilesSync();
 
             if (!this.translationCache) {
-                const runtime = ensureTranslateCacheRuntime(new Map());
+                const runtime = ensureTranslateCacheRuntime();
                 this.translationCache = runtime.cache;
                 this.lastSeenByCacheKey = runtime.lastSeenByCacheKey;
             }
+
+            existingEntries =
+                this.translationCache instanceof Map
+                    ? Array.from(this.translationCache.entries())
+                    : [];
+            existingLastSeenEntries =
+                this.lastSeenByCacheKey instanceof Map
+                    ? Array.from(this.lastSeenByCacheKey.entries())
+                    : [];
 
             this.translationCache.clear();
             this.cacheBucketByCompositeKey = new Map();
@@ -654,15 +666,50 @@ export const translateOnTheFlyCoreMethods = {
             runCacheMigrationsIfNeeded(this);
             this.loadVariableTranslationSettingsFromDisk();
 
+            // Guard against destructive empty reloads (observed during separate-window bootstrap).
+            // If we previously had in-memory cache but disk load yields nothing, keep existing state.
+            if (this.translationCache.size === 0 && existingEntries.length > 0) {
+                for (const [key, value] of existingEntries) {
+                    this.translationCache.set(key, value);
+                }
+
+                if (this.lastSeenByCacheKey && existingLastSeenEntries.length > 0) {
+                    this.lastSeenByCacheKey.clear();
+                    for (const [key, value] of existingLastSeenEntries) {
+                        this.lastSeenByCacheKey.set(key, value);
+                    }
+                }
+
+                this.notifyCacheRuntime('cache-load-restored-from-memory');
+                return;
+            }
+
             this.notifyCacheRuntime('cache-loaded');
         } catch (error) {
             console.warn('[TranslateOnTheFly] Failed to load cache, starting fresh', error);
-            const runtime = ensureTranslateCacheRuntime(new Map());
+            const runtime = ensureTranslateCacheRuntime();
             this.translationCache = runtime.cache;
             this.lastSeenByCacheKey = runtime.lastSeenByCacheKey;
             this.cacheBucketByCompositeKey = new Map();
             this.safeVariableTranslationIds = [];
             this.safeVariableTranslationIdSet = new Set();
+
+            if (this.translationCache.size === 0 && existingEntries.length > 0) {
+                for (const [key, value] of existingEntries) {
+                    this.translationCache.set(key, value);
+                }
+
+                if (this.lastSeenByCacheKey && existingLastSeenEntries.length > 0) {
+                    this.lastSeenByCacheKey.clear();
+                    for (const [key, value] of existingLastSeenEntries) {
+                        this.lastSeenByCacheKey.set(key, value);
+                    }
+                }
+
+                this.notifyCacheRuntime('cache-load-failed-restored-from-memory');
+                return;
+            }
+
             this.notifyCacheRuntime('cache-load-failed-reset');
         }
     },

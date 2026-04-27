@@ -118,6 +118,8 @@ export function runCacheMigrationsIfNeeded(panel) {
 // Individual migrations
 // ---------------------------------------------------------------------------
 
+import { isMapLike } from '../../js/TranslateCacheRuntime.js';
+
 /**
  * v1: Remove trailing \n characters from the text portion of every cache key.
  *
@@ -131,7 +133,7 @@ export function runCacheMigrationsIfNeeded(panel) {
  */
 function _migrateV1StripTrailingNewlines(panel) {
     const cache = panel.translationCache;
-    if (!(cache instanceof Map)) {
+    if (!isMapLike(cache)) {
         return false;
     }
 

@@ -1,5 +1,7 @@
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 
+import { isMapLike } from '../../js/TranslateCacheRuntime.js';
+
 export const translateOnTheFlyRuntimeMethods = {
     setupTranslationHook() {
         const self = this;
@@ -314,7 +316,7 @@ export const translateOnTheFlyRuntimeMethods = {
 
             // Ensure the key exists so Names Manager can list it as cache-only actor_name.
             if (
-                self.translationCache instanceof Map &&
+                isMapLike(self.translationCache) &&
                 !self.translationCache.has(speakerKey) &&
                 typeof self.setCacheValue === 'function'
             ) {

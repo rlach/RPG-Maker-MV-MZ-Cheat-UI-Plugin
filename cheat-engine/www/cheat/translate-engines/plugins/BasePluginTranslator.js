@@ -1,4 +1,5 @@
 import { BasePhase } from '../translation-phases/BasePhase.js';
+import { shouldApplyHook } from '../../js/HookGuardHelper.js';
 
 export class BasePluginTranslator extends BasePhase {
     constructor() {
@@ -50,6 +51,21 @@ export class BasePluginTranslator extends BasePhase {
     }
 
     /**
+     * Generate unique hook guard name for this plugin translator
+     * @private
+     * @returns {string} Hook name (e.g., 'PLUGIN_MY_PLUGIN_TRANSLATOR_HOOK')
+     */
+    _getPluginHookName() {
+        const pluginName = String(this.getPluginName() || 'unknown')
+            .trim()
+            .toUpperCase()
+            .replaceAll(/[^A-Z0-9]+/g, '_')
+            .replaceAll(/(^_|_$)/g, '');
+
+        return `PLUGIN_${pluginName}_HOOK`;
+    }
+
+    /**
      * Register XML-style plugin tag configs with the active translation engine.
      * Call this inside enablePluginTranslation() to automatically protect plugin-specific
      * tags during LLM translation (they are encoded/decoded rather than passed raw).
@@ -89,6 +105,11 @@ export class BasePluginTranslator extends BasePhase {
 
         if (this._pluginDetected) {
             try {
+                // Use hook guard to prevent re-initialization if this translator runs in separate window
+                if (!shouldApplyHook(this._getPluginHookName())) {
+                    return this._pluginDetected;
+                }
+
                 this.enablePluginTranslation();
             } catch (error) {
                 console.warn(

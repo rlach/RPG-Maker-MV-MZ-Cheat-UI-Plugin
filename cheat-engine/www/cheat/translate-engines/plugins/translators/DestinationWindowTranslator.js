@@ -144,10 +144,6 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (window.__CHEAT_DESTINATION_WINDOW_TRANSLATOR_HOOKED__) {
-            return;
-        }
-
         if (
             !window.Game_Interpreter ||
             !Game_Interpreter.prototype ||
@@ -179,8 +175,6 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
 
             return original.apply(this, arguments);
         };
-
-        window.__CHEAT_DESTINATION_WINDOW_TRANSLATOR_HOOKED__ = true;
     }
 
     async prepareTranslator() {

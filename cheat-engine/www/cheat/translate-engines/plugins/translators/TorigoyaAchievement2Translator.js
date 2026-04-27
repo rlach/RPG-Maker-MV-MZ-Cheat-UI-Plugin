@@ -291,10 +291,6 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (window.__CHEAT_TORIGOYA_ACHIEVEMENT2_TRANSLATOR_HOOKED__) {
-            return;
-        }
-
         const namespace = window.Torigoya && window.Torigoya.Achievement2;
         if (!namespace) {
             return;
@@ -470,8 +466,6 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
                 return result;
             };
         }
-
-        window.__CHEAT_TORIGOYA_ACHIEVEMENT2_TRANSLATOR_HOOKED__ = true;
     }
 
     async prepareTranslator() {

@@ -37,10 +37,6 @@ export class AutoNamePopupTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (window.__CHEAT_AUTO_NAME_POPUP_TRANSLATOR_HOOKED__) {
-            return;
-        }
-
         if (!window.Game_Message || !Game_Message.prototype) {
             return;
         }
@@ -90,7 +86,7 @@ export class AutoNamePopupTranslator extends BasePluginTranslator {
             return text
                 .replace(/\\[cCnNvVpPgG]\[\d+\]/g, '')
                 .replace(/\\[cCnNvVpPgG]/g, '')
-                .replace(/\\[.!<>|^\$]/g, '')
+                .replace(/\\[.!<>|^$]/g, '')
                 .trim();
         };
 
@@ -147,8 +143,6 @@ export class AutoNamePopupTranslator extends BasePluginTranslator {
                 console.warn('[AutoNamePopupTranslator] Speaker name translation failed', error);
             }
         };
-
-        window.__CHEAT_AUTO_NAME_POPUP_TRANSLATOR_HOOKED__ = true;
     }
 
     collectUntranslated() {

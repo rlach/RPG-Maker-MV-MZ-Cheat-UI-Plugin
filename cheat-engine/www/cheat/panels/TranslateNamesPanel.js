@@ -2,6 +2,7 @@ import { ensureTranslationRuntime } from './translate-on-the-fly/TranslationRunt
 import { createTranslationBatchManager } from '../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
 import { ConfirmDialog } from '../js/DialogHelper.js';
+import { ensureTranslateCacheRuntime, isMapLike } from '../js/TranslateCacheRuntime.js';
 
 export default {
     name: 'TranslateNamesPanel',
@@ -510,12 +511,12 @@ export default {
             this.loading = true;
             try {
                 const { sourceLang, targetLang } = this.getLanguagePair();
-                const cache = window.__TranslateOnTheFlyCache;
+                const { cache } = ensureTranslateCacheRuntime();
                 const prefix = `actor_name:${sourceLang}-${targetLang}-`;
 
                 // Collect all actor_name cache entries
                 const cacheNameMap = new Map();
-                if (cache instanceof Map) {
+                if (isMapLike(cache)) {
                     for (const [key, value] of cache.entries()) {
                         if (key.startsWith(prefix)) {
                             const name = key.slice(prefix.length);
@@ -603,8 +604,8 @@ export default {
             }
 
             const { sourceLang, targetLang } = this.getLanguagePair();
-            const cache = window.__TranslateOnTheFlyCache;
-            if (!(cache instanceof Map)) {
+            const { cache } = ensureTranslateCacheRuntime();
+            if (!isMapLike(cache)) {
                 this.refresh();
                 return;
             }

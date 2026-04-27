@@ -1,5 +1,6 @@
 import { KeyValueStorage } from "./KeyValueStorage.js";
 import { ensureSettingsMigration } from './UnifiedSettings.js';
+import { ensureRootWindowStateValue, setRootWindowStateValue } from './RootWindowState.js';
 
 class TranslateOnTheFlyStateManager {
   constructor() {
@@ -111,4 +112,9 @@ class TranslateOnTheFlyStateManager {
   }
 }
 
-export const TranslateOnTheFlyState = new TranslateOnTheFlyStateManager();
+export const TranslateOnTheFlyState = ensureRootWindowStateValue(
+  '__TranslateOnTheFlyStateManager',
+  () => new TranslateOnTheFlyStateManager(),
+);
+
+setRootWindowStateValue('__TranslateOnTheFlyState', TranslateOnTheFlyState);

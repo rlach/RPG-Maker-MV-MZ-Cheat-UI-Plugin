@@ -22,10 +22,6 @@ export class TextPictureTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (window.__CHEAT_TEXT_PICTURE_TRANSLATOR_HOOKED__) {
-            return;
-        }
-
         if (
             !window.Game_Picture ||
             !Game_Picture.prototype ||
@@ -86,8 +82,6 @@ export class TextPictureTranslator extends BasePluginTranslator {
 
             return result;
         };
-
-        window.__CHEAT_TEXT_PICTURE_TRANSLATOR_HOOKED__ = true;
     }
 
     async prepareTranslator() {

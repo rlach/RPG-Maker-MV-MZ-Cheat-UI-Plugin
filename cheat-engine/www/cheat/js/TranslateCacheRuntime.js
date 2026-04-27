@@ -1,7 +1,26 @@
+import {
+    getRootWindow,
+    notifyRootWindowEvent,
+    setRootWindowStateValue,
+    subscribeRootWindowEvent,
+} from './RootWindowState.js'
+
 const RUNTIME_EVENT_NAME = 'cheat:translate-cache-runtime-updated'
 
+export function isMapLike(value) {
+    return (
+        !!value &&
+        typeof value.get === 'function' &&
+        typeof value.set === 'function' &&
+        typeof value.has === 'function' &&
+        typeof value.delete === 'function' &&
+        typeof value.clear === 'function' &&
+        typeof value.entries === 'function'
+    )
+}
+
 function ensureMap(value) {
-    if (value instanceof Map) {
+    if (isMapLike(value)) {
         return value
     }
 
@@ -9,20 +28,23 @@ function ensureMap(value) {
 }
 
 export function ensureTranslateCacheRuntime(cacheMap = null) {
-    const cache = ensureMap(cacheMap || window.__TranslateOnTheFlyCache)
-    window.__TranslateOnTheFlyCache = cache
+    const root = getRootWindow()
+    const existingRootCache = root['__TranslateOnTheFlyCache']
+    const cacheSource = isMapLike(existingRootCache) ? existingRootCache : cacheMap
+    const cache = ensureMap(cacheSource)
+    setRootWindowStateValue('__TranslateOnTheFlyCache', cache)
 
-    const lastSeenByCacheKey = ensureMap(window.__TranslateOnTheFlyLastSeenByCacheKey)
-    window.__TranslateOnTheFlyLastSeenByCacheKey = lastSeenByCacheKey
+    const lastSeenByCacheKey = ensureMap(root['__TranslateOnTheFlyLastSeenByCacheKey'])
+    setRootWindowStateValue('__TranslateOnTheFlyLastSeenByCacheKey', lastSeenByCacheKey)
 
-    if (!Number.isFinite(window.__TranslateOnTheFlyCacheVersion)) {
-        window.__TranslateOnTheFlyCacheVersion = 0
+    if (!Number.isFinite(root['__TranslateOnTheFlyCacheVersion'])) {
+        setRootWindowStateValue('__TranslateOnTheFlyCacheVersion', 0)
     }
 
     return {
         cache,
         lastSeenByCacheKey,
-        version: window.__TranslateOnTheFlyCacheVersion
+        version: root['__TranslateOnTheFlyCacheVersion']
     }
 }
 
@@ -36,20 +58,35 @@ export function getTranslateCacheRuntimeEventName() {
 }
 
 export function notifyTranslateCacheRuntimeChanged(reason = 'unknown', key = null) {
-    ensureTranslateCacheRuntime()
-    window.__TranslateOnTheFlyCacheVersion += 1
+    const runtime = ensureTranslateCacheRuntime()
+    const version = Number.isFinite(runtime.version) ? runtime.version + 1 : 1
+    setRootWindowStateValue('__TranslateOnTheFlyCacheVersion', version)
 
     const detail = {
         reason,
         key,
-        version: window.__TranslateOnTheFlyCacheVersion,
+        version,
         timestamp: Date.now()
     }
 
-    try {
-        window.dispatchEvent(new CustomEvent(RUNTIME_EVENT_NAME, { detail }))
-    } catch (error) {
-        // CustomEvent may fail on unusual environments; ignore safely.
+    notifyRootWindowEvent(RUNTIME_EVENT_NAME, detail)
+
+    const dispatchToWindow = (targetWindow) => {
+        if (!targetWindow || typeof targetWindow.dispatchEvent !== 'function') {
+            return
+        }
+
+        try {
+            targetWindow.dispatchEvent(new CustomEvent(RUNTIME_EVENT_NAME, { detail }))
+        } catch (error) {
+            // CustomEvent may fail on unusual environments; ignore safely.
+        }
+    }
+
+    const root = getRootWindow()
+    dispatchToWindow(root)
+    if (root !== window) {
+        dispatchToWindow(window)
     }
 
     return detail
@@ -60,15 +97,15 @@ export function onTranslateCacheRuntimeChanged(handler) {
         return () => {}
     }
 
-    const wrapped = (event) => {
-        const detail = event && event.detail ? event.detail : {}
+    const wrapped = (detail) => {
         handler(detail)
     }
 
-    window.addEventListener(RUNTIME_EVENT_NAME, wrapped)
+    ensureTranslateCacheRuntime()
+    const unsubscribeRoot = subscribeRootWindowEvent(RUNTIME_EVENT_NAME, wrapped)
 
     return () => {
-        window.removeEventListener(RUNTIME_EVENT_NAME, wrapped)
+        unsubscribeRoot()
     }
 }
 

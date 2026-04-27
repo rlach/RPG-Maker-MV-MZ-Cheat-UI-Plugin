@@ -340,7 +340,11 @@
 
           // Boot translation hook
           try {
-            ensureTranslationRuntime();
+            if (parentWin && typeof parentWin.__ensureTranslationRuntime === "function") {
+              parentWin.__ensureTranslationRuntime();
+            } else {
+              ensureTranslationRuntime();
+            }
             console.log("[CheatWindow] Translation runtime ensured");
           } catch (err) {
             console.warn("[CheatWindow] Failed to mount translator", err);

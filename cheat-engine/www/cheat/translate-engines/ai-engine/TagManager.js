@@ -11,6 +11,7 @@ import {
     TAG_STYLE,
     TAG_TYPE,
 } from './constants.js';
+import { ensureTranslateCacheRuntime } from '../../js/TranslateCacheRuntime.js';
 
 const BRACKET_CLOSE_BY_OPEN = Object.freeze({
     [TAG_BRACKET.ANGLE]: '>',
@@ -730,7 +731,7 @@ export class TagManager {
         const pairProfiles =
             (this.panel.nameProfilesByLangPair && this.panel.nameProfilesByLangPair[pairKey]) || {};
 
-        const cache = window.__TranslateOnTheFlyCache;
+        const { cache } = ensureTranslateCacheRuntime();
         if (!(cache instanceof Map)) {
             return '';
         }
