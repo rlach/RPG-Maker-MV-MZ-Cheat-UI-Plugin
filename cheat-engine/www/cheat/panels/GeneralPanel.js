@@ -103,9 +103,12 @@ export default {
             </template>
             <template v-slot:append>
                 <v-icon color="grey lighten-3" @click="addTextSpeed(stepTextSpeed)">mdi-chevron-right</v-icon>
-                <span class="grey--text text--lighten-1 align-self-center ml-2">{{textSpeed.toFixed(1)}}</span>
+              <span class="grey--text text--lighten-1 align-self-center ml-2">{{formatTextSpeedLabel(textSpeed)}}</span>
             </template>
         </v-slider>
+          <div class="caption grey--text text--lighten-1 mt-1 ml-1">
+            0 = instant, 1 = default, 20 = very slow
+          </div>
         
         <v-slider
             v-model="gameSpeed"
@@ -222,9 +225,9 @@ export default {
       maxSpeed: 10,
       stepSpeed: 0.5,
 
-      minTextSpeed: 0.1,
-      maxTextSpeed: 10,
-      stepTextSpeed: 0.1,
+      minTextSpeed: 0,
+      maxTextSpeed: 20,
+      stepTextSpeed: 1,
 
       gameSpeed: 1,
       minGameSpeed: 0.1,
@@ -515,10 +518,7 @@ export default {
     onTextSpeedChange() {
       const textSpeedCheat = this.cheatApi.TextSpeedCheat;
       if (textSpeedCheat && textSpeedCheat.setTextSpeed) {
-        textSpeedCheat.setTextSpeed(this.textSpeed);
-      }
-      if (textSpeedCheat && textSpeedCheat.__writeSettings) {
-        textSpeedCheat.__writeSettings(this.textSpeed);
+        this.textSpeed = textSpeedCheat.setTextSpeed(this.textSpeed);
       }
       this.initializeVariables();
     },
@@ -529,6 +529,18 @@ export default {
         this.maxTextSpeed,
       );
       this.onTextSpeedChange();
+    },
+
+    formatTextSpeedLabel(value) {
+      if (value === 0) {
+        return "Instant";
+      }
+
+      if (value === 1) {
+        return "1 (Default)";
+      }
+
+      return String(value);
     },
   },
 };

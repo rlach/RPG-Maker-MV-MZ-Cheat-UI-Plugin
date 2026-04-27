@@ -526,18 +526,25 @@ export class BattleCheat {
 
 export class AlwaysDashCheat {
     static getAlwaysDash() {
-        if (typeof ConfigManager !== 'undefined' && ConfigManager.alwaysDash !== undefined) {
-            return ConfigManager.alwaysDash;
+        const configManager = window['ConfigManager'];
+
+        if (configManager && configManager.alwaysDash !== undefined) {
+            return configManager.alwaysDash;
         }
+
         return false;
     }
 
     static setAlwaysDash(value) {
-        if (typeof ConfigManager !== 'undefined') {
-            ConfigManager.alwaysDash = !!value;
-            if (typeof ConfigManager.save === 'function') {
-                ConfigManager.save();
-            }
+        const configManager = window['ConfigManager'];
+
+        if (!configManager) {
+            return;
+        }
+
+        configManager.alwaysDash = !!value;
+        if (typeof configManager.save === 'function') {
+            configManager.save();
         }
     }
 
@@ -563,51 +570,130 @@ export class AlwaysDashCheat {
 }
 
 export class TextSpeedCheat {
+    static defaultTextSpeed() {
+        return 1;
+    }
+
+    static normalizeTextSpeed(speed) {
+        const numericSpeed = Number(speed);
+
+        if (!Number.isFinite(numericSpeed)) {
+            return TextSpeedCheat.defaultTextSpeed();
+        }
+
+        return Math.max(0, Math.min(20, Math.round(numericSpeed)));
+    }
+
     static getTextSpeed() {
         if (typeof $gameSystem !== 'undefined' && $gameSystem._textSpeed !== undefined) {
-            return $gameSystem._textSpeed;
+            return TextSpeedCheat.normalizeTextSpeed($gameSystem._textSpeed);
         }
-        return 1; // default is normal speed
+
+        return TextSpeedCheat.defaultTextSpeed();
     }
 
     static setTextSpeed(speed) {
-        // Clamp speed between 0.1 and 10
-        const clampedSpeed = Math.max(0.1, Math.min(10, speed));
-        
+        const clampedSpeed = TextSpeedCheat.normalizeTextSpeed(speed);
+
         if (typeof $gameSystem !== 'undefined') {
-            if (!$gameSystem._textSpeed) {
-                $gameSystem._textSpeed = 1;
-            }
             $gameSystem._textSpeed = clampedSpeed;
         }
+
+        return clampedSpeed;
     }
 
-    static getCharacterWaitTime() {
-        // Calculate wait frames based on text speed
-        // Speed 1 = 4 frames (default), Speed 10 = 0.4 frames
-        const baseWait = 4;
-        const speed = this.getTextSpeed();
-        return Math.max(1, Math.round(baseWait / speed));
+    static isInstant() {
+        return TextSpeedCheat.getTextSpeed() === 0;
     }
 
-    static __writeSettings(textSpeed) {
-        setUnifiedSetting('textSpeed', textSpeed);
+    static getCharacterWaitFrames() {
+        return Math.max(0, TextSpeedCheat.getTextSpeed() - 1);
     }
 
-    static __readSettings() {
-        const textSpeed = getUnifiedSetting('textSpeed', undefined);
+    static shouldDelayCharacter(windowMessage, character) {
+        if (!windowMessage || TextSpeedCheat.isInstant()) {
+            return false;
+        }
 
-        if (textSpeed === undefined) {
+        if (MessageCheat.skip || windowMessage._showFast || windowMessage._lineShowFast) {
+            return false;
+        }
+
+        return character !== '\n' && character !== '\f' && character !== '\x1b';
+    }
+
+    static applyCharacterWait(windowMessage, character) {
+        if (!TextSpeedCheat.shouldDelayCharacter(windowMessage, character)) {
             return;
         }
 
-        this.setTextSpeed(textSpeed);
+        const waitFrames = TextSpeedCheat.getCharacterWaitFrames();
+        if (waitFrames > 0) {
+            windowMessage._waitCount = Math.max(windowMessage._waitCount || 0, waitFrames);
+        }
+    }
+
+    static __writeSettings(textSpeed) {
+        TextSpeedCheat.setTextSpeed(textSpeed);
+    }
+
+    static __readSettings() {
+        // Text speed lives in current game data ($gameSystem), not cheat settings.
     }
 }
 
 export class MessageCheat {
     static initialize() {
         this.skip = false;
+
+        Window_Message.prototype.processCharacter = function (textState) {
+            const currentCharacter = textState && textState.text
+                ? textState.text[textState.index]
+                : undefined;
+
+            Window_Base.prototype.processCharacter.call(this, textState);
+            TextSpeedCheat.applyCharacterWait(this, currentCharacter);
+        };
+
+        if (typeof Window_Message.prototype.shouldBreakHere === 'function') {
+            const _Window_Message_shouldBreakHere = Window_Message.prototype.shouldBreakHere;
+            Window_Message.prototype.shouldBreakHere = function (textState) {
+                if (TextSpeedCheat.isInstant() && this.canBreakHere(textState)) {
+                    return this.isWaiting();
+                }
+
+                return _Window_Message_shouldBreakHere.call(this, textState);
+            };
+        } else {
+            Window_Message.prototype.updateMessage = function () {
+                if (this._textState) {
+                    while (!this.isEndOfText(this._textState)) {
+                        if (this.needsNewPage(this._textState)) {
+                            this.newPage(this._textState);
+                        }
+
+                        this.updateShowFast();
+                        this.processCharacter(this._textState);
+
+                        if (!TextSpeedCheat.isInstant() && !this._showFast && !this._lineShowFast) {
+                            break;
+                        }
+
+                        if (this.pause || this._waitCount > 0) {
+                            break;
+                        }
+                    }
+
+                    if (this.isEndOfText(this._textState)) {
+                        this.onEndOfText();
+                    }
+
+                    return true;
+                }
+
+                return false;
+            };
+        }
 
         // Skip message display animation
         // It seems to be executed whenever each character is output in the message window
@@ -934,13 +1020,13 @@ export class MessageCheat {
 
 // Expose cheat helpers on the window so external cheat windows can reuse the same instances
 try {
-    window.GeneralCheat = GeneralCheat;
-    window.GameSpeedCheat = GameSpeedCheat;
-    window.SpeedCheat = SpeedCheat;
-    window.SceneCheat = SceneCheat;
-    window.MessageCheat = MessageCheat;
-    window.AlwaysDashCheat = AlwaysDashCheat;
-    window.TextSpeedCheat = TextSpeedCheat;
+    window['GeneralCheat'] = GeneralCheat;
+    window['GameSpeedCheat'] = GameSpeedCheat;
+    window['SpeedCheat'] = SpeedCheat;
+    window['SceneCheat'] = SceneCheat;
+    window['MessageCheat'] = MessageCheat;
+    window['AlwaysDashCheat'] = AlwaysDashCheat;
+    window['TextSpeedCheat'] = TextSpeedCheat;
 } catch (err) {
     // Non-fatal: best-effort exposure only
 }
