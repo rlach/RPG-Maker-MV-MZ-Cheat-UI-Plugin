@@ -54,8 +54,8 @@ function wrapSegmentTextByBrOnly(runtimeContext, originalWrapText, text, maxWidt
         const segment = segments[i];
         const wrappedSegment = originalWrapText.call(runtimeContext, segment, maxWidth, options);
 
-        // Convert only line breaks introduced by wrapping in this segment.
-        rebuilt += String(wrappedSegment || '').replace(/\n/g, '<br>');
+        const wrappedLines = String(wrappedSegment || '').split('\n');
+        rebuilt += wrappedLines.join('<br>');
 
         // Keep original newlines untouched.
         if (i < segments.length - 1) {
