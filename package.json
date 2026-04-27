@@ -9,7 +9,9 @@
         "lint": "eslint ./cheat-engine/www --ext .js,.vue",
         "lint:fix": "eslint ./cheat-engine/www --ext .js,.vue --fix",
         "check:duplicates": "node ./scripts/check-duplicates.mjs",
-        "check:duplicates:strict": "node ./scripts/check-duplicates.mjs --strict"
+        "check:duplicates:strict": "node ./scripts/check-duplicates.mjs --strict",
+        "test": "vitest run",
+        "test:watch": "vitest"
     },
     "devDependencies": {
         "@eslint/js": "^9.24.0",
@@ -18,6 +20,7 @@
         "globals": "^16.0.0",
         "jscpd": "^4.0.5",
         "prettier": "^3.5.3",
+        "vitest": "^4.1.5",
         "vue-eslint-parser": "^10.0.0"
     }
 }

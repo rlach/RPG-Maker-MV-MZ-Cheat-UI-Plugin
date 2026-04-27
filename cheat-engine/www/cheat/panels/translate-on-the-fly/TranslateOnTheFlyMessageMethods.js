@@ -1,5 +1,6 @@
 import { Alert } from '../../js/AlertHelper.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
+import { wrapTextByVisibleWidth } from './TextWrap.js';
 
 export const translateOnTheFlyMessageMethods = {
     replaceMessageText(translatedText) {
@@ -178,84 +179,10 @@ export const translateOnTheFlyMessageMethods = {
             return text;
         }
 
-        const flattenExistingNewlines = !!(options && options.flattenExistingNewlines);
-        let sourceText = text;
-        if (flattenExistingNewlines && typeof sourceText === 'string') {
-            sourceText = sourceText
-                .replace(/\r\n/g, '\n')
-                .replace(/\n+/g, ' ')
-                .replace(/[ \t]{2,}/g, ' ')
-                .trim();
-        }
-
-        // Strip RPG Maker escape sequences for visible-length calculation.
-        // Covers: \c[N], \n[N], \v[N], \i[N], \{, \}, \!, \., \|, \<, \>, etc.
-        const TAG_RE = /\\[A-Za-z${}|.!><^]\[\d+\]|\\[A-Za-z${}|.!><^]/g;
-        const getVisibleLength = (str) => str.replace(TAG_RE, '').length;
-
-        // A token is a "follow-up" when its visible content has no word characters
-        // (pure punctuation, or pure tags with 0 visible width).
-        // Follow-ups must travel with the preceding word — never start a new line alone.
-        const isFollowUp = (token) => {
-            const visible = token.replace(TAG_RE, '');
-            return visible.length === 0 || !/\w/.test(visible);
-        };
-
-        const lines = sourceText.split('\n');
-        const wrappedLines = [];
-
-        for (const line of lines) {
-            if (getVisibleLength(line) <= maxWidth) {
-                wrappedLines.push(line);
-                continue;
-            }
-
-            // Split by spaces, discard empty tokens from consecutive spaces.
-            const rawTokens = line.split(' ').filter((t) => t !== '');
-
-            // Build wrap units: punctuation/tag-only tokens attach to the preceding
-            // unit (preserving the space), so they always wrap with their word.
-            const units = [];
-            for (const token of rawTokens) {
-                if (units.length > 0 && isFollowUp(token)) {
-                    units[units.length - 1] += ' ' + token;
-                } else {
-                    units.push(token);
-                }
-            }
-
-            let currentLine = '';
-
-            for (const unit of units) {
-                const unitLen = getVisibleLength(unit);
-
-                if (unitLen > maxWidth) {
-                    // Unit is wider than the whole line — push as-is, no splitting
-                    if (currentLine) {
-                        wrappedLines.push(currentLine);
-                        currentLine = '';
-                    }
-                    wrappedLines.push(unit);
-                    continue;
-                }
-
-                const testLine = currentLine ? currentLine + ' ' + unit : unit;
-                if (getVisibleLength(testLine) <= maxWidth) {
-                    currentLine = testLine;
-                } else {
-                    if (currentLine) {
-                        wrappedLines.push(currentLine);
-                    }
-                    currentLine = unit;
-                }
-            }
-
-            if (currentLine) {
-                wrappedLines.push(currentLine);
-            }
-        }
-
-        return wrappedLines.join('\n');
+        return wrapTextByVisibleWidth(text, maxWidth, {
+            flattenExistingNewlines: !!(options && options.flattenExistingNewlines),
+            tagEntries: this.engine?.tagManager?.tagEntries,
+        });
     },
 
     async translateCommandName(commandName) {
