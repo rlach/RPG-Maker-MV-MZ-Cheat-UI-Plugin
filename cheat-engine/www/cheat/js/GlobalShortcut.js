@@ -1,26 +1,10 @@
 import { Key } from './KeyCodes.js';
 import { Alert } from './AlertHelper.js';
-import { cloneObject } from './Tools.js';
+import { cloneObject, isNwjsEnvironment, isUtilsReady } from './Tools.js';
 import { SpeedCheat, SceneCheat, GeneralCheat, BattleCheat, MessageCheat } from './CheatHelper.js';
 import { ShortcutMap } from './ShortcutHelper.js';
 
 const INIT_RETRY_TIMEOUT_MS = 100;
-
-function isNwjsEnvironment() {
-    const utils = typeof Utils !== 'undefined' ? Utils : null;
-    if (utils && typeof utils.isNwjs === 'function') {
-        try {
-            return Boolean(utils.isNwjs());
-        } catch (err) {}
-    }
-
-    return false;
-}
-
-function isUtilsReady() {
-    const utils = typeof Utils !== 'undefined' ? Utils : null;
-    return Boolean(utils && typeof utils.isNwjs === 'function');
-}
 
 // default shortcut settings
 const defaultShortcutSettings = {
@@ -539,7 +523,9 @@ class GlobalShortcut {
 
         if (!isUtilsReady()) {
             if (retryCount === 0 || retryCount % 50 === 0) {
-                console.warn('[cheat plugin warn] Utils is not ready yet; retrying GlobalShortcut initialization');
+                console.warn(
+                    '[cheat plugin warn] Utils is not ready yet; retrying GlobalShortcut initialization'
+                );
             }
 
             this.initializeRetryHandle = setTimeout(() => {
