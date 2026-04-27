@@ -11,7 +11,7 @@ const SCRIPT_STRING_ASSIGN_RE = /(=\s*")((?:[^"\\]|\\.)*?)("\s*;?\s*)$/;
 // Minimum heuristic: at least one non-ASCII character, so purely ASCII
 // identifiers / short literals are not sent for translation.
 function looksTranslatable(text) {
-    return /[^\x00-\x7F]/.test(text);
+    return Array.from(String(text || '')).some((char) => char.charCodeAt(0) > 0x7f);
 }
 
 function escapeForJsStringLiteral(translated) {
@@ -106,10 +106,6 @@ export class YEPCoreEngineScriptTranslator extends BasePluginTranslator {
     // -------------------------------------------------------------------------
 
     enablePluginTranslation() {
-        if (window.__CHEAT_YEP_CORE_ENGINE_SCRIPT_TRANSLATOR_HOOKED__) {
-            return;
-        }
-
         if (
             !window.Game_Interpreter ||
             !Game_Interpreter.prototype ||
@@ -211,8 +207,6 @@ export class YEPCoreEngineScriptTranslator extends BasePluginTranslator {
                 applyGameVariableRefresh('sceneMap.onMapLoaded');
             };
         }
-
-        window.__CHEAT_YEP_CORE_ENGINE_SCRIPT_TRANSLATOR_HOOKED__ = true;
     }
 
     /**

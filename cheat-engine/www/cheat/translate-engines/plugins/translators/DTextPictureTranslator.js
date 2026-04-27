@@ -28,11 +28,8 @@ export class DTextPictureTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (window.__CHEAT_DTEXT_PICTURE_TRANSLATOR_HOOKED__) {
-            return;
-        }
-
         if (
+            !window.Game_Screen ||
             !window.Game_Screen ||
             !Game_Screen.prototype ||
             typeof Game_Screen.prototype.setDTextPicture !== 'function'
@@ -73,8 +70,6 @@ export class DTextPictureTranslator extends BasePluginTranslator {
 
             return original.apply(this, arguments);
         };
-
-        window.__CHEAT_DTEXT_PICTURE_TRANSLATOR_HOOKED__ = true;
     }
 
     async prepareTranslator() {

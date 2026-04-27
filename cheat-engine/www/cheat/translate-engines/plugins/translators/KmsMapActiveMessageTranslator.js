@@ -80,10 +80,6 @@ export class KmsMapActiveMessageTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (window.__CHEAT_KMS_MAP_ACTIVE_MESSAGE_TRANSLATOR_HOOKED__) {
-            return;
-        }
-
         if (!window.Game_Event || !Game_Event.prototype) {
             return;
         }
@@ -187,8 +183,6 @@ export class KmsMapActiveMessageTranslator extends BasePluginTranslator {
                 }
             };
         }
-
-        window.__CHEAT_KMS_MAP_ACTIVE_MESSAGE_TRANSLATOR_HOOKED__ = true;
     }
 
     async prepareTranslator() {

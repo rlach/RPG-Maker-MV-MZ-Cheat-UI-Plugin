@@ -223,10 +223,6 @@ export class MultipleWindowSkinSystemTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (window.__CHEAT_MULTIPLE_WINDOW_SKIN_SYSTEM_TRANSLATOR_HOOKED__) {
-            return;
-        }
-
         if (
             !window.Window_Message ||
             !Window_Message.prototype ||
@@ -261,8 +257,6 @@ export class MultipleWindowSkinSystemTranslator extends BasePluginTranslator {
 
             return originalStartMessage.apply(this, arguments);
         };
-
-        window.__CHEAT_MULTIPLE_WINDOW_SKIN_SYSTEM_TRANSLATOR_HOOKED__ = true;
     }
 
     async prepareTranslator() {

@@ -70,10 +70,6 @@ export class TMNamePopTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (window.__CHEAT_TM_NAME_POP_TRANSLATOR_HOOKED__) {
-            return;
-        }
-
         if (
             !window.Game_CharacterBase ||
             !Game_CharacterBase.prototype ||
@@ -97,8 +93,6 @@ export class TMNamePopTranslator extends BasePluginTranslator {
             }
             return original.call(this, translatedName, shiftY);
         };
-
-        window.__CHEAT_TM_NAME_POP_TRANSLATOR_HOOKED__ = true;
     }
 
     async prepareTranslator() {

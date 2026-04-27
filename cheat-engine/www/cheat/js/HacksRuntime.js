@@ -1,4 +1,9 @@
 import { KeyValueStorage } from './KeyValueStorage.js';
+import {
+    ensureRootWindowStateValue,
+    getRootWindow,
+    setRootWindowStateValue,
+} from './RootWindowState.js';
 
 const HACKS_STORAGE = new KeyValueStorage('./www/cheat-settings/hacks.json');
 const STORAGE_KEY = 'data';
@@ -11,14 +16,6 @@ const MESSAGE_SKIP_SWITCH_KEYS = ['SkipSwitchId', 'スキップスイッチ'];
 function hasOwn(source, key) {
     // eslint-disable-next-line prefer-object-has-own
     return Object.prototype.hasOwnProperty.call(source, key);
-}
-
-function getRootWindow() {
-    if (window.__CHEAT_EXTERNAL_WINDOW__ && window.opener && !window.opener.closed) {
-        return window.opener;
-    }
-
-    return window;
 }
 
 function toLongSafe(value) {
@@ -286,9 +283,14 @@ class HacksRuntime {
     }
 }
 
-export const HACKS_RUNTIME = new HacksRuntime();
+export const HACKS_RUNTIME = ensureRootWindowStateValue(
+    '__HACKS_RUNTIME',
+    () => new HacksRuntime()
+);
+setRootWindowStateValue('__HACKS_RUNTIME', HACKS_RUNTIME);
 
 export function ensureHacksRuntime() {
     HACKS_RUNTIME.applyEnabledHacks();
+    setRootWindowStateValue('__HACKS_RUNTIME', HACKS_RUNTIME);
     return HACKS_RUNTIME;
 }
