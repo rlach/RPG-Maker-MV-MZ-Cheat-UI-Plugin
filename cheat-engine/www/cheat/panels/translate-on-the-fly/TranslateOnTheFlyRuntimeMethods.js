@@ -78,13 +78,17 @@ export const translateOnTheFlyRuntimeMethods = {
             }
         };
 
-        const shouldReturnTranslatedVariableValue = () => {
+        const shouldRunTranslationLifecycleHooks = () => {
             return (
                 self.isTranslationEnabled() ||
                 !!self.translateCacheWhenDisabled ||
                 (typeof self.isNonOtfTranslationProcessActive === 'function' &&
                     self.isNonOtfTranslationProcessActive())
             );
+        };
+
+        const shouldReturnTranslatedVariableValue = () => {
+            return shouldRunTranslationLifecycleHooks();
         };
 
         const shouldUseImageCacheTranslation = () => {
@@ -163,6 +167,10 @@ export const translateOnTheFlyRuntimeMethods = {
         };
 
         const applyCurrentMapDisplayNameFromCache = () => {
+            if (!shouldRunTranslationLifecycleHooks()) {
+                return;
+            }
+
             if (!window.$dataMap || typeof $dataMap !== 'object') {
                 return;
             }
@@ -1173,9 +1181,12 @@ export const translateOnTheFlyRuntimeMethods = {
 
         DataManager.extractSaveContents = function (contents) {
             DataManager._extractSaveContents(contents);
-            console.log(
-                '[TranslateOnTheFly] Extracted save contents, applying cached translations if any'
-            );
+
+            if (!shouldRunTranslationLifecycleHooks()) {
+                return;
+            }
+
+            console.log('[TranslateOnTheFly] Extracted save contents, applying cached translations if any');
 
             applyLifecycleTranslations('extractSaveContents');
             console.log(
@@ -1189,9 +1200,12 @@ export const translateOnTheFlyRuntimeMethods = {
 
         DataManager.createGameObjects = function () {
             DataManager._createGameObjects();
-            console.log(
-                '[TranslateOnTheFly] Created game objects, applying cached translations if any'
-            );
+
+            if (!shouldRunTranslationLifecycleHooks()) {
+                return;
+            }
+
+            console.log('[TranslateOnTheFly] Created game objects, applying cached translations if any');
             applyLifecycleTranslations('createGameObjects');
             console.log('[TranslateOnTheFly] Applied cached translations to data containers');
         };
@@ -1202,9 +1216,12 @@ export const translateOnTheFlyRuntimeMethods = {
 
         DataManager.loadDatabase = function () {
             DataManager._loadDatabase();
-            console.log(
-                '[TranslateOnTheFly] Loaded database, applying cached system message translations if any'
-            );
+
+            if (!shouldRunTranslationLifecycleHooks()) {
+                return;
+            }
+
+            console.log('[TranslateOnTheFly] Loaded database, applying cached system message translations if any');
             applyLifecycleTranslations('loadDatabase');
             console.log('[TranslateOnTheFly] Applied cached translations to system messages');
         };
@@ -1216,7 +1233,9 @@ export const translateOnTheFlyRuntimeMethods = {
             }
 
             Scene_Title.prototype.createCommandWindow = function () {
-                applyLifecycleTranslations('sceneTitleCreateCommandWindow');
+                if (shouldRunTranslationLifecycleHooks()) {
+                    applyLifecycleTranslations('sceneTitleCreateCommandWindow');
+                }
                 return Scene_Title.prototype._translateOriginalCreateCommandWindow.call(this);
             };
         }
@@ -1228,7 +1247,9 @@ export const translateOnTheFlyRuntimeMethods = {
             }
 
             Scene_Load.prototype.helpWindowText = function () {
-                applyLifecycleTranslations('sceneLoadHelpWindowText');
+                if (shouldRunTranslationLifecycleHooks()) {
+                    applyLifecycleTranslations('sceneLoadHelpWindowText');
+                }
                 return Scene_Load.prototype._translateOriginalHelpWindowText.call(this);
             };
         }
@@ -1239,8 +1260,10 @@ export const translateOnTheFlyRuntimeMethods = {
             }
 
             Scene_Map.prototype.onMapLoaded = function () {
-                applyLifecycleTranslations('sceneMapOnMapLoaded');
-                applyCurrentMapDisplayNameFromCache();
+                if (shouldRunTranslationLifecycleHooks()) {
+                    applyLifecycleTranslations('sceneMapOnMapLoaded');
+                    applyCurrentMapDisplayNameFromCache();
+                }
                 return Scene_Map.prototype._translateOriginalOnMapLoaded.call(this);
             };
         }
