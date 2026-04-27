@@ -47,6 +47,7 @@ export default {
       currentKey: Key.createEmpty(),
       show: false,
       currentComponentName: defaultComponent,
+      cheatInitializedNotificationShown: false,
     };
   },
 
@@ -299,8 +300,21 @@ export default {
         .replace(/'/g, "&#39;");
     },
 
-    notifyCheatInitialized() {
+    notifyCheatInitialized(retryCount = 0) {
+      if (this.cheatInitializedNotificationShown) {
+        return;
+      }
+
       if (window.__CHEAT_EXTERNAL_WINDOW__) {
+        return;
+      }
+
+      if (
+        !GLOBAL_SHORTCUT ||
+        typeof GLOBAL_SHORTCUT.isInitialized !== "function" ||
+        !GLOBAL_SHORTCUT.isInitialized()
+      ) {
+        setTimeout(() => this.notifyCheatInitialized(retryCount + 1), 100);
         return;
       }
 
@@ -309,10 +323,12 @@ export default {
           ? GLOBAL_SHORTCUT.getShortcut("toggleCheatModal")
           : null;
 
-      const shortcutLabel =
-        toggleShortcut && typeof toggleShortcut.asDisplayString === "function"
-          ? toggleShortcut.asDisplayString()
-          : "Ctrl + C";
+      if (!toggleShortcut || typeof toggleShortcut.asDisplayString !== "function") {
+        setTimeout(() => this.notifyCheatInitialized(retryCount + 1), 100);
+        return;
+      }
+
+      const shortcutLabel = toggleShortcut.asDisplayString();
 
       const highlightedShortcut = `<span style="color:#ffd54f">${this.escapeHtml(shortcutLabel)}</span>`;
       Alert.infoHtml(
@@ -320,6 +336,7 @@ export default {
         null,
         5000,
       );
+      this.cheatInitializedNotificationShown = true;
     },
 
     getCurrentCheatVersion() {

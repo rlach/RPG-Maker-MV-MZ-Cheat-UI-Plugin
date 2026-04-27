@@ -4,15 +4,22 @@ import { cloneObject } from './Tools.js';
 import { SpeedCheat, SceneCheat, GeneralCheat, BattleCheat, MessageCheat } from './CheatHelper.js';
 import { ShortcutMap } from './ShortcutHelper.js';
 
+const INIT_RETRY_TIMEOUT_MS = 100;
+
 function isNwjsEnvironment() {
-    const utils = globalThis['Utils'];
+    const utils = typeof Utils !== 'undefined' ? Utils : null;
     if (utils && typeof utils.isNwjs === 'function') {
         try {
             return Boolean(utils.isNwjs());
         } catch (err) {}
     }
 
-    return Boolean(typeof process !== 'undefined' && process.versions && process.versions.nw);
+    return false;
+}
+
+function isUtilsReady() {
+    const utils = typeof Utils !== 'undefined' ? Utils : null;
+    return Boolean(utils && typeof utils.isNwjs === 'function');
 }
 
 // default shortcut settings
@@ -516,13 +523,48 @@ function parseKeyObjectToString(src) {
 
 class GlobalShortcut {
     constructor() {
+        this.initialized = false;
+        this.initializeRetryHandle = null;
+
         // Don't initialize shortcuts in external window
         if (!window.opener) {
-            this.initialize();
+            this.initializeWithRetry();
         }
     }
 
+    initializeWithRetry(retryCount = 0) {
+        if (this.initialized) {
+            return;
+        }
+
+        if (!isUtilsReady()) {
+            if (retryCount === 0 || retryCount % 50 === 0) {
+                console.warn('[cheat plugin warn] Utils is not ready yet; retrying GlobalShortcut initialization');
+            }
+
+            this.initializeRetryHandle = setTimeout(() => {
+                this.initializeWithRetry(retryCount + 1);
+            }, INIT_RETRY_TIMEOUT_MS);
+            return;
+        }
+
+        this.initialize();
+    }
+
+    isInitialized() {
+        return this.initialized;
+    }
+
     initialize() {
+        if (this.initialized) {
+            return;
+        }
+
+        if (this.initializeRetryHandle) {
+            clearTimeout(this.initializeRetryHandle);
+            this.initializeRetryHandle = null;
+        }
+
         console.log('__global shortcut initialized');
 
         this.shortcutSettingsFile = './www/cheat-settings/shortcuts.json';
@@ -541,6 +583,8 @@ class GlobalShortcut {
         // initialize shortcut map
         this.shortcutMap = new ShortcutMap();
         this.initializeShortcutMap();
+
+        this.initialized = true;
     }
 
     initializeShortcutConfig() {
@@ -625,6 +669,10 @@ class GlobalShortcut {
     }
 
     runKeyEnterEvent(e, key) {
+        if (!this.shortcutMap) {
+            return;
+        }
+
         if (this.shortcutMap.runEnterAction(key)) {
             e.preventDefault();
             e.stopImmediatePropagation();
@@ -633,6 +681,10 @@ class GlobalShortcut {
     }
 
     runKeyRepeatEvent(e, key) {
+        if (!this.shortcutMap) {
+            return;
+        }
+
         if (this.shortcutMap.runRepeatAction(key)) {
             e.preventDefault();
             e.stopImmediatePropagation();
@@ -641,6 +693,10 @@ class GlobalShortcut {
     }
 
     runKeyLeaveEvent(e, key) {
+        if (!this.shortcutMap) {
+            return;
+        }
+
         if (this.shortcutMap.runLeaveAction(key)) {
             e.preventDefault();
             e.stopImmediatePropagation();
@@ -747,23 +803,42 @@ class GlobalShortcut {
     }
 
     getSettings(shortcutId) {
-        return this.shortcutSettings[shortcutId];
+        if (!this.shortcutSettings) {
+            return null;
+        }
+
+        return this.shortcutSettings[shortcutId] || null;
     }
 
     getConfig(shortcutId) {
-        return this.shortcutConfig[shortcutId];
+        if (!this.shortcutConfig) {
+            return null;
+        }
+
+        return this.shortcutConfig[shortcutId] || null;
     }
 
     getParamConfig(shortcutId, paramId) {
-        return this.getConfig(shortcutId).param[paramId];
+        const shortcutConfig = this.getConfig(shortcutId);
+        if (!shortcutConfig || !shortcutConfig.param) {
+            return null;
+        }
+
+        return shortcutConfig.param[paramId] || null;
     }
 
     getParam(shortcutId, paramId) {
-        return this.getSettings(shortcutId).param[paramId];
+        const shortcutSettings = this.getSettings(shortcutId);
+        if (!shortcutSettings || !shortcutSettings.param) {
+            return null;
+        }
+
+        return shortcutSettings.param[paramId];
     }
 
     getShortcut(shortcutId) {
-        return this.getSettings(shortcutId).shortcut;
+        const shortcutSettings = this.getSettings(shortcutId);
+        return shortcutSettings ? shortcutSettings.shortcut : null;
     }
 
     setShortcut(shortcutId, newKey) {
