@@ -14,6 +14,7 @@ import TranslateSettingsPanel from './panels/TranslateSettingsPanel.js';
 import TranslateOnTheFlyPanel from './panels/TranslateOnTheFlyPanel.js';
 import TranslateNamesPanel from './panels/TranslateNamesPanel.js';
 import TranslateCacheManagerPanel from './panels/TranslateCacheManagerPanel.js';
+import TranslateImagesPanel from './panels/TranslateImagesPanel.js';
 import TranslateTagManagerPanel from './panels/TranslateTagManagerPanel.js';
 import HacksPanel from './panels/HacksPanel.js';
 import { CHEAT_WINDOW_MANAGER } from './js/CheatWindowManager.js';
@@ -38,6 +39,7 @@ export default {
         TranslateOnTheFlyPanel,
         TranslateNamesPanel,
         TranslateCacheManagerPanel,
+        TranslateImagesPanel,
         TranslateTagManagerPanel,
         HacksPanel,
     },
@@ -189,6 +191,11 @@ export default {
                             name: 'Cache Manager',
                             icon: 'mdi-table-search',
                             component: 'translate-cache-manager-panel',
+                        },
+                        {
+                            name: 'Images',
+                            icon: 'mdi-folder-image',
+                            component: 'translate-images-panel',
                         },
                         {
                             name: 'ezTrans Settings',
