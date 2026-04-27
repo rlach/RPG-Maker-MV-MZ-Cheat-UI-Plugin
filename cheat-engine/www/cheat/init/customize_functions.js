@@ -1,18 +1,12 @@
 // customize mv functions
 import { MessageCheat } from "../js/CheatHelper.js";
-import { isRpgMakerMv, getRpgMakerName } from "../js/RpgMakerRuntime.js";
 
 export function customizeRPGMakerFunctions(mainComponent) {
   if (window.__CHEAT_EXTERNAL_WINDOW__) {
     // return
   }
 
-  const rpgMakerName = getRpgMakerName();
-  if (!rpgMakerName) {
-    console.log(
-      "Engine not ready yet, retrying customizeRPGMakerFunctions in 1 second...",
-    );
-    setTimeout(() => customizeRPGMakerFunctions(mainComponent), 1000);
+  if (window.__CHEAT_TOUCHINPUT_CUSTOMIZED__) {
     return;
   }
 
@@ -28,39 +22,50 @@ export function customizeRPGMakerFunctions(mainComponent) {
     return;
   }
 
-  const getUiInputBlocks = () => {
-    const blocks = [
-      document.querySelector("#cheat-modal"),
-      document.querySelector("#tof-progress-box"),
-      ...Array.from(
-        document.querySelectorAll(
-          ".object-translation-dialog .v-card, .object-translation-map-events-dialog .v-card, .object-translation-plugins-dialog .v-card",
-        ),
-      ),
-    ].filter(Boolean);
-    return blocks;
+  const CHEAT_UI_SELECTOR =
+    "#cheat-modal, #tof-progress-box, .object-translation-dialog .v-card, .object-translation-map-events-dialog .v-card, .object-translation-plugins-dialog .v-card";
+
+  const getEventTargetElement = (event) => {
+    if (!event) {
+      return null;
+    }
+
+    const target = event.target;
+    if (!target) {
+      return null;
+    }
+
+    if (typeof target.closest === "function") {
+      return target;
+    }
+
+    return target.parentElement || null;
+  };
+
+  const isEventFromCheatUi = (event) => {
+    const targetEl = getEventTargetElement(event);
+    return !!(
+      targetEl &&
+      typeof targetEl.closest === "function" &&
+      targetEl.closest(CHEAT_UI_SELECTOR)
+    );
   };
 
   const isMouseInsideUiInputBlock = (event) => {
-    const blocks = getUiInputBlocks();
-    const progressBox = document.querySelector("#tof-progress-box");
-    for (const block of blocks) {
-      const bcr = block.getBoundingClientRect();
-      if (
-        bcr.left <= event.clientX &&
-        event.clientX <= bcr.left + bcr.width &&
-        bcr.top <= event.clientY &&
-        event.clientY <= bcr.top + bcr.height
-      ) {
-        if (progressBox && block === progressBox) {
-          return Number(event.button) === 0;
-        }
-
-        return true;
-      }
+    if (!isEventFromCheatUi(event)) {
+      return false;
     }
 
-    return false;
+    const targetEl = getEventTargetElement(event);
+    if (!targetEl || typeof targetEl.closest !== "function") {
+      return true;
+    }
+
+    if (targetEl.closest("#tof-progress-box")) {
+      return Number(event.button) === 0;
+    }
+
+    return true;
   };
 
   const isObjectTranslationModalOpen = () =>
@@ -68,50 +73,38 @@ export function customizeRPGMakerFunctions(mainComponent) {
       ".object-translation-dialog.v-dialog__content--active, .object-translation-map-events-dialog.v-dialog__content--active, .object-translation-plugins-dialog.v-dialog__content--active",
     );
 
-  if (isRpgMakerMv()) {
-    // WARN: directly changing engine code can be dangerous
-    // remove preventDefault
-    TouchInput._onWheel = function (event) {
-      if (!event || isMouseInsideUiInputBlock(event)) {
-        return;
-      }
+  const addWheelDelta = (touchInput, event) => {
+    if (touchInput._newState) {
+      touchInput._newState.wheelX += event.deltaX;
+      touchInput._newState.wheelY += event.deltaY;
+      return;
+    }
 
-      this._events.wheelX += event.deltaX;
-      this._events.wheelY += event.deltaY;
-    };
+    if (touchInput._events) {
+      touchInput._events.wheelX += event.deltaX;
+      touchInput._events.wheelY += event.deltaY;
+    }
+  };
 
-    // Ignore click input routed to the game when pointer is inside cheat UI.
-    const TouchInput_onMouseDown = TouchInput._onMouseDown;
-    TouchInput._onMouseDown = function (event) {
-      if (isMouseInsideUiInputBlock(event)) {
-        return;
-      }
+  // WARN: directly changing engine code can be dangerous
+  // remove preventDefault for game wheel events and let Vue UI consume wheel over cheat modal.
+  TouchInput._onWheel = function (event) {
+    if (!event || isEventFromCheatUi(event)) {
+      return;
+    }
 
-      TouchInput_onMouseDown.call(this, event);
-    };
-  } else {
-    // MZ Settings
-    // WARN: directly changing engine code can be dangerous
-    // remove preventDefault
-    TouchInput._onWheel = function (event) {
-      if (!event || isMouseInsideUiInputBlock(event)) {
-        return;
-      }
+    addWheelDelta(this, event);
+  };
 
-      this._newState.wheelX += event.deltaX;
-      this._newState.wheelY += event.deltaY;
-    };
+  // Ignore click input routed to the game when pointer is inside cheat UI.
+  const TouchInput_onMouseDown = TouchInput._onMouseDown;
+  TouchInput._onMouseDown = function (event) {
+    if (isMouseInsideUiInputBlock(event)) {
+      return;
+    }
 
-    // Ignore click input routed to the game when pointer is inside cheat UI.
-    const TouchInput_onMouseDown = TouchInput._onMouseDown;
-    TouchInput._onMouseDown = function (event) {
-      if (isMouseInsideUiInputBlock(event)) {
-        return;
-      }
-
-      TouchInput_onMouseDown.call(this, event);
-    };
-  }
+    TouchInput_onMouseDown.call(this, event);
+  };
 
   if (window.Input && typeof window.Input._onKeyDown === "function") {
     const Input_onKeyDown = Input._onKeyDown;
@@ -135,5 +128,6 @@ export function customizeRPGMakerFunctions(mainComponent) {
     };
   }
 
+  window.__CHEAT_TOUCHINPUT_CUSTOMIZED__ = true;
   MessageCheat.initialize();
 }
