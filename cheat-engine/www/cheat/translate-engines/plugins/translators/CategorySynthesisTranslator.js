@@ -17,7 +17,6 @@ const ESCAPE_CHAR = String.fromCharCode(27);
 const ESCAPE_PREFIX_PATTERN = `(?:\\\\|${ESCAPE_CHAR}|\\\\u001b)`;
 const ESCAPE_ICON_REGEX = new RegExp(`${ESCAPE_PREFIX_PATTERN}I\\[(\\d+)\\]`, 'gi');
 const ESCAPE_COLOR_REGEX = new RegExp(`${ESCAPE_PREFIX_PATTERN}C\\[(\\d+)\\]`, 'gi');
-const DEBUG_FLAG_NAME = '__CHEAT_DEBUG_CATEGORY_SYNTHESIS_TRANSLATOR';
 const DEBUG_LOG_LIMIT = 600;
 let DEBUG_LOG_COUNT = 0;
 let DEBUG_LOG_LIMIT_NOTIFIED = false;
@@ -206,9 +205,10 @@ function isCategorySynthesisSceneActive() {
         return false;
     }
 
-    const ctorName = scene.constructor && typeof scene.constructor.name === 'string'
-        ? scene.constructor.name
-        : '';
+    const ctorName =
+        scene.constructor && typeof scene.constructor.name === 'string'
+            ? scene.constructor.name
+            : '';
 
     if (ctorName === 'Scene_CategorySynthesis') {
         return true;
@@ -218,7 +218,7 @@ function isCategorySynthesisSceneActive() {
 }
 
 function isDebugEnabled() {
-    return ANY_WINDOW[DEBUG_FLAG_NAME] !== false;
+    return false;
 }
 
 function debugLog(message, payload) {
@@ -1059,7 +1059,9 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
 
             const normalizedOriginal = categories.map((entry) => normalizeCategoryToken(entry));
             const normalizedMerged = merged.map((entry) => normalizeCategoryToken(entry));
-            const canonicalOriginal = categories.map((entry) => toCanonicalBuiltinCategoryKey(entry));
+            const canonicalOriginal = categories.map((entry) =>
+                toCanonicalBuiltinCategoryKey(entry)
+            );
             const canonicalMerged = merged.map((entry) => toCanonicalBuiltinCategoryKey(entry));
             const canonicalSelected = toCanonicalBuiltinCategoryKey(selectedCategory);
             const canonicalAnyOriginal = categories.map((entry) => toCanonicalCategoryKey(entry));
@@ -1189,7 +1191,10 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
             }
         }
 
-        const translatedCandidates = this.translateCategoryCandidatesForMatch(runtime, rawCategories);
+        const translatedCandidates = this.translateCategoryCandidatesForMatch(
+            runtime,
+            rawCategories
+        );
         for (const translatedCategory of translatedCandidates) {
             if (normalizeCategoryToken(translatedCategory) === normalizedTarget) {
                 return true;
@@ -1227,7 +1232,12 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
             }
 
             const category = this._category;
-            if (category === '_item' || category === '_weapon' || category === '_armor' || category === '_keyItem') {
+            if (
+                category === '_item' ||
+                category === '_weapon' ||
+                category === '_armor' ||
+                category === '_keyItem'
+            ) {
                 return originalRecipeIncludes.apply(this, arguments);
             }
 
@@ -1258,7 +1268,10 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
                     continue;
                 }
 
-                if (typeof DataManager.isSynthesisItem === 'function' && DataManager.isSynthesisItem(m[0])) {
+                if (
+                    typeof DataManager.isSynthesisItem === 'function' &&
+                    DataManager.isSynthesisItem(m[0])
+                ) {
                     const decoded = DataManager.decodeSynthesisItem(m[0]);
                     if ($gameParty.numItems(decoded) < m[1]) {
                         return false;
@@ -1269,7 +1282,9 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
                 const neededCategory = m[0];
                 const amount = Number(m[1]) || 0;
                 let count = 0;
-                const allItems = Array.isArray($gameParty?.allItems?.()) ? $gameParty.allItems() : [];
+                const allItems = Array.isArray($gameParty?.allItems?.())
+                    ? $gameParty.allItems()
+                    : [];
                 for (const it of allItems) {
                     if (translator.hasCategoryMatch(runtime, it, neededCategory)) {
                         count += $gameParty.numItems(it);
@@ -1290,7 +1305,11 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
                 return originalStatusNumItems.apply(this, arguments);
             }
 
-            if (!item || (typeof DataManager.isSynthesisItem === 'function' && DataManager.isSynthesisItem(item))) {
+            if (
+                !item ||
+                (typeof DataManager.isSynthesisItem === 'function' &&
+                    DataManager.isSynthesisItem(item))
+            ) {
                 return originalStatusNumItems.apply(this, arguments);
             }
 
@@ -1389,7 +1408,11 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
                 return false;
             }
 
-            if (typeof DataManager.isItem === 'function' && DataManager.isItem(item) && item.itypeId > 2) {
+            if (
+                typeof DataManager.isItem === 'function' &&
+                DataManager.isItem(item) &&
+                item.itypeId > 2
+            ) {
                 return false;
             }
 
@@ -1407,7 +1430,11 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
 
     patchSynthesisUiTextRuntime() {
         const BaseWindow = ANY_WINDOW.Window_Base;
-        if (!BaseWindow || !BaseWindow.prototype || typeof BaseWindow.prototype.drawText !== 'function') {
+        if (
+            !BaseWindow ||
+            !BaseWindow.prototype ||
+            typeof BaseWindow.prototype.drawText !== 'function'
+        ) {
             return;
         }
 
@@ -1459,7 +1486,8 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
                 }
 
                 const helpWindow = this._synthesisWindow._helpWindow;
-                const currentHelpText = typeof helpWindow._text === 'string' ? helpWindow._text : '';
+                const currentHelpText =
+                    typeof helpWindow._text === 'string' ? helpWindow._text : '';
                 if (!isUsableText(currentHelpText)) {
                     return result;
                 }
@@ -1557,8 +1585,9 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
 
         const items = this.buildUniquePendingItems(panel);
         const totalStrings = items.length;
-        const leftStrings = items.filter((item) => !panel.hasUsableCacheValue(item.cacheKey))
-            .length;
+        const leftStrings = items.filter(
+            (item) => !panel.hasUsableCacheValue(item.cacheKey)
+        ).length;
 
         return {
             total: totalStrings,
