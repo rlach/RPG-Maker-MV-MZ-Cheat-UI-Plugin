@@ -1,4 +1,5 @@
 import { AutoNamePopupTranslator } from './translators/AutoNamePopupTranslator.js';
+import { CategorySynthesisTranslator } from './translators/CategorySynthesisTranslator.js';
 import { CbrEroStatusTranslator } from './translators/CbrEroStatusTranslator.js';
 import { ExternMessageTranslator } from './translators/ExternMessageTranslator.js';
 import { CbrEroStatusMvTranslator } from './translators/CbrEroStatusMvTranslator.js';
@@ -36,6 +37,7 @@ class PluginTranslatorRegistry {
     constructor() {
         this.translatorClasses = [
             AutoNamePopupTranslator,
+            CategorySynthesisTranslator,
             CbrEroStatusTranslator,
             ExternMessageTranslator,
             CbrEroStatusMvTranslator,
