@@ -103,14 +103,52 @@ function normalizeSourceText(text, flattenExistingNewlines) {
     return sourceText.replace(/\r\n/g, '\n').replace(/\n[ \t]+/g, '\n');
 }
 
+function isShortPunctuationOnlyLine(line, knownEscapeTagRegex) {
+    const trimmedLine = String(line || '').trim();
+    if (!trimmedLine) {
+        return false;
+    }
+
+    const visibleText = stripKnownEscapeTags(trimmedLine, knownEscapeTagRegex);
+    if (!visibleText || visibleText.length > 5) {
+        return false;
+    }
+
+    return /^[\p{P}\p{S}]+$/u.test(visibleText);
+}
+
+function normalizeLlmPunctuationOnlyBreaks(sourceText, knownEscapeTagRegex) {
+    const lines = String(sourceText || '').split('\n');
+    const mergedLines = [];
+
+    for (const line of lines) {
+        const previousLine = mergedLines.length > 0 ? mergedLines[mergedLines.length - 1] : '';
+        if (
+            previousLine &&
+            previousLine.trim().length > 0 &&
+            isShortPunctuationOnlyLine(line, knownEscapeTagRegex)
+        ) {
+            mergedLines[mergedLines.length - 1] = previousLine + String(line || '').trim();
+            continue;
+        }
+
+        mergedLines.push(line);
+    }
+
+    return mergedLines.join('\n');
+}
+
 export function wrapTextByVisibleWidth(text, maxWidth, options = {}) {
     if (!maxWidth || maxWidth <= 0) {
         return text;
     }
 
     const flattenExistingNewlines = !!options.flattenExistingNewlines;
-    const sourceText = normalizeSourceText(text, flattenExistingNewlines);
     const knownEscapeTagRegex = buildKnownEscapeTagRegex(options.tagEntries);
+    const normalizedSourceText = normalizeSourceText(text, flattenExistingNewlines);
+    const sourceText = flattenExistingNewlines
+        ? normalizedSourceText
+        : normalizeLlmPunctuationOnlyBreaks(normalizedSourceText, knownEscapeTagRegex);
     const getVisibleLength = (value) => stripKnownEscapeTags(value, knownEscapeTagRegex).length;
     const isFollowUp = (token) => {
         const visible = stripKnownEscapeTags(token, knownEscapeTagRegex);

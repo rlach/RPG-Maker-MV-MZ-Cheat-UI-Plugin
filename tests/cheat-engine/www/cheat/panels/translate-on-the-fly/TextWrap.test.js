@@ -78,4 +78,25 @@ describe('wrapTextByVisibleWidth', () => {
 
         expect(output).toBe('Alpha Beta ,\nGamma');
     });
+
+    it('normalizes llm newline before punctuation-only fragments and wraps at width 52', () => {
+        const llmShortPunctuation =
+            '\\V[23]\n"To ensure a swift defeat, our \\V[23]Warrior unit and members of the Holy Magic Research Society for support were hastily assembled as a force\n."';
+        const llmLongPunctuation =
+            '\\V[23]\n"To ensure a swift defeat, our \\V[23]Warrior unit and members of the Holy Magic Research Society for support were hastily assembled as a force\n................."';
+        const noLlmBreakButNeedsRewrap =
+            '\\V[23]\n"To ensure a swift defeat, our \\V[23]Warrior unit and members of the Holy Magic Research Society for support were hastily assembled as a very little force\n...."';
+
+        expect(wrapTextByVisibleWidth(llmShortPunctuation, 52)).toBe(
+            '\\V[23]\n"To ensure a swift defeat, our \\V[23]Warrior unit and\nmembers of the Holy Magic Research Society for\nsupport were hastily assembled as a force."'
+        );
+
+        expect(wrapTextByVisibleWidth(llmLongPunctuation, 52)).toBe(
+            '\\V[23]\n"To ensure a swift defeat, our \\V[23]Warrior unit and\nmembers of the Holy Magic Research Society for\nsupport were hastily assembled as a force\n................."'
+        );
+
+        expect(wrapTextByVisibleWidth(noLlmBreakButNeedsRewrap, 52)).toBe(
+            '\\V[23]\n"To ensure a swift defeat, our \\V[23]Warrior unit and\nmembers of the Holy Magic Research Society for\nsupport were hastily assembled as a very little\nforce...."'
+        );
+    });
 });
