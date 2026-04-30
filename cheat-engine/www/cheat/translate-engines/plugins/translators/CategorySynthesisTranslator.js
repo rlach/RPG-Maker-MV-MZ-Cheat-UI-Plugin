@@ -182,25 +182,6 @@ function normalizePluginName(value) {
         .toLowerCase();
 }
 
-function resolveRuntime() {
-    return typeof ANY_WINDOW.__ensureTranslationRuntime === 'function'
-        ? ANY_WINDOW.__ensureTranslationRuntime()
-        : ANY_WINDOW.__TranslationRuntime || null;
-}
-
-function isRuntimeTranslationActive(runtime) {
-    if (!runtime) {
-        return false;
-    }
-
-    const translationEnabled =
-        typeof runtime.isTranslationEnabled === 'function'
-            ? !!runtime.isTranslationEnabled()
-            : !!runtime.enabled;
-
-    return translationEnabled || !!runtime.translateCacheWhenDisabled;
-}
-
 function isCategorySynthesisSceneActive() {
     const scene = ANY_WINDOW.SceneManager?._scene;
     if (!scene || typeof scene !== 'object') {
@@ -737,9 +718,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
 
         const cacheKey = runtime.getCacheKey(text, cacheType);
 
-        if (typeof runtime.markCacheKeySeen === 'function') {
-            runtime.markCacheKeySeen(cacheKey);
-        }
+        runtime.markCacheKeySeen?.(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             return text;
@@ -972,8 +951,8 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
                 return categories;
             }
 
-            const runtime = resolveRuntime();
-            if (!isRuntimeTranslationActive(runtime) || !isCategorySynthesisSceneActive()) {
+            const runtime = translator.getRuntime();
+            if (!translator.isRuntimeTranslationActive(runtime) || !isCategorySynthesisSceneActive()) {
                 return categories;
             }
 
@@ -1229,7 +1208,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
 
         const originalRecipeIncludes = RecipeWindow.prototype.includes;
         RecipeWindow.prototype.includes = function (item) {
-            if (!isRuntimeTranslationActive(resolveRuntime())) {
+            if (!translator.isRuntimeTranslationActive(translator.getRuntime())) {
                 return originalRecipeIncludes.apply(this, arguments);
             }
 
@@ -1243,13 +1222,13 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
                 return originalRecipeIncludes.apply(this, arguments);
             }
 
-            const runtime = resolveRuntime();
+            const runtime = translator.getRuntime();
             return translator.hasCategoryMatch(runtime, item, category);
         };
 
         const originalRecipeCheckEnable = RecipeWindow.prototype.checkEnableRecipe;
         RecipeWindow.prototype.checkEnableRecipe = function (recipe) {
-            if (!isRuntimeTranslationActive(resolveRuntime())) {
+            if (!translator.isRuntimeTranslationActive(translator.getRuntime())) {
                 return originalRecipeCheckEnable.apply(this, arguments);
             }
 
@@ -1262,7 +1241,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
                 ary = ary.concat(recipe.machinery || []);
             }
 
-            const runtime = resolveRuntime();
+            const runtime = translator.getRuntime();
 
             for (let i = 0, max = ary.length; i < max; i++) {
                 const m = ary[i];
@@ -1303,7 +1282,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
 
         const originalStatusNumItems = SynthesisStatusWindow.prototype.numItems;
         SynthesisStatusWindow.prototype.numItems = function (item) {
-            if (!isRuntimeTranslationActive(resolveRuntime())) {
+            if (!translator.isRuntimeTranslationActive(translator.getRuntime())) {
                 return originalStatusNumItems.apply(this, arguments);
             }
 
@@ -1324,7 +1303,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
             }
 
             let count = 0;
-            const runtime = resolveRuntime();
+            const runtime = translator.getRuntime();
             const allItems = Array.isArray($gameParty?.allItems?.()) ? $gameParty.allItems() : [];
             for (const it of allItems) {
                 if (typeof DataManager.isMaterial !== 'function' || !DataManager.isMaterial(it)) {
@@ -1342,7 +1321,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
 
         const originalEstimateCheckRecipe = EstimateWindow.prototype.checkRecipe;
         EstimateWindow.prototype.checkRecipe = function (ary) {
-            if (!isRuntimeTranslationActive(resolveRuntime())) {
+            if (!translator.isRuntimeTranslationActive(translator.getRuntime())) {
                 return originalEstimateCheckRecipe.apply(this, arguments);
             }
 
@@ -1351,7 +1330,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
             }
 
             const sets = this._sets.clone();
-            const runtime = resolveRuntime();
+            const runtime = translator.getRuntime();
 
             for (let i = 0, max = ary.length; i < max; i++) {
                 const recipeEntry = ary[i];
@@ -1398,7 +1377,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
 
         const originalMaterialIncludes = MaterialWindow.prototype.includes;
         MaterialWindow.prototype.includes = function (item) {
-            if (!isRuntimeTranslationActive(resolveRuntime())) {
+            if (!translator.isRuntimeTranslationActive(translator.getRuntime())) {
                 return originalMaterialIncludes.apply(this, arguments);
             }
 
@@ -1425,7 +1404,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
                 return DataManager.decodeSynthesisItem(this._category) === item;
             }
 
-            const runtime = resolveRuntime();
+            const runtime = translator.getRuntime();
             return translator.hasCategoryMatch(runtime, item, this._category);
         };
     }
@@ -1454,8 +1433,8 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
         const originalDrawText = BaseWindow.prototype.drawText;
 
         BaseWindow.prototype.drawText = function (text, x, y, maxWidth, align) {
-            const runtime = resolveRuntime();
-            if (isRuntimeTranslationActive(runtime) && typeof text === 'string') {
+            const runtime = translator.getRuntime();
+            if (translator.isRuntimeTranslationActive(runtime) && typeof text === 'string') {
                 const ctorName = this?.constructor?.name || '';
                 if (targetWindowNames.has(ctorName)) {
                     const translated = translator.translateKnownPluginText(runtime, text);
@@ -1478,8 +1457,8 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
             ANY_WINDOW.Scene_CategorySynthesis.prototype.activateSynthesis = function () {
                 const result = originalActivateSynthesis.apply(this, arguments);
 
-                const runtime = resolveRuntime();
-                if (!isRuntimeTranslationActive(runtime)) {
+                const runtime = translator.getRuntime();
+                if (!translator.isRuntimeTranslationActive(runtime)) {
                     return result;
                 }
 

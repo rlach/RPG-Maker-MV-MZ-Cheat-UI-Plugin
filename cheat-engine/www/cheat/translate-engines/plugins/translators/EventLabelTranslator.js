@@ -34,12 +34,6 @@ function toBoolean(value, fallback = false) {
     return fallback;
 }
 
-function getTranslationRuntime() {
-    return typeof window.__ensureTranslationRuntime === 'function'
-        ? window.__ensureTranslationRuntime()
-        : window.__TranslationRuntime || null;
-}
-
 export class EventLabelTranslator extends BasePluginTranslator {
     constructor() {
         super();
@@ -400,21 +394,14 @@ export class EventLabelTranslator extends BasePluginTranslator {
             }
 
             try {
-                const runtime = getTranslationRuntime();
-                if (
-                    !runtime ||
-                    typeof runtime.getCacheKey !== 'function' ||
-                    typeof runtime.hasUsableCacheValue !== 'function' ||
-                    !(runtime.translationCache instanceof Map)
-                ) {
+                const runtime = translator.getRuntime();
+                if (!runtime) {
                     return label;
                 }
 
                 const cacheKey = runtime.getCacheKey(originalText, translator.getCacheType());
 
-                if (typeof runtime.markCacheKeySeen === 'function') {
-                    runtime.markCacheKeySeen(cacheKey);
-                }
+                runtime.markCacheKeySeen?.(cacheKey);
 
                 if (!runtime.hasUsableCacheValue(cacheKey)) {
                     return label;

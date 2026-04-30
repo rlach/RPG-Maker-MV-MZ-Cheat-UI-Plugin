@@ -26,9 +26,7 @@ function isUsableText(value) {
 }
 
 function getRuntime() {
-    return typeof window.__ensureTranslationRuntime === 'function'
-        ? window.__ensureTranslationRuntime()
-        : window.__TranslationRuntime || null;
+    return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
 }
 
 function parseParamFieldCsv(rawValue) {
@@ -186,9 +184,7 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
         }
 
         const cacheKey = runtime.getCacheKey(text, this.getCacheType());
-        if (typeof runtime.markCacheKeySeen === 'function') {
-            runtime.markCacheKeySeen(cacheKey);
-        }
+        runtime.markCacheKeySeen?.(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             return text;

@@ -8,10 +8,16 @@ export class BasePluginTranslator extends BasePhase {
         this._detectionChecked = false;
     }
 
+    /**
+     * @returns {string}
+     */
     getPluginName() {
         throw new Error('getPluginName() must be implemented by plugin translator');
     }
 
+    /**
+     * @returns {string}
+     */
     getPluginLabel() {
         return this.getPluginName();
     }
@@ -79,9 +85,7 @@ export class BasePluginTranslator extends BasePhase {
         }
 
         const runtime =
-            typeof window.__ensureTranslationRuntime === 'function'
-                ? window.__ensureTranslationRuntime()
-                : window.__TranslationRuntime || null;
+            window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
 
         if (typeof runtime?.engine?.addPluginTags !== 'function') {
             return;
@@ -135,7 +139,8 @@ export class BasePluginTranslator extends BasePhase {
         return this.ensureDetection();
     }
 
-    isActive({ panel } = {}) {
+    isActive(context = {}) {
+        const panel = context?.panel;
         if (!this.ensureDetection()) {
             return false;
         }
@@ -176,7 +181,91 @@ export class BasePluginTranslator extends BasePhase {
         );
     }
 
-    countPluginAmountSync() {
+    countPluginAmountSync(_context = {}) {
         return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
+    }
+
+    static _resolveGlobalRuntime() {
+        return globalThis.__ensureTranslationRuntime?.() || globalThis.__TranslationRuntime || null;
+    }
+
+    static ensureGlobalRuntimeContract() {
+        const runtime = BasePluginTranslator._resolveGlobalRuntime();
+        return BasePluginTranslator.ensureRuntimeContract(runtime);
+    }
+
+    static ensureRuntimeContract(runtime) {
+        if (!runtime || typeof runtime !== 'object') {
+            return null;
+        }
+
+        if (runtime.__CHEAT_RUNTIME_CONTRACT_READY__) {
+            return runtime;
+        }
+
+        if (!(runtime.translationCache instanceof Map)) {
+            runtime.translationCache = new Map();
+        }
+
+        if (typeof runtime.isTranslationEnabled !== 'function') {
+            runtime.isTranslationEnabled = function () {
+                return !!this.enabled;
+            };
+        }
+
+        if (typeof runtime.markCacheKeySeen !== 'function') {
+            runtime.markCacheKeySeen = function () {};
+        }
+
+        if (typeof runtime.hasUsableCacheValue !== 'function') {
+            runtime.hasUsableCacheValue = function (cacheKey) {
+                if (!(this.translationCache instanceof Map)) {
+                    return false;
+                }
+
+                const value = this.translationCache.get(cacheKey);
+                return typeof value === 'string' && !!value.trim();
+            };
+        }
+
+        if (typeof runtime.cleanTranslatedText !== 'function') {
+            runtime.cleanTranslatedText = function (text) {
+                return String(text ?? '');
+            };
+        }
+
+        if (typeof runtime.wrapText !== 'function') {
+            runtime.wrapText = function (text) {
+                return String(text ?? '');
+            };
+        }
+
+        if (typeof runtime.hasCurrentMessagePortrait !== 'function') {
+            runtime.hasCurrentMessagePortrait = function () {
+                return false;
+            };
+        }
+
+        Object.defineProperty(runtime, '__CHEAT_RUNTIME_CONTRACT_READY__', {
+            value: true,
+            configurable: true,
+            enumerable: false,
+            writable: false,
+        });
+
+        return runtime;
+    }
+
+    getRuntime() {
+        return BasePluginTranslator.ensureGlobalRuntimeContract();
+    }
+
+    isRuntimeTranslationActive(runtime = this.getRuntime()) {
+        if (!runtime) {
+            return false;
+        }
+
+        const translationEnabled = !!(runtime.isTranslationEnabled() || runtime.enabled);
+        return translationEnabled || !!runtime.translateCacheWhenDisabled;
     }
 }

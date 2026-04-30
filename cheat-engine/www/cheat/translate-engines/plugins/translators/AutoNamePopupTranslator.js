@@ -37,14 +37,11 @@ export class AutoNamePopupTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
+        const translator = this;
+
         if (!window.Game_Message || !Game_Message.prototype) {
             return;
         }
-
-        const runtime =
-            typeof window.__ensureTranslationRuntime === 'function'
-                ? window.__ensureTranslationRuntime()
-                : window.__TranslationRuntime || null;
 
         const originalAllText = Game_Message.prototype.allText;
 
@@ -108,14 +105,12 @@ export class AutoNamePopupTranslator extends BasePluginTranslator {
             originalSetSpeakerName.call(this, speakerName);
 
             try {
+                const runtime = translator.getRuntime();
                 if (
                     speakerName &&
                     typeof speakerName === 'string' &&
                     speakerName.trim() &&
-                    runtime &&
-                    typeof runtime.getCacheKey === 'function' &&
-                    typeof runtime.hasUsableCacheValue === 'function' &&
-                    runtime.translationCache instanceof Map
+                    runtime
                 ) {
                     // Extract plain text (without control characters)
                     const plainText = extractPlainText(speakerName);

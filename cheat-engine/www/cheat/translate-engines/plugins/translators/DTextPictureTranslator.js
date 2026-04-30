@@ -28,6 +28,8 @@ export class DTextPictureTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
+        const translator = this;
+
         if (
             !window.Game_Screen ||
             !window.Game_Screen ||
@@ -40,19 +42,9 @@ export class DTextPictureTranslator extends BasePluginTranslator {
         const original = Game_Screen.prototype.setDTextPicture;
         Game_Screen.prototype.setDTextPicture = function (value, size) {
             try {
-                const runtime =
-                    typeof window.__ensureTranslationRuntime === 'function'
-                        ? window.__ensureTranslationRuntime()
-                        : window.__TranslationRuntime || null;
+                const runtime = translator.getRuntime();
 
-                if (
-                    runtime &&
-                    typeof value === 'string' &&
-                    value.trim() &&
-                    typeof runtime.getCacheKey === 'function' &&
-                    typeof runtime.hasUsableCacheValue === 'function' &&
-                    runtime.translationCache instanceof Map
-                ) {
+                if (runtime && typeof value === 'string' && value.trim()) {
                     const cacheKey = runtime.getCacheKey(value, 'plugin_dtext');
                     if (runtime.hasUsableCacheValue(cacheKey)) {
                         const cached = runtime.translationCache.get(cacheKey);

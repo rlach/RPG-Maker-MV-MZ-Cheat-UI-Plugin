@@ -5,8 +5,9 @@ export class GameArrays extends BasePhase {
     return "gameArrays";
   }
 
-  applyDataOnLifecycle({ panel } = {}) {
-    if (!panel || typeof panel.getGameArrayDefs !== "function") {
+  applyDataOnLifecycle(context = {}) {
+    const panel = context?.panel;
+    if (!panel) {
       return true;
     }
 
@@ -17,8 +18,7 @@ export class GameArrays extends BasePhase {
 
   applyCachedTranslationsToArrays(panel, arrays) {
     for (const entry of arrays || []) {
-      const parentObj =
-        entry && typeof entry.parent === "function" ? entry.parent() : null;
+      const parentObj = entry ? entry.parent() : null;
       if (!parentObj || !Array.isArray(parentObj[entry.prop])) {
         continue;
       }
@@ -79,14 +79,8 @@ export class GameArrays extends BasePhase {
   }
 
   async createEntries({ panel }) {
-    const arrays =
-      typeof panel.getGameArrayDefs === "function"
-        ? panel.getGameArrayDefs()
-        : [];
-    const candidates =
-      typeof panel.collectGameArrayCandidates === "function"
-        ? panel.collectGameArrayCandidates()
-        : { pendingValues: [] };
+    const arrays = panel.getGameArrayDefs();
+    const candidates = panel.collectGameArrayCandidates();
     const pendingValues = Array.isArray(candidates && candidates.pendingValues)
       ? candidates.pendingValues
       : [];
@@ -156,9 +150,6 @@ export class GameArrays extends BasePhase {
   }
 
   countAmountSync({ panel }) {
-    if (typeof panel.countGameArraysStats === "function") {
-      return panel.countGameArraysStats();
-    }
-    return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
+    return panel.countGameArraysStats();
   }
 }

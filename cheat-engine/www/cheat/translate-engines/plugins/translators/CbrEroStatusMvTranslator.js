@@ -4,9 +4,7 @@ const RUNTIME_HOOK_GUARD = "__CHEAT_CBR_ERO_STATUS_MV_TRANSLATOR_HOOKED__";
 const PAGE_PLUGIN_NAME_RE = /^CBR_eroStatus_(\d+)$/i;
 
 function getRuntime() {
-  return typeof window.__ensureTranslationRuntime === "function"
-    ? window.__ensureTranslationRuntime()
-    : window.__TranslationRuntime || null;
+  return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
 }
 
 function isUsableText(value) {
@@ -235,9 +233,7 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
     }
 
     const cacheKey = runtime.getCacheKey(subject, this.getCacheType());
-    if (typeof runtime.markCacheKeySeen === "function") {
-      runtime.markCacheKeySeen(cacheKey);
-    }
+    runtime.markCacheKeySeen?.(cacheKey);
 
     if (!runtime.hasUsableCacheValue(cacheKey)) {
       return subject;

@@ -124,7 +124,7 @@ export const objectTranslationRuntimeMethods = {
         }
 
         this.objectTranslationTypeOrder = next;
-        if (persist && typeof this.saveSettings === 'function') {
+        if (persist) {
             this.saveSettings();
         }
         return next;
@@ -234,6 +234,10 @@ export const objectTranslationRuntimeMethods = {
         };
     },
 
+    /**
+     * @param {Array<{id:number,name:string}>|null} validMaps
+     * @returns {number[]}
+     */
     getSelectedObjectTranslationMapIds(validMaps = null) {
         const safeMaps = Array.isArray(validMaps) ? validMaps : this.getValidMapInfos();
         const validIds = safeMaps.map((mapInfo) => Number(mapInfo.id)).filter(Boolean);
@@ -300,7 +304,7 @@ export const objectTranslationRuntimeMethods = {
         };
         this.enabledPluginTranslators = next;
 
-        if (persist && typeof this.saveSettings === 'function') {
+        if (persist) {
             this.saveSettings();
         }
     },
@@ -414,7 +418,7 @@ export const objectTranslationRuntimeMethods = {
             this.batchManager = createTranslationBatchManager(this);
         }
 
-        const defs = this.getObjectTranslationTypeDefs();
+        const defs = /** @type {Array<{id:string}>} */ (this.getObjectTranslationTypeDefs());
         const countedByKind = new Map(
             this.batchManager
                 .countAmountSync(defs.map((def) => ({ kind: def.id })))

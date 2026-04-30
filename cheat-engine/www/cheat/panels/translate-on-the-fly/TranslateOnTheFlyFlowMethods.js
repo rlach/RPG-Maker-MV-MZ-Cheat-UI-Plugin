@@ -170,9 +170,7 @@ export const translateOnTheFlyFlowMethods = {
 
     markDryRunExecuted() {
         this.dryRunExecutedAtLeastOnce = true;
-        if (typeof this.saveSettings === 'function') {
-            this.saveSettings();
-        }
+        this.saveSettings();
     },
 
     getOverallTranslationCompletionStats() {
@@ -213,11 +211,7 @@ export const translateOnTheFlyFlowMethods = {
             return true;
         }
 
-        if (typeof this.engine?.hasActiveBackgroundRequest === 'function') {
-            return this.engine.hasActiveBackgroundRequest();
-        }
-
-        return false;
+        return !!this.engine?.hasActiveBackgroundRequest?.();
     },
 
     isForegroundDialogBatchActive() {
@@ -293,13 +287,9 @@ export const translateOnTheFlyFlowMethods = {
             console.log(
                 `[TranslateOnTheFly] Background batch preempted (${label}), instant retry ${attempts}/${maxPreemptedRetries}`
             );
-            if (this.batchManager && typeof this.batchManager.onBatchPausedByOtf === 'function') {
-                this.batchManager.onBatchPausedByOtf('translating event');
-            }
+            this.batchManager?.onBatchPausedByOtf?.('translating event');
             await this.waitForForegroundDialogBatch();
-            if (this.batchManager && typeof this.batchManager.onBatchResumed === 'function') {
-                this.batchManager.onBatchResumed(label);
-            }
+            this.batchManager?.onBatchResumed?.(label);
         }
 
         return { successes: [], failures: [] };
@@ -368,10 +358,7 @@ export const translateOnTheFlyFlowMethods = {
             return false;
         }
 
-        if (
-            typeof this.engine.hasActiveBackgroundRequest === 'function' &&
-            !this.engine.hasActiveBackgroundRequest()
-        ) {
+        if (!this.engine.hasActiveBackgroundRequest?.()) {
             return false;
         }
 

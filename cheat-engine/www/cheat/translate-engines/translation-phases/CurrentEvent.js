@@ -15,7 +15,28 @@ export class CurrentEvent extends BasePhase {
 
     constructor(options = {}) {
         super();
+        this._state = {
+            items: /** @type {any[]} */ ([]),
+            normalizedCurrentText: '',
+            messageHasPortrait: false,
+            pendingKeys: new Set(),
+            textSuccesses: 0,
+        };
         this.configure(options);
+    }
+
+    _ensureState() {
+        if (!this._state) {
+            this._state = {
+                items: /** @type {any[]} */ ([]),
+                normalizedCurrentText: this.currentText || '',
+                messageHasPortrait: !!this.messageHasPortrait,
+                pendingKeys: new Set(),
+                textSuccesses: 0,
+            };
+        }
+
+        return this._state;
     }
 
     configure(options = {}) {
@@ -25,7 +46,7 @@ export class CurrentEvent extends BasePhase {
         this.maxDepth = options.maxDepth;
         this.messageHasPortrait = !!options.messageHasPortrait;
         this._state = {
-            items: [],
+            items: /** @type {any[]} */ ([]),
             normalizedCurrentText: this.currentText || '',
             messageHasPortrait: this.messageHasPortrait,
             pendingKeys: new Set(),
@@ -61,9 +82,7 @@ export class CurrentEvent extends BasePhase {
         const messageHasPortrait =
             typeof request.hasPortrait === 'boolean'
                 ? request.hasPortrait
-                : typeof panel.hasCurrentMessagePortrait === 'function'
-                  ? panel.hasCurrentMessagePortrait(gameMessage)
-                  : false;
+                                : panel.hasCurrentMessagePortrait(gameMessage);
         const fullEvent = !!request.fullEvent;
         const maxDepth = fullEvent ? request.maxDepth : 0;
 
@@ -151,10 +170,9 @@ export class CurrentEvent extends BasePhase {
                 // message_portrait is not re-harvested and stored again as message (or vice
                 // versa), which would cause cache duplication and translation mismatches.
                 const isMessageType =
-                    typeof panel.isMessageCacheType === 'function' &&
                     panel.isMessageCacheType(type);
                 const hasUsable =
-                    isMessageType && typeof panel.getMessageCacheLookupKeys === 'function'
+                    isMessageType
                         ? panel
                               .getMessageCacheLookupKeys(value, {
                                   hasPortrait: type === 'message_portrait',
@@ -303,11 +321,12 @@ export class CurrentEvent extends BasePhase {
         }
 
         let translated = panel.translationCache.get(firstTextItem.cacheKey);
-        if (!translated && typeof panel.getPreferredMessageCacheEntry === 'function') {
+        if (!translated) {
+            const state = this._ensureState();
             const preferred = panel.getPreferredMessageCacheEntry(
                 firstTextItem.value || fallbackText || '',
                 {
-                    hasPortrait: !!this._state.messageHasPortrait,
+                    hasPortrait: !!state.messageHasPortrait,
                 }
             );
             translated = preferred ? preferred.value : translated;
@@ -341,6 +360,7 @@ export class CurrentEvent extends BasePhase {
     }
 
     collectUntranslated({ panel }) {
+        const state = this._ensureState();
         const interpreter = panel.findMessageInterpreter();
         const normalized = panel.resolveOriginalMessageContext(
             this.currentText,
@@ -364,9 +384,9 @@ export class CurrentEvent extends BasePhase {
         );
 
         this.appendCurrentChoiceItems(panel, items);
-        this._state.items = items;
-        this._state.normalizedCurrentText = normalizedCurrentText;
-        this._state.messageHasPortrait = this.messageHasPortrait;
+        state.items = items;
+        state.normalizedCurrentText = normalizedCurrentText;
+        state.messageHasPortrait = !!this.messageHasPortrait;
 
         if (!items.length) {
             return [];
@@ -376,7 +396,7 @@ export class CurrentEvent extends BasePhase {
         if (normalizedCurrentText) {
             mandatoryCacheKeys.add(
                 panel.getMessageCacheKey(normalizedCurrentText, {
-                    hasPortrait: !!this._state.messageHasPortrait,
+                    hasPortrait: !!state.messageHasPortrait,
                 })
             );
         }
@@ -430,12 +450,12 @@ export class CurrentEvent extends BasePhase {
         }
 
         const uniqueItems = [...mandatoryItems, ...optionalItems];
-        this._state.pendingKeys = new Set();
-        this._state.textSuccesses = 0;
+        state.pendingKeys = new Set();
+        state.textSuccesses = 0;
 
         for (const item of uniqueItems) {
             panel.pendingTranslations.set(item.cacheKey, true);
-            this._state.pendingKeys.add(item.cacheKey);
+            state.pendingKeys.add(item.cacheKey);
         }
 
         console.log(
@@ -446,11 +466,12 @@ export class CurrentEvent extends BasePhase {
     }
 
     setData({ panel, successes, failures }) {
+        const state = this._ensureState();
         super.setData({ panel, successes, failures });
 
         for (const success of successes || []) {
             if (success && isMessageTextType(success.type)) {
-                this._state.textSuccesses += 1;
+                state.textSuccesses += 1;
             }
         }
 
@@ -472,24 +493,26 @@ export class CurrentEvent extends BasePhase {
     }
 
     finalizePhase({ panel }) {
+        const state = this._ensureState();
         try {
             this.applyCurrentText(
                 panel,
-                this._state.items,
-                this._state.normalizedCurrentText || this.currentText || '',
-                this._state.textSuccesses
+                state.items,
+                state.normalizedCurrentText || this.currentText || '',
+                state.textSuccesses
             );
             this.applyCurrentChoices(panel);
         } finally {
-            for (const key of this._state.pendingKeys || []) {
+            for (const key of state.pendingKeys || []) {
                 panel.pendingTranslations.delete(key);
             }
         }
     }
 
     handleFatalError({ panel, error }) {
+        const state = this._ensureState();
         console.error('[TranslateOnTheFly] Ahead translation error:', error);
-        for (const key of this._state.pendingKeys || []) {
+        for (const key of state.pendingKeys || []) {
             panel.failedTranslations.set(key, Date.now());
             panel.pendingTranslations.delete(key);
         }
@@ -497,3 +520,6 @@ export class CurrentEvent extends BasePhase {
         panel._translationApplied = true;
     }
 }
+
+/** @type {CurrentEvent|null} */
+CurrentEvent._instance = null;

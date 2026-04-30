@@ -33,9 +33,7 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
     }
 
     getRuntime() {
-        return typeof window.__ensureTranslationRuntime === 'function'
-            ? window.__ensureTranslationRuntime()
-            : window.__TranslationRuntime || null;
+        return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
     }
 
     findPluginEntry() {
@@ -380,9 +378,7 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
 
         const cacheKey = runtime.getCacheKey(text, this.getCacheType());
 
-        if (typeof runtime.markCacheKeySeen === 'function') {
-            runtime.markCacheKeySeen(cacheKey);
-        }
+        runtime.markCacheKeySeen?.(cacheKey);
 
         if (
             !(runtime.translationCache instanceof Map) ||
@@ -409,14 +405,7 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
             return text;
         }
 
-        const cleaned =
-            typeof runtime.cleanTranslatedText === 'function'
-                ? runtime.cleanTranslatedText(text)
-                : text;
-
-        if (typeof runtime.wrapText !== 'function') {
-            return cleaned;
-        }
+        const cleaned = runtime.cleanTranslatedText(text);
 
         const maxWidth = Number(runtime.descriptionMaxLineWidth || runtime.maxLineWidth || 0) || 0;
 

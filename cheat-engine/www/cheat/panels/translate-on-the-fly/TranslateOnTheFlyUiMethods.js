@@ -112,9 +112,7 @@ export const translateOnTheFlyUiMethods = {
             event.preventDefault();
             event.stopPropagation();
           }
-          if (typeof this.requestBatchQueueAbort === "function") {
-            this.requestBatchQueueAbort();
-          }
+          this.requestBatchQueueAbort();
         };
 
         closeBtn.addEventListener("mousedown", stopDragPropagation);

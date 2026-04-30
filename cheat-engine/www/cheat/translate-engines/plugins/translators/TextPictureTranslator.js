@@ -38,9 +38,7 @@ export class TextPictureTranslator extends BasePluginTranslator {
 
             try {
                 const runtime =
-                    typeof window.__ensureTranslationRuntime === 'function'
-                        ? window.__ensureTranslationRuntime()
-                        : window.__TranslationRuntime || null;
+                    window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
 
                 if (
                     !runtime ||
@@ -58,9 +56,7 @@ export class TextPictureTranslator extends BasePluginTranslator {
 
                 const cacheKey = runtime.getCacheKey(text, translator.getCacheType());
 
-                if (typeof runtime.markCacheKeySeen === 'function') {
-                    runtime.markCacheKeySeen(cacheKey);
-                }
+                runtime.markCacheKeySeen?.(cacheKey);
 
                 if (!runtime.hasUsableCacheValue(cacheKey)) {
                     return result;

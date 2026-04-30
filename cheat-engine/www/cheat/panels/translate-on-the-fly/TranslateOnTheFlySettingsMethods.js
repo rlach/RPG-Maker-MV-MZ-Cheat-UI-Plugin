@@ -138,12 +138,8 @@ export const translateOnTheFlySettingsMethods = {
     },
 
     onChangeFlatProgressWindow() {
-        if (typeof this.resetProgressBoxPositionToDefault === 'function') {
-            this.resetProgressBoxPositionToDefault();
-        }
-        if (typeof this.ensureProgressBoxElements === 'function') {
-            this.ensureProgressBoxElements();
-        }
+        this.resetProgressBoxPositionToDefault();
+        this.ensureProgressBoxElements();
         this.saveSettings();
     },
 
@@ -187,9 +183,7 @@ export const translateOnTheFlySettingsMethods = {
         if (this.engineSettings && this.engineSettings[this.translationEngine]) {
             const engineConfig = this.engineSettings[this.translationEngine];
             Object.assign(this.engine, engineConfig);
-            if (typeof this.engine.setCustomTags === 'function') {
-                this.engine.setCustomTags(this.engine.customTags || []);
-            }
+            this.engine.setCustomTags?.(this.engine.customTags || []);
         }
 
         // Bind new engine config data to panel

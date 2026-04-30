@@ -104,9 +104,7 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
 
         const cacheKey = runtime.getCacheKey(text, this.getCacheType());
 
-        if (typeof runtime.markCacheKeySeen === 'function') {
-            runtime.markCacheKeySeen(cacheKey);
-        }
+        runtime.markCacheKeySeen?.(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             return text;
@@ -193,9 +191,7 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
 
                 // TMMenuLabel refreshes once in its constructor before this patch point.
                 // Refresh again so the first menu open immediately reflects cached translations.
-                if (this._menuLabelWindow && typeof this._menuLabelWindow.refresh === 'function') {
-                    this._menuLabelWindow.refresh();
-                }
+                this._menuLabelWindow?.refresh?.();
             } catch (error) {
                 console.warn(
                     '[TMMenuLabelTranslator] Failed to patch menu label window instance',

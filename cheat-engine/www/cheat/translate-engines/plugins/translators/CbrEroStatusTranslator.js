@@ -6,9 +6,7 @@ const PLUGIN_SCRIPT_HEADER = 'CBR-エロステータス';
 const TEXT_LINE_PREFIX = 'テキスト-';
 
 function getRuntime() {
-    return typeof window.__ensureTranslationRuntime === 'function'
-        ? window.__ensureTranslationRuntime()
-        : window.__TranslationRuntime || null;
+    return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
 }
 
 function isUsableText(value) {
@@ -49,9 +47,7 @@ function buildTranslatedDataLine(line, runtime, cacheType) {
     }
 
     const cacheKey = runtime.getCacheKey(payload, cacheType);
-    if (typeof runtime.markCacheKeySeen === 'function') {
-        runtime.markCacheKeySeen(cacheKey);
-    }
+    runtime.markCacheKeySeen?.(cacheKey);
 
     if (!(runtime.translationCache instanceof Map)) {
         return line;

@@ -3,9 +3,7 @@ import { BasePluginTranslator } from '../BasePluginTranslator.js';
 const RUNTIME_HOOK_GUARD = '__CHEAT_MOG_BATTLE_COMMANDS_TRANSLATOR_HOOKED__';
 
 function resolveTranslationRuntime() {
-    return typeof window.__ensureTranslationRuntime === 'function'
-        ? window.__ensureTranslationRuntime()
-        : window.__TranslationRuntime || null;
+    return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
 }
 
 function buildTranslatedToOriginalCommandMap(runtime) {

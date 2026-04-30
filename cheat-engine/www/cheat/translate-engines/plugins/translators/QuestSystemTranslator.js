@@ -47,9 +47,7 @@ function parseJsonSafely(value, fallback) {
 }
 
 function getRuntime() {
-    return typeof window.__ensureTranslationRuntime === 'function'
-        ? window.__ensureTranslationRuntime()
-        : window.__TranslationRuntime || null;
+    return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
 }
 
 export class QuestSystemTranslator extends BasePluginTranslator {
@@ -291,9 +289,7 @@ export class QuestSystemTranslator extends BasePluginTranslator {
     tryGetCachedTextForType(text, runtime, cacheType) {
         const cacheKey = runtime.getCacheKey(text, cacheType);
 
-        if (typeof runtime.markCacheKeySeen === 'function') {
-            runtime.markCacheKeySeen(cacheKey);
-        }
+        runtime.markCacheKeySeen?.(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             if (!this._debugSeenMissKeys.has(cacheKey)) {

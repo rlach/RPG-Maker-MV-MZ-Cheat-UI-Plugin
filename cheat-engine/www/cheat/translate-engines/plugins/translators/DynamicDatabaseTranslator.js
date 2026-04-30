@@ -4,9 +4,7 @@ import { DATA_CONTAINER_TRANSLATION_DEFINITIONS } from "../../translation-phases
 const RUNTIME_HOOK_GUARD = "__CHEAT_DYNAMIC_DATABASE_TRANSLATOR_HOOKED__";
 
 function getRuntime() {
-  return typeof window.__ensureTranslationRuntime === "function"
-    ? window.__ensureTranslationRuntime()
-    : window.__TranslationRuntime || null;
+  return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
 }
 
 function isUsableText(value) {
@@ -110,9 +108,7 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
       const dataCacheType = `${dataType}_${field}`;
       const dataCacheKey = runtime.getCacheKey(originalText, dataCacheType);
 
-      if (typeof runtime.markCacheKeySeen === "function") {
-        runtime.markCacheKeySeen(dataCacheKey);
-      }
+      runtime.markCacheKeySeen?.(dataCacheKey);
 
       if (runtime.hasUsableCacheValue(dataCacheKey)) {
         const directCached = runtime.translationCache.get(dataCacheKey);
@@ -124,9 +120,7 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
 
     const pluginCacheKey = runtime.getCacheKey(originalText, this.getCacheType());
 
-    if (typeof runtime.markCacheKeySeen === "function") {
-      runtime.markCacheKeySeen(pluginCacheKey);
-    }
+    runtime.markCacheKeySeen?.(pluginCacheKey);
 
     if (!runtime.hasUsableCacheValue(pluginCacheKey)) {
       return null;

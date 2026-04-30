@@ -446,16 +446,16 @@ class ShortcutConfig {
         if (!this.leaveAction) this.leaveAction = (param) => {};
         if (!this.clearTimeoutHandle) this.clearTimeoutHandle = () => {};
 
-        if (typeof this.clearTimeoutHandle === 'function') {
+        if (this.clearTimeoutHandle?.bind) {
             this.clearTimeoutHandle = this.clearTimeoutHandle.bind(this);
         }
-        if (typeof this.enterAction === 'function') {
+        if (this.enterAction?.bind) {
             this.enterAction = this.enterAction.bind(this);
         }
-        if (typeof this.repeatAction === 'function') {
+        if (this.repeatAction?.bind) {
             this.repeatAction = this.repeatAction.bind(this);
         }
-        if (typeof this.leaveAction === 'function') {
+        if (this.leaveAction?.bind) {
             this.leaveAction = this.leaveAction.bind(this);
         }
     }

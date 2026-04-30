@@ -422,9 +422,7 @@ export class ConfigManager {
         } finally {
             this.aiEngine.loadingModels = false;
             this._syncPanelEngineConfig();
-            if (this.aiEngine.panel && typeof this.aiEngine.panel.saveSettings === 'function') {
-                this.aiEngine.panel.saveSettings();
-            }
+            this.aiEngine.panel?.saveSettings?.();
         }
     }
 

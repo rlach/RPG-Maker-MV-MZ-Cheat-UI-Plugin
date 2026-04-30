@@ -93,9 +93,7 @@ export class KmsMapActiveMessageTranslator extends BasePluginTranslator {
 
         const cacheType = this.getCacheType();
         const resolveRuntime = () =>
-            typeof window.__ensureTranslationRuntime === 'function'
-                ? window.__ensureTranslationRuntime()
-                : window.__TranslationRuntime || null;
+            window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
 
         const translateTextFromCache = (text) => {
             if (typeof text !== 'string' || !text.trim()) {
@@ -113,9 +111,7 @@ export class KmsMapActiveMessageTranslator extends BasePluginTranslator {
 
             const cacheKey = runtime.getCacheKey(text, cacheType);
 
-            if (typeof runtime.markCacheKeySeen === 'function') {
-                runtime.markCacheKeySeen(cacheKey);
-            }
+            runtime.markCacheKeySeen?.(cacheKey);
 
             if (!(runtime.translationCache instanceof Map)) {
                 return text;

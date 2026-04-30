@@ -29,12 +29,10 @@ export const translateOnTheFlyCoreMethods = {
         }
 
         this._batchQueueAbortRequested = true;
-        let cancelled = false;
-        if (this.engine && typeof this.engine.cancelActiveRequest === 'function') {
-            cancelled = this.engine.cancelActiveRequest('request_aborted');
-        } else if (this.engine && typeof this.engine.cancelActiveBackgroundRequest === 'function') {
-            cancelled = this.engine.cancelActiveBackgroundRequest();
-        }
+        const cancelled =
+            this.engine?.cancelActiveRequest?.('request_aborted') ||
+            this.engine?.cancelActiveBackgroundRequest?.() ||
+            false;
 
         console.log(
             `[TranslateOnTheFly] Queue abort requested by user (${cancelled ? 'active request cancelled' : 'no active request'})`
@@ -189,9 +187,7 @@ export const translateOnTheFlyCoreMethods = {
 
         const lookupKeys = this.getMessageCacheLookupKeys(text, options);
         for (const cacheKey of lookupKeys) {
-            if (typeof this.markCacheKeySeen === 'function') {
-                this.markCacheKeySeen(cacheKey);
-            }
+            this.markCacheKeySeen(cacheKey);
 
             if (!this.hasUsableCacheValue(cacheKey)) {
                 continue;

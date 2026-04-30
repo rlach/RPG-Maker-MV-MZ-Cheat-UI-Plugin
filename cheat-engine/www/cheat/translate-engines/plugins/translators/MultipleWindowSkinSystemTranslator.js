@@ -1,11 +1,5 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 
-function getTranslationRuntime() {
-    return typeof window.__ensureTranslationRuntime === 'function'
-        ? window.__ensureTranslationRuntime()
-        : window.__TranslationRuntime || null;
-}
-
 function getSafeCurrentMessageText() {
     if (!window.$gameMessage) {
         return '';
@@ -31,9 +25,6 @@ function getSafeCurrentMessageText() {
 function applyCachedCurrentMessageTranslation(runtime) {
     if (
         !runtime ||
-        typeof runtime.getPreferredMessageCacheEntry !== 'function' ||
-        typeof runtime.getCacheKey !== 'function' ||
-        !(runtime.translationCache instanceof Map) ||
         !window.$gameMessage
     ) {
         return;
@@ -41,10 +32,7 @@ function applyCachedCurrentMessageTranslation(runtime) {
 
     const originalText = getSafeCurrentMessageText();
     if (typeof originalText === 'string' && originalText.trim()) {
-        const hasPortrait =
-            typeof runtime.hasCurrentMessagePortrait === 'function'
-                ? runtime.hasCurrentMessagePortrait($gameMessage)
-                : false;
+        const hasPortrait = runtime.hasCurrentMessagePortrait($gameMessage);
         const preferred = runtime.getPreferredMessageCacheEntry(originalText, {
             hasPortrait,
         });
@@ -63,9 +51,7 @@ function applyCachedCurrentMessageTranslation(runtime) {
     if (typeof originalSpeaker === 'string' && originalSpeaker.trim()) {
         const speakerCacheKey = runtime.getCacheKey(originalSpeaker, 'speaker');
 
-        if (typeof runtime.markCacheKeySeen === 'function') {
-            runtime.markCacheKeySeen(speakerCacheKey);
-        }
+        runtime.markCacheKeySeen?.(speakerCacheKey);
 
         if (runtime.hasUsableCacheValue(speakerCacheKey)) {
             const cachedSpeaker = runtime.translationCache.get(speakerCacheKey);
@@ -78,13 +64,7 @@ function applyCachedCurrentMessageTranslation(runtime) {
 }
 
 function applyCachedActorNameTranslation(actorNameWindow, runtime) {
-    if (
-        !actorNameWindow ||
-        !runtime ||
-        typeof runtime.getCacheKey !== 'function' ||
-        typeof runtime.hasUsableCacheValue !== 'function' ||
-        !(runtime.translationCache instanceof Map)
-    ) {
+    if (!actorNameWindow || !runtime) {
         return;
     }
 
@@ -139,9 +119,7 @@ function applyCachedActorNameTranslation(actorNameWindow, runtime) {
     );
 
     for (const cacheKey of keys) {
-        if (typeof runtime.markCacheKeySeen === 'function') {
-            runtime.markCacheKeySeen(cacheKey);
-        }
+        runtime.markCacheKeySeen?.(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             continue;
@@ -163,7 +141,7 @@ function applyCachedActorNameTranslation(actorNameWindow, runtime) {
     }
 }
 
-function patchActorNameWindowStart(actorNameWindow) {
+function patchActorNameWindowStart(actorNameWindow, translator) {
     if (
         !actorNameWindow ||
         typeof actorNameWindow.start !== 'function' ||
@@ -187,7 +165,7 @@ function patchActorNameWindowStart(actorNameWindow) {
     const originalStart = actorNameWindow.start;
     actorNameWindow.start = function () {
         try {
-            const runtime = getTranslationRuntime();
+            const runtime = translator.getRuntime();
             applyCachedActorNameTranslation(this, runtime);
         } catch (error) {
             console.warn(
@@ -223,6 +201,8 @@ export class MultipleWindowSkinSystemTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
+        const translator = this;
+
         if (
             !window.Window_Message ||
             !Window_Message.prototype ||
@@ -244,8 +224,8 @@ export class MultipleWindowSkinSystemTranslator extends BasePluginTranslator {
             }
 
             try {
-                patchActorNameWindowStart(this._actorNameWindow);
-                const runtime = getTranslationRuntime();
+                patchActorNameWindowStart(this._actorNameWindow, translator);
+                const runtime = translator.getRuntime();
                 applyCachedCurrentMessageTranslation(runtime);
                 applyCachedActorNameTranslation(this._actorNameWindow, runtime);
             } catch (error) {

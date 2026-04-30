@@ -54,45 +54,29 @@ class ObjectTranslationService {
     }
 
     if (
-      typeof runtime.isNonOtfTranslationProcessActive === "function" &&
       runtime.isNonOtfTranslationProcessActive()
     ) {
-      const activeLabel =
-        typeof runtime.getActiveNonOtfTranslationProcessLabel === "function"
-          ? runtime.getActiveNonOtfTranslationProcessLabel()
-          : "translation";
+      const activeLabel = runtime.getActiveNonOtfTranslationProcessLabel();
       Alert.warn(
         `Another translation is already in progress (${activeLabel}).`,
       );
       return;
     }
 
-    if (runtime.checkIfDataIsLoaded && runtime.checkIfDataIsLoaded()) {
+    if (runtime.checkIfDataIsLoaded()) {
       Alert.warn("Game data is not fully loaded yet");
       return;
     }
 
-    const stats =
-      typeof runtime.getObjectTranslationStats === "function"
-        ? runtime.getObjectTranslationStats()
-        : [];
+    const stats = runtime.getObjectTranslationStats();
     const commonEventsStats =
       stats.find((item) => item.id === "commonEvents") ||
-      (runtime.countCommonEventsStats
-        ? runtime.countCommonEventsStats()
-        : { totalStrings: 0, leftStrings: 0 });
+      runtime.countCommonEventsStats();
     const mapEventsStats =
       stats.find((item) => item.id === "mapEvents") ||
-      (runtime.countMapEventsStats
-        ? runtime.countMapEventsStats()
-        : { total: 0 });
-    const selectedMapIds = runtime.getSelectedObjectTranslationMapIds
-      ? runtime.getSelectedObjectTranslationMapIds()
-      : [];
-    const pluginDetails =
-      typeof runtime.buildObjectTranslationPluginDetails === "function"
-        ? await runtime.buildObjectTranslationPluginDetails()
-        : [];
+      runtime.countMapEventsStats();
+    const selectedMapIds = runtime.getSelectedObjectTranslationMapIds();
+    const pluginDetails = await runtime.buildObjectTranslationPluginDetails();
     const selectedPluginsCount = pluginDetails.filter(
       (item) => item && item.selected,
     ).length;
@@ -111,12 +95,10 @@ class ObjectTranslationService {
       if (item.id === "mapEvents") {
         return {
           ...item,
-          metaText: runtime.getObjectTranslationMapEventsMetaText
-            ? runtime.getObjectTranslationMapEventsMetaText(
-                mapEventsStats.total,
-                selectedMapIds.length,
-              )
-            : `${mapEventsStats.total || 0} maps`,
+          metaText: runtime.getObjectTranslationMapEventsMetaText(
+            mapEventsStats.total,
+            selectedMapIds.length,
+          ),
           total: mapEventsStats.total,
         };
       }
@@ -134,13 +116,10 @@ class ObjectTranslationService {
             (acc, entry) => acc + (Number(entry.leftStrings) || 0),
             0,
           ),
-          metaText:
-            typeof runtime.getObjectTranslationPluginsMetaText === "function"
-              ? runtime.getObjectTranslationPluginsMetaText(
-                  pluginDetails.length,
-                  selectedPluginsCount,
-                )
-              : `${pluginDetails.length} plugins`,
+          metaText: runtime.getObjectTranslationPluginsMetaText(
+            pluginDetails.length,
+            selectedPluginsCount,
+          ),
         };
       }
 
@@ -172,9 +151,7 @@ class ObjectTranslationService {
     const runtime = this.ensureRuntime();
     if (runtime) {
       runtime.cacheEmptyStringsRepeatUntilSuccess = !!value;
-      if (typeof runtime.saveSettings === "function") {
-        runtime.saveSettings();
-      }
+      runtime.saveSettings();
     }
   }
 
@@ -184,10 +161,7 @@ class ObjectTranslationService {
 
   async openMapSelection() {
     const runtime = this.ensureRuntime();
-    if (
-      !runtime ||
-      typeof runtime.buildObjectTranslationMapEventDetails !== "function"
-    ) {
+    if (!runtime) {
       Alert.error("Translation runtime not initialized");
       return;
     }
@@ -212,10 +186,7 @@ class ObjectTranslationService {
 
   async openPluginSelection() {
     const runtime = this.ensureRuntime();
-    if (
-      !runtime ||
-      typeof runtime.buildObjectTranslationPluginDetails !== "function"
-    ) {
+    if (!runtime) {
       Alert.error("Translation runtime not initialized");
       return;
     }
@@ -265,19 +236,15 @@ class ObjectTranslationService {
       return;
     }
 
-    if (typeof runtime.setPluginTranslatorEnabled === "function") {
-      for (const item of this.state.pluginDetails) {
-        runtime.setPluginTranslatorEnabled(
-          item.id,
-          !!this.state.pluginDraftSelection[item.id],
-          { persist: false },
-        );
-      }
+    for (const item of this.state.pluginDetails) {
+      runtime.setPluginTranslatorEnabled(
+        item.id,
+        !!this.state.pluginDraftSelection[item.id],
+        { persist: false },
+      );
     }
 
-    if (typeof runtime.saveSettings === "function") {
-      runtime.saveSettings();
-    }
+    runtime.saveSettings();
 
     const selectedPluginsCount = this.state.pluginDetails.filter(
       (item) => !!this.state.pluginDraftSelection[item.id],
@@ -286,13 +253,10 @@ class ObjectTranslationService {
 
     const pluginsItem = this.state.modalStats.find((item) => item.id === "plugins");
     if (pluginsItem) {
-      pluginsItem.metaText =
-        typeof runtime.getObjectTranslationPluginsMetaText === "function"
-          ? runtime.getObjectTranslationPluginsMetaText(
-              this.state.pluginDetails.length,
-              selectedPluginsCount,
-            )
-          : `${this.state.pluginDetails.length} plugins`;
+      pluginsItem.metaText = runtime.getObjectTranslationPluginsMetaText(
+        this.state.pluginDetails.length,
+        selectedPluginsCount,
+      );
     }
 
     this.closePluginSelection();
@@ -340,7 +304,7 @@ class ObjectTranslationService {
     const mapEventsItem = this.state.modalStats.find(
       (item) => item.id === "mapEvents",
     );
-    if (mapEventsItem && runtime.getObjectTranslationMapEventsMetaText) {
+    if (mapEventsItem) {
       mapEventsItem.metaText = runtime.getObjectTranslationMapEventsMetaText(
         mapEventsItem.total,
         selectedMapIds.length,
@@ -352,19 +316,15 @@ class ObjectTranslationService {
 
   async startTranslation(dryRun = false) {
     const runtime = this.ensureRuntime();
-    if (!runtime || typeof runtime.runObjectTranslationJob !== "function") {
+    if (!runtime) {
       Alert.error("Translation runtime not initialized");
       return;
     }
 
     if (
-      typeof runtime.isNonOtfTranslationProcessActive === "function" &&
       runtime.isNonOtfTranslationProcessActive()
     ) {
-      const activeLabel =
-        typeof runtime.getActiveNonOtfTranslationProcessLabel === "function"
-          ? runtime.getActiveNonOtfTranslationProcessLabel()
-          : "translation";
+      const activeLabel = runtime.getActiveNonOtfTranslationProcessLabel();
       Alert.warn(
         `Another translation is already in progress (${activeLabel}).`,
       );
@@ -422,10 +382,7 @@ class ObjectTranslationService {
     this.state.modalStats = reordered;
 
     const runtime = this.ensureRuntime();
-    if (
-      runtime &&
-      typeof runtime.setObjectTranslationTypeOrder === "function"
-    ) {
+    if (runtime) {
       runtime.setObjectTranslationTypeOrder(reordered.map((item) => item.id));
     }
   }

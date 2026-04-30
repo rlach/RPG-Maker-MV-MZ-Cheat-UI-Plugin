@@ -56,11 +56,7 @@ export class TranslationBatchManager {
   }
 
   isQueueAbortRequested() {
-    return !!(
-      this.panel &&
-      typeof this.panel.isBatchQueueAbortRequested === "function" &&
-      this.panel.isBatchQueueAbortRequested()
-    );
+    return !!(this.panel && this.panel.isBatchQueueAbortRequested());
   }
 
   countBatchRequestedChars(batchItems) {
@@ -108,8 +104,8 @@ export class TranslationBatchManager {
       return;
     }
 
-    if (typeof strategy.getQueueScopeCacheTypes === "function") {
-      const types = strategy.getQueueScopeCacheTypes({
+    {
+      const types = strategy.getQueueScopeCacheTypes?.({
         panel: this.panel,
         request,
       });
@@ -119,8 +115,8 @@ export class TranslationBatchManager {
       );
     }
 
-    if (typeof strategy.getCacheType === "function") {
-      const type = strategy.getCacheType();
+    {
+      const type = strategy.getCacheType?.();
       if (type) {
         targetSet.add(String(type).trim());
       }
@@ -165,11 +161,7 @@ export class TranslationBatchManager {
       return;
     }
 
-    if (
-      kind === "gameArrays" &&
-      this.panel &&
-      typeof this.panel.getGameArrayDefs === "function"
-    ) {
+    if (kind === "gameArrays" && this.panel) {
       const defs = this.panel.getGameArrayDefs() || [];
       for (const def of defs) {
         const type = def?.type;
@@ -206,17 +198,18 @@ export class TranslationBatchManager {
       return;
     }
 
+    const safeDefinition = /** @type {any} */ (definition);
     if (
-      definition &&
-      typeof definition.cachePrefix === "string" &&
-      Array.isArray(definition.fields)
+      safeDefinition &&
+      typeof safeDefinition.cachePrefix === "string" &&
+      Array.isArray(safeDefinition.fields)
     ) {
-      for (const field of definition.fields) {
+      for (const field of safeDefinition.fields) {
         const normalizedField = String(field || "").trim();
         if (!normalizedField) {
           continue;
         }
-        targetSet.add(`${definition.cachePrefix}_${normalizedField}`);
+        targetSet.add(`${safeDefinition.cachePrefix}_${normalizedField}`);
       }
     }
 
@@ -262,17 +255,14 @@ export class TranslationBatchManager {
         continue;
       }
 
-      const hasUsable =
-        typeof this.panel.hasUsableCacheValue === "function"
-          ? this.panel.hasUsableCacheValue(failure.cacheKey)
-          : false;
+      const hasUsable = this.panel.hasUsableCacheValue(failure.cacheKey);
       if (!hasUsable) {
         this.panel.setCacheValue(failure.cacheKey, "", { persist: false });
         changedKeys.push(failure.cacheKey);
       }
     }
 
-    if (persist && typeof this.panel.persistCache === "function") {
+    if (persist) {
       this.panel.persistCache(changedKeys);
     }
 
@@ -317,10 +307,7 @@ export class TranslationBatchManager {
   }
 
   async runBatchedTranslation(items, options = {}) {
-    if (
-      this.panel &&
-      typeof this.panel.clearQueueCompletionScope === "function"
-    ) {
+    if (this.panel) {
       this.panel.clearQueueCompletionScope();
     }
 
@@ -535,11 +522,7 @@ export class TranslationBatchManager {
                   backgroundJob: false,
                 });
 
-            if (
-              result &&
-              result.recoveryStrategyUsed === true &&
-              typeof this.errorRecovery.recordRecoveryAttempt === "function"
-            ) {
+            if (result && result.recoveryStrategyUsed === true) {
               this.errorRecovery.recordRecoveryAttempt(1);
             }
 
@@ -552,7 +535,9 @@ export class TranslationBatchManager {
           }
         } catch (error) {
           const rejectReason =
-            (error && error.message) || "batch_translate_exception";
+            error instanceof Error
+              ? error.message
+              : String(error || "batch_translate_exception");
           failures = batch.map((item) => ({
             ...item,
             rejectReason,
@@ -572,11 +557,7 @@ export class TranslationBatchManager {
 
         for (const failure of failures) {
           allFailures.push(failure);
-          if (
-            failure &&
-            failure.recoveryAttempted === true &&
-            typeof this.errorRecovery.recordRecoveryAttempt === "function"
-          ) {
+          if (failure && failure.recoveryAttempted === true) {
             this.errorRecovery.recordRecoveryAttempt(1);
           }
           this.errorRecovery.recordFailure(failure);
@@ -588,11 +569,7 @@ export class TranslationBatchManager {
           { persist: false },
         );
 
-        if (
-          !dryRun &&
-          changedKeys.length > 0 &&
-          typeof this.panel.persistCache === "function"
-        ) {
+        if (!dryRun && changedKeys.length > 0) {
           this.panel.persistCache(changedKeys);
         }
 
@@ -625,11 +602,7 @@ export class TranslationBatchManager {
           });
         }
 
-        if (
-          !dryRun &&
-          this.panel &&
-          typeof this.panel.recordBatchThroughputSample === "function"
-        ) {
+        if (!dryRun && this.panel) {
           this.panel.recordBatchThroughputSample(
             batchRequestedChars,
             Date.now() - batchStartedAt,
@@ -696,12 +669,8 @@ export class TranslationBatchManager {
       });
       const stats = this.errorRecovery.getStats();
 
-      if (
-        !interruptedForCurrentMap &&
-        hasStrategy &&
-        typeof strategy.finalizePhase === "function"
-      ) {
-        strategy.finalizePhase({
+      if (!interruptedForCurrentMap && hasStrategy) {
+        strategy.finalizePhase?.({
           panel: this.panel,
           pendingItems,
         });
@@ -719,11 +688,7 @@ export class TranslationBatchManager {
     const safeQueueEntries = [...queueEntries];
     const dryRun = !!options.dryRun;
 
-    if (
-      dryRun &&
-      this.panel &&
-      typeof this.panel.markDryRunExecuted === "function"
-    ) {
+    if (dryRun && this.panel) {
       this.panel.markDryRunExecuted();
     }
 
@@ -744,10 +709,7 @@ export class TranslationBatchManager {
       };
     }
 
-    if (
-      this.panel &&
-      typeof this.panel.startQueueCompletionScope === "function"
-    ) {
+    if (this.panel) {
       this.panel.startQueueCompletionScope(Array.from(queueScopeCacheTypes));
     }
 
@@ -758,10 +720,7 @@ export class TranslationBatchManager {
           break;
         }
 
-        const currentMapId =
-          typeof this.panel.getCurrentMapIdForPhasePriority === "function"
-            ? this.panel.getCurrentMapIdForPhasePriority()
-            : 0;
+        const currentMapId = this.panel.getCurrentMapIdForPhasePriority();
         if (currentMapId > 0) {
           const currentMapEntryIndex = this.getCurrentMapEntryIndex(
             safeQueueEntries,
@@ -804,10 +763,7 @@ export class TranslationBatchManager {
                 return false;
               }
 
-              const freshCurrentMapId =
-                typeof this.panel.getCurrentMapIdForPhasePriority === "function"
-                  ? this.panel.getCurrentMapIdForPhasePriority()
-                  : 0;
+              const freshCurrentMapId = this.panel.getCurrentMapIdForPhasePriority();
               const freshCurrentMapEntryIndex = this.getCurrentMapEntryIndex(
                 safeQueueEntries,
                 freshCurrentMapId,
@@ -847,10 +803,7 @@ export class TranslationBatchManager {
       }
     } finally {
       this.progressTracker.endQueue();
-      if (
-        this.panel &&
-        typeof this.panel.clearQueueCompletionScope === "function"
-      ) {
+      if (this.panel) {
         this.panel.clearQueueCompletionScope();
       }
     }
@@ -866,10 +819,7 @@ export class TranslationBatchManager {
           persist: false,
         },
       );
-      if (
-        changedKeys.length > 0 &&
-        typeof this.panel.persistCache === "function"
-      ) {
+      if (changedKeys.length > 0) {
         this.panel.persistCache(changedKeys);
       }
     }
@@ -893,10 +843,7 @@ export class TranslationBatchManager {
           persist: false,
         },
       );
-      if (
-        changedKeys.length > 0 &&
-        typeof this.panel.persistCache === "function"
-      ) {
+      if (changedKeys.length > 0) {
         this.panel.persistCache(changedKeys);
       }
     }
@@ -937,13 +884,11 @@ export class TranslationBatchManager {
       }
 
       const counted =
-        (typeof definition.countAmountSync === "function"
-          ? definition.countAmountSync({
-              request,
-              manager: this,
-              panel: this.panel,
-            })
-          : null) || {};
+        definition.countAmountSync?.({
+          request,
+          manager: this,
+          panel: this.panel,
+        }) || {};
       result.push({
         kind: request && request.kind,
         total: Math.max(0, Number(counted.total) || 0),

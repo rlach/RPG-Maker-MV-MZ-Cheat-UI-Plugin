@@ -16,8 +16,12 @@ export class Variables extends BasePhase {
     this.configure(scanResult);
   }
 
+  /**
+   * @param {any} scanResult
+   */
   configure(scanResult = null) {
-    this.scanResult = scanResult || Variables.createEmptyScanResult();
+    const safeScanResult = scanResult || Variables.createEmptyScanResult();
+    this.scanResult = safeScanResult;
     return this;
   }
 
@@ -33,10 +37,7 @@ export class Variables extends BasePhase {
   }
 
   static getMarkedVariableIdSet(panel) {
-    const safeIds =
-      panel && typeof panel.getSafeVariableTranslationIds === 'function'
-        ? panel.getSafeVariableTranslationIds()
-        : [];
+    const safeIds = panel ? panel.getSafeVariableTranslationIds() : [];
     return new Set(
       safeIds
         .map((id) => Number(id))
@@ -51,15 +52,17 @@ export class Variables extends BasePhase {
     }
 
     try {
-      const fs = require('fs');
-      const path = require('path');
+      // @ts-ignore Node built-in available in NW.js runtime.
+      const fileSystem = require('fs');
+      // @ts-ignore Node built-in available in NW.js runtime.
+      const pathModule = require('path');
       const fileName = `Map${String(safeMapId).padStart(3, '0')}.json`;
-      const filePath = path.resolve('./data', fileName);
-      if (!fs.existsSync(filePath)) {
+      const filePath = pathModule.resolve('./data', fileName);
+      if (!fileSystem.existsSync(filePath)) {
         return null;
       }
 
-      return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      return JSON.parse(fileSystem.readFileSync(filePath, 'utf-8'));
     } catch (error) {
       console.warn(`[Variables] Failed to load map ${safeMapId}`, error);
       return null;
@@ -72,10 +75,7 @@ export class Variables extends BasePhase {
 
   static collectMapEntries(panel, allowedVariableIds) {
     const entries = [];
-    const validMaps =
-      panel && typeof panel.getValidMapInfos === 'function'
-        ? panel.getValidMapInfos()
-        : [];
+    const validMaps = panel ? panel.getValidMapInfos() : [];
 
     for (const mapInfo of validMaps) {
       const mapData = Variables.loadMapDataSync(mapInfo.id);
@@ -232,3 +232,6 @@ export class Variables extends BasePhase {
       : [];
   }
 }
+
+/** @type {Variables|null} */
+Variables._instance = null;

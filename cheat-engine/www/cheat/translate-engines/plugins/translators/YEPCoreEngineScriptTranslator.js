@@ -52,9 +52,7 @@ function resolveCachedTranslation(runtime, sourceText, cacheType) {
     for (const candidate of candidates) {
         const cacheKey = runtime.getCacheKey(candidate, cacheType);
 
-        if (typeof runtime.markCacheKeySeen === 'function') {
-            runtime.markCacheKeySeen(cacheKey);
-        }
+        runtime.markCacheKeySeen?.(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             continue;
@@ -73,12 +71,6 @@ function resolveCachedTranslation(runtime, sourceText, cacheType) {
     }
 
     return null;
-}
-
-function getTranslationRuntime() {
-    return typeof window.__ensureTranslationRuntime === 'function'
-        ? window.__ensureTranslationRuntime()
-        : window.__TranslationRuntime || null;
 }
 
 export class YEPCoreEngineScriptTranslator extends BasePluginTranslator {
@@ -106,6 +98,8 @@ export class YEPCoreEngineScriptTranslator extends BasePluginTranslator {
     // -------------------------------------------------------------------------
 
     enablePluginTranslation() {
+        const translator = this;
+
         if (
             !window.Game_Interpreter ||
             !Game_Interpreter.prototype ||
@@ -119,14 +113,9 @@ export class YEPCoreEngineScriptTranslator extends BasePluginTranslator {
 
         Game_Interpreter.prototype.command355 = function () {
             try {
-                const runtime = getTranslationRuntime();
+                const runtime = translator.getRuntime();
 
-                if (
-                    runtime &&
-                    typeof runtime.getCacheKey === 'function' &&
-                    typeof runtime.hasUsableCacheValue === 'function' &&
-                    runtime.translationCache instanceof Map
-                ) {
+                if (runtime) {
                     // Translate the 355 line (first line of the script block)
                     YEPCoreEngineScriptTranslator._translateCommandParam(
                         this._list,
@@ -164,7 +153,7 @@ export class YEPCoreEngineScriptTranslator extends BasePluginTranslator {
 
         const applyGameVariableRefresh = (reason) => {
             try {
-                const runtime = getTranslationRuntime();
+                const runtime = translator.getRuntime();
                 const stats = YEPCoreEngineScriptTranslator.applyCachedTranslationsToGameVariables(
                     runtime,
                     cacheType

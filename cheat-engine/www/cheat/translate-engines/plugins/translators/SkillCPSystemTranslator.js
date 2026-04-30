@@ -149,9 +149,7 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
         const cacheType = this.getCacheTypeByField(field);
         const cacheKey = runtime.getCacheKey(text, cacheType);
 
-        if (typeof runtime.markCacheKeySeen === 'function') {
-            runtime.markCacheKeySeen(cacheKey);
-        }
+        runtime.markCacheKeySeen?.(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             return text;

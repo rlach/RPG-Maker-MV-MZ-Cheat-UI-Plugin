@@ -5,12 +5,6 @@ const CACHE_TYPE = 'plugin_message_window_popup';
 const DEBUG_LOG = true;
 const WIDTH_OVERRIDE_EXTRA_PX = 10;
 
-function resolveRuntime() {
-    return typeof window.__ensureTranslationRuntime === 'function'
-        ? window.__ensureTranslationRuntime()
-        : window.__TranslationRuntime || null;
-}
-
 function getTranslatedMessageTextForPopupSizing(runtime, originalText, options = {}) {
     if (typeof originalText !== 'string' || !originalText.trim()) {
         return null;
@@ -96,20 +90,6 @@ function computeDesiredPopupWidth(windowMessage, measuredText) {
     );
 }
 
-function isPopupSizingTranslationActive(runtime) {
-    if (!runtime) {
-        return false;
-    }
-
-    const translationEnabled =
-        typeof runtime.isTranslationEnabled === 'function'
-            ? !!runtime.isTranslationEnabled()
-            : !!runtime.enabled;
-
-    const translateCacheWhenDisabled = !!runtime.translateCacheWhenDisabled;
-    return translationEnabled || translateCacheWhenDisabled;
-}
-
 function limitPopupHeightToFirstPage(windowMessage) {
     const faceHeight = windowMessage.getFaceHeight();
     const lineHeight = windowMessage.itemHeight();
@@ -134,6 +114,8 @@ export class MessageWindowPopupTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
+        const translator = this;
+
         if (window[RUNTIME_HOOK_GUARD]) {
             return;
         }
@@ -151,7 +133,7 @@ export class MessageWindowPopupTranslator extends BasePluginTranslator {
         const originalResizeForPopup = Window_Message.prototype.resizeForPopup;
 
         Window_Message.prototype.resizeForPopup = function () {
-            const runtime = resolveRuntime();
+            const runtime = translator.getRuntime();
             const currentText =
                 typeof $gameMessage?.allText === 'function'
                     ? String($gameMessage.allText() || '')
@@ -162,7 +144,7 @@ export class MessageWindowPopupTranslator extends BasePluginTranslator {
                     ? $gameMessage._translateOriginalText
                     : currentText;
 
-            const popupSizingEnabled = isPopupSizingTranslationActive(runtime);
+            const popupSizingEnabled = translator.isRuntimeTranslationActive(runtime);
             if (!popupSizingEnabled) {
                 originalResizeForPopup.apply(this, arguments);
                 debugLog('resizeForPopup(skip-disabled)', {
@@ -259,8 +241,8 @@ export class MessageWindowPopupTranslator extends BasePluginTranslator {
                 return;
             }
 
-            const runtime = resolveRuntime();
-            if (!isPopupSizingTranslationActive(runtime)) {
+            const runtime = translator.getRuntime();
+            if (!translator.isRuntimeTranslationActive(runtime)) {
                 return;
             }
 
@@ -273,10 +255,7 @@ export class MessageWindowPopupTranslator extends BasePluginTranslator {
                 $gameMessage._translateOriginalText.trim()
                     ? $gameMessage._translateOriginalText
                     : currentText;
-            const hasPortrait =
-                typeof runtime?.hasCurrentMessagePortrait === 'function'
-                    ? runtime.hasCurrentMessagePortrait($gameMessage)
-                    : false;
+            const hasPortrait = runtime?.hasCurrentMessagePortrait($gameMessage) || false;
             const { measuredText, source } = resolveMeasuredPopupText(
                 runtime,
                 originalTextForCache,
@@ -327,14 +306,9 @@ export class MessageWindowPopupTranslator extends BasePluginTranslator {
                         y: this.y,
                         width: this.width,
                         height: this.height,
-                        popupBaseX:
-                            typeof this.getPopupBaseX === 'function' ? this.getPopupBaseX() : null,
-                        popupBaseY:
-                            typeof this.getPopupBaseY === 'function' ? this.getPopupBaseY() : null,
-                        popupLeftX:
-                            typeof this.findPopupLeftX === 'function'
-                                ? this.findPopupLeftX()
-                                : null,
+                        popupBaseX: this.getPopupBaseX?.() ?? null,
+                        popupBaseY: this.getPopupBaseY?.() ?? null,
+                        popupLeftX: this.findPopupLeftX?.() ?? null,
                     });
                 } catch (error) {
                     console.warn(

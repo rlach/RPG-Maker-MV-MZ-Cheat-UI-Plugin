@@ -74,28 +74,6 @@ function parseStructArray(rawValue) {
     return result;
 }
 
-function resolveRuntime() {
-    const ensureRuntime = ANY_WINDOW.__ensureTranslationRuntime;
-    if (typeof ensureRuntime === 'function') {
-        return ensureRuntime();
-    }
-
-    return ANY_WINDOW.__TranslationRuntime || null;
-}
-
-function isRuntimeTranslationActive(runtime) {
-    if (!runtime) {
-        return false;
-    }
-
-    const translationEnabled =
-        typeof runtime.isTranslationEnabled === 'function'
-            ? !!runtime.isTranslationEnabled()
-            : !!runtime.enabled;
-
-    return translationEnabled || !!runtime.translateCacheWhenDisabled;
-}
-
 export class NrpMapTravelTranslator extends BasePluginTranslator {
     constructor() {
         super();
@@ -247,10 +225,8 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
             text: previewText(text),
         });
 
-        if (typeof runtime.markCacheKeySeen === 'function') {
-            runtime.markCacheKeySeen(cacheKey);
-            debugLog('markCacheKeySeen', { cacheKey, cacheType });
-        }
+        runtime.markCacheKeySeen?.(cacheKey);
+        debugLog('markCacheKeySeen', { cacheKey, cacheType });
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             debugLog('cache miss', { cacheKey, cacheType, text: previewText(text) });
@@ -399,12 +375,12 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
             const result = originalMakeItemList.apply(this, arguments);
 
             try {
-                const runtime = resolveRuntime();
+                const runtime = translator.getRuntime();
                 debugLog('hook makeItemList called', {
-                    active: isRuntimeTranslationActive(runtime),
+                    active: translator.isRuntimeTranslationActive(runtime),
                     items: Array.isArray(this._data) ? this._data.length : -1,
                 });
-                if (!isRuntimeTranslationActive(runtime)) {
+                if (!translator.isRuntimeTranslationActive(runtime)) {
                     return result;
                 }
 
@@ -425,12 +401,12 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
         if (originalDrawItemName) {
             windowInstance.drawItemName = function (item, x, y) {
                 try {
-                    const runtime = resolveRuntime();
+                    const runtime = translator.getRuntime();
                     debugLog('hook drawItemName called', {
-                        active: isRuntimeTranslationActive(runtime),
+                        active: translator.isRuntimeTranslationActive(runtime),
                         item: previewText(item && item.SpotName),
                     });
-                    if (isRuntimeTranslationActive(runtime)) {
+                    if (translator.isRuntimeTranslationActive(runtime)) {
                         translator.translateSpotItemInPlace(item, runtime);
                     }
                 } catch (error) {
@@ -447,12 +423,12 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
         if (originalUpdateHelp) {
             windowInstance.updateHelp = function () {
                 try {
-                    const runtime = resolveRuntime();
+                    const runtime = translator.getRuntime();
                     debugLog('hook updateHelp called', {
-                        active: isRuntimeTranslationActive(runtime),
+                        active: translator.isRuntimeTranslationActive(runtime),
                     });
-                    if (isRuntimeTranslationActive(runtime) && typeof this.item === 'function') {
-                        translator.translateSpotItemInPlace(this.item(), runtime);
+                    if (translator.isRuntimeTranslationActive(runtime)) {
+                        translator.translateSpotItemInPlace(this.item?.(), runtime);
                     }
                 } catch (error) {
                     console.warn(
@@ -470,8 +446,8 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
                 const result = originalUpdate.apply(this, arguments);
 
                 try {
-                    const runtime = resolveRuntime();
-                    if (!isRuntimeTranslationActive(runtime)) {
+                    const runtime = translator.getRuntime();
+                    if (!translator.isRuntimeTranslationActive(runtime)) {
                         return result;
                     }
 
@@ -482,15 +458,9 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
 
                     debugLog('update applied delayed translations; refreshing window');
 
-                    if (typeof this.refresh === 'function') {
-                        this.refresh();
-                    }
+                    this.refresh?.();
 
-                    if (typeof this.callUpdateHelp === 'function') {
-                        this.callUpdateHelp();
-                    } else if (typeof this.updateHelp === 'function') {
-                        this.updateHelp();
-                    }
+                    this.callUpdateHelp?.() || this.updateHelp?.();
                 } catch (error) {
                     console.warn(
                         '[NrpMapTravelTranslator] Failed during delayed translation update',
@@ -558,12 +528,12 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
                 const result = originalAddMainCommands.apply(this, arguments);
 
                 try {
-                    const runtime = resolveRuntime();
+                    const runtime = translator.getRuntime();
                     debugLog('hook addMainCommands called', {
-                        active: isRuntimeTranslationActive(runtime),
+                        active: translator.isRuntimeTranslationActive(runtime),
                         listCount: Array.isArray(this._list) ? this._list.length : -1,
                     });
-                    if (!isRuntimeTranslationActive(runtime)) {
+                    if (!translator.isRuntimeTranslationActive(runtime)) {
                         return result;
                     }
 

@@ -152,9 +152,7 @@ function resolveFromCache(text, runtime) {
 
     const cacheKey = runtime.getCacheKey(text, CACHE_TYPE);
 
-    if (typeof runtime.markCacheKeySeen === 'function') {
-        runtime.markCacheKeySeen(cacheKey);
-    }
+    runtime.markCacheKeySeen?.(cacheKey);
 
     if (!runtime.hasUsableCacheValue(cacheKey)) {
         return text;
@@ -514,19 +512,11 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
             // On first scene open, the original draw happened before patching.
             // Refresh once so translated draw methods take effect immediately.
             try {
-                if (this._gamepadWindow && typeof this._gamepadWindow.refresh === 'function') {
-                    this._gamepadWindow.refresh();
-                }
-                if (this._gamepadWindow && typeof this._gamepadWindow.updateHelp === 'function') {
-                    this._gamepadWindow.updateHelp();
-                }
+                this._gamepadWindow?.refresh?.();
+                this._gamepadWindow?.updateHelp?.();
 
-                if (this._sybmolWindow && typeof this._sybmolWindow.refresh === 'function') {
-                    this._sybmolWindow.refresh();
-                }
-                if (this._sybmolWindow && typeof this._sybmolWindow.updateHelp === 'function') {
-                    this._sybmolWindow.updateHelp();
-                }
+                this._sybmolWindow?.refresh?.();
+                this._sybmolWindow?.updateHelp?.();
             } catch (error) {
                 console.warn(
                     '[ManoInputConfigTranslator] Failed to refresh patched gamepad config windows',
@@ -560,7 +550,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
         const originalDrawItem = proto.drawItem;
 
         proto.drawItem = function (index) {
-            const item = typeof this.itemAt === 'function' ? this.itemAt(index) : null;
+            const item = this.itemAt?.(index) || null;
             if (!item) {
                 return originalDrawItem.call(this, index);
             }

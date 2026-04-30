@@ -20,8 +20,6 @@ export class Actor extends DataContainer {
 
     const dataContainer = window.$dataActors;
     const gameActors = window.$gameActors;
-    const canResolveActor =
-      gameActors && typeof gameActors.actor === "function";
 
     for (let i = 1; i < dataContainer.length; i++) {
       const item = dataContainer[i];
@@ -29,7 +27,7 @@ export class Actor extends DataContainer {
         continue;
       }
 
-      const actorInstance = canResolveActor ? gameActors.actor(item.id) : null;
+      const actorInstance = gameActors?.actor?.(item.id) || null;
 
       if (!item._translateOriginal) {
         item._translateOriginal = {};

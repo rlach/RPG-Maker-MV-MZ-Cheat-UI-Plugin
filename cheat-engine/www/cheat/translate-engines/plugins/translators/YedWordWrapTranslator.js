@@ -5,28 +5,6 @@ const WRAP_TEXT_PATCH_GUARD = '__CHEAT_YED_WORD_WRAP_WRAP_TEXT_PATCHED__';
 const WRAP_TAG_RE = /<wrap>/i;
 const BR_TAG_RE = /<br\s*\/?>/gi;
 
-function resolveRuntime() {
-    const ensureRuntime = globalThis['__ensureTranslationRuntime'];
-    if (typeof ensureRuntime === 'function') {
-        return ensureRuntime();
-    }
-
-    return globalThis['__TranslationRuntime'] || null;
-}
-
-function isRuntimeTranslationActive(runtime) {
-    if (!runtime) {
-        return false;
-    }
-
-    const translationEnabled =
-        typeof runtime.isTranslationEnabled === 'function'
-            ? !!runtime.isTranslationEnabled()
-            : !!runtime.enabled;
-
-    return translationEnabled || !!runtime.translateCacheWhenDisabled;
-}
-
 function tokenizeByBrTag(text) {
     const input = String(text || '');
     const tokens = [];
@@ -79,11 +57,13 @@ export class YedWordWrapTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
+        const translator = this;
+
         if (window[RUNTIME_HOOK_GUARD]) {
             return;
         }
 
-        const runtime = resolveRuntime();
+        const runtime = translator.getRuntime();
         if (!runtime || typeof runtime.wrapText !== 'function') {
             return;
         }
@@ -108,8 +88,8 @@ export class YedWordWrapTranslator extends BasePluginTranslator {
             }
 
             try {
-                const activeRuntime = resolveRuntime();
-                if (!isRuntimeTranslationActive(activeRuntime)) {
+                const activeRuntime = translator.getRuntime();
+                if (!translator.isRuntimeTranslationActive(activeRuntime)) {
                     return originalWrapText.call(this, text, maxWidth, options);
                 }
 

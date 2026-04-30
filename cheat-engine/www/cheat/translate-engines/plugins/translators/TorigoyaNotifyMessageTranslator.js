@@ -25,9 +25,7 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
     }
 
     getRuntime() {
-        return typeof window.__ensureTranslationRuntime === 'function'
-            ? window.__ensureTranslationRuntime()
-            : window.__TranslationRuntime || null;
+        return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
     }
 
     normalizeArgsObject(value) {
@@ -50,9 +48,7 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
 
         const cacheKey = runtime.getCacheKey(text, this.getCacheType());
 
-        if (typeof runtime.markCacheKeySeen === 'function') {
-            runtime.markCacheKeySeen(cacheKey);
-        }
+        runtime.markCacheKeySeen?.(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             return text;

@@ -36,3 +36,13 @@ When adding a new runtime/store:
 - The base class generates a unique hook guard name from the plugin name (e.g., `PLUGIN_DTEXT_PICTURE_HOOK`).
 - Guardrails and guards are rooted on parent window via `HookGuardHelper.js` — child windows inherit protection automatically.
 
+## Runtime Contracts And Boilerplate
+
+- Follow `boundary strict, core clean`.
+- Validate data at boundaries (plugin params, storage, API/network, DOM, cross-window payloads).
+- Inside internal runtime code owned by this repository, avoid repetitive `typeof`/`is function` checks for known methods.
+- Prefer one normalization step plus direct calls over repeated defensive branching.
+- Use `types/rpgmaker-globals.d.ts` to declare known globals and runtime aliases instead of adding ad-hoc runtime checks.
+- Plugin translators must rely on `BasePluginTranslator` runtime contracts (`getRuntime`, `isRuntimeTranslationActive`) and must not add local runtime/type guard boilerplate.
+- When introducing new RPG Maker globals/classes/symbols in JS, update `types/rpgmaker-globals.d.ts` in the same PR.
+

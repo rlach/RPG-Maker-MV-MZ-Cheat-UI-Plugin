@@ -86,9 +86,7 @@ const SCENE_GLOSSARY_PLUGIN_TAGS = (() => {
 })();
 
 function getRuntime() {
-  return typeof window.__ensureTranslationRuntime === "function"
-    ? window.__ensureTranslationRuntime()
-    : window.__TranslationRuntime || null;
+  return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
 }
 
 function isUsableText(value) {
@@ -223,9 +221,7 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
     }
 
     const cacheKey = runtime.getCacheKey(originalNote, ITEM_NOTE_CACHE_TYPE);
-    if (typeof runtime.markCacheKeySeen === "function") {
-      runtime.markCacheKeySeen(cacheKey);
-    }
+    runtime.markCacheKeySeen?.(cacheKey);
 
     if (!runtime.hasUsableCacheValue(cacheKey)) {
       return;

@@ -363,9 +363,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
 
         const cacheKey = runtime.getCacheKey(sourceText, cacheType);
 
-        if (typeof runtime.markCacheKeySeen === 'function') {
-            runtime.markCacheKeySeen(cacheKey);
-        }
+        runtime.markCacheKeySeen?.(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             return { cacheKey, translatedText: sourceText };

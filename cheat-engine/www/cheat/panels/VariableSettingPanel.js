@@ -228,10 +228,7 @@ export default {
         },
 
         getRawVariableValue(variableId) {
-            if (
-                this.translationRuntime &&
-                typeof this.translationRuntime.getRawGameVariableValue === 'function'
-            ) {
+            if (this.translationRuntime) {
                 return this.translationRuntime.getRawGameVariableValue(variableId);
             }
 
@@ -243,19 +240,11 @@ export default {
         },
 
         isSafeForTranslate(variableId) {
-            return !!(
-                this.translationRuntime &&
-                typeof this.translationRuntime.isVariableSafeForTranslation === 'function' &&
-                this.translationRuntime.isVariableSafeForTranslation(variableId)
-            );
+            return !!this.translationRuntime?.isVariableSafeForTranslation?.(variableId);
         },
 
         toggleSafeForTranslate(item) {
-            if (
-                !item ||
-                !this.translationRuntime ||
-                typeof this.translationRuntime.setVariableSafeForTranslation !== 'function'
-            ) {
+            if (!item || !this.translationRuntime) {
                 return;
             }
 

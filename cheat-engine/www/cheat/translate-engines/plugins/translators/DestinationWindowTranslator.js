@@ -120,9 +120,7 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
 
         const cacheKey = runtime.getCacheKey(parsed.text, this.getCacheType());
 
-        if (typeof runtime.markCacheKeySeen === 'function') {
-            runtime.markCacheKeySeen(cacheKey);
-        }
+        runtime.markCacheKeySeen?.(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             return null;
@@ -158,9 +156,7 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
         Game_Interpreter.prototype.pluginCommand = function (command, args) {
             try {
                 const runtime =
-                    typeof window.__ensureTranslationRuntime === 'function'
-                        ? window.__ensureTranslationRuntime()
-                        : window.__TranslationRuntime || null;
+                    window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
 
                 const translatedArgs = translator.buildTranslatedArgs(command, args, runtime);
                 if (Array.isArray(translatedArgs)) {

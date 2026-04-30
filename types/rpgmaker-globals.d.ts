@@ -18,6 +18,8 @@ declare const $dataEnemies: any;
 declare const $dataTroops: any;
 declare const $dataStates: any;
 declare const $dataMap: any;
+declare const $dataMapInfos: any;
+declare const $dataCommonEvents: any;
 declare const $dataSystem: any;
 
 declare const SceneManager: any;
@@ -31,11 +33,15 @@ declare const Input: any;
 declare const TouchInput: any;
 
 declare const Game_Actor: any;
+declare const Game_CharacterBase: any;
+declare const Game_Event: any;
 declare const Game_Party: any;
 declare const Game_Interpreter: any;
 declare const Game_Message: any;
+declare const Game_Variables: any;
 declare const Game_Player: any;
 declare const Game_Map: any;
+declare const Game_Screen: any;
 
 declare const Scene_Base: any;
 declare const Scene_Map: any;
@@ -49,21 +55,53 @@ declare const Sprite: any;
 declare const Window_Base: any;
 declare const Window_Selectable: any;
 declare const Window_Message: any;
+declare const Window_Command: any;
+declare const Window_MenuCommand: any;
 declare const Window_ScrollText: any;
 declare const Window_BattleLog: any;
+declare const Window_TitleCommand: any;
 
 declare const PluginManager: any;
 declare const Utils: any;
+declare const Imported: any;
+declare function require(name: string): any;
 
 declare interface Window {
     nw?: any;
+    Vue?: any;
     __CHEAT_EXTERNAL_WINDOW__?: boolean;
     $externMessage?: any;
+    $gameMessage?: any;
+    $gameParty?: any;
+    $gameActors?: any;
+    $dataMap?: any;
+    $dataActors?: any;
+    $dataMapInfos?: any;
+    $dataCommonEvents?: any;
+    $dataTroops?: any;
+    $dataSystem?: any;
     $plugins?: any[];
+    __ensureTranslationRuntime?: () => any;
+    __TranslationRuntime?: any;
+    __ensureTranslateOnTheFlyRuntime?: () => any;
+    __TranslateRuntime?: any;
     __CHEAT_MAIN_WINDOW__?: Window | null;
+    __CHEAT_EVENT_LABEL_TRANSLATOR_HOOKED__?: boolean;
     GeneralCheat?: any;
     GameSpeedCheat?: any;
     SpeedCheat?: any;
     SceneCheat?: any;
     MessageCheat?: any;
+    Game_Message?: any;
+    Game_Screen?: any;
+    Game_Event?: any;
+    Game_CharacterBase?: any;
+    Game_Interpreter?: any;
+    DataManager?: any;
+    Scene_Map?: any;
+    Window_Message?: any;
+    Window_MenuCommand?: any;
+    Window_TitleCommand?: any;
+    PluginManager?: any;
+    Torigoya?: any;
 }

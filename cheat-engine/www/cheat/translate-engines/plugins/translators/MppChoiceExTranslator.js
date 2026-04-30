@@ -16,9 +16,7 @@ function isUsableText(value) {
 }
 
 function getRuntime() {
-    return typeof runtimeGlobal.__ensureTranslationRuntime === 'function'
-        ? runtimeGlobal.__ensureTranslationRuntime()
-        : runtimeGlobal.__TranslationRuntime || null;
+    return runtimeGlobal.__ensureTranslationRuntime?.() || runtimeGlobal.__TranslationRuntime || null;
 }
 
 function splitChoiceConditionPrefix(choiceText) {
@@ -63,13 +61,10 @@ function normalizeAsDialogueText(text, runtime) {
         return value;
     }
 
-    const cleaned =
-        runtime && typeof runtime.cleanTranslatedText === 'function'
-            ? runtime.cleanTranslatedText(value)
-            : value;
+    const cleaned = runtime?.cleanTranslatedText?.(value) || value;
 
     const maxWidth = Number(runtime?.maxLineWidth) || 0;
-    if (runtime && typeof runtime.wrapText === 'function' && maxWidth > 0) {
+    if (maxWidth > 0) {
         return runtime.wrapText(cleaned, maxWidth);
     }
 
@@ -201,9 +196,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
             }
 
             const cacheKey = runtime.getCacheKey(originalText, this.getChoiceCacheType());
-            if (typeof runtime.markCacheKeySeen === 'function') {
-                runtime.markCacheKeySeen(cacheKey);
-            }
+            runtime.markCacheKeySeen?.(cacheKey);
 
             if (!runtime.hasUsableCacheValue(cacheKey)) {
                 continue;
@@ -250,9 +243,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
             }
 
             const cacheKey = runtime.getCacheKey(originalBlock, this.getChoiceHelpCacheType());
-            if (typeof runtime.markCacheKeySeen === 'function') {
-                runtime.markCacheKeySeen(cacheKey);
-            }
+            runtime.markCacheKeySeen?.(cacheKey);
 
             if (!runtime.hasUsableCacheValue(cacheKey)) {
                 return entry;

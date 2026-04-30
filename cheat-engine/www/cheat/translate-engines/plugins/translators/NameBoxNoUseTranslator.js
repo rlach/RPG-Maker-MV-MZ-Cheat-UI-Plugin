@@ -31,19 +31,6 @@ function parseBoolean(value, defaultValue = false) {
     return !!defaultValue;
 }
 
-function isRuntimeCacheResolutionActive(runtime) {
-    if (!runtime) {
-        return false;
-    }
-
-    const translationEnabled =
-        typeof runtime.isTranslationEnabled === 'function'
-            ? !!runtime.isTranslationEnabled()
-            : !!runtime.enabled;
-
-    return translationEnabled || !!runtime.translateCacheWhenDisabled;
-}
-
 export class NameBoxNoUseTranslator extends BasePluginTranslator {
     getPluginName() {
         return 'NameBoxNoUse';
@@ -139,7 +126,7 @@ export class NameBoxNoUseTranslator extends BasePluginTranslator {
         const text = contextObject['text'];
         const gameMessage = contextObject['gameMessage'];
 
-        if (!isRuntimeCacheResolutionActive(runtime)) {
+        if (!this.isRuntimeTranslationActive(runtime)) {
             return null;
         }
 

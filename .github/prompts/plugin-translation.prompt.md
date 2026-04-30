@@ -20,6 +20,9 @@ Hard constraints:
 - Edit only files under cheat-engine/www/cheat for implementation changes.
 - Never modify user game project plugin files outside this repository.
 - Preserve plugin command syntax/prefixes exactly (do not translate command tokens that must remain literal).
+- Plugin translators must stay clean: no local runtime typeguards/helpers for internal runtime contracts.
+- Runtime/type safety for plugin translators is guaranteed by BasePluginTranslator + registry startup normalization.
+- If new RPG Maker globals/classes are used, update `types/rpgmaker-globals.d.ts` in the same task.
 
 If information is missing, ask concise clarifying questions before coding:
 
@@ -58,6 +61,8 @@ Implementation workflow:
 - Hook the narrowest stable method that observes displayed text for this plugin.
 - Do not break original plugin behavior.
 - Only replace text payload, never required command keywords/prefixes.
+- Do not add translator-local helpers like `resolveRuntime`, `isRuntimeTranslationActive`, or repetitive `typeof runtime.method === 'function'` checks.
+- Use base APIs directly (`this.getRuntime()`, `this.isRuntimeTranslationActive(runtime)`) and keep translator code focused on plugin-specific behavior.
 - All real-time hooks are gated by runtime translation settings: hooks only execute when **either**:
     - `runtime.isTranslationEnabled()` returns true (user enabled "Enable Real-time Translation"), **OR**
     - `runtime.translateCacheWhenDisabled` is true (user enabled "Translate cached keys even when Real-time translation is disabled")
@@ -79,6 +84,7 @@ Implementation workflow:
 
 - Run error check on changed files.
 - Ensure no references remain to removed/deprecated helper methods.
+- Ensure new RPG Maker symbols introduced by the translator are declared in `types/rpgmaker-globals.d.ts`.
 
 Output requirements in final response:
 

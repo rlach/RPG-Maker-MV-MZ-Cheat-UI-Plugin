@@ -192,10 +192,7 @@ export const translateOnTheFlyMessageMethods = {
                 return commandName;
             }
 
-            const sourceName =
-                typeof this.getCanonicalSystemCommandName === 'function'
-                    ? this.getCanonicalSystemCommandName(cleanName)
-                    : cleanName;
+            const sourceName = this.getCanonicalSystemCommandName(cleanName);
 
             const commandKey = this.getCacheKey(sourceName, 'command');
 
@@ -385,30 +382,22 @@ export const translateOnTheFlyMessageMethods = {
             return false;
         }
 
-        // Check if engine has isFullyConfigured method
-        if (typeof this.engine.isFullyConfigured === 'function') {
-            return this.engine.isFullyConfigured();
-        }
-
-        // Fallback: assume fully configured if method doesn't exist
-        return true;
+        return this.engine.isFullyConfigured();
     },
 
     async translateAndApplyCurrentMessage() {
         try {
             const gameMessage = this.currentGameMessage || $gameMessage;
-            if (!gameMessage || typeof gameMessage.allText !== 'function') {
+            if (!gameMessage) {
                 console.warn('[TranslateOnTheFly] No gameMessage available');
                 return;
             }
-            if (!this.engine || typeof this.engine.batchTranslate !== 'function') {
+            if (!this.engine) {
                 console.error(
-                    '[TranslateOnTheFly] No engine available or batchTranslate not found',
+                    '[TranslateOnTheFly] No engine available',
                     {
                         hasEngine: !!this.engine,
                         engineType: this.engine ? this.engine.constructor.name : 'null',
-                        hasBatchTranslate:
-                            this.engine && typeof this.engine.batchTranslate === 'function',
                     }
                 );
                 Alert.error('Translation engine not initialized');

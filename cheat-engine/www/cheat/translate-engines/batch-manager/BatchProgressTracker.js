@@ -133,11 +133,7 @@ export class BatchProgressTracker {
     const title = this.paused
       ? `batch paused by OTF - ${this.pauseReason || "translating event"}`
       : this.currentStepLabel;
-    const totalCompletionLine =
-      this.panel &&
-      typeof this.panel.getOverallTranslationCompletionLine === "function"
-        ? this.panel.getOverallTranslationCompletionLine()
-        : null;
+    const totalCompletionLine = this.panel?.getOverallTranslationCompletionLine?.() || null;
     const progress = BatchSummaryReporter.buildProgress({
       title,
       processed: this.currentProcessed,
@@ -146,7 +142,6 @@ export class BatchProgressTracker {
       currentStepProcessed: this.currentStepProcessed,
       totalErrors: this.totalErrors,
       totalProcessed: this.queueProcessed,
-      queueTotal: this.queueTotal,
       totalCompletionLine,
     });
 

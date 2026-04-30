@@ -14,32 +14,18 @@ function extractNameFromTagValue(tagValue) {
     return firstToken || null;
 }
 
-function getTranslationRuntime() {
-    return typeof window.__ensureTranslationRuntime === 'function'
-        ? window.__ensureTranslationRuntime()
-        : window.__TranslationRuntime || null;
-}
-
-function applyNamePopTranslation(namePop) {
+function applyNamePopTranslation(namePop, runtime) {
     if (typeof namePop !== 'string' || !namePop.trim()) {
         return namePop;
     }
 
-    const runtime = getTranslationRuntime();
-    if (
-        !runtime ||
-        typeof runtime.getCacheKey !== 'function' ||
-        typeof runtime.hasUsableCacheValue !== 'function' ||
-        !(runtime.translationCache instanceof Map)
-    ) {
+    if (!runtime) {
         return namePop;
     }
 
     const cacheKey = runtime.getCacheKey(namePop, CACHE_TYPE);
 
-    if (typeof runtime.markCacheKeySeen === 'function') {
-        runtime.markCacheKeySeen(cacheKey);
-    }
+    runtime.markCacheKeySeen?.(cacheKey);
 
     if (!runtime.hasUsableCacheValue(cacheKey)) {
         return namePop;
@@ -69,7 +55,13 @@ export class TMNamePopTranslator extends BasePluginTranslator {
         return CACHE_TYPE;
     }
 
+    applyNamePopTranslation(namePop) {
+        return applyNamePopTranslation(namePop, this.getRuntime());
+    }
+
     enablePluginTranslation() {
+        const translator = this;
+
         if (
             !window.Game_CharacterBase ||
             !Game_CharacterBase.prototype ||
@@ -87,7 +79,7 @@ export class TMNamePopTranslator extends BasePluginTranslator {
         Game_CharacterBase.prototype.setNamePop = function (namePop, shiftY) {
             let translatedName = namePop;
             try {
-                translatedName = applyNamePopTranslation(namePop);
+                translatedName = translator.applyNamePopTranslation(namePop);
             } catch (error) {
                 console.warn('[TMNamePopTranslator] Failed to apply cached translation', error);
             }
