@@ -34,6 +34,7 @@ import { TorigoyaAchievementTranslator } from './translators/TorigoyaAchievement
 import { TorigoyaNotifyMessageTranslator } from './translators/TorigoyaNotifyMessageTranslator.js';
 import { YedWordWrapTranslator } from './translators/YedWordWrapTranslator.js';
 import { YEPCoreEngineScriptTranslator } from './translators/YEPCoreEngineScriptTranslator.js';
+import { YepMessageCoreTranslator } from './translators/YepMessageCoreTranslator.js';
 
 class PluginTranslatorRegistry {
     constructor() {
@@ -73,6 +74,7 @@ class PluginTranslatorRegistry {
             TorigoyaNotifyMessageTranslator,
             YedWordWrapTranslator,
             YEPCoreEngineScriptTranslator,
+            YepMessageCoreTranslator,
         ];
         this.translatorInstances = new Map();
         this.detectedPluginNames = new Set();
