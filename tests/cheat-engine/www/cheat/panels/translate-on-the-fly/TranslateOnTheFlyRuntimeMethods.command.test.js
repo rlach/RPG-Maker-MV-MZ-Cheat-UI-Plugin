@@ -206,7 +206,7 @@ function createRuntime({
         isNonOtfTranslationProcessActive() {
             return false;
         },
-        getCacheKey(text, type = 'text') {
+        getCacheKey(text, type) {
             const normalizedText = typeof text === 'string' ? text.replace(/\n+$/, '') : text;
             return `${type}:${this.sourceLang}-${this.targetLang}-${normalizedText}`;
         },

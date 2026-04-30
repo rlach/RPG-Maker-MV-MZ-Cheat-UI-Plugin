@@ -2,7 +2,7 @@ import { BasePhase } from './BasePhase.js';
 import { collectEventCommandEntries } from '../../js/EventCommandTraversal.js';
 
 function isMessageTextType(type) {
-    return type === 'message' || type === 'message_portrait' || type === 'text';
+    return type === 'message' || type === 'message_portrait';
 }
 
 export class CurrentEvent extends BasePhase {

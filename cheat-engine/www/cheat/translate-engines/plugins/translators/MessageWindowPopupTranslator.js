@@ -11,31 +11,21 @@ function resolveRuntime() {
         : window.__TranslationRuntime || null;
 }
 
-function getTranslatedMessageTextForPopupSizing(runtime, originalText) {
+function getTranslatedMessageTextForPopupSizing(runtime, originalText, options = {}) {
     if (typeof originalText !== 'string' || !originalText.trim()) {
         return null;
     }
 
     if (
         !runtime ||
-        typeof runtime.getCacheKey !== 'function' ||
-        typeof runtime.hasUsableCacheValue !== 'function' ||
+        typeof runtime.getPreferredMessageCacheEntry !== 'function' ||
         !(runtime.translationCache instanceof Map)
     ) {
         return null;
     }
 
-    const cacheKey = runtime.getCacheKey(originalText, 'text');
-
-    if (typeof runtime.markCacheKeySeen === 'function') {
-        runtime.markCacheKeySeen(cacheKey);
-    }
-
-    if (!runtime.hasUsableCacheValue(cacheKey)) {
-        return null;
-    }
-
-    const cached = runtime.translationCache.get(cacheKey);
+    const preferred = runtime.getPreferredMessageCacheEntry(originalText, options);
+    const cached = preferred ? preferred.value : null;
     if (typeof cached !== 'string' || !cached.trim()) {
         return null;
     }
@@ -43,12 +33,12 @@ function getTranslatedMessageTextForPopupSizing(runtime, originalText) {
     return cached;
 }
 
-function resolveMeasuredPopupText(runtime, originalText, currentText) {
-    const fromOriginal = getTranslatedMessageTextForPopupSizing(runtime, originalText);
+function resolveMeasuredPopupText(runtime, originalText, currentText, options = {}) {
+    const fromOriginal = getTranslatedMessageTextForPopupSizing(runtime, originalText, options);
     const hasSameCurrentText = originalText === currentText;
     const fromCurrent = hasSameCurrentText
         ? null
-        : getTranslatedMessageTextForPopupSizing(runtime, currentText);
+        : getTranslatedMessageTextForPopupSizing(runtime, currentText, options);
 
     if (typeof fromOriginal === 'string' && fromOriginal.trim()) {
         return {
@@ -183,10 +173,15 @@ export class MessageWindowPopupTranslator extends BasePluginTranslator {
                 return;
             }
 
+            const hasPortrait =
+                typeof runtime?.hasCurrentMessagePortrait === 'function'
+                    ? runtime.hasCurrentMessagePortrait($gameMessage)
+                    : false;
             const { measuredText, source } = resolveMeasuredPopupText(
                 runtime,
                 originalTextForCache,
-                currentText
+                currentText,
+                { hasPortrait }
             );
 
             const originalTexts = Array.isArray($gameMessage?._texts)
@@ -278,10 +273,15 @@ export class MessageWindowPopupTranslator extends BasePluginTranslator {
                 $gameMessage._translateOriginalText.trim()
                     ? $gameMessage._translateOriginalText
                     : currentText;
+            const hasPortrait =
+                typeof runtime?.hasCurrentMessagePortrait === 'function'
+                    ? runtime.hasCurrentMessagePortrait($gameMessage)
+                    : false;
             const { measuredText, source } = resolveMeasuredPopupText(
                 runtime,
                 originalTextForCache,
-                currentText
+                currentText,
+                { hasPortrait }
             );
 
             const desiredWidth = computeDesiredPopupWidth(this, measuredText);

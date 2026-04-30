@@ -113,14 +113,18 @@ export const translateOnTheFlyCoreMethods = {
         return enabled;
     },
 
-    getCacheKey(text, type = 'text') {
+    getCacheKey(text, type) {
+        if (typeof type !== 'string' || !type.trim()) {
+            throw new Error('[TranslateOnTheFly] getCacheKey requires an explicit cache type');
+        }
+
         const cacheType = type === 'speaker' ? 'actor_name' : type;
         const normalizedText = typeof text === 'string' ? text.replace(/\n+$/, '') : text;
         return `${cacheType}:${this.sourceLang}-${this.targetLang}-${normalizedText}`;
     },
 
     isMessageCacheType(type) {
-        return type === 'message' || type === 'message_portrait' || type === 'text';
+        return type === 'message' || type === 'message_portrait';
     },
 
     getCurrentMessageFaceName(gameMessage = null) {
@@ -170,15 +174,12 @@ export const translateOnTheFlyCoreMethods = {
             ? [
                   this.getCacheKey(text, 'message_portrait'),
                   this.getCacheKey(text, 'message'),
-                  this.getCacheKey(text, 'text'),
               ]
             : [
                   this.getCacheKey(text, 'message'),
-                  // Fallback: text may have been harvested as message_portrait when the event
-                  // data had a faceName but the runtime $gameMessage had it cleared by a plugin.
+                // Fallback across message variants when portrait state differs between
+                // harvesting and runtime rendering contexts.
                   this.getCacheKey(text, 'message_portrait'),
-                  // Backward compatibility with older caches that stored event messages as "text".
-                  this.getCacheKey(text, 'text'),
               ];
 
         return Array.from(new Set(keys));
@@ -191,6 +192,10 @@ export const translateOnTheFlyCoreMethods = {
 
         const lookupKeys = this.getMessageCacheLookupKeys(text, options);
         for (const cacheKey of lookupKeys) {
+            if (typeof this.markCacheKeySeen === 'function') {
+                this.markCacheKeySeen(cacheKey);
+            }
+
             if (!this.hasUsableCacheValue(cacheKey)) {
                 continue;
             }

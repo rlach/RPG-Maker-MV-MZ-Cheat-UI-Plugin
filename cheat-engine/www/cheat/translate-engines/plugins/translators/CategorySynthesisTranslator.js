@@ -10,7 +10,9 @@ const SHOP_COMMAND_NAMES = new Set(['合成ショップ設定', 'SettingSynthesi
 
 const COMMAND_ARG_NAME_KEYS = new Set(['名前', 'name']);
 const COMMAND_ARG_CATEGORY_KEYS = new Set(['カテゴリ', 'categories']);
-const ANY_WINDOW = /** @type {any} */ (window);
+const ANY_WINDOW = /** @type {any} */ (
+    typeof globalThis !== 'undefined' ? globalThis : {}
+);
 
 const CATEGORY_TOKEN_SPLIT = ',';
 const ESCAPE_CHAR = String.fromCharCode(27);

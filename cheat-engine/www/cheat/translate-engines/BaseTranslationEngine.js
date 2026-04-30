@@ -92,7 +92,7 @@ export default class BaseTranslationEngine {
     }
 
     // Helper methods available to all engines
-    getCacheKey(text, type = 'text') {
+    getCacheKey(text, type) {
         return this.panel.getCacheKey(text, type);
     }
 
@@ -117,7 +117,7 @@ export default class BaseTranslationEngine {
     }
 
     isMessageType(type) {
-        return type === 'text' || type === 'message' || type === 'message_portrait';
+        return type === 'message' || type === 'message_portrait';
     }
 
     getWrapConfigForType(type) {

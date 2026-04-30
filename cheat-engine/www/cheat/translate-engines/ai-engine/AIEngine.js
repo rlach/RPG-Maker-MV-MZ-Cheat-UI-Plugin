@@ -468,7 +468,6 @@ class AIEngine extends BaseTranslationEngine {
 
         // Keep message/speaker/choice compact and sequential as before.
         if (
-            rawType === 'text' ||
             rawType === 'message' ||
             rawType === 'message_portrait' ||
             rawType === 'speaker' ||

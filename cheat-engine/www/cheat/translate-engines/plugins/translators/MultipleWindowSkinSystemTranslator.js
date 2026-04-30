@@ -31,8 +31,8 @@ function getSafeCurrentMessageText() {
 function applyCachedCurrentMessageTranslation(runtime) {
     if (
         !runtime ||
+        typeof runtime.getPreferredMessageCacheEntry !== 'function' ||
         typeof runtime.getCacheKey !== 'function' ||
-        typeof runtime.hasUsableCacheValue !== 'function' ||
         !(runtime.translationCache instanceof Map) ||
         !window.$gameMessage
     ) {
@@ -41,18 +41,18 @@ function applyCachedCurrentMessageTranslation(runtime) {
 
     const originalText = getSafeCurrentMessageText();
     if (typeof originalText === 'string' && originalText.trim()) {
-        const textCacheKey = runtime.getCacheKey(originalText, 'text');
+        const hasPortrait =
+            typeof runtime.hasCurrentMessagePortrait === 'function'
+                ? runtime.hasCurrentMessagePortrait($gameMessage)
+                : false;
+        const preferred = runtime.getPreferredMessageCacheEntry(originalText, {
+            hasPortrait,
+        });
 
-        if (typeof runtime.markCacheKeySeen === 'function') {
-            runtime.markCacheKeySeen(textCacheKey);
-        }
-
-        if (runtime.hasUsableCacheValue(textCacheKey)) {
-            const cachedText = runtime.translationCache.get(textCacheKey);
-            if (typeof cachedText === 'string' && cachedText.trim()) {
-                $gameMessage._translateOriginalText = originalText;
-                $gameMessage._texts = String(cachedText).split(/\r?\n/);
-            }
+        const cachedText = preferred ? preferred.value : null;
+        if (typeof cachedText === 'string' && cachedText.trim()) {
+            $gameMessage._translateOriginalText = originalText;
+            $gameMessage._texts = String(cachedText).split(/\r?\n/);
         }
     }
 

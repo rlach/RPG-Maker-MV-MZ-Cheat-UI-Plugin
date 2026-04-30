@@ -15,11 +15,13 @@
  *         RPG Maker pads message text with one \n per configured visible line,
  *         but the actual count varies between harvesting and seen-lookup contexts,
  *         causing spurious duplicate keys.
+ *   v2 – Migrate legacy text.{langPair}.cache.json buckets into
+ *         message.{langPair}.cache.json and remove text buckets.
  */
 
 const SETTINGS_FILE_NAME = 'cache-settings.json';
 
-export const CURRENT_CACHE_VERSION = 1;
+export const CURRENT_CACHE_VERSION = 2;
 
 // ---------------------------------------------------------------------------
 // Public helpers used by the main runtime
@@ -103,6 +105,10 @@ export function runCacheMigrationsIfNeeded(panel) {
         didMutateCache = _migrateV1StripTrailingNewlines(panel) || didMutateCache;
     }
 
+    if (storedVersion < 2) {
+        didMutateCache = _migrateV2TextBucketToMessageBucket(panel) || didMutateCache;
+    }
+
     if (didMutateCache) {
         _persistAllBucketsSync(panel);
     }
@@ -166,6 +172,169 @@ function _migrateV1StripTrailingNewlines(panel) {
     );
 
     return true;
+}
+
+/**
+ * v2: Migrate legacy text cache bucket into message bucket.
+ *
+ * Rules:
+ *  - if text exists and message does not: move all keys to message
+ *  - if both exist: merge per text key
+ *      - if only one side has a usable translation, keep that value
+ *      - if both have usable translations, keep message (newer)
+ *      - otherwise keep message
+ *  - remove text bucket file for every affected language pair
+ *
+ * @param {object} panel
+ * @returns {boolean} true if any migration work was applied
+ */
+function _migrateV2TextBucketToMessageBucket(panel) {
+    const cache = panel.translationCache;
+    if (!isMapLike(cache)) {
+        return false;
+    }
+
+    const fs = panel.getCacheFileSystem();
+    const langPairs = _collectTextMigrationLangPairs(panel);
+    if (langPairs.size === 0) {
+        console.log('[TranslateOnTheFly] Migration v2: no legacy text buckets found');
+        return false;
+    }
+
+    let didMutateCache = false;
+    let movedEntries = 0;
+    let mergedEntries = 0;
+    let renamedFiles = 0;
+    let deletedFiles = 0;
+
+    for (const langPair of langPairs) {
+        const textBucketId = panel.getCacheBucketId('text', langPair);
+        const messageBucketId = panel.getCacheBucketId('message', langPair);
+        const textFilePath = panel.getSplitCacheFilePathFromBucketId(textBucketId);
+        const messageFilePath = panel.getSplitCacheFilePathFromBucketId(messageBucketId);
+        const textFileExists = !!textFilePath && fs.existsSync(textFilePath);
+        const messageFileExists = !!messageFilePath && fs.existsSync(messageFilePath);
+
+        if (textFileExists && !messageFileExists && textFilePath && messageFilePath) {
+            try {
+                fs.renameSync(textFilePath, messageFilePath);
+                renamedFiles++;
+            } catch (error) {
+                console.warn(
+                    `[TranslateOnTheFly] Migration v2: failed to rename ${textFilePath} to ${messageFilePath}`,
+                    error
+                );
+            }
+        }
+
+        const prefixes = {
+            text: `text:${langPair}-`,
+            message: `message:${langPair}-`,
+        };
+        const textEntries = new Map();
+        const messageEntries = new Map();
+
+        for (const [compositeKey, value] of cache.entries()) {
+            if (compositeKey.startsWith(prefixes.text)) {
+                textEntries.set(compositeKey.slice(prefixes.text.length), value);
+                continue;
+            }
+
+            if (compositeKey.startsWith(prefixes.message)) {
+                messageEntries.set(compositeKey.slice(prefixes.message.length), value);
+            }
+        }
+
+        if (textEntries.size === 0) {
+            continue;
+        }
+
+        for (const [textKey, textValue] of textEntries.entries()) {
+            const hasMessage = messageEntries.has(textKey);
+            if (!hasMessage) {
+                messageEntries.set(textKey, textValue);
+                movedEntries++;
+                didMutateCache = true;
+                continue;
+            }
+
+            const messageValue = messageEntries.get(textKey);
+            const textHasTranslation = _hasUsableTextTranslation(textValue);
+            const messageHasTranslation = _hasUsableTextTranslation(messageValue);
+
+            if (!messageHasTranslation && textHasTranslation) {
+                messageEntries.set(textKey, textValue);
+                mergedEntries++;
+                didMutateCache = true;
+            }
+        }
+
+        for (const textKey of textEntries.keys()) {
+            cache.delete(`${prefixes.text}${textKey}`);
+            didMutateCache = true;
+        }
+
+        for (const [textKey, messageValue] of messageEntries.entries()) {
+            const messageCompositeKey = `${prefixes.message}${textKey}`;
+            if (cache.get(messageCompositeKey) !== messageValue) {
+                cache.set(messageCompositeKey, messageValue);
+                didMutateCache = true;
+            }
+        }
+
+        if (textFilePath && fs.existsSync(textFilePath)) {
+            try {
+                fs.unlinkSync(textFilePath);
+                deletedFiles++;
+            } catch (error) {
+                console.warn(
+                    `[TranslateOnTheFly] Migration v2: failed to remove legacy text cache file ${textFilePath}`,
+                    error
+                );
+            }
+        }
+    }
+
+    if (didMutateCache) {
+        panel.cacheBucketByCompositeKey = new Map();
+        for (const compositeKey of cache.keys()) {
+            panel.rememberCacheBucketForKey(compositeKey);
+        }
+    }
+
+    console.log(
+        `[TranslateOnTheFly] Migration v2: langPairs=${langPairs.size}, moved=${movedEntries}, merged=${mergedEntries}, renamedFiles=${renamedFiles}, deletedFiles=${deletedFiles}`
+    );
+
+    return didMutateCache || renamedFiles > 0 || deletedFiles > 0;
+}
+
+function _collectTextMigrationLangPairs(panel) {
+    const langPairs = new Set();
+
+    for (const bucketId of panel.getAllSplitCacheBucketsFromDiskSync()) {
+        const parsed = panel.parseCacheBucketId(bucketId);
+        if (!parsed || parsed.type !== 'text') {
+            continue;
+        }
+
+        langPairs.add(parsed.langPair);
+    }
+
+    for (const compositeKey of panel.translationCache.keys()) {
+        const parsed = panel.parseCompositeCacheKey(compositeKey);
+        if (!parsed || parsed.type !== 'text') {
+            continue;
+        }
+
+        langPairs.add(parsed.langPair);
+    }
+
+    return langPairs;
+}
+
+function _hasUsableTextTranslation(value) {
+    return typeof value === 'string' && value.trim().length > 0;
 }
 
 // ---------------------------------------------------------------------------

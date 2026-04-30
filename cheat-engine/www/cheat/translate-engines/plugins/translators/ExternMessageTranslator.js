@@ -10,7 +10,7 @@ import { ExternBaseTranslator } from '../ExternBaseTranslator.js';
  * Because the expanded text ultimately reaches $gameMessage through standard
  * 401 commands, the existing on-the-fly text runtime already applies
  * cached translations automatically.  This translator's sole job is to
- * pre-populate the 'text' cache with translations of every text value that
+ * pre-populate the 'message' cache with translations of every text value that
  * lives in the CSV, so there is nothing to do in enablePluginTranslation().
  *
  * Data source: window.$externMessage._map, which is populated by the plugin
@@ -32,13 +32,13 @@ export class ExternMessageTranslator extends ExternBaseTranslator {
     }
 
     /**
-     * Use the standard 'text' cache type so translations are stored in
-     * text.{lang-pair}.cache.json alongside regular map message translations,
+     * Use the standard 'message' cache type so translations are stored in
+     * message.{lang-pair}.cache.json alongside regular map message translations,
      * and the existing runtime text-replacement logic applies them without any
      * additional hook.
      */
     getCacheType() {
-        return 'text';
+        return 'message';
     }
 
     // No runtime hook is needed: after ExternMessage expands \M[KEY] tokens
