@@ -1,4 +1,5 @@
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
+import { PLUGIN_TRANSLATOR_REGISTRY } from '../../translate-engines/plugins/PluginTranslatorRegistry.js';
 
 export const translateOnTheFlyRuntimeMethods = {
     setupTranslationHook() {
@@ -172,21 +173,44 @@ export const translateOnTheFlyRuntimeMethods = {
                 };
             }
 
-            const activeKey = self.getMessageCacheKey(originalText, {
+            const normalizedSourceText = PLUGIN_TRANSLATOR_REGISTRY.resolveMessageCacheSourceText({
+                runtime: self,
+                text: originalText,
                 hasPortrait: !!hasPortrait,
+                gameMessage: $gameMessage || null,
             });
-            const lookupKeys = self.getMessageCacheLookupKeys(originalText, {
+
+            const keySourceText =
+                typeof normalizedSourceText === 'string' && normalizedSourceText.length > 0
+                    ? normalizedSourceText
+                    : originalText;
+
+            const activeKey = self.getMessageCacheKey(keySourceText, {
                 hasPortrait: !!hasPortrait,
             });
 
-            for (const key of lookupKeys) {
+            const lookupKeys = self.getMessageCacheLookupKeys(keySourceText, {
+                hasPortrait: !!hasPortrait,
+            });
+
+            if (keySourceText !== originalText) {
+                lookupKeys.push(
+                    ...self.getMessageCacheLookupKeys(originalText, {
+                        hasPortrait: !!hasPortrait,
+                    })
+                );
+            }
+
+            const dedupedLookupKeys = Array.from(new Set(lookupKeys));
+
+            for (const key of dedupedLookupKeys) {
                 if (!self.hasUsableCacheValue(key)) {
                     continue;
                 }
 
                 return {
                     activeKey,
-                    lookupKeys,
+                    lookupKeys: dedupedLookupKeys,
                     ready: true,
                     translated: self.translationCache.get(key),
                     resolvedKey: key,
@@ -195,7 +219,7 @@ export const translateOnTheFlyRuntimeMethods = {
 
             return {
                 activeKey,
-                lookupKeys,
+                lookupKeys: dedupedLookupKeys,
                 ready: false,
                 translated: null,
                 resolvedKey: null,

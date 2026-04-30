@@ -95,6 +95,15 @@ export class BasePluginTranslator extends BasePhase {
         return Promise.resolve();
     }
 
+    /**
+     * @param {object} _context
+     * @returns {string|null}
+     */
+    resolveMessageCacheSourceText(_context = {}) {
+        // Optional hook point for plugin-specific message cache key normalization.
+        return null;
+    }
+
     ensureDetection() {
         if (this._detectionChecked) {
             return this._pluginDetected;

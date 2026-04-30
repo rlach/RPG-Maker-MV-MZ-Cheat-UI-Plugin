@@ -14,6 +14,7 @@ import { LLStandingPictureTranslator } from './translators/LLStandingPictureTran
 import { MgpExternChoicesTranslator } from './translators/MgpExternChoicesTranslator.js';
 import { MogBattleCommandsTranslator } from './translators/MogBattleCommandsTranslator.js';
 import { MessageWindowPopupTranslator } from './translators/MessageWindowPopupTranslator.js';
+import { NameBoxNoUseTranslator } from './translators/NameBoxNoUseTranslator.js';
 import { MppChoiceExTranslator } from './translators/MppChoiceExTranslator.js';
 import { MppMessageExTranslator } from './translators/MppMessageExTranslator.js';
 import { MultipleWindowSkinSystemTranslator } from './translators/MultipleWindowSkinSystemTranslator.js';
@@ -52,6 +53,7 @@ class PluginTranslatorRegistry {
             MgpExternChoicesTranslator,
             MessageWindowPopupTranslator,
             MogBattleCommandsTranslator,
+            NameBoxNoUseTranslator,
             MppChoiceExTranslator,
             MppMessageExTranslator,
             MultipleWindowSkinSystemTranslator,
@@ -158,6 +160,54 @@ class PluginTranslatorRegistry {
                 leftStrings: Math.max(0, Number(counts.leftStrings) || 0),
             };
         });
+    }
+
+    resolveMessageCacheSourceText(context = {}) {
+        const contextObject = context && typeof context === 'object' ? context : {};
+        const runtime = contextObject['runtime'] || null;
+        const sourceText =
+            typeof contextObject['text'] === 'string'
+                ? contextObject['text']
+                : contextObject['text'] !== null && contextObject['text'] !== undefined
+                  ? String(contextObject['text'])
+                  : '';
+
+        if (!sourceText) {
+            return sourceText;
+        }
+
+        this.ensureDetectionStarted({ runtime });
+
+        let resolvedText = sourceText;
+        const translators = this.getDetectedTranslatorInstances();
+        for (const translator of translators) {
+            if (!translator || typeof translator.resolveMessageCacheSourceText !== 'function') {
+                continue;
+            }
+
+            if (!translator.isActive({ panel: runtime })) {
+                continue;
+            }
+
+            try {
+                const nextValue = translator.resolveMessageCacheSourceText({
+                    ...context,
+                    runtime,
+                    text: resolvedText,
+                });
+
+                if (typeof nextValue === 'string' && nextValue !== resolvedText) {
+                    resolvedText = nextValue;
+                }
+            } catch (error) {
+                console.warn(
+                    `[PluginTranslatorRegistry] Failed to normalize message cache source for ${translator.getPluginName()}`,
+                    error
+                );
+            }
+        }
+
+        return resolvedText;
     }
 }
 
