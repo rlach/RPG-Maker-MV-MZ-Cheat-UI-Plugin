@@ -41,7 +41,6 @@
 - Easy to find items, switched, variables, etc by searching text.
 - Save location and recall, teleport cheats.
 - Supports developers tool.
-- Translate variables, switches, maps. (Needs [ezTransWeb](https://github.com/HelloKS/ezTransWeb) : Only supports for Korean.)
 - **Maybe more features..?**
 
 # Set up

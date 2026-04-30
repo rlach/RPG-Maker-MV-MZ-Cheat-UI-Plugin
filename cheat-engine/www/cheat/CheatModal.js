@@ -10,7 +10,6 @@ import SaveRecallPanel from './panels/SaveRecallPanel.js';
 import TeleportPanel from './panels/TeleportPanel.js';
 import TextLogPanel from './panels/TextLogPanel.js';
 import ShortcutPanel from './panels/ShortcutPanel.js';
-import TranslateSettingsPanel from './panels/TranslateSettingsPanel.js';
 import TranslateOnTheFlyPanel from './panels/TranslateOnTheFlyPanel.js';
 import TranslateNamesPanel from './panels/TranslateNamesPanel.js';
 import TranslateCacheManagerPanel from './panels/TranslateCacheManagerPanel.js';
@@ -35,7 +34,6 @@ export default {
         TeleportPanel,
         TextLogPanel,
         ShortcutPanel,
-        TranslateSettingsPanel,
         TranslateOnTheFlyPanel,
         TranslateNamesPanel,
         TranslateCacheManagerPanel,
@@ -196,11 +194,6 @@ export default {
                             name: 'Images',
                             icon: 'mdi-folder-image',
                             component: 'translate-images-panel',
-                        },
-                        {
-                            name: 'ezTrans Settings',
-                            icon: 'mdi-google-translate',
-                            component: 'translate-settings-panel',
                         },
                     ],
                 },

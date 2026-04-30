@@ -1,33 +1,10 @@
 import {KeyValueStorage} from './KeyValueStorage.js'
 
-export const END_POINT_URL_PATTERN_TEXT_SYMBOL = '${TEXT}'
-
-export const DEFAULT_END_POINTS = {
-    ezTransWeb: {
-        id: 'ezTransWeb',
-        name: 'ezTransWeb (JP → KR)',
-        helpUrl: 'https://github.com/HelloKS/ezTransWeb',
-        data: {
-            method: 'get',
-            urlPattern: `http://localhost:5000/translate?text=${END_POINT_URL_PATTERN_TEXT_SYMBOL}`
-        }
-    },
-
-    ezTransServer: {
-        id: 'ezTransServer',
-        name: 'eztrans-server (JP → KR)',
-        helpUrl: 'https://github.com/nanikit/eztrans-server',
-        data: {
-            method: 'post',
-            urlPattern: `http://localhost:8000`,
-            body: END_POINT_URL_PATTERN_TEXT_SYMBOL
-        }
-    }
-}
-
-export const RECOMMEND_CHUNK_SIZE = {
-    ezTransWeb: 500,
-    ezTransServer: 100
+const END_POINT_URL_PATTERN_TEXT_SYMBOL = '${TEXT}'
+const DEFAULT_TRANSLATE_ENDPOINT_DATA = {
+    method: 'get',
+    urlPattern: `http://localhost:5000/translate?text=${END_POINT_URL_PATTERN_TEXT_SYMBOL}`,
+    body: ''
 }
 
 
@@ -114,14 +91,7 @@ class TranslateSettings {
         if (!json) {
             this.data = {
                 enabled: false,
-
-                endPointSelection: 'ezTransWeb',
-
-                customEndPointData: {
-                    method: 'get',
-                    urlPattern: `http://localhost:5000/translate?text=${END_POINT_URL_PATTERN_TEXT_SYMBOL}`,
-                    body: ''
-                },
+                endPointData: {...DEFAULT_TRANSLATE_ENDPOINT_DATA},
 
                 targets: {
                     items: false,
@@ -136,6 +106,27 @@ class TranslateSettings {
         }
 
         this.data = JSON.parse(json)
+
+        if (!this.data.endPointData || typeof this.data.endPointData !== 'object') {
+            const legacyEndPointData = this.data.customEndPointData
+            this.data.endPointData = {
+                ...DEFAULT_TRANSLATE_ENDPOINT_DATA,
+                ...(legacyEndPointData && typeof legacyEndPointData === 'object' ? legacyEndPointData : {})
+            }
+        }
+
+        if (!Number.isFinite(this.data.bulkTranslateChunkSize) || this.data.bulkTranslateChunkSize <= 0) {
+            this.data.bulkTranslateChunkSize = 500
+        }
+
+        if (!this.data.targets || typeof this.data.targets !== 'object') {
+            this.data.targets = {
+                items: false,
+                variables: true,
+                switches: true,
+                maps: true,
+            }
+        }
     }
 
     __writeSettings () {
@@ -143,11 +134,7 @@ class TranslateSettings {
     }
 
     getEndPointData () {
-        if (this.getEndPointSelection() === 'custom') {
-            return this.getCustomEndPointData()
-        }
-
-        return DEFAULT_END_POINTS[this.getEndPointSelection()].data
+        return this.data.endPointData
     }
 
     setEnabled (flag) {
@@ -159,42 +146,8 @@ class TranslateSettings {
         return this.data.enabled
     }
 
-
-    getEndPointSelection () {
-        return this.data.endPointSelection
-    }
-
-    setEndPointSelection (endPointId) {
-        this.data.endPointSelection = endPointId
-        this.__writeSettings()
-    }
-
-    getCustomEndPointData () {
-        return this.data.customEndPointData
-    }
-
-    setCustomEndPointMethod (method) {
-        this.data.customEndPointData.method = method
-        this.__writeSettings()
-    }
-
-    setCustomEndPointUrlPattern (urlPattern) {
-        this.data.customEndPointData.urlPattern = urlPattern
-        this.__writeSettings()
-    }
-
-    setCustomEndPointBody (body) {
-        this.data.customEndPointData.body = body
-        this.__writeSettings()
-    }
-
     getBulkTranslateChunkSize() {
         return this.data.bulkTranslateChunkSize
-    }
-
-    setBulkTranslateChunkSize (chunkSize) {
-        this.data.bulkTranslateChunkSize = chunkSize
-        this.__writeSettings()
     }
 
     getTargets () {
