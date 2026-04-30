@@ -2,6 +2,10 @@ import { Alert } from '../../js/AlertHelper.js';
 import { MessageCheat } from '../../js/CheatHelper.js';
 import { TranslateOnTheFlyState } from '../../js/TranslateOnTheFlyState.js';
 import { ensureTranslateCacheRuntime } from '../../js/TranslateCacheRuntime.js';
+import {
+    getMessageSourceTextVariants as getMessageSourceTextVariantsHelper,
+    buildMessageCacheLookupKeys,
+} from '../../js/MessageCacheKeyHelper.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { DATA_CONTAINER_TRANSLATION_DEFINITIONS } from '../../translate-engines/translation-phases/DataContainerDefinitions.js';
 import {
@@ -165,24 +169,17 @@ export const translateOnTheFlyCoreMethods = {
         return options?.hasPortrait ? 'message_portrait' : 'message';
     },
 
+    getMessageSourceTextVariants(text) {
+        return getMessageSourceTextVariantsHelper(text);
+    },
+
     getMessageCacheKey(text, options = {}) {
-        return this.getCacheKey(text, this.getMessageCacheType(options));
+        const [primaryText] = this.getMessageSourceTextVariants(text);
+        return this.getCacheKey(primaryText, this.getMessageCacheType(options));
     },
 
     getMessageCacheLookupKeys(text, options = {}) {
-        const keys = options?.hasPortrait
-            ? [
-                  this.getCacheKey(text, 'message_portrait'),
-                  this.getCacheKey(text, 'message'),
-              ]
-            : [
-                  this.getCacheKey(text, 'message'),
-                // Fallback across message variants when portrait state differs between
-                // harvesting and runtime rendering contexts.
-                  this.getCacheKey(text, 'message_portrait'),
-              ];
-
-        return Array.from(new Set(keys));
+        return buildMessageCacheLookupKeys(this.getCacheKey.bind(this), text, !!options?.hasPortrait);
     },
 
     getPreferredMessageCacheEntry(text, options = {}) {
