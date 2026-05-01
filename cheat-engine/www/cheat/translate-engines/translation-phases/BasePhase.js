@@ -1,41 +1,39 @@
 export class BasePhase {
-  getTranslationPhaseLabel() {
-    throw new Error(
-      "getTranslationPhaseLabel() must be implemented by strategy",
-    );
-  }
-
-  collectUntranslated() {
-    throw new Error("collectUntranslated() must be implemented by strategy");
-  }
-
-  toTranslationBatchItems(pendingItems) {
-    const safePendingItems = Array.isArray(pendingItems) ? pendingItems : [];
-    return safePendingItems.map((item) => ({
-      type: item.type,
-      id: item.id,
-      value: item.value,
-      cacheKey: item.cacheKey,
-    }));
-  }
-
-  setData({ panel, successes, failures }) {
-    for (const success of successes || []) {
-      if (!success || !success.cacheKey) {
-        continue;
-      }
-
-      panel.setCacheValue(success.cacheKey, success.translated);
+    getTranslationPhaseLabel() {
+        throw new Error('getTranslationPhaseLabel() must be implemented by strategy');
     }
 
-    panel.markBatchFailuresAsUntranslated(failures || [], true);
-  }
+    collectUntranslated() {
+        throw new Error('collectUntranslated() must be implemented by strategy');
+    }
 
-  finalizePhase() {
-    // Optional hook for strategies that need post-batch data materialization.
-  }
+    toTranslationBatchItems(pendingItems) {
+        const safePendingItems = Array.isArray(pendingItems) ? pendingItems : [];
+        return safePendingItems.map((item) => ({
+            type: item.type,
+            id: item.id,
+            value: item.value,
+            cacheKey: item.cacheKey,
+        }));
+    }
 
-  applyDataOnLifecycle() {
-    return true;
-  }
+    setData({ panel, successes, failures }) {
+        for (const success of successes || []) {
+            if (!success || !success.cacheKey) {
+                continue;
+            }
+
+            panel.setCacheValue(success.cacheKey, success.translated);
+        }
+
+        panel.markBatchFailuresAsUntranslated(failures || [], true);
+    }
+
+    finalizePhase() {
+        // Optional hook for strategies that need post-batch data materialization.
+    }
+
+    applyDataOnLifecycle() {
+        return true;
+    }
 }

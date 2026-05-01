@@ -98,9 +98,7 @@ function ensureTranslateOnTheFlyRuntimeWithRetry(options = {}) {
         }
 
         if (attempt >= maxAttempts) {
-            console.warn(
-                `[TranslateOnTheFly] Runtime bootstrap failed after ${attempt} attempts`
-            );
+            console.warn(`[TranslateOnTheFly] Runtime bootstrap failed after ${attempt} attempts`);
             return null;
         }
 

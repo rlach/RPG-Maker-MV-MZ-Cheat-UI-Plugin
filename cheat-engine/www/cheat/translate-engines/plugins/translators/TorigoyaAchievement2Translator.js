@@ -135,7 +135,11 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
         }
 
         const pluginNames = this.getPluginNameAliases()
-            .map((name) => String(name || '').trim().toLowerCase())
+            .map((name) =>
+                String(name || '')
+                    .trim()
+                    .toLowerCase()
+            )
             .filter(Boolean);
         if (pluginNames.length <= 0) {
             return null;
@@ -158,7 +162,11 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
         }
 
         const pluginNames = this.getPluginNameAliases()
-            .map((name) => String(name || '').trim().toLowerCase())
+            .map((name) =>
+                String(name || '')
+                    .trim()
+                    .toLowerCase()
+            )
             .filter(Boolean);
         if (pluginNames.length <= 0) {
             return false;

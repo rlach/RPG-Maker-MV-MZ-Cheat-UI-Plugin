@@ -4,7 +4,11 @@ import { TranslateOnTheFlyState } from './TranslateOnTheFlyState.js';
 import { MESSAGE_LOG } from './MessageLogStore.js';
 import { OBJECT_TRANSLATION_SERVICE } from '../panels/translate-on-the-fly/ObjectTranslationService.js';
 import { ensureTranslationRuntime } from '../panels/translate-on-the-fly/TranslationRuntime.js';
-import { ensureSettingsMigration, getUnifiedSetting, setUnifiedSetting } from './UnifiedSettings.js';
+import {
+    ensureSettingsMigration,
+    getUnifiedSetting,
+    setUnifiedSetting,
+} from './UnifiedSettings.js';
 
 export class GeneralCheat {
     static toggleCheatModal(componentName = null) {}
@@ -647,9 +651,8 @@ export class MessageCheat {
         this.skip = false;
 
         Window_Message.prototype.processCharacter = function (textState) {
-            const currentCharacter = textState && textState.text
-                ? textState.text[textState.index]
-                : undefined;
+            const currentCharacter =
+                textState && textState.text ? textState.text[textState.index] : undefined;
 
             Window_Base.prototype.processCharacter.call(this, textState);
             TextSpeedCheat.applyCharacterWait(this, currentCharacter);
@@ -863,7 +866,8 @@ export class MessageCheat {
                 const makeTextState = (text) => {
                     if (typeof msgWindow.createTextState === 'function') {
                         const ts = msgWindow.createTextState(text, 0, 0, 0);
-                        ts.x = typeof msgWindow.newLineX === 'function' ? msgWindow.newLineX(ts) : 0;
+                        ts.x =
+                            typeof msgWindow.newLineX === 'function' ? msgWindow.newLineX(ts) : 0;
                         ts.startX = ts.x;
                         return ts;
                     }

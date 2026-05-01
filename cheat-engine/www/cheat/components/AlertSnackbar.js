@@ -1,4 +1,4 @@
-import {Alert} from'../js/AlertHelper.js'
+import { Alert } from '../js/AlertHelper.js';
 
 export default {
     name: 'ShortcutPanel',
@@ -33,79 +33,79 @@ export default {
 </v-snackbar>
     `,
 
-    data () {
+    data() {
         return {
             showSnackbar: false,
             text: [],
             timeout: 1000,
-            color: 'black'
-        }
+            color: 'black',
+        };
     },
 
-    mounted () {
+    mounted() {
         Alert.alertInternal = (level, msg, err = null, timeout = 1500) => {
-            let color = null
+            let color = null;
             switch (level) {
                 case 'success':
-                    color = 'green'
-                    break
+                    color = 'green';
+                    break;
                 case 'info':
-                    color = 'blue'
-                    break
+                    color = 'blue';
+                    break;
                 case 'warn':
-                    color = 'orange'
-                    break
+                    color = 'orange';
+                    break;
                 case 'error':
-                    color = 'red'
-                    break
+                    color = 'red';
+                    break;
                 default:
-                    color = 'blue-grey'
+                    color = 'blue-grey';
             }
 
             this.show({
                 text: msg,
                 color: color,
                 timeout: timeout,
-            })
-        }
+            });
+        };
     },
 
-    created () {
+    created() {},
 
-    },
-
-    methods : {
-        normalizeText (text) {
+    methods: {
+        normalizeText(text) {
             if (typeof text === 'string') {
-                return text.split('\n').map(line => ({
+                return text.split('\n').map((line) => ({
                     value: line,
                     html: false,
-                }))
+                }));
             }
 
             if (text && typeof text.text === 'string') {
-                return text.text.split('\n').map(line => ({
+                return text.text.split('\n').map((line) => ({
                     value: line,
                     html: !!text.html,
-                }))
+                }));
             }
 
-            return [{
-                value: String(text),
-                html: false,
-            }]
+            return [
+                {
+                    value: String(text),
+                    html: false,
+                },
+            ];
         },
 
-        show (options) {
-            this.showSnackbar = false
+        show(options) {
+            this.showSnackbar = false;
 
-            this.text = this.normalizeText(options.text)
-            this.timeout = options.timeout
+            this.text = this.normalizeText(options.text);
+            this.timeout = options.timeout;
             if (options.color) {
-                this.color = options.color
+                this.color = options.color;
             }
 
-            this.showSnackbar = true
-        }
-    }
-}
+            this.showSnackbar = true;
+        },
+    },
+};

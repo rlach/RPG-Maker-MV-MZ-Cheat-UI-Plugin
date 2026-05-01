@@ -75,7 +75,8 @@ export const TAG_CONFIGS = [
         requiredConsistency: true,
     },
     {
-        description: 'Draw the subsequent text in the nth color. Text color conforms to the contents of the [Window.png] system image.',
+        description:
+            'Draw the subsequent text in the nth color. Text color conforms to the contents of the [Window.png] system image.',
         type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
         tagSymbol: 'C',
         requiredConsistency: false,

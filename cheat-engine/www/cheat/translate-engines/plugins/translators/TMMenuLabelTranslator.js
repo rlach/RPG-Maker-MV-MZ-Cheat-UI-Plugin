@@ -51,7 +51,9 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
             return null;
         }
 
-        const pluginName = String(this.getPluginName() || '').trim().toLowerCase();
+        const pluginName = String(this.getPluginName() || '')
+            .trim()
+            .toLowerCase();
         if (!pluginName) {
             return null;
         }
@@ -151,7 +153,10 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
                 try {
                     if (label && typeof label === 'object') {
                         const runtime = getRuntime();
-                        const translatedName = translator.resolveRuntimeTranslation(label.name, runtime);
+                        const translatedName = translator.resolveRuntimeTranslation(
+                            label.name,
+                            runtime
+                        );
                         const translatedFooter = translator.resolveRuntimeTranslation(
                             label.footer,
                             runtime
@@ -238,7 +243,11 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
 
         const pluginEntry = this.findPluginEntry();
         if (pluginEntry && pluginEntry.parameters) {
-            this.appendEntriesFromParameters(pluginEntry.parameters, 'pluginEntryParameter', entries);
+            this.appendEntriesFromParameters(
+                pluginEntry.parameters,
+                'pluginEntryParameter',
+                entries
+            );
         }
 
         const pluginManager = window['PluginManager'];
@@ -293,7 +302,9 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
 
         const items = this.buildUniquePendingItems(panel);
         const totalStrings = items.length;
-        const leftStrings = items.filter((item) => !panel.hasUsableCacheValue(item.cacheKey)).length;
+        const leftStrings = items.filter(
+            (item) => !panel.hasUsableCacheValue(item.cacheKey)
+        ).length;
 
         return {
             total: totalStrings,

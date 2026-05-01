@@ -1,9 +1,9 @@
-import { MESSAGE_LOG } from "../js/MessageLogStore.js";
+import { MESSAGE_LOG } from '../js/MessageLogStore.js';
 
 export default {
-  name: "TextLogPanel",
+    name: 'TextLogPanel',
 
-  template: `
+    template: `
 <v-card flat class="ma-0 pa-0" style="background: transparent; height: 100%; overflow: hidden; display: flex; flex-direction: column;">
     <v-card-subtitle class="pb-0 font-weight-bold">Text Log</v-card-subtitle>
     <div class="py-1 px-4 caption" style="margin: 0;">
@@ -45,109 +45,109 @@ export default {
 </v-card>
     `,
 
-  data() {
-    return {
-      messageEntries: [],
-      messageUnsubscribe: null,
-      hasSelection: false,
-    };
-  },
-
-  created() {
-    this.messageUnsubscribe = MESSAGE_LOG.subscribe((entries) => {
-      this.messageEntries = entries;
-      this.$nextTick(() => this.scrollToBottom());
-    });
-
-    document.addEventListener("selectionchange", this.onSelectionChange);
-  },
-
-  beforeDestroy() {
-    if (this.messageUnsubscribe) {
-      this.messageUnsubscribe();
-      this.messageUnsubscribe = null;
-    }
-
-    document.removeEventListener("selectionchange", this.onSelectionChange);
-  },
-
-  methods: {
-    formatMessageEntry(entry) {
-      const date = new Date(entry.timestamp);
-      const hours = String(date.getHours()).padStart(2, "0");
-      const minutes = String(date.getMinutes()).padStart(2, "0");
-      const seconds = String(date.getSeconds()).padStart(2, "0");
-      const speaker = entry.speakerName ? ` ${entry.speakerName}: ` : " ";
-      return `[${hours}:${minutes}:${seconds}]${speaker}${entry.text}`;
+    data() {
+        return {
+            messageEntries: [],
+            messageUnsubscribe: null,
+            hasSelection: false,
+        };
     },
 
-    scrollToBottom() {
-      const container = this.$refs.messageLogContainer;
-      if (container) {
-        container.scrollTop = container.scrollHeight;
-      }
+    created() {
+        this.messageUnsubscribe = MESSAGE_LOG.subscribe((entries) => {
+            this.messageEntries = entries;
+            this.$nextTick(() => this.scrollToBottom());
+        });
+
+        document.addEventListener('selectionchange', this.onSelectionChange);
     },
 
-    async onCopy() {
-      const selection = window.getSelection();
-      const text = selection ? selection.toString() : "";
-
-      if (!text || !this.hasSelection) {
-        return;
-      }
-
-      try {
-        if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-        } else {
-          const textarea = document.createElement("textarea");
-          textarea.value = text;
-          textarea.style.position = "fixed";
-          textarea.style.top = "-1000px";
-          document.body.appendChild(textarea);
-          textarea.focus();
-          textarea.select();
-          document.execCommand("copy");
-          document.body.removeChild(textarea);
-        }
-      } catch (err) {
-        console.warn("[TextLogPanel] Failed to copy log", err);
-      }
-    },
-
-    onClearMessages() {
-      MESSAGE_LOG.clear();
-    },
-
-    onSelectionChange() {
-      try {
-        const sel = window.getSelection();
-        const text = sel ? sel.toString() : "";
-        if (!text) {
-          this.hasSelection = false;
-          return;
+    beforeDestroy() {
+        if (this.messageUnsubscribe) {
+            this.messageUnsubscribe();
+            this.messageUnsubscribe = null;
         }
 
-        const messageContainer = this.$refs.messageLogContainer;
-        if (!messageContainer) {
-          this.hasSelection = false;
-          return;
-        }
-
-        const anchorNode = sel.anchorNode;
-        const focusNode = sel.focusNode;
-
-        const withinMessage =
-          messageContainer &&
-          anchorNode &&
-          messageContainer.contains(anchorNode) &&
-          focusNode &&
-          messageContainer.contains(focusNode);
-
-        this.hasSelection = withinMessage && text.trim().length > 0;
-      } catch (err) {
-        this.hasSelection = false;
-      }
+        document.removeEventListener('selectionchange', this.onSelectionChange);
     },
-  },
+
+    methods: {
+        formatMessageEntry(entry) {
+            const date = new Date(entry.timestamp);
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            const speaker = entry.speakerName ? ` ${entry.speakerName}: ` : ' ';
+            return `[${hours}:${minutes}:${seconds}]${speaker}${entry.text}`;
+        },
+
+        scrollToBottom() {
+            const container = this.$refs.messageLogContainer;
+            if (container) {
+                container.scrollTop = container.scrollHeight;
+            }
+        },
+
+        async onCopy() {
+            const selection = window.getSelection();
+            const text = selection ? selection.toString() : '';
+
+            if (!text || !this.hasSelection) {
+                return;
+            }
+
+            try {
+                if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text);
+                } else {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = text;
+                    textarea.style.position = 'fixed';
+                    textarea.style.top = '-1000px';
+                    document.body.appendChild(textarea);
+                    textarea.focus();
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                }
+            } catch (err) {
+                console.warn('[TextLogPanel] Failed to copy log', err);
+            }
+        },
+
+        onClearMessages() {
+            MESSAGE_LOG.clear();
+        },
+
+        onSelectionChange() {
+            try {
+                const sel = window.getSelection();
+                const text = sel ? sel.toString() : '';
+                if (!text) {
+                    this.hasSelection = false;
+                    return;
+                }
+
+                const messageContainer = this.$refs.messageLogContainer;
+                if (!messageContainer) {
+                    this.hasSelection = false;
+                    return;
+                }
+
+                const anchorNode = sel.anchorNode;
+                const focusNode = sel.focusNode;
+
+                const withinMessage =
+                    messageContainer &&
+                    anchorNode &&
+                    messageContainer.contains(anchorNode) &&
+                    focusNode &&
+                    messageContainer.contains(focusNode);
+
+                this.hasSelection = withinMessage && text.trim().length > 0;
+            } catch (err) {
+                this.hasSelection = false;
+            }
+        },
+    },
 };

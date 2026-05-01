@@ -16,14 +16,14 @@ function isUsableText(value) {
 }
 
 function getRuntime() {
-    return runtimeGlobal.__ensureTranslationRuntime?.() || runtimeGlobal.__TranslationRuntime || null;
+    return (
+        runtimeGlobal.__ensureTranslationRuntime?.() || runtimeGlobal.__TranslationRuntime || null
+    );
 }
 
 function normalizeChoiceDisplayText(choiceText) {
     const original = String(choiceText || '');
-    return original
-        .replace(/\s?if\((.+?)\)/i, '')
-        .replace(/\s?en\((.+?)\)/i, '');
+    return original.replace(/\s?if\((.+?)\)/i, '').replace(/\s?en\((.+?)\)/i, '');
 }
 
 function toStringArray(value) {

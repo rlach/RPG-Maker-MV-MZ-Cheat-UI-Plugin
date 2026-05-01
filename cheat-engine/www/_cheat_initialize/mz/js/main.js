@@ -48,7 +48,7 @@ function validateNwjsVersion() {
         let docsUrl = '';
 
         if (/^ko\b/.test(navigator.language)) {
-                        msg = `게임의 Node Webkit 버전이 치트를 사용하기에 너무 낮습니다. (MZ)
+            msg = `게임의 Node Webkit 버전이 치트를 사용하기에 너무 낮습니다. (MZ)
   - 현재 버전=${nwjsVersion}, 최소 요구 버전=${minRequiredNwjsVersion}
 치트가 제대로 동작하지 않을 수 있습니다.
 
@@ -56,7 +56,7 @@ function validateNwjsVersion() {
             docsUrl =
                 'https://github.com/paramonos/RPG-Maker-MV-MZ-Cheat-UI-Plugin/blob/main/README_ko-kr.md#%EA%B2%8C%EC%9E%84%EC%9D%98-nwjs-%EB%B2%84%EC%A0%84%EC%9D%B4-0264-%EB%B3%B4%EB%8B%A4-%EB%82%AE%EC%9D%80-%EA%B2%BD%EC%9A%B0-%EC%98%9B%EB%82%A0-%EB%B2%84%EC%A0%84%EC%9D%98-mv-%EA%B2%8C%EC%9E%84%EC%9D%B8-%EA%B2%BD%EC%9A%B0';
         } else {
-                        msg = `Node Webkit version of game is too low to use cheat in MZ
+            msg = `Node Webkit version of game is too low to use cheat in MZ
   - version=${nwjsVersion}, minimum required version=${minRequiredNwjsVersion}
 Cheat may not work properly.
 

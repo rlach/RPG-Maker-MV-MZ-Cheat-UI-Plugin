@@ -1,4 +1,4 @@
-import {ConfirmDialog} from '../js/DialogHelper.js'
+import { ConfirmDialog } from '../js/DialogHelper.js';
 
 export default {
     name: 'ConfirmDialog',
@@ -44,21 +44,21 @@ export default {
     data: () => ({
         showDialog: false,
 
-        options: undefined
+        options: undefined,
     }),
 
     mounted() {
-        ConfirmDialog.show = this.show
-        ConfirmDialog.close = this.close
+        ConfirmDialog.show = this.show;
+        ConfirmDialog.close = this.close;
     },
 
     computed: {
-        messageArray () {
+        messageArray() {
             if (this.options) {
-                return this.options.message.split('\n')
+                return this.options.message.split('\n');
             }
-            return []
-        }
+            return [];
+        },
     },
 
     methods: {
@@ -66,37 +66,44 @@ export default {
             return {
                 width: 400,
                 message: '',
-                actions: [{
-                    icon: 'mdi-close',
-                    iconRight: false,
-                    label: '취소',
-                    color: 'red',
-                    action: this.close
-                }]
-            }
+                actions: [
+                    {
+                        icon: 'mdi-close',
+                        iconRight: false,
+                        label: '취소',
+                        color: 'red',
+                        action: this.close,
+                    },
+                ],
+            };
         },
 
         show(options) {
-            const opt = this.defaultSettings()
-            this.copyObjectProps(options, opt)
-            this.options = opt
-            this.showDialog = true
+            const opt = this.defaultSettings();
+            this.copyObjectProps(options, opt);
+            this.options = opt;
+            this.showDialog = true;
         },
 
         close() {
-            this.showDialog = false
-            this.options = undefined
+            this.showDialog = false;
+            this.options = undefined;
         },
 
         copyObjectProps(src, dest) {
             for (const key of Object.keys(src)) {
-                const value = src[key]
-                if (!Array.isArray(value) && typeof value === 'object' && value !== null && Object.prototype.hasOwnProperty.call(dest, key)) {
-                    this.copyObjectProps(value, dest[key])
+                const value = src[key];
+                if (
+                    !Array.isArray(value) &&
+                    typeof value === 'object' &&
+                    value !== null &&
+                    Object.prototype.hasOwnProperty.call(dest, key)
+                ) {
+                    this.copyObjectProps(value, dest[key]);
                 } else {
-                    dest[key] = src[key]
+                    dest[key] = src[key];
                 }
             }
-        }
-    }
-}
+        },
+    },
+};

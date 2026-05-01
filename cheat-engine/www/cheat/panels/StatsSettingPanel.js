@@ -1,4 +1,4 @@
-import {GeneralCheat} from '../js/CheatHelper.js'
+import { GeneralCheat } from '../js/CheatHelper.js';
 
 export default {
     name: 'StatsSettingPanel',
@@ -100,26 +100,26 @@ export default {
 </v-card>
     `,
 
-    data () {
+    data() {
         return {
             selectedTab: null,
             paramNames: [], // name of stats (Max HP, ATK, ...)
-            actors: []
-        }
+            actors: [],
+        };
     },
 
-    created () {
-        this.initializeVariables()
+    created() {
+        this.initializeVariables();
     },
 
     methods: {
-        extractActorData (actor) {
+        extractActorData(actor) {
             // get actor param
-            const paramSize = actor._paramPlus.length
-            const param = new Array(paramSize)
+            const paramSize = actor._paramPlus.length;
+            const param = new Array(paramSize);
 
             for (let paramId = 0; paramId < paramSize; ++paramId) {
-                param[paramId] = actor.param(paramId)
+                param[paramId] = actor.param(paramId);
             }
 
             return {
@@ -129,34 +129,34 @@ export default {
                 godMode: GeneralCheat.isGodMode(actor),
                 level: actor.level,
                 exp: actor.currentExp(), // actor._exp contains exp data for each class (_exp[classId] = exp)
-                param: param
-            }
+                param: param,
+            };
         },
 
-        initializeVariables () {
-            this.paramNames = $dataSystem.terms.params
-            this.actors = $gameParty.members().map(actor => this.extractActorData(actor))
+        initializeVariables() {
+            this.paramNames = $dataSystem.terms.params;
+            this.actors = $gameParty.members().map((actor) => this.extractActorData(actor));
         },
 
-        onLevelChange (item) {
-            item._actor.changeLevel(Number(item.level), false)
-            this.initializeVariables()
+        onLevelChange(item) {
+            item._actor.changeLevel(Number(item.level), false);
+            this.initializeVariables();
         },
 
-        onExpChange (item) {
-            item._actor.changeExp(Number(item.exp), false)
-            this.initializeVariables()
+        onExpChange(item) {
+            item._actor.changeExp(Number(item.exp), false);
+            this.initializeVariables();
         },
 
-        onParamChange (item, paramIndex) {
-            const diff = item.param[paramIndex] - item._actor.param(paramIndex)
-            item._actor.addParam(paramIndex, diff)
-            this.initializeVariables()
+        onParamChange(item, paramIndex) {
+            const diff = item.param[paramIndex] - item._actor.param(paramIndex);
+            item._actor.addParam(paramIndex, diff);
+            this.initializeVariables();
         },
 
-        onGodModeChange (item) {
-            GeneralCheat.toggleGodMode(item._actor)
-            this.initializeVariables()
-        }
-    }
-}
+        onGodModeChange(item) {
+            GeneralCheat.toggleGodMode(item._actor);
+            this.initializeVariables();
+        },
+    },
+};

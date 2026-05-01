@@ -177,7 +177,11 @@ export const translateOnTheFlyCoreMethods = {
     },
 
     getMessageCacheLookupKeys(text, options = {}) {
-        return buildMessageCacheLookupKeys(this.getCacheKey.bind(this), text, !!options?.hasPortrait);
+        return buildMessageCacheLookupKeys(
+            this.getCacheKey.bind(this),
+            text,
+            !!options?.hasPortrait
+        );
     },
 
     getPreferredMessageCacheEntry(text, options = {}) {

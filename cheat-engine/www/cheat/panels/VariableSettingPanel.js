@@ -171,18 +171,13 @@ export default {
         filteredTableItems() {
             return this.tableItems.filter((item) => {
                 const matchesNameless = !this.excludeNameless || !!item.name;
-                const matchesSafeFilter =
-                    !this.onlySafeForTranslate || !!item.safeForTranslate;
+                const matchesSafeFilter = !this.onlySafeForTranslate || !!item.safeForTranslate;
                 const search = (this.search || '').trim().toLowerCase();
                 if (!search) {
                     return matchesNameless && matchesSafeFilter;
                 }
 
-                return (
-                    matchesNameless &&
-                    matchesSafeFilter &&
-                    this.matchesSearch(item, search)
-                );
+                return matchesNameless && matchesSafeFilter && this.matchesSearch(item, search);
             });
         },
     },
@@ -215,11 +210,7 @@ export default {
             // modify value
             let value = item.value;
             // Convert to number if it's a numeric string
-            if (
-                value !== '' &&
-                value !== null &&
-                !Number.isNaN(Number(value))
-            ) {
+            if (value !== '' && value !== null && !Number.isNaN(Number(value))) {
                 value = Number(value);
             }
             $gameVariables.setValue(item.id, value);
@@ -254,7 +245,9 @@ export default {
         },
 
         matchesSearch(item, search) {
-            const safeSearch = String(search || '').trim().toLowerCase();
+            const safeSearch = String(search || '')
+                .trim()
+                .toLowerCase();
             if (!safeSearch) {
                 return true;
             }

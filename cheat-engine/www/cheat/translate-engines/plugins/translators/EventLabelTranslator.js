@@ -61,7 +61,9 @@ export class EventLabelTranslator extends BasePluginTranslator {
             return null;
         }
 
-        const pluginName = String(this.getPluginName() || '').trim().toLowerCase();
+        const pluginName = String(this.getPluginName() || '')
+            .trim()
+            .toLowerCase();
         if (!pluginName) {
             return null;
         }

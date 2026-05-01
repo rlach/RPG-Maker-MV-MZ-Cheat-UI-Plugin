@@ -1,15 +1,19 @@
-import { ensureSettingsMigration, getUnifiedSetting, setUnifiedSetting } from './UnifiedSettings.js'
-import { isRpgMakerMv } from './RpgMakerRuntime.js'
+import {
+    ensureSettingsMigration,
+    getUnifiedSetting,
+    setUnifiedSetting,
+} from './UnifiedSettings.js';
+import { isRpgMakerMv } from './RpgMakerRuntime.js';
 
 class CheatWindowManager {
-    constructor () {
-        ensureSettingsMigration()
-        this.useSeparateWindow = false
-        this.externalWindow = null
-        this.mainComponent = null
-        this.lastComponent = null
-        this.overlaySize = { width: 700, height: 400 }
-        this.__load()
+    constructor() {
+        ensureSettingsMigration();
+        this.useSeparateWindow = false;
+        this.externalWindow = null;
+        this.mainComponent = null;
+        this.lastComponent = null;
+        this.overlaySize = { width: 700, height: 400 };
+        this.__load();
 
         const main = nw.Window.get();
 
@@ -22,243 +26,249 @@ class CheatWindowManager {
         });
     }
 
-    __load () {
+    __load() {
         try {
-            const data = getUnifiedSetting('ui', {}) || {}
+            const data = getUnifiedSetting('ui', {}) || {};
             if (Object.prototype.hasOwnProperty.call(data, 'openInSeparateWindow')) {
-                this.useSeparateWindow = !!data.openInSeparateWindow
+                this.useSeparateWindow = !!data.openInSeparateWindow;
             }
 
             if (data.overlaySize) {
-                const { width, height } = data.overlaySize
+                const { width, height } = data.overlaySize;
                 if (Number.isFinite(width) && Number.isFinite(height)) {
-                    this.overlaySize = { width, height }
+                    this.overlaySize = { width, height };
                 }
             }
         } catch (err) {
-            console.warn('[CheatWindowManager] Failed to load settings', err)
+            console.warn('[CheatWindowManager] Failed to load settings', err);
         }
     }
 
-    __save () {
+    __save() {
         try {
             const data = {
                 openInSeparateWindow: this.useSeparateWindow,
-                overlaySize: this.overlaySize
-            }
-            setUnifiedSetting('ui', data)
+                overlaySize: this.overlaySize,
+            };
+            setUnifiedSetting('ui', data);
         } catch (err) {
-            console.warn('[CheatWindowManager] Failed to save settings', err)
+            console.warn('[CheatWindowManager] Failed to save settings', err);
         }
     }
 
-    setMainComponent (component) {
-        this.mainComponent = component
+    setMainComponent(component) {
+        this.mainComponent = component;
     }
 
-    isSeparateWindowEnabled () {
-        return !!this.useSeparateWindow
+    isSeparateWindowEnabled() {
+        return !!this.useSeparateWindow;
     }
 
-    setSeparateWindowEnabled (flag) {
-        this.useSeparateWindow = !!flag
-        this.__save()
+    setSeparateWindowEnabled(flag) {
+        this.useSeparateWindow = !!flag;
+        this.__save();
 
         if (!this.useSeparateWindow) {
-            this.closeExternalWindow()
+            this.closeExternalWindow();
         }
     }
 
-    setLastComponent (componentName) {
+    setLastComponent(componentName) {
         if (componentName) {
-            this.lastComponent = componentName
+            this.lastComponent = componentName;
         }
     }
 
-    setOverlaySize (width, height) {
+    setOverlaySize(width, height) {
         if (!Number.isFinite(width) || !Number.isFinite(height)) {
-            return
+            return;
         }
-        this.overlaySize = { width, height }
-        this.__save()
+        this.overlaySize = { width, height };
+        this.__save();
     }
 
-    getOverlaySize () {
-        return { ...this.overlaySize }
+    getOverlaySize() {
+        return { ...this.overlaySize };
     }
 
-    getExternalWindowPath () {
-        const base = isRpgMakerMv() ? 'www/cheat/window.html' : 'cheat/window.html'
+    getExternalWindowPath() {
+        const base = isRpgMakerMv() ? 'www/cheat/window.html' : 'cheat/window.html';
         return this.lastComponent
             ? `${base}?component=${encodeURIComponent(this.lastComponent)}`
-            : base
+            : base;
     }
 
-    attachExternalWindowLifecycle (nwWin) {
+    attachExternalWindowLifecycle(nwWin) {
         if (!nwWin) {
-            return
+            return;
         }
 
         // NW.js window close event exists in both MV and MZ runtimes.
         if (typeof nwWin.on === 'function') {
             nwWin.on('closed', () => {
-                console.log('[CheatWindowManager] External window closed')
-                this.externalWindow = null
-            })
+                console.log('[CheatWindowManager] External window closed');
+                this.externalWindow = null;
+            });
         }
 
         const bindDomWindow = () => {
-            const domWin = nwWin.window
+            const domWin = nwWin.window;
             if (!domWin || typeof domWin.addEventListener !== 'function') {
-                return
+                return;
             }
 
-            domWin.__CHEAT_PARENT_WINDOW__ = window
+            domWin.__CHEAT_PARENT_WINDOW__ = window;
 
             domWin.addEventListener('beforeunload', () => {
-                console.log('[CheatWindowManager] External window beforeunload')
-                this.externalWindow = null
-            })
+                console.log('[CheatWindowManager] External window beforeunload');
+                this.externalWindow = null;
+            });
 
             domWin.addEventListener('load', () => {
-                console.log('[CheatWindowManager] External window loaded')
-            })
+                console.log('[CheatWindowManager] External window loaded');
+            });
 
             domWin.addEventListener('error', (e) => {
-                console.error('[CheatWindowManager] Error in external window:', e)
-            })
-        }
+                console.error('[CheatWindowManager] Error in external window:', e);
+            });
+        };
 
         if (nwWin.window && typeof nwWin.window.addEventListener === 'function') {
-            bindDomWindow()
+            bindDomWindow();
         } else if (typeof nwWin.on === 'function') {
-            nwWin.on('loaded', bindDomWindow)
+            nwWin.on('loaded', bindDomWindow);
         }
     }
 
-    openExternalWindow (componentName = null) {
+    openExternalWindow(componentName = null) {
         const openNow = () => {
-            this.setLastComponent(componentName || this.lastComponent)
+            this.setLastComponent(componentName || this.lastComponent);
 
             if (this.lastComponent) {
-                window.__CHEAT_DEFAULT_COMPONENT__ = this.lastComponent
+                window.__CHEAT_DEFAULT_COMPONENT__ = this.lastComponent;
             }
 
             if (this.externalWindow && !this.externalWindow.closed) {
                 try {
-                    this.externalWindow.focus()
-                    return
+                    this.externalWindow.focus();
+                    return;
                 } catch (err) {
                     // fall through to reopen
                 }
             }
 
             try {
-                const targetPath = this.getExternalWindowPath()
-                console.log('[CheatWindowManager] Opening external window:', targetPath)
+                const targetPath = this.getExternalWindowPath();
+                console.log('[CheatWindowManager] Opening external window:', targetPath);
                 nw.Window.open(targetPath, {}, (newWin) => {
                     this.externalWindow = newWin;
                     console.log('[CheatWindowManager] External window opened callback:', newWin);
 
                     if (this.externalWindow) {
-                        this.attachExternalWindowLifecycle(this.externalWindow)
+                        this.attachExternalWindowLifecycle(this.externalWindow);
                     } else {
-                        console.error('[CheatWindowManager] Failed to create external window')
+                        console.error('[CheatWindowManager] Failed to create external window');
                     }
-                })
+                });
             } catch (err) {
-                console.error('[CheatWindowManager] Exception opening external window:', err)
+                console.error('[CheatWindowManager] Exception opening external window:', err);
             }
-        }
+        };
 
         const ensureRuntimeReady = () => {
-            const ensureRuntime = window.__ensureTranslationRuntime
+            const ensureRuntime = window.__ensureTranslationRuntime;
             if (typeof ensureRuntime === 'function') {
                 try {
-                    ensureRuntime()
+                    ensureRuntime();
                 } catch (error) {
-                    console.warn('[CheatWindowManager] Failed to pre-bootstrap translation runtime', error)
+                    console.warn(
+                        '[CheatWindowManager] Failed to pre-bootstrap translation runtime',
+                        error
+                    );
                 }
             }
-        }
+        };
 
-        const ensureDepsWithRetry = window.__ensureEveryDependencyReadyWithRetry
+        const ensureDepsWithRetry = window.__ensureEveryDependencyReadyWithRetry;
         if (typeof ensureDepsWithRetry === 'function') {
             ensureDepsWithRetry({ delayMs: 100, logEvery: 20 })
                 .then(() => {
-                    ensureRuntimeReady()
-                    openNow()
+                    ensureRuntimeReady();
+                    openNow();
                 })
                 .catch((error) => {
-                    console.warn('[CheatWindowManager] Dependency pre-bootstrap failed, opening anyway', error)
-                    ensureRuntimeReady()
-                    openNow()
-                })
-            return
+                    console.warn(
+                        '[CheatWindowManager] Dependency pre-bootstrap failed, opening anyway',
+                        error
+                    );
+                    ensureRuntimeReady();
+                    openNow();
+                });
+            return;
         }
 
-        ensureRuntimeReady()
-        openNow()
+        ensureRuntimeReady();
+        openNow();
     }
 
-    closeExternalWindow () {
+    closeExternalWindow() {
         try {
             if (this.externalWindow && !this.externalWindow.closed) {
-                this.externalWindow.close()
+                this.externalWindow.close();
             }
         } catch (err) {
-            console.warn('[CheatWindowManager] Failed to close external window', err)
+            console.warn('[CheatWindowManager] Failed to close external window', err);
         } finally {
-            this.externalWindow = null
+            this.externalWindow = null;
         }
     }
 
-    toggleCheatUi (componentName = null) {
+    toggleCheatUi(componentName = null) {
         if (!this.isSeparateWindowEnabled()) {
             if (this.mainComponent) {
-                const prevComponentName = this.mainComponent.currentComponentName
+                const prevComponentName = this.mainComponent.currentComponentName;
 
                 if (componentName) {
-                    this.mainComponent.currentComponentName = componentName
+                    this.mainComponent.currentComponentName = componentName;
                 }
 
                 if (this.mainComponent.show) {
                     if (!componentName || componentName === prevComponentName) {
-                        this.mainComponent.show = false
+                        this.mainComponent.show = false;
                     }
-                    return
+                    return;
                 }
 
-                this.mainComponent.show = true
+                this.mainComponent.show = true;
             }
-            return
+            return;
         }
 
-        this.setLastComponent(componentName)
+        this.setLastComponent(componentName);
 
         if (this.externalWindow && !this.externalWindow.closed) {
-            this.closeExternalWindow()
+            this.closeExternalWindow();
         } else {
-            this.openExternalWindow(componentName)
+            this.openExternalWindow(componentName);
         }
     }
 
-    openCheatUi (componentName = null) {
+    openCheatUi(componentName = null) {
         if (!this.isSeparateWindowEnabled()) {
             if (this.mainComponent) {
                 if (componentName) {
-                    this.mainComponent.currentComponentName = componentName
+                    this.mainComponent.currentComponentName = componentName;
                 }
-                this.mainComponent.show = true
+                this.mainComponent.show = true;
             }
-            return
+            return;
         }
 
-        this.openExternalWindow(componentName)
+        this.openExternalWindow(componentName);
     }
 }
 
-export const CHEAT_WINDOW_MANAGER = new CheatWindowManager()
+export const CHEAT_WINDOW_MANAGER = new CheatWindowManager();
 
 // Expose on window for cross-window access
-window.__CHEAT_WINDOW_MANAGER__ = CHEAT_WINDOW_MANAGER
+window.__CHEAT_WINDOW_MANAGER__ = CHEAT_WINDOW_MANAGER;

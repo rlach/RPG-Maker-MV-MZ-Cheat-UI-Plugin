@@ -1,79 +1,79 @@
 export class ErrorRecoveryStrategy {
-  constructor(sessionId = "") {
-    this.sessionId = sessionId;
-    this.failuresByType = new Map();
-    this.failedKeys = new Set();
-    this.recoveredKeys = new Set();
-    this.recoveryAttempts = 0;
-  }
-
-  reset(nextSessionId = "") {
-    this.sessionId = nextSessionId || this.sessionId;
-    this.failuresByType.clear();
-    this.failedKeys.clear();
-    this.recoveredKeys.clear();
-    this.recoveryAttempts = 0;
-  }
-
-  recordFailure(failure) {
-    if (!failure || typeof failure !== "object") {
-      this._incrementType("unknown");
-      return;
+    constructor(sessionId = '') {
+        this.sessionId = sessionId;
+        this.failuresByType = new Map();
+        this.failedKeys = new Set();
+        this.recoveredKeys = new Set();
+        this.recoveryAttempts = 0;
     }
 
-    const reason = this._resolveReason(failure);
-    this._incrementType(reason);
-
-    if (failure.cacheKey) {
-      this.failedKeys.add(failure.cacheKey);
-    }
-  }
-
-  recordRecovery(cacheKey) {
-    if (!cacheKey) {
-      return;
+    reset(nextSessionId = '') {
+        this.sessionId = nextSessionId || this.sessionId;
+        this.failuresByType.clear();
+        this.failedKeys.clear();
+        this.recoveredKeys.clear();
+        this.recoveryAttempts = 0;
     }
 
-    this.recoveredKeys.add(cacheKey);
-  }
+    recordFailure(failure) {
+        if (!failure || typeof failure !== 'object') {
+            this._incrementType('unknown');
+            return;
+        }
 
-  recordRecoveryAttempt(count = 1) {
-    const safeCount = Math.max(1, Number(count) || 1);
-    this.recoveryAttempts += safeCount;
-  }
+        const reason = this._resolveReason(failure);
+        this._incrementType(reason);
 
-  getStats() {
-    const byType = {};
-    for (const [type, count] of this.failuresByType.entries()) {
-      byType[type] = count;
+        if (failure.cacheKey) {
+            this.failedKeys.add(failure.cacheKey);
+        }
     }
 
-    return {
-      totalErrors: this.failedKeys.size,
-      recoveredErrors: this.recoveredKeys.size,
-      recoveryAttempts: this.recoveryAttempts,
-      byType,
-    };
-  }
+    recordRecovery(cacheKey) {
+        if (!cacheKey) {
+            return;
+        }
 
-  _incrementType(type) {
-    const key = type || "unknown";
-    this.failuresByType.set(key, (this.failuresByType.get(key) || 0) + 1);
-  }
-
-  _resolveReason(failure) {
-    if (typeof failure.errorType === "string" && failure.errorType) {
-      return failure.errorType;
+        this.recoveredKeys.add(cacheKey);
     }
 
-    if (typeof failure.cancelReason === "string" && failure.cancelReason) {
-      return failure.cancelReason;
+    recordRecoveryAttempt(count = 1) {
+        const safeCount = Math.max(1, Number(count) || 1);
+        this.recoveryAttempts += safeCount;
     }
 
-    if (typeof failure.rejectReason === "string" && failure.rejectReason) {
-      return failure.rejectReason;
+    getStats() {
+        const byType = {};
+        for (const [type, count] of this.failuresByType.entries()) {
+            byType[type] = count;
+        }
+
+        return {
+            totalErrors: this.failedKeys.size,
+            recoveredErrors: this.recoveredKeys.size,
+            recoveryAttempts: this.recoveryAttempts,
+            byType,
+        };
     }
 
-    return "unknown";
-  }
+    _incrementType(type) {
+        const key = type || 'unknown';
+        this.failuresByType.set(key, (this.failuresByType.get(key) || 0) + 1);
+    }
+
+    _resolveReason(failure) {
+        if (typeof failure.errorType === 'string' && failure.errorType) {
+            return failure.errorType;
+        }
+
+        if (typeof failure.cancelReason === 'string' && failure.cancelReason) {
+            return failure.cancelReason;
+        }
+
+        if (typeof failure.rejectReason === 'string' && failure.rejectReason) {
+            return failure.rejectReason;
+        }
+
+        return 'unknown';
+    }
 }

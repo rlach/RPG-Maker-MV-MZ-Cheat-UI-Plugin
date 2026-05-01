@@ -5,12 +5,7 @@ const CACHE_TYPE = 'plugin_skill_cp_system';
 const COMMAND_CACHE_TYPE = 'command';
 
 const MENU_TITLE_FIELD = 'Menu Skill Setting Title';
-const PARAM_FIELDS = [
-    'CP Name',
-    'Set Name',
-    'No Equip Slot Name',
-    MENU_TITLE_FIELD,
-];
+const PARAM_FIELDS = ['CP Name', 'Set Name', 'No Equip Slot Name', MENU_TITLE_FIELD];
 
 function isUsableText(value) {
     return typeof value === 'string' && value.trim() !== '';
@@ -58,7 +53,9 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
             return null;
         }
 
-        const pluginName = String(this.getPluginName() || '').trim().toLowerCase();
+        const pluginName = String(this.getPluginName() || '')
+            .trim()
+            .toLowerCase();
         if (!pluginName) {
             return null;
         }
@@ -199,7 +196,9 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
                         continue;
                     }
 
-                    const translated = translator.translateIfSkillCpField(entry.name, [MENU_TITLE_FIELD]);
+                    const translated = translator.translateIfSkillCpField(entry.name, [
+                        MENU_TITLE_FIELD,
+                    ]);
 
                     if (translated !== entry.name) {
                         entry.name = translated;
@@ -351,7 +350,11 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
 
         const pluginEntry = this.findPluginEntry();
         if (pluginEntry && pluginEntry.parameters) {
-            this.appendEntriesFromParameters(pluginEntry.parameters, 'pluginEntryParameter', entries);
+            this.appendEntriesFromParameters(
+                pluginEntry.parameters,
+                'pluginEntryParameter',
+                entries
+            );
         }
 
         const runtimeParameters = this.getRuntimeParameters();
@@ -407,7 +410,9 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
 
         const items = this.buildUniquePendingItems(panel);
         const totalStrings = items.length;
-        const leftStrings = items.filter((item) => !panel.hasUsableCacheValue(item.cacheKey)).length;
+        const leftStrings = items.filter(
+            (item) => !panel.hasUsableCacheValue(item.cacheKey)
+        ).length;
 
         return {
             total: totalStrings,

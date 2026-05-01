@@ -94,12 +94,19 @@ export default {
             : [];
         this.languageOptions = runtimeOptions.map((item) => ({ ...item }));
 
-        if (this.runtime && typeof this.runtime.targetLang === 'string' && this.runtime.targetLang) {
+        if (
+            this.runtime &&
+            typeof this.runtime.targetLang === 'string' &&
+            this.runtime.targetLang
+        ) {
             this.selectedTargetLang = this.runtime.targetLang;
         }
 
         if (!this.languageOptions.some((item) => item.value === this.selectedTargetLang)) {
-            this.languageOptions.unshift({ text: this.selectedTargetLang, value: this.selectedTargetLang });
+            this.languageOptions.unshift({
+                text: this.selectedTargetLang,
+                value: this.selectedTargetLang,
+            });
         }
 
         this.refreshFolderTree();
@@ -119,7 +126,8 @@ export default {
 
             const path = nodeRequire('path');
             const nodeProcess = globalThis && globalThis.process;
-            const cwd = nodeProcess && typeof nodeProcess.cwd === 'function' ? nodeProcess.cwd() : '.';
+            const cwd =
+                nodeProcess && typeof nodeProcess.cwd === 'function' ? nodeProcess.cwd() : '.';
             return isRpgMakerMv() ? path.join(cwd, 'www', 'img') : path.join(cwd, 'img');
         },
 
@@ -147,7 +155,12 @@ export default {
                 const directoryEntries = fs
                     .readdirSync(absolutePath, { withFileTypes: true })
                     .filter((entry) => entry.isDirectory())
-                    .map((entry) => buildNode(path.join(absolutePath, entry.name), `${relativePath}/${entry.name}`));
+                    .map((entry) =>
+                        buildNode(
+                            path.join(absolutePath, entry.name),
+                            `${relativePath}/${entry.name}`
+                        )
+                    );
 
                 directoryEntries.sort(sortByName);
 
@@ -237,7 +250,8 @@ export default {
 
         encodeRelativeLogicalPath(relativePath) {
             const safePath = toPosixPath(relativePath || '');
-            const runtimeUtils = typeof globalThis !== 'undefined' ? Reflect.get(globalThis, 'Utils') : null;
+            const runtimeUtils =
+                typeof globalThis !== 'undefined' ? Reflect.get(globalThis, 'Utils') : null;
             const encodePart =
                 runtimeUtils &&
                 (typeof runtimeUtils === 'object' || typeof runtimeUtils === 'function') &&
@@ -396,7 +410,10 @@ export default {
                 const sourceFiles = this.collectSourceImageFiles(sourceRoot);
                 for (const relativeFilePath of sourceFiles) {
                     const logicalRelativePath = this.toLogicalRelativePath(relativeFilePath);
-                    const relativeDir = toPosixPath(path.dirname(logicalRelativePath)).replace(/^\.$/, '');
+                    const relativeDir = toPosixPath(path.dirname(logicalRelativePath)).replace(
+                        /^\.$/,
+                        ''
+                    );
 
                     if (!this.isSelectedByFolderPrefix(relativeDir, selectedFolders)) {
                         continue;
@@ -426,7 +443,11 @@ export default {
                 }
 
                 if (failedCount > 0) {
-                    Alert.info(`Decoded ${decodedCount} images to png (${failedCount} failed)`, null, 2200);
+                    Alert.info(
+                        `Decoded ${decodedCount} images to png (${failedCount} failed)`,
+                        null,
+                        2200
+                    );
                 } else {
                     Alert.info(`Decoded ${decodedCount} images to png`, null, 2200);
                 }

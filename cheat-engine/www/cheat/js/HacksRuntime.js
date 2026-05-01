@@ -104,11 +104,7 @@ class HacksRuntime {
             }
 
             const data = JSON.parse(json);
-            if (
-                data &&
-                typeof data === 'object' &&
-                hasOwn(data, BITMAP_GET_PIXEL_LONG_FIX_KEY)
-            ) {
+            if (data && typeof data === 'object' && hasOwn(data, BITMAP_GET_PIXEL_LONG_FIX_KEY)) {
                 this.state[BITMAP_GET_PIXEL_LONG_FIX_KEY] = !!data[BITMAP_GET_PIXEL_LONG_FIX_KEY];
             }
         } catch (err) {

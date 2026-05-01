@@ -250,8 +250,7 @@ export class TMNamePopTranslator extends BasePluginTranslator {
     // Command line format: "namePop <eventId> <nameText> [shiftY] [outlineColor]"
     // In RMMV, parameters[0] is the full command string; args[1] is the name token.
     extractNameFromPluginCommand(cmd) {
-        const commandLine =
-            typeof cmd.parameters?.[0] === 'string' ? cmd.parameters[0] : '';
+        const commandLine = typeof cmd.parameters?.[0] === 'string' ? cmd.parameters[0] : '';
 
         const parts = commandLine.trim().split(' ');
         if (String(parts[0] || '').trim() !== NAME_POP_COMMAND) {

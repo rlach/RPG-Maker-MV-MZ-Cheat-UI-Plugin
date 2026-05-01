@@ -1,4 +1,4 @@
-import {Key} from '../js/KeyCodes.js'
+import { Key } from '../js/KeyCodes.js';
 
 export default {
     name: 'ShortcutPanel',
@@ -28,82 +28,81 @@ export default {
 </v-text-field>
     `,
 
-    data () {
-        return {
-        }
+    data() {
+        return {};
     },
 
     model: {
         prop: 'shortcut',
-        event: 'change'
+        event: 'change',
     },
 
     props: {
         shortcut: {
             type: Key,
-            default: () => Key.createEmpty()
+            default: () => Key.createEmpty(),
         },
 
         deletable: {
             type: Boolean,
-            default: true
+            default: true,
         },
 
         label: {
             type: String,
-            default: ''
+            default: '',
         },
 
         solo: {
             type: Boolean,
-            default: false
+            default: false,
         },
 
         outlined: {
             type: Boolean,
-            default: false
+            default: false,
         },
 
         backgroundColor: {
             type: String,
-            default: undefined
+            default: undefined,
         },
 
         combiningKeyAlone: {
             type: Boolean,
-            default: false
-        }
+            default: false,
+        },
     },
 
     computed: {
-        deleteBtnStyle () {
-            return `opacity: ${this.shortcut.isEmpty() ? 0 : 0.7}`
+        deleteBtnStyle() {
+            return `opacity: ${this.shortcut.isEmpty() ? 0 : 0.7}`;
         },
 
-        showingText () {
-            return this.shortcut.asDisplayString()
-        }
+        showingText() {
+            return this.shortcut.asDisplayString();
+        },
     },
 
-    methods : {
-        onDeleteClick () {
-            const eventKey = Key.createEmpty()
-            this.$emit('change', eventKey)
-            this.$emit('input', eventKey)
+    methods: {
+        onDeleteClick() {
+            const eventKey = Key.createEmpty();
+            this.$emit('change', eventKey);
+            this.$emit('input', eventKey);
         },
 
-        onShortcutInput (e) {
-            const eventKey = Key.fromEvent(e)
+        onShortcutInput(e) {
+            const eventKey = Key.fromEvent(e);
 
             if (eventKey.isCombiningKey() && !this.combiningKeyAlone) {
-                return
+                return;
             }
 
             if (!eventKey.equals(this.shortcut)) {
-                this.$emit('change', eventKey)
+                this.$emit('change', eventKey);
             }
 
-            this.$emit('input', eventKey)
-        }
-    }
-}
+            this.$emit('input', eventKey);
+        },
+    },
+};

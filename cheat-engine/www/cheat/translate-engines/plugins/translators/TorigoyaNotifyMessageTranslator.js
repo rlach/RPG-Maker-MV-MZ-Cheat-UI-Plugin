@@ -65,7 +65,10 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
 
         const notifyWindowClass = window.Torigoya?.NotifyMessage?.Window;
 
-        if (!notifyWindowClass?.prototype || typeof notifyWindowClass.prototype.setup !== 'function') {
+        if (
+            !notifyWindowClass?.prototype ||
+            typeof notifyWindowClass.prototype.setup !== 'function'
+        ) {
             return;
         }
 
@@ -80,7 +83,10 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
                     notifyItem.message = getTranslatedText(notifyItem.message);
                 }
             } catch (error) {
-                console.warn('[TorigoyaNotifyMessageTranslator] Failed to apply cached translation', error);
+                console.warn(
+                    '[TorigoyaNotifyMessageTranslator] Failed to apply cached translation',
+                    error
+                );
             }
 
             return originalSetup.call(this, notifyItem);
@@ -185,7 +191,10 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
                 const mapData = await loadMapDataById(mapId);
                 this.collectMapDataEntries(mapData, mapId, output);
             } catch (error) {
-                console.warn(`[TorigoyaNotifyMessageTranslator] Failed to scan map ${mapId}`, error);
+                console.warn(
+                    `[TorigoyaNotifyMessageTranslator] Failed to scan map ${mapId}`,
+                    error
+                );
             }
         }
     }

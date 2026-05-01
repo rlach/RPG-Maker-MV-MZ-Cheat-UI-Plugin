@@ -92,8 +92,7 @@ export function runCacheMigrationsIfNeeded(panel) {
     }
 
     const settings = readCacheSettings(panel);
-    const storedVersion =
-        settings && typeof settings.version === 'number' ? settings.version : 0;
+    const storedVersion = settings && typeof settings.version === 'number' ? settings.version : 0;
 
     if (storedVersion >= CURRENT_CACHE_VERSION) {
         return;

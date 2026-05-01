@@ -1,28 +1,28 @@
-import { BasePhase } from "./BasePhase.js";
+import { BasePhase } from './BasePhase.js';
 
 export class DirectItems extends BasePhase {
-  getKind() {
-    return "directItems";
-  }
+    getKind() {
+        return 'directItems';
+    }
 
-  async createEntries({ request }) {
-    const items = Array.isArray(request.items) ? request.items : [];
+    async createEntries({ request }) {
+        const items = Array.isArray(request.items) ? request.items : [];
 
-    return [
-      {
-        items,
-        priorityMapId: 0,
-      },
-    ];
-  }
+        return [
+            {
+                items,
+                priorityMapId: 0,
+            },
+        ];
+    }
 
-  countAmountSync({ request }) {
-    const items = Array.isArray(request.items) ? request.items : [];
-    return {
-      total: items.length,
-      left: items.length,
-      totalStrings: items.length,
-      leftStrings: items.length,
-    };
-  }
+    countAmountSync({ request }) {
+        const items = Array.isArray(request.items) ? request.items : [];
+        return {
+            total: items.length,
+            left: items.length,
+            totalStrings: items.length,
+            leftStrings: items.length,
+        };
+    }
 }

@@ -94,7 +94,9 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
             return null;
         }
 
-        const pluginName = String(this.getPluginName() || '').trim().toLowerCase();
+        const pluginName = String(this.getPluginName() || '')
+            .trim()
+            .toLowerCase();
         if (!pluginName) {
             return null;
         }
@@ -317,7 +319,10 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
                                 continue;
                             }
 
-                            command.name = translator.resolveRuntimeTranslation(command.name, runtime);
+                            command.name = translator.resolveRuntimeTranslation(
+                                command.name,
+                                runtime
+                            );
                         }
                     }
                 } catch (error) {
@@ -390,7 +395,11 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
 
         const pluginEntry = this.findPluginEntry();
         if (pluginEntry && pluginEntry.parameters) {
-            this.appendPluginParameterEntries(pluginEntry.parameters, 'pluginEntryParameter', entries);
+            this.appendPluginParameterEntries(
+                pluginEntry.parameters,
+                'pluginEntryParameter',
+                entries
+            );
         }
 
         const pluginManager = window.PluginManager;
@@ -539,7 +548,9 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
 
         const items = this.buildUniquePendingItems(panel);
         const totalStrings = items.length;
-        const leftStrings = items.filter((item) => !panel.hasUsableCacheValue(item.cacheKey)).length;
+        const leftStrings = items.filter(
+            (item) => !panel.hasUsableCacheValue(item.cacheKey)
+        ).length;
 
         return {
             total: totalStrings,

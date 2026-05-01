@@ -1,14 +1,14 @@
-import KeyInputField from '../components/KeyInputField.js'
-import { GLOBAL_SHORTCUT } from '../js/GlobalShortcut.js'
-import {Key} from '../js/KeyCodes.js'
-import {Alert} from '../js/AlertHelper.js'
-import {getRowsPerPage, setRowsPerPage} from '../js/TableSettings.js'
+import KeyInputField from '../components/KeyInputField.js';
+import { GLOBAL_SHORTCUT } from '../js/GlobalShortcut.js';
+import { Key } from '../js/KeyCodes.js';
+import { Alert } from '../js/AlertHelper.js';
+import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
 
 export default {
     name: 'ShortcutPanel',
 
     components: {
-        KeyInputField
+        KeyInputField,
     },
 
     template: `
@@ -162,7 +162,7 @@ export default {
 </v-card>
     `,
 
-    data () {
+    data() {
         return {
             isExternalWindow: !!window.__CHEAT_EXTERNAL_WINDOW__,
             shortcutApi: null,
@@ -180,7 +180,7 @@ export default {
             tableHeaders: [
                 {
                     text: 'Name',
-                    value: 'name'
+                    value: 'name',
                 },
                 {
                     text: 'Desc',
@@ -188,112 +188,116 @@ export default {
                 },
                 {
                     text: 'Shortcut',
-                    value: 'shortcut'
+                    value: 'shortcut',
                 },
                 {
                     text: 'Param',
-                    value: 'param'
-                }
-            ]
-        }
+                    value: 'param',
+                },
+            ],
+        };
     },
 
-    created () {
-        if (this.isExternalWindow && window.opener && !window.opener.closed && window.opener.GLOBAL_SHORTCUT) {
-            this.shortcutApi = window.opener.GLOBAL_SHORTCUT
+    created() {
+        if (
+            this.isExternalWindow &&
+            window.opener &&
+            !window.opener.closed &&
+            window.opener.GLOBAL_SHORTCUT
+        ) {
+            this.shortcutApi = window.opener.GLOBAL_SHORTCUT;
         } else {
-            this.shortcutApi = GLOBAL_SHORTCUT
+            this.shortcutApi = GLOBAL_SHORTCUT;
         }
 
         if (!this.shortcutApi || (this.isExternalWindow && this.shortcutApi === GLOBAL_SHORTCUT)) {
-            this.showUnavailable = true
-            return
+            this.showUnavailable = true;
+            return;
         }
 
-        this.initializeVariables()
+        this.initializeVariables();
     },
 
     watch: {
-        rowsPerPage (val) {
-            const parsed = Number(val)
+        rowsPerPage(val) {
+            const parsed = Number(val);
             if (!Number.isFinite(parsed) || parsed <= 0) {
-                return
+                return;
             }
 
             if (parsed !== val) {
-                this.rowsPerPage = parsed
-                return
+                this.rowsPerPage = parsed;
+                return;
             }
 
-            setRowsPerPage(parsed)
-        }
+            setRowsPerPage(parsed);
+        },
     },
 
     computed: {
-        filteredHeaders () {
-            return this.tableHeaders.filter(header => !this.hideDesc || header.value !== 'desc')
+        filteredHeaders() {
+            return this.tableHeaders.filter((header) => !this.hideDesc || header.value !== 'desc');
         },
 
-        filteredShortcuts () {
-            return this.shortcuts.filter(item => {
-                return this.shortcutSearch.isEmpty() || item.shortcut.contains(this.shortcutSearch)
-            })
-        }
+        filteredShortcuts() {
+            return this.shortcuts.filter((item) => {
+                return this.shortcutSearch.isEmpty() || item.shortcut.contains(this.shortcutSearch);
+            });
+        },
     },
 
     methods: {
-        restoreToDefault () {
-            this.shortcutApi.restoreDefaultSettings()
-            this.initializeVariables()
+        restoreToDefault() {
+            this.shortcutApi.restoreDefaultSettings();
+            this.initializeVariables();
         },
 
-        onSearchChange (search) {
-          this.shortcutSearch = Key.createEmpty()
+        onSearchChange(search) {
+            this.shortcutSearch = Key.createEmpty();
         },
 
-        onShortcutSearchChange (key) {
-            this.search = ''
+        onShortcutSearchChange(key) {
+            this.search = '';
         },
 
-        changeExpanded (item) {
+        changeExpanded(item) {
             if (this.tableExpanded.length === 1 && this.tableExpanded[0] === item) {
-                this.tableExpanded = []
+                this.tableExpanded = [];
             } else {
-                this.tableExpanded = [item]
+                this.tableExpanded = [item];
             }
         },
 
-        onShortcutChange (key, item) {
+        onShortcutChange(key, item) {
             try {
-                this.shortcutApi.setShortcut(item.id, key)
+                this.shortcutApi.setShortcut(item.id, key);
             } catch (err) {
-                Alert.error(err.message)
+                Alert.error(err.message);
             }
 
-            item.shortcut = this.shortcutApi.getShortcut(item.id)
+            item.shortcut = this.shortcutApi.getShortcut(item.id);
         },
 
         onParameterChange(value, item, paramId) {
             try {
-                this.shortcutApi.setParam(item.id, paramId, value)
+                this.shortcutApi.setParam(item.id, paramId, value);
             } catch (err) {
-                Alert.error(err.message)
+                Alert.error(err.message);
             }
 
-            item.param[paramId].value = this.shortcutApi.getParam(item.id, paramId)
+            item.param[paramId].value = this.shortcutApi.getParam(item.id, paramId);
         },
 
-        convertToInternalData (settings, config) {
-            const param = {}
+        convertToInternalData(settings, config) {
+            const param = {};
 
             if (settings.param) {
                 for (const paramName of Object.keys(settings.param)) {
                     param[paramName] = {
                         id: paramName,
-                        value: settings.param[paramName]
-                    }
+                        value: settings.param[paramName],
+                    };
                 }
-
             }
 
             return {
@@ -306,28 +310,35 @@ export default {
 
                 // use deep copy of settings
                 shortcut: Key.fromKey(settings.shortcut),
-                param: param
-            }
+                param: param,
+            };
         },
 
-        initializeVariables () {
+        initializeVariables() {
             if (!this.shortcutApi || !this.shortcutApi.shortcutConfig) {
-                this.showUnavailable = true
-                return
+                this.showUnavailable = true;
+                return;
             }
 
-            this.shortcuts = Object.keys(this.shortcutApi.shortcutConfig).map(key => {
-                return this.convertToInternalData(this.shortcutApi.shortcutSettings[key], this.shortcutApi.shortcutConfig[key])
-            })
+            this.shortcuts = Object.keys(this.shortcutApi.shortcutConfig).map((key) => {
+                return this.convertToInternalData(
+                    this.shortcutApi.shortcutSettings[key],
+                    this.shortcutApi.shortcutConfig[key]
+                );
+            });
         },
 
-        tableItemFilter (value, search, item) {
+        tableItemFilter(value, search, item) {
             if (search === null || search.trim() === '') {
-                return true
+                return true;
             }
 
-            search = search.toLowerCase()
-            return item.name.toLowerCase().contains(search) || item.desc.toLowerCase().contains(search) || item.shortcut.asDisplayString().toLowerCase().contains(search)
-        }
-    }
-}
+            search = search.toLowerCase();
+            return (
+                item.name.toLowerCase().contains(search) ||
+                item.desc.toLowerCase().contains(search) ||
+                item.shortcut.asDisplayString().toLowerCase().contains(search)
+            );
+        },
+    },
+};

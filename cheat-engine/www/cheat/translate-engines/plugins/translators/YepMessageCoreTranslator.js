@@ -39,7 +39,8 @@ const YEP_MESSAGE_CORE_PLUGIN_TAGS = [
         requiredConsistency: false,
     },
     {
-        description: 'If using word wrap mode, this will cause a line break (<line break> alias supported by plugin).',
+        description:
+            'If using word wrap mode, this will cause a line break (<line break> alias supported by plugin).',
         style: TAG_STYLE.XML,
         type: TAG_TYPE.WITHOUT_PARAMETER,
         tagSymbol: 'br',

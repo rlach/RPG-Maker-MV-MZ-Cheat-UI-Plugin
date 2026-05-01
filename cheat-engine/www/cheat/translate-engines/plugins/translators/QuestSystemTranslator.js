@@ -78,7 +78,9 @@ export class QuestSystemTranslator extends BasePluginTranslator {
         if (this._debugLogCount >= this._debugLogLimit) {
             if (!this._debugSuppressedNoticeShown) {
                 this._debugSuppressedNoticeShown = true;
-                console.log('[QuestSystemTranslator][debug] log limit reached; suppressing further logs');
+                console.log(
+                    '[QuestSystemTranslator][debug] log limit reached; suppressing further logs'
+                );
             }
             return;
         }
@@ -140,7 +142,9 @@ export class QuestSystemTranslator extends BasePluginTranslator {
             return null;
         }
 
-        const pluginName = String(this.getPluginName() || '').trim().toLowerCase();
+        const pluginName = String(this.getPluginName() || '')
+            .trim()
+            .toLowerCase();
         if (!pluginName) {
             return null;
         }
@@ -200,7 +204,9 @@ export class QuestSystemTranslator extends BasePluginTranslator {
         for (let rewardIndex = 0; rewardIndex < parsedRewards.length; rewardIndex++) {
             const rewardRaw = parsedRewards[rewardIndex];
             const reward =
-                typeof rewardRaw === 'string' ? parseJsonSafely(rewardRaw, null) : rewardRaw || null;
+                typeof rewardRaw === 'string'
+                    ? parseJsonSafely(rewardRaw, null)
+                    : rewardRaw || null;
 
             if (!reward || typeof reward !== 'object' || Array.isArray(reward)) {
                 continue;
@@ -231,7 +237,8 @@ export class QuestSystemTranslator extends BasePluginTranslator {
 
         for (let questIndex = 0; questIndex < parsedQuestDatas.length; questIndex++) {
             const questRaw = parsedQuestDatas[questIndex];
-            const quest = typeof questRaw === 'string' ? parseJsonSafely(questRaw, null) : questRaw || null;
+            const quest =
+                typeof questRaw === 'string' ? parseJsonSafely(questRaw, null) : questRaw || null;
 
             if (!quest || typeof quest !== 'object' || Array.isArray(quest)) {
                 continue;
@@ -440,11 +447,14 @@ export class QuestSystemTranslator extends BasePluginTranslator {
                             pluginCacheType,
                         ]);
                         if (translated !== item.name) {
-                            console.log('[QuestSystemTranslator][debug] command list entry translated', {
-                                className,
-                                original: item.name,
-                                translated,
-                            });
+                            console.log(
+                                '[QuestSystemTranslator][debug] command list entry translated',
+                                {
+                                    className,
+                                    original: item.name,
+                                    translated,
+                                }
+                            );
                             item.name = translated;
                         }
                     }
@@ -463,7 +473,10 @@ export class QuestSystemTranslator extends BasePluginTranslator {
         };
         const installQuestStateTextHook = () => {
             const questDataClass = window.QuestSystemAlias?.QuestData;
-            if (!questDataClass?.prototype || typeof questDataClass.prototype.stateText !== 'function') {
+            if (
+                !questDataClass?.prototype ||
+                typeof questDataClass.prototype.stateText !== 'function'
+            ) {
                 return;
             }
 
@@ -478,7 +491,10 @@ export class QuestSystemTranslator extends BasePluginTranslator {
                 try {
                     return translateWithRuntime(original);
                 } catch (error) {
-                    console.warn('[QuestSystemTranslator] Failed to translate QuestData.stateText()', error);
+                    console.warn(
+                        '[QuestSystemTranslator] Failed to translate QuestData.stateText()',
+                        error
+                    );
                     return original;
                 }
             };
@@ -587,7 +603,9 @@ export class QuestSystemTranslator extends BasePluginTranslator {
                     if (translatedText !== text) {
                         console.log('[QuestSystemTranslator][debug] drawText translated', {
                             ctorName,
-                            original: String(text).replaceAll('\n', String.raw`\n`).slice(0, 120),
+                            original: String(text)
+                                .replaceAll('\n', String.raw`\n`)
+                                .slice(0, 120),
                             translated: String(translatedText)
                                 .replaceAll('\n', String.raw`\n`)
                                 .slice(0, 120),
@@ -631,7 +649,9 @@ export class QuestSystemTranslator extends BasePluginTranslator {
                     if (translatedText !== text) {
                         console.log('[QuestSystemTranslator][debug] drawTextEx translated', {
                             ctorName,
-                            original: String(text).replaceAll('\n', String.raw`\n`).slice(0, 120),
+                            original: String(text)
+                                .replaceAll('\n', String.raw`\n`)
+                                .slice(0, 120),
                             translated: String(translatedText)
                                 .replaceAll('\n', String.raw`\n`)
                                 .slice(0, 120),
@@ -667,11 +687,14 @@ export class QuestSystemTranslator extends BasePluginTranslator {
                             'command',
                         ]);
                         if (translatedText !== text) {
-                            console.log('[QuestSystemTranslator][debug] createTextState translated', {
-                                ctorName: getCtorName(this),
-                                original: formatPreview(text),
-                                translated: formatPreview(translatedText),
-                            });
+                            console.log(
+                                '[QuestSystemTranslator][debug] createTextState translated',
+                                {
+                                    ctorName: getCtorName(this),
+                                    original: formatPreview(text),
+                                    translated: formatPreview(translatedText),
+                                }
+                            );
                         }
                     }
                 } catch (error) {
@@ -701,10 +724,13 @@ export class QuestSystemTranslator extends BasePluginTranslator {
                             'command',
                         ]);
                         if (translatedText !== text) {
-                            console.log('[QuestSystemTranslator][debug] Bitmap.drawText translated', {
-                                original: formatPreview(text),
-                                translated: formatPreview(translatedText),
-                            });
+                            console.log(
+                                '[QuestSystemTranslator][debug] Bitmap.drawText translated',
+                                {
+                                    original: formatPreview(text),
+                                    translated: formatPreview(translatedText),
+                                }
+                            );
                         }
                     }
                 } catch (error) {
@@ -749,10 +775,13 @@ export class QuestSystemTranslator extends BasePluginTranslator {
                                 pluginCacheType,
                             ]);
                             if (translated !== command.name) {
-                                console.log('[QuestSystemTranslator][debug] menu command translated', {
-                                    original: String(command.name),
-                                    translated: String(translated),
-                                });
+                                console.log(
+                                    '[QuestSystemTranslator][debug] menu command translated',
+                                    {
+                                        original: String(command.name),
+                                        translated: String(translated),
+                                    }
+                                );
                                 command.name = translated;
                             }
                         }
@@ -807,7 +836,11 @@ export class QuestSystemTranslator extends BasePluginTranslator {
 
         const pluginEntry = this.findPluginEntry();
         if (pluginEntry?.parameters) {
-            this.appendEntriesFromParameters(pluginEntry.parameters, 'pluginEntryParameter', entries);
+            this.appendEntriesFromParameters(
+                pluginEntry.parameters,
+                'pluginEntryParameter',
+                entries
+            );
         }
 
         if (window.PluginManager && typeof PluginManager.parameters === 'function') {
@@ -862,7 +895,9 @@ export class QuestSystemTranslator extends BasePluginTranslator {
 
         const items = this.buildUniquePendingItems(panel);
         const totalStrings = items.length;
-        const leftStrings = items.filter((item) => !panel.hasUsableCacheValue(item.cacheKey)).length;
+        const leftStrings = items.filter(
+            (item) => !panel.hasUsableCacheValue(item.cacheKey)
+        ).length;
 
         return {
             total: totalStrings,

@@ -4,10 +4,10 @@
  * All hook guards are stored on the root window to ensure cross-window awareness
  */
 
-import { getRootWindow } from './RootWindowState.js'
-import { isMapLike } from './TranslateCacheRuntime.js'
+import { getRootWindow } from './RootWindowState.js';
+import { isMapLike } from './TranslateCacheRuntime.js';
 
-const HOOK_GUARDS_MAP_KEY = '__CHEAT_PLUGIN_HOOK_GUARDS__'
+const HOOK_GUARDS_MAP_KEY = '__CHEAT_PLUGIN_HOOK_GUARDS__';
 
 function isSetLike(value) {
     return (
@@ -18,17 +18,17 @@ function isSetLike(value) {
         typeof value.clear === 'function' &&
         typeof value.values === 'function' &&
         !isMapLike(value)
-    )
+    );
 }
 
 function ensureHookGuardsMap() {
-    const root = getRootWindow()
+    const root = getRootWindow();
 
     if (!root[HOOK_GUARDS_MAP_KEY] || !isSetLike(root[HOOK_GUARDS_MAP_KEY])) {
-        root[HOOK_GUARDS_MAP_KEY] = new Set()
+        root[HOOK_GUARDS_MAP_KEY] = new Set();
     }
 
-    return root[HOOK_GUARDS_MAP_KEY]
+    return root[HOOK_GUARDS_MAP_KEY];
 }
 
 /**
@@ -38,11 +38,11 @@ function ensureHookGuardsMap() {
  */
 export function isHookAlreadyApplied(hookName) {
     if (typeof hookName !== 'string' || !hookName.trim()) {
-        return false
+        return false;
     }
 
-    const guards = ensureHookGuardsMap()
-    return guards.has(hookName)
+    const guards = ensureHookGuardsMap();
+    return guards.has(hookName);
 }
 
 /**
@@ -52,17 +52,17 @@ export function isHookAlreadyApplied(hookName) {
  */
 export function markHookAsApplied(hookName) {
     if (typeof hookName !== 'string' || !hookName.trim()) {
-        return false
+        return false;
     }
 
-    const guards = ensureHookGuardsMap()
+    const guards = ensureHookGuardsMap();
 
     if (guards.has(hookName)) {
-        return false
+        return false;
     }
 
-    guards.add(hookName)
-    return true
+    guards.add(hookName);
+    return true;
 }
 
 /**
@@ -79,11 +79,11 @@ export function markHookAsApplied(hookName) {
  */
 export function shouldApplyHook(hookName) {
     if (isHookAlreadyApplied(hookName)) {
-        return false
+        return false;
     }
 
-    markHookAsApplied(hookName)
-    return true
+    markHookAsApplied(hookName);
+    return true;
 }
 
 /**
@@ -91,8 +91,8 @@ export function shouldApplyHook(hookName) {
  * NOT recommended for production use
  */
 export function clearAllHookGuards() {
-    const root = getRootWindow()
-    root[HOOK_GUARDS_MAP_KEY] = new Set()
+    const root = getRootWindow();
+    root[HOOK_GUARDS_MAP_KEY] = new Set();
 }
 
 /**
@@ -100,6 +100,6 @@ export function clearAllHookGuards() {
  * @returns {string[]} Array of hook names that have been applied
  */
 export function getAppliedHooks() {
-    const guards = ensureHookGuardsMap()
-    return Array.from(guards)
+    const guards = ensureHookGuardsMap();
+    return Array.from(guards);
 }

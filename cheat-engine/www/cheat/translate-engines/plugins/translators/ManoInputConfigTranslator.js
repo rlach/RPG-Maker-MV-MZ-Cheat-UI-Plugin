@@ -232,15 +232,19 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
                     let translated = commandName;
                     try {
                         translated = resolveFromCache(commandName, getRuntime());
-                    } catch (_) { /* noop */ }
+                    } catch (_) {
+                        /* noop */
+                    }
                     return origDrawCommand.call(this, translated, rect);
                 };
             }
 
             // These helpers bypass drawCommand and write directly with drawText.
             for (const methodName of [
-                'drawApplyCommand', 'drawDefaultCommand',
-                'drawexitCommand', 'drawChangeLayoutCommand',
+                'drawApplyCommand',
+                'drawDefaultCommand',
+                'drawexitCommand',
+                'drawChangeLayoutCommand',
             ]) {
                 if (typeof kcProto[methodName] === 'function') {
                     const origMethod = kcProto[methodName];
@@ -248,7 +252,11 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
                         const origDrawText = this.drawText;
                         this.drawText = (text, ...rest) => {
                             let translated = text;
-                            try { translated = resolveFromCache(text, getRuntime()); } catch (_) { /* noop */ }
+                            try {
+                                translated = resolveFromCache(text, getRuntime());
+                            } catch (_) {
+                                /* noop */
+                            }
                             return origDrawText.call(this, translated, ...rest);
                         };
                         try {
@@ -291,7 +299,9 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
                     const origName = command.name;
                     try {
                         command.name = resolveFromCache(origName, getRuntime());
-                    } catch (_) { /* noop */ }
+                    } catch (_) {
+                        /* noop */
+                    }
                     try {
                         return origGpDrawCommand.call(this, index);
                     } finally {
@@ -303,14 +313,22 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
             // drawApplyCommand / drawDefaultCommand / drawExitCommand bypass
             // drawCommand(index) and read setting.commandText.* directly.
             // Wrap drawText on the instance for the duration of each call.
-            for (const methodName of ['drawApplyCommand', 'drawDefaultCommand', 'drawExitCommand']) {
+            for (const methodName of [
+                'drawApplyCommand',
+                'drawDefaultCommand',
+                'drawExitCommand',
+            ]) {
                 if (typeof proto[methodName] === 'function') {
                     const origMethod = proto[methodName];
                     proto[methodName] = function (...args) {
                         const origDrawText = this.drawText;
                         this.drawText = (text, ...rest) => {
                             let translated = text;
-                            try { translated = resolveFromCache(text, getRuntime()); } catch (_) { /* noop */ }
+                            try {
+                                translated = resolveFromCache(text, getRuntime());
+                            } catch (_) {
+                                /* noop */
+                            }
                             return origDrawText.call(this, translated, ...rest);
                         };
                         try {
@@ -327,12 +345,17 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
         // createHelpWindow calls this._helpWindow.setText(createPadinfoText(pad))
         // once. Hook the scene method to re-translate the text that was just set.
         const SceneGamepadConfig = manoNs['Scene_GamepadConfig'];
-        if (SceneGamepadConfig && SceneGamepadConfig.prototype &&
-            typeof SceneGamepadConfig.prototype.createHelpWindow === 'function') {
+        if (
+            SceneGamepadConfig &&
+            SceneGamepadConfig.prototype &&
+            typeof SceneGamepadConfig.prototype.createHelpWindow === 'function'
+        ) {
             const origCreateHelpWindow = SceneGamepadConfig.prototype.createHelpWindow;
             SceneGamepadConfig.prototype.createHelpWindow = function () {
                 origCreateHelpWindow.call(this);
-                if (!this._helpWindow) { return; }
+                if (!this._helpWindow) {
+                    return;
+                }
                 try {
                     // After the original call, re-translate whatever text was set.
                     const currentText = this._helpWindow._text || '';
@@ -342,15 +365,20 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
                             this._helpWindow.setText(translated);
                         }
                     }
-                } catch (_) { /* noop */ }
+                } catch (_) {
+                    /* noop */
+                }
             };
         }
 
         // ── Window_InputSymbolList: symbolName(index) ────────────────────────
         // drawItem calls this.symbolName(index) to get the display string.
         const WindowInputSymbolList = manoNs['Window_InputSymbolList'];
-        if (WindowInputSymbolList && WindowInputSymbolList.prototype &&
-            typeof WindowInputSymbolList.prototype.symbolName === 'function') {
+        if (
+            WindowInputSymbolList &&
+            WindowInputSymbolList.prototype &&
+            typeof WindowInputSymbolList.prototype.symbolName === 'function'
+        ) {
             const origSymbolName = WindowInputSymbolList.prototype.symbolName;
             WindowInputSymbolList.prototype.symbolName = function (index) {
                 const text = origSymbolName.call(this, index);
@@ -578,10 +606,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
                     }
                 }
             } catch (error) {
-                console.warn(
-                    '[ManoInputConfigTranslator] drawItem translation failed',
-                    error
-                );
+                console.warn('[ManoInputConfigTranslator] drawItem translation failed', error);
             }
 
             if (patchedLeft === rawLeft && patchedRight === rawRight) {
@@ -721,7 +746,11 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
         }
         // MV has textApply as a plain non-JSON string
         const textApply = params['textApply'];
-        if (typeof textApply === 'string' && textApply.trim() && !textApply.trim().startsWith('{')) {
+        if (
+            typeof textApply === 'string' &&
+            textApply.trim() &&
+            !textApply.trim().startsWith('{')
+        ) {
             return true;
         }
         return false;
@@ -737,13 +766,28 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
     _appendEntriesFromParametersMV(params, scope, output) {
         // ── Plain string command/symbol texts ────────────────────────────────
         const plainFields = [
-            'textApply', 'textRollback', 'textDefault', 'textChangeLayout', 'textExit',
+            'textApply',
+            'textRollback',
+            'textDefault',
+            'textChangeLayout',
+            'textExit',
             'textEmpty',
-            'textOK', 'textCancel', 'textShift', 'textMenu',
-            'textPageup', 'textPagedown', 'textEscape',
-            'textSymbol6', 'textSymbol7', 'textSymbol8',
-            'textUp', 'textDown', 'textLeft', 'textRight',
-            'commandName', 'keyconfigCommandName',
+            'textOK',
+            'textCancel',
+            'textShift',
+            'textMenu',
+            'textPageup',
+            'textPagedown',
+            'textEscape',
+            'textSymbol6',
+            'textSymbol7',
+            'textSymbol8',
+            'textUp',
+            'textDown',
+            'textLeft',
+            'textRight',
+            'commandName',
+            'keyconfigCommandName',
         ];
 
         for (const field of plainFields) {
@@ -833,7 +877,15 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
         }
 
         // ── struct<KeyconfigCommand> parameters ──────────────────────────────
-        for (const field of ['apply', 'rollback', 'reset', 'WASD', 'style', 'changeLayout', 'exit']) {
+        for (const field of [
+            'apply',
+            'rollback',
+            'reset',
+            'WASD',
+            'style',
+            'changeLayout',
+            'exit',
+        ]) {
             const text = extractKeyconfigCommand(params[field]);
             if (isUsableText(text)) {
                 output.push({ text, source: { scope, field } });
@@ -991,7 +1043,9 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
 
         const items = this.buildUniquePendingItems(panel);
         const totalStrings = items.length;
-        const leftStrings = items.filter((item) => !panel.hasUsableCacheValue(item.cacheKey)).length;
+        const leftStrings = items.filter(
+            (item) => !panel.hasUsableCacheValue(item.cacheKey)
+        ).length;
 
         return {
             total: totalStrings,

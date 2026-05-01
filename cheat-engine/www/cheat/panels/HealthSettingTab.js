@@ -51,7 +51,7 @@ export default {
 </div>
     `,
 
-    data () {
+    data() {
         return {
             tableHeaders: [
                 {
@@ -60,29 +60,29 @@ export default {
                 },
                 {
                     text: 'Hp',
-                    value: 'hp'
+                    value: 'hp',
                 },
                 {
                     text: 'Mp',
-                    value: 'mp'
-                }
+                    value: 'mp',
+                },
             ],
 
             editingItems: [],
-        }
+        };
     },
 
     props: {
         items: {
             type: Array,
-            default: []
-        }
+            default: [],
+        },
     },
 
     watch: {
         items: {
             immediate: true,
-            handler () {
+            handler() {
                 this.editingItems = this.items.map((member) => {
                     return {
                         _member: member,
@@ -93,17 +93,17 @@ export default {
                         },
                         mp: {
                             mp: member.mp,
-                            mmp: member.mmp
-                        }
-                    }
-                })
-            }
-        }
+                            mmp: member.mmp,
+                        },
+                    };
+                });
+            },
+        },
     },
 
     methods: {
-        onDataChange () {
-            this.$emit('change', this.editingItems)
-        }
-    }
-}
+        onDataChange() {
+            this.$emit('change', this.editingItems);
+        },
+    },
+};

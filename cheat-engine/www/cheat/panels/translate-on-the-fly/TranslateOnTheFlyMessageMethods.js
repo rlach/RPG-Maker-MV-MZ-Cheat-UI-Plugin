@@ -393,13 +393,10 @@ export const translateOnTheFlyMessageMethods = {
                 return;
             }
             if (!this.engine) {
-                console.error(
-                    '[TranslateOnTheFly] No engine available',
-                    {
-                        hasEngine: !!this.engine,
-                        engineType: this.engine ? this.engine.constructor.name : 'null',
-                    }
-                );
+                console.error('[TranslateOnTheFly] No engine available', {
+                    hasEngine: !!this.engine,
+                    engineType: this.engine ? this.engine.constructor.name : 'null',
+                });
                 Alert.error('Translation engine not initialized');
                 return;
             }

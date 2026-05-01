@@ -106,7 +106,7 @@ function migrateLegacySettingsFiles(settings) {
     const hasSceneOption = Object.prototype.hasOwnProperty.call(gameSpeedData, 'sceneOption');
     if (hasRate || hasSceneOption) {
         const migratedGameSpeed = {
-            ...(normalizeObject(settings.gameSpeed)),
+            ...normalizeObject(settings.gameSpeed),
         };
         if (hasRate) {
             migratedGameSpeed.rate = gameSpeedData.rate;
@@ -123,7 +123,11 @@ function migrateLegacySettingsFiles(settings) {
                 fs.unlinkSync(filePath);
             }
         } catch (error) {
-            console.warn('[UnifiedSettings] Failed to remove legacy settings file:', filePath, error);
+            console.warn(
+                '[UnifiedSettings] Failed to remove legacy settings file:',
+                filePath,
+                error
+            );
         }
     });
 }

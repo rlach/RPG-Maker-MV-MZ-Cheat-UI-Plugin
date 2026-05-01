@@ -76,7 +76,8 @@ export default {
     methods: {
         initializeVariables() {
             this.bitmapGetPixelLongFix = HACKS_RUNTIME.isBitmapGetPixelLongFixEnabled();
-            this.hasMessageSkipSkipSwitchConfig = HACKS_RUNTIME.hasMessageSkipConfiguredSkipSwitch();
+            this.hasMessageSkipSkipSwitchConfig =
+                HACKS_RUNTIME.hasMessageSkipConfiguredSkipSwitch();
             this.messageSkipSwitchId = HACKS_RUNTIME.getMessageSkipForcedSkipSwitchId();
             this.messageSkipForcedSkipEnabled = HACKS_RUNTIME.isMessageSkipForcedSkipEnabled();
         },
@@ -86,7 +87,8 @@ export default {
         },
 
         onMessageSkipForcedSkipChange(enabled) {
-            this.messageSkipForcedSkipEnabled = HACKS_RUNTIME.setMessageSkipForcedSkipEnabled(!!enabled);
+            this.messageSkipForcedSkipEnabled =
+                HACKS_RUNTIME.setMessageSkipForcedSkipEnabled(!!enabled);
         },
     },
 };

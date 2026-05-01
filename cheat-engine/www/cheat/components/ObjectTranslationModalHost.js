@@ -1,9 +1,9 @@
-import { OBJECT_TRANSLATION_SERVICE } from "../panels/translate-on-the-fly/ObjectTranslationService.js";
+import { OBJECT_TRANSLATION_SERVICE } from '../panels/translate-on-the-fly/ObjectTranslationService.js';
 
 export default {
-  name: "ObjectTranslationModalHost",
+    name: 'ObjectTranslationModalHost',
 
-  template: `
+    template: `
 <div>
   <v-dialog
     v-model="objectTranslationDialogVisible"
@@ -211,230 +211,226 @@ export default {
 </div>
   `,
 
-  data() {
-    return {
-      service: OBJECT_TRANSLATION_SERVICE,
-      dragSourceIndex: -1,
-    };
-  },
-
-  computed: {
-    objectTranslationDialogVisible: {
-      get() {
-        return this.service.state.dialogVisible;
-      },
-      set(value) {
-        this.service.state.dialogVisible = !!value;
-      },
+    data() {
+        return {
+            service: OBJECT_TRANSLATION_SERVICE,
+            dragSourceIndex: -1,
+        };
     },
 
-    objectTranslationMapEventsDialogVisible: {
-      get() {
-        return this.service.state.mapEventsDialogVisible;
-      },
-      set(value) {
-        this.service.state.mapEventsDialogVisible = !!value;
-      },
+    computed: {
+        objectTranslationDialogVisible: {
+            get() {
+                return this.service.state.dialogVisible;
+            },
+            set(value) {
+                this.service.state.dialogVisible = !!value;
+            },
+        },
+
+        objectTranslationMapEventsDialogVisible: {
+            get() {
+                return this.service.state.mapEventsDialogVisible;
+            },
+            set(value) {
+                this.service.state.mapEventsDialogVisible = !!value;
+            },
+        },
+
+        objectTranslationPluginsDialogVisible: {
+            get() {
+                return this.service.state.pluginsDialogVisible;
+            },
+            set(value) {
+                this.service.state.pluginsDialogVisible = !!value;
+            },
+        },
+
+        objectTranslationMapEventsSearch: {
+            get() {
+                return this.service.state.mapEventsSearch;
+            },
+            set(value) {
+                this.service.state.mapEventsSearch = value;
+            },
+        },
+
+        objectTranslationPluginsSearch: {
+            get() {
+                return this.service.state.pluginsSearch;
+            },
+            set(value) {
+                this.service.state.pluginsSearch = value;
+            },
+        },
+
+        objectTranslationModalStats() {
+            return this.service.state.modalStats;
+        },
+
+        objectTranslationSelection() {
+            return this.service.state.selection;
+        },
+
+        cacheEmptyStringsRepeatUntilSuccess: {
+            get() {
+                return !!this.service.state.cacheEmptyStringsRepeatUntilSuccess;
+            },
+            set(v) {
+                this.service.setCacheEmptyStringsRepeatUntilSuccess(!!v);
+            },
+        },
+
+        objectTranslationMapEventsLoading() {
+            return this.service.state.mapEventsLoading;
+        },
+
+        objectTranslationMapEventDraftSelection() {
+            return this.service.state.mapEventDraftSelection;
+        },
+
+        objectTranslationPluginsLoading() {
+            return this.service.state.pluginsLoading;
+        },
+
+        objectTranslationPluginDraftSelection() {
+            return this.service.state.pluginDraftSelection;
+        },
+
+        filteredObjectTranslationMapEventDetails() {
+            const items = Array.isArray(this.service.state.mapEventDetails)
+                ? this.service.state.mapEventDetails
+                : [];
+            const search = (this.objectTranslationMapEventsSearch || '').trim().toLowerCase();
+            if (!search) {
+                return items;
+            }
+
+            return items.filter((item) => {
+                const label = String(item.label || '').toLowerCase();
+                const id = String(item.id || '').toLowerCase();
+                return label.includes(search) || id.includes(search);
+            });
+        },
+
+        filteredObjectTranslationPluginDetails() {
+            const items = Array.isArray(this.service.state.pluginDetails)
+                ? this.service.state.pluginDetails
+                : [];
+            const search = (this.objectTranslationPluginsSearch || '').trim().toLowerCase();
+            if (!search) {
+                return items;
+            }
+
+            return items.filter((item) => {
+                const label = String(item.label || '').toLowerCase();
+                const id = String(item.id || '').toLowerCase();
+                return label.includes(search) || id.includes(search);
+            });
+        },
     },
 
-    objectTranslationPluginsDialogVisible: {
-      get() {
-        return this.service.state.pluginsDialogVisible;
-      },
-      set(value) {
-        this.service.state.pluginsDialogVisible = !!value;
-      },
+    methods: {
+        openMapEventsSelectionModal() {
+            this.service.openMapSelection();
+        },
+
+        openPluginsSelectionModal() {
+            this.service.openPluginSelection();
+        },
+
+        openObjectTranslationSubSelection(typeId) {
+            if (typeId === 'mapEvents') {
+                this.openMapEventsSelectionModal();
+                return;
+            }
+
+            if (typeId === 'plugins') {
+                this.openPluginsSelectionModal();
+            }
+        },
+
+        closeObjectTranslationModal() {
+            this.service.closeModal();
+        },
+
+        startObjectTranslationFromModal(dryRun = false) {
+            this.service.startObjectTranslationFromModal(!!dryRun);
+        },
+
+        closeMapEventsSelectionModal() {
+            this.service.closeMapSelection();
+        },
+
+        closePluginsSelectionModal() {
+            this.service.closePluginSelection();
+        },
+
+        selectAllMapEventsForObjectTranslation() {
+            this.service.selectAllMaps();
+        },
+
+        deselectAllMapEventsForObjectTranslation() {
+            this.service.deselectAllMaps();
+        },
+
+        selectAllPluginsForObjectTranslation() {
+            this.service.selectAllPlugins();
+        },
+
+        deselectAllPluginsForObjectTranslation() {
+            this.service.deselectAllPlugins();
+        },
+
+        saveMapEventsSelection() {
+            this.service.saveMapSelection();
+        },
+
+        savePluginsSelection() {
+            this.service.savePluginSelection();
+        },
+
+        onItemDragStart(event, index) {
+            const item = this.objectTranslationModalStats[index];
+            if (item && item.noDragDrop) {
+                if (event) {
+                    event.preventDefault();
+                }
+                return;
+            }
+            this.dragSourceIndex = index;
+            if (event && event.dataTransfer) {
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', String(index));
+            }
+        },
+
+        onItemDragOver(event, index) {
+            if (this.dragSourceIndex < 0 || this.dragSourceIndex === index) {
+                return;
+            }
+
+            if (event && event.dataTransfer) {
+                event.dataTransfer.dropEffect = 'move';
+            }
+        },
+
+        onItemDrop(event, index) {
+            let fromIndex = this.dragSourceIndex;
+            if (event && event.dataTransfer) {
+                const raw = event.dataTransfer.getData('text/plain');
+                const parsed = Number(raw);
+                if (Number.isFinite(parsed)) {
+                    fromIndex = parsed;
+                }
+            }
+
+            this.dragSourceIndex = -1;
+            this.service.reorderModalItem(fromIndex, index);
+        },
+
+        onItemDragEnd() {
+            this.dragSourceIndex = -1;
+        },
     },
-
-    objectTranslationMapEventsSearch: {
-      get() {
-        return this.service.state.mapEventsSearch;
-      },
-      set(value) {
-        this.service.state.mapEventsSearch = value;
-      },
-    },
-
-    objectTranslationPluginsSearch: {
-      get() {
-        return this.service.state.pluginsSearch;
-      },
-      set(value) {
-        this.service.state.pluginsSearch = value;
-      },
-    },
-
-    objectTranslationModalStats() {
-      return this.service.state.modalStats;
-    },
-
-    objectTranslationSelection() {
-      return this.service.state.selection;
-    },
-
-    cacheEmptyStringsRepeatUntilSuccess: {
-      get() {
-        return !!this.service.state.cacheEmptyStringsRepeatUntilSuccess;
-      },
-      set(v) {
-        this.service.setCacheEmptyStringsRepeatUntilSuccess(!!v);
-      },
-    },
-
-    objectTranslationMapEventsLoading() {
-      return this.service.state.mapEventsLoading;
-    },
-
-    objectTranslationMapEventDraftSelection() {
-      return this.service.state.mapEventDraftSelection;
-    },
-
-    objectTranslationPluginsLoading() {
-      return this.service.state.pluginsLoading;
-    },
-
-    objectTranslationPluginDraftSelection() {
-      return this.service.state.pluginDraftSelection;
-    },
-
-    filteredObjectTranslationMapEventDetails() {
-      const items = Array.isArray(this.service.state.mapEventDetails)
-        ? this.service.state.mapEventDetails
-        : [];
-      const search = (this.objectTranslationMapEventsSearch || "")
-        .trim()
-        .toLowerCase();
-      if (!search) {
-        return items;
-      }
-
-      return items.filter((item) => {
-        const label = String(item.label || "").toLowerCase();
-        const id = String(item.id || "").toLowerCase();
-        return label.includes(search) || id.includes(search);
-      });
-    },
-
-    filteredObjectTranslationPluginDetails() {
-      const items = Array.isArray(this.service.state.pluginDetails)
-        ? this.service.state.pluginDetails
-        : [];
-      const search = (this.objectTranslationPluginsSearch || "")
-        .trim()
-        .toLowerCase();
-      if (!search) {
-        return items;
-      }
-
-      return items.filter((item) => {
-        const label = String(item.label || "").toLowerCase();
-        const id = String(item.id || "").toLowerCase();
-        return label.includes(search) || id.includes(search);
-      });
-    },
-  },
-
-  methods: {
-    openMapEventsSelectionModal() {
-      this.service.openMapSelection();
-    },
-
-    openPluginsSelectionModal() {
-      this.service.openPluginSelection();
-    },
-
-    openObjectTranslationSubSelection(typeId) {
-      if (typeId === "mapEvents") {
-        this.openMapEventsSelectionModal();
-        return;
-      }
-
-      if (typeId === "plugins") {
-        this.openPluginsSelectionModal();
-      }
-    },
-
-    closeObjectTranslationModal() {
-      this.service.closeModal();
-    },
-
-    startObjectTranslationFromModal(dryRun = false) {
-      this.service.startObjectTranslationFromModal(!!dryRun);
-    },
-
-    closeMapEventsSelectionModal() {
-      this.service.closeMapSelection();
-    },
-
-    closePluginsSelectionModal() {
-      this.service.closePluginSelection();
-    },
-
-    selectAllMapEventsForObjectTranslation() {
-      this.service.selectAllMaps();
-    },
-
-    deselectAllMapEventsForObjectTranslation() {
-      this.service.deselectAllMaps();
-    },
-
-    selectAllPluginsForObjectTranslation() {
-      this.service.selectAllPlugins();
-    },
-
-    deselectAllPluginsForObjectTranslation() {
-      this.service.deselectAllPlugins();
-    },
-
-    saveMapEventsSelection() {
-      this.service.saveMapSelection();
-    },
-
-    savePluginsSelection() {
-      this.service.savePluginSelection();
-    },
-
-    onItemDragStart(event, index) {
-      const item = this.objectTranslationModalStats[index];
-      if (item && item.noDragDrop) {
-        if (event) {
-          event.preventDefault();
-        }
-        return;
-      }
-      this.dragSourceIndex = index;
-      if (event && event.dataTransfer) {
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("text/plain", String(index));
-      }
-    },
-
-    onItemDragOver(event, index) {
-      if (this.dragSourceIndex < 0 || this.dragSourceIndex === index) {
-        return;
-      }
-
-      if (event && event.dataTransfer) {
-        event.dataTransfer.dropEffect = "move";
-      }
-    },
-
-    onItemDrop(event, index) {
-      let fromIndex = this.dragSourceIndex;
-      if (event && event.dataTransfer) {
-        const raw = event.dataTransfer.getData("text/plain");
-        const parsed = Number(raw);
-        if (Number.isFinite(parsed)) {
-          fromIndex = parsed;
-        }
-      }
-
-      this.dragSourceIndex = -1;
-      this.service.reorderModalItem(fromIndex, index);
-    },
-
-    onItemDragEnd() {
-      this.dragSourceIndex = -1;
-    },
-  },
 };

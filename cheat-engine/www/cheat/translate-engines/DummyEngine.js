@@ -36,12 +36,12 @@ export default class DummyEngine extends BaseTranslationEngine {
         console.log('[DummyEngine] Batch translate called with', items.length, 'items');
 
         // Return all items as failures
-        const failures = items.map(item => ({
+        const failures = items.map((item) => ({
             type: item.type,
             id: item.id,
             value: item.value,
             cacheKey: item.cacheKey,
-            rejectReason: "I'm a dummy"
+            rejectReason: "I'm a dummy",
         }));
 
         return { successes: [], failures };

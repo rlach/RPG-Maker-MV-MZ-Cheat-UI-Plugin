@@ -23,10 +23,7 @@ function getSafeCurrentMessageText() {
 }
 
 function applyCachedCurrentMessageTranslation(runtime) {
-    if (
-        !runtime ||
-        !window.$gameMessage
-    ) {
+    if (!runtime || !window.$gameMessage) {
         return;
     }
 
