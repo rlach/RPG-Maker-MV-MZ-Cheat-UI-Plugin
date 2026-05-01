@@ -4,6 +4,7 @@ import {
     countEventCommandEntries,
 } from '../../js/EventCommandTraversal.js';
 import { loadMapDataById } from '../../panels/translate-on-the-fly/ObjectTranslationModalMethods.js';
+import { normalizeMessageEntryForPlugins } from '../plugins/PluginMessageEntryNormalizer.js';
 
 export class MapEvents extends BasePhase {
     static getInstance() {
@@ -28,6 +29,9 @@ export class MapEvents extends BasePhase {
 
     static countEventCommandListStats(panel, list = []) {
         return countEventCommandEntries(list, {
+            transformEntry(entry) {
+                return normalizeMessageEntryForPlugins(panel, entry);
+            },
             isUntranslated(entry) {
                 return !panel.hasUsableCacheValue(panel.getCacheKey(entry.value, entry.type));
             },
@@ -151,7 +155,11 @@ export class MapEvents extends BasePhase {
                     continue;
                 }
 
-                const entries = collectEventCommandEntries(page.list);
+                const entries = collectEventCommandEntries(page.list, {
+                    transformEntry(entry) {
+                        return normalizeMessageEntryForPlugins(panel, entry);
+                    },
+                });
                 for (const entry of entries) {
                     const cacheKey = panel.getCacheKey(entry.value, entry.type);
                     if (panel.hasUsableCacheValue(cacheKey)) {

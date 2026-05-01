@@ -1,5 +1,6 @@
 import { BasePhase } from './BasePhase.js';
 import { collectEventCommandEntries } from '../../js/EventCommandTraversal.js';
+import { normalizeMessageEntryForPlugins } from '../plugins/PluginMessageEntryNormalizer.js';
 
 function isMessageTextType(type) {
     return type === 'message' || type === 'message_portrait';
@@ -82,7 +83,7 @@ export class CurrentEvent extends BasePhase {
         const messageHasPortrait =
             typeof request.hasPortrait === 'boolean'
                 ? request.hasPortrait
-                                : panel.hasCurrentMessagePortrait(gameMessage);
+                : panel.hasCurrentMessagePortrait(gameMessage);
         const fullEvent = !!request.fullEvent;
         const maxDepth = fullEvent ? request.maxDepth : 0;
 
@@ -169,16 +170,14 @@ export class CurrentEvent extends BasePhase {
                 // For message types check all variants so that a text already cached as
                 // message_portrait is not re-harvested and stored again as message (or vice
                 // versa), which would cause cache duplication and translation mismatches.
-                const isMessageType =
-                    panel.isMessageCacheType(type);
-                const hasUsable =
-                    isMessageType
-                        ? panel
-                              .getMessageCacheLookupKeys(value, {
-                                  hasPortrait: type === 'message_portrait',
-                              })
-                              .some((k) => panel.hasUsableCacheValue(k))
-                        : panel.hasUsableCacheValue(cacheKey);
+                const isMessageType = panel.isMessageCacheType(type);
+                const hasUsable = isMessageType
+                    ? panel
+                          .getMessageCacheLookupKeys(value, {
+                              hasPortrait: type === 'message_portrait',
+                          })
+                          .some((k) => panel.hasUsableCacheValue(k))
+                    : panel.hasUsableCacheValue(cacheKey);
                 if (hasUsable) {
                     return true;
                 }
@@ -226,7 +225,11 @@ export class CurrentEvent extends BasePhase {
         }
 
         const list = interpreter._list;
-        const entries = collectEventCommandEntries(list);
+        const entries = collectEventCommandEntries(list, {
+            transformEntry(entry) {
+                return normalizeMessageEntryForPlugins(panel, entry);
+            },
+        });
 
         if (!entries.length) {
             return items;

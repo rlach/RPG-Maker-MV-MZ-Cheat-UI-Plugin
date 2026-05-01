@@ -2,6 +2,7 @@ import { TRANSLATE_SETTINGS, TRANSLATOR } from '../../js/TranslateHelper.js';
 import { countEventCommandEntries } from '../../js/EventCommandTraversal.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../../translate-engines/plugins/PluginTranslatorRegistry.js';
+import { normalizeMessageEntryForPlugins } from '../../translate-engines/plugins/PluginMessageEntryNormalizer.js';
 import {
     getSystemMessageCacheKey,
     getSystemMessagesSource,
@@ -25,7 +26,11 @@ const DEFAULT_OBJECT_TRANSLATION_TYPE_DEFS = Object.freeze([
     { id: 'gameArrays', label: 'game arrays (terms, types, elements)' },
     { id: 'troops', label: 'Troops' },
     { id: 'plugins', label: 'Plugins' },
-    { id: 'cacheEmptyStrings', label: 'Translate all empty strings in cache (including previous errors)', noDragDrop: true },
+    {
+        id: 'cacheEmptyStrings',
+        label: 'Translate all empty strings in cache (including previous errors)',
+        noDragDrop: true,
+    },
 ]);
 
 export function loadMapDataById(mapId) {
@@ -174,6 +179,7 @@ export const objectTranslationRuntimeMethods = {
             }
 
             const stats = countEventCommandEntries(entry.list, {
+                transformEntry: (item) => normalizeMessageEntryForPlugins(this, item),
                 isUntranslated: (item) =>
                     !this.hasUsableCacheValue(this.getCacheKey(item.value, item.type)),
             });
@@ -197,6 +203,7 @@ export const objectTranslationRuntimeMethods = {
 
     countEventCommandListStats(list = []) {
         return countEventCommandEntries(list, {
+            transformEntry: (item) => normalizeMessageEntryForPlugins(this, item),
             isUntranslated: (item) =>
                 !this.hasUsableCacheValue(this.getCacheKey(item.value, item.type)),
         });

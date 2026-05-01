@@ -32,6 +32,7 @@ import { TMNamePopTranslator } from './translators/TMNamePopTranslator.js';
 import { TorigoyaAchievement2Translator } from './translators/TorigoyaAchievement2Translator.js';
 import { TorigoyaAchievementTranslator } from './translators/TorigoyaAchievementTranslator.js';
 import { TorigoyaNotifyMessageTranslator } from './translators/TorigoyaNotifyMessageTranslator.js';
+import { TRPSkitTranslator } from './translators/TrpSkitTranslator.js';
 import { YedWordWrapTranslator } from './translators/YedWordWrapTranslator.js';
 import { YEPCoreEngineScriptTranslator } from './translators/YEPCoreEngineScriptTranslator.js';
 import { YepMessageCoreTranslator } from './translators/YepMessageCoreTranslator.js';
@@ -72,6 +73,7 @@ class PluginTranslatorRegistry {
             TorigoyaAchievement2Translator,
             TorigoyaAchievementTranslator,
             TorigoyaNotifyMessageTranslator,
+            TRPSkitTranslator,
             YedWordWrapTranslator,
             YEPCoreEngineScriptTranslator,
             YepMessageCoreTranslator,

@@ -162,109 +162,26 @@ export function extractMessageEntryAt(list, messageCmdIndex) {
     };
 }
 
-export function collectEventCommandEntries(list) {
+export function collectVariableAssignmentEntries(list, options = {}) {
     if (!Array.isArray(list)) {
         return [];
     }
 
-    const entries = [];
+    const allowedVariableIds =
+        options && typeof options === 'object' && 'allowedVariableIds' in options
+            ? options.allowedVariableIds
+            : null;
 
-    for (let i = 0; i < list.length; i++) {
-        const cmd = list[i];
-        if (!cmd || typeof cmd.code !== 'number') {
-            continue;
-        }
-
-        if (cmd.code === SHOW_TEXT_CODE) {
-            const messageEntry = extractMessageEntryAt(list, i);
-            if (!messageEntry) {
-                continue;
-            }
-
-            const messageType = messageEntry.hasPortrait ? 'message_portrait' : 'message';
-
-            if (isNonEmptyString(messageEntry.speaker)) {
-                entries.push({
-                    type: 'speaker',
-                    value: messageEntry.speaker,
-                    cmdIndex: i,
-                    nextIndex: messageEntry.nextIndex,
-                    command: cmd,
-                });
-            }
-
-            if (isNonEmptyString(messageEntry.text)) {
-                entries.push({
-                    type: messageType,
-                    value: messageEntry.text,
-                    cmdIndex: i,
-                    nextIndex: messageEntry.nextIndex,
-                    command: cmd,
-                });
-            }
-
-            continue;
-        }
-
-        if (cmd.code === SHOW_CHOICES_CODE) {
-            const choices = cmd.parameters && cmd.parameters[0];
-            if (!Array.isArray(choices)) {
-                continue;
-            }
-
-            for (let choiceIndex = 0; choiceIndex < choices.length; choiceIndex++) {
-                const choice = choices[choiceIndex];
-                if (!isNonEmptyString(choice)) {
-                    continue;
-                }
-
-                entries.push({
-                    type: 'choice',
-                    value: choice,
-                    cmdIndex: i,
-                    choiceIndex,
-                    command: cmd,
-                });
-            }
-
-            continue;
-        }
-
-        // Change Name (RPG Maker command 320): actorId, newName
-        // Treat as speaker so cache keys are stored under actor_name namespace.
-        if (cmd.code === CHANGE_NAME_CODE) {
-            const changedName = cmd.parameters && cmd.parameters[1];
-            if (!isNonEmptyString(changedName)) {
-                continue;
-            }
-
-            entries.push({
-                type: 'speaker',
-                value: changedName,
-                cmdIndex: i,
-                command: cmd,
-            });
-        }
+    let allowedIds = null;
+    if (allowedVariableIds instanceof Set) {
+        allowedIds = allowedVariableIds;
+    } else if (Array.isArray(allowedVariableIds)) {
+        allowedIds = new Set(
+            allowedVariableIds
+                .map((id) => Number(id))
+                .filter((id) => Number.isInteger(id) && id > 0)
+        );
     }
-
-    return entries;
-}
-
-export function collectVariableAssignmentEntries(list, { allowedVariableIds = null } = {}) {
-    if (!Array.isArray(list)) {
-        return [];
-    }
-
-    const allowedIds =
-        allowedVariableIds instanceof Set
-            ? allowedVariableIds
-            : Array.isArray(allowedVariableIds)
-              ? new Set(
-                    allowedVariableIds
-                        .map((id) => Number(id))
-                        .filter((id) => Number.isInteger(id) && id > 0)
-                )
-              : null;
     const entries = [];
 
     for (let i = 0; i < list.length; i++) {
@@ -318,12 +235,141 @@ export function collectVariableAssignmentEntries(list, { allowedVariableIds = nu
     return entries;
 }
 
+function applyEntryTransform(entry, transformEntry) {
+    if (typeof transformEntry !== 'function') {
+        return entry;
+    }
+
+    const transformed = transformEntry(entry);
+    return transformed && typeof transformed === 'object' ? transformed : entry;
+}
+
 /**
  * @param {Array} list
- * @param {{ isUntranslated?: (entry: any) => boolean }} [options]
+ * @param {{ transformEntry?: (entry: any) => any }} [options]
  */
-export function countEventCommandEntries(list, { isUntranslated } = {}) {
-    const entries = collectEventCommandEntries(list);
+export function collectEventCommandEntries(list, { transformEntry } = {}) {
+    if (!Array.isArray(list)) {
+        return [];
+    }
+
+    const entries = [];
+
+    for (let i = 0; i < list.length; i++) {
+        const cmd = list[i];
+        if (!cmd || typeof cmd.code !== 'number') {
+            continue;
+        }
+
+        if (cmd.code === SHOW_TEXT_CODE) {
+            const messageEntry = extractMessageEntryAt(list, i);
+            if (!messageEntry) {
+                continue;
+            }
+
+            const messageType = messageEntry.hasPortrait ? 'message_portrait' : 'message';
+
+            if (isNonEmptyString(messageEntry.speaker)) {
+                const speakerEntry = applyEntryTransform(
+                    {
+                        type: 'speaker',
+                        value: messageEntry.speaker,
+                        cmdIndex: i,
+                        nextIndex: messageEntry.nextIndex,
+                        command: cmd,
+                    },
+                    transformEntry
+                );
+
+                if (isNonEmptyString(speakerEntry.value)) {
+                    entries.push(speakerEntry);
+                }
+            }
+
+            if (isNonEmptyString(messageEntry.text)) {
+                const textEntry = applyEntryTransform(
+                    {
+                        type: messageType,
+                        value: messageEntry.text,
+                        cmdIndex: i,
+                        nextIndex: messageEntry.nextIndex,
+                        command: cmd,
+                    },
+                    transformEntry
+                );
+
+                if (isNonEmptyString(textEntry.value)) {
+                    entries.push(textEntry);
+                }
+            }
+
+            continue;
+        }
+
+        if (cmd.code === SHOW_CHOICES_CODE) {
+            const choices = cmd.parameters && cmd.parameters[0];
+            if (!Array.isArray(choices)) {
+                continue;
+            }
+
+            for (let choiceIndex = 0; choiceIndex < choices.length; choiceIndex++) {
+                const choice = choices[choiceIndex];
+                if (!isNonEmptyString(choice)) {
+                    continue;
+                }
+
+                const choiceEntry = applyEntryTransform(
+                    {
+                        type: 'choice',
+                        value: choice,
+                        cmdIndex: i,
+                        choiceIndex,
+                        command: cmd,
+                    },
+                    transformEntry
+                );
+
+                if (isNonEmptyString(choiceEntry.value)) {
+                    entries.push(choiceEntry);
+                }
+            }
+
+            continue;
+        }
+
+        // Change Name (RPG Maker command 320): actorId, newName
+        // Treat as speaker so cache keys are stored under actor_name namespace.
+        if (cmd.code === CHANGE_NAME_CODE) {
+            const changedName = cmd.parameters && cmd.parameters[1];
+            if (!isNonEmptyString(changedName)) {
+                continue;
+            }
+
+            const nameEntry = applyEntryTransform(
+                {
+                    type: 'speaker',
+                    value: changedName,
+                    cmdIndex: i,
+                    command: cmd,
+                },
+                transformEntry
+            );
+
+            if (isNonEmptyString(nameEntry.value)) {
+                entries.push(nameEntry);
+            }
+        }
+    }
+
+    return entries;
+}
+
+/**
+ * @param {Array} list
+ * @param {{ isUntranslated?: (entry: any) => boolean, transformEntry?: (entry: any) => any }} [options]
+ */
+export function countEventCommandEntries(list, { isUntranslated, transformEntry } = {}) {
+    const entries = collectEventCommandEntries(list, { transformEntry });
     let totalStrings = 0;
     let leftStrings = 0;
 

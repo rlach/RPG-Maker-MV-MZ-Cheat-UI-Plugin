@@ -3,6 +3,7 @@ import {
     collectEventCommandEntries,
     countEventCommandEntries,
 } from '../../js/EventCommandTraversal.js';
+import { normalizeMessageEntryForPlugins } from '../plugins/PluginMessageEntryNormalizer.js';
 
 export class Troops extends BasePhase {
     static getInstance() {
@@ -48,6 +49,9 @@ export class Troops extends BasePhase {
                 }
 
                 const stats = countEventCommandEntries(page.list, {
+                    transformEntry(entry) {
+                        return normalizeMessageEntryForPlugins(panel, entry);
+                    },
                     isUntranslated(entry) {
                         return !panel.hasUsableCacheValue(panel.getCacheKey(entry.value, 'troop'));
                     },
@@ -115,7 +119,11 @@ export class Troops extends BasePhase {
                     continue;
                 }
 
-                const entries = collectEventCommandEntries(page.list);
+                const entries = collectEventCommandEntries(page.list, {
+                    transformEntry(entry) {
+                        return normalizeMessageEntryForPlugins(panel, entry);
+                    },
+                });
                 for (const entry of entries) {
                     pushTroopItem(entry.value, entry.type, troopIdx, pageIdx, entry.cmdIndex);
                 }

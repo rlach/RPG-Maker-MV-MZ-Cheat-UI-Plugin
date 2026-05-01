@@ -104,4 +104,10 @@ declare interface Window {
     Window_TitleCommand?: any;
     PluginManager?: any;
     Torigoya?: any;
+    TRP_CORE?: {
+        skitParameters?: {
+            dataActors?: Record<string, { name?: string; inputName?: string; fileName?: string }>;
+            nameToInputList?: Record<string, string>;
+        };
+    };
 }
