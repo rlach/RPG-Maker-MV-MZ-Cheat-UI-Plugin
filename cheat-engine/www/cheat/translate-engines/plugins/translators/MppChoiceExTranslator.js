@@ -19,28 +19,11 @@ function getRuntime() {
     return runtimeGlobal.__ensureTranslationRuntime?.() || runtimeGlobal.__TranslationRuntime || null;
 }
 
-function splitChoiceConditionPrefix(choiceText) {
+function normalizeChoiceDisplayText(choiceText) {
     const original = String(choiceText || '');
-    let rest = original;
-    let prefix = '';
-
-    // MPP_ChoiceEX supports if(...) and en(...) markers in the choice text.
-    const conditionPrefixRegex = /^(\s*(?:if|en)\([^)]*\)\s*)/i;
-
-    while (true) {
-        const match = conditionPrefixRegex.exec(rest);
-        if (!match) {
-            break;
-        }
-
-        prefix += match[1];
-        rest = rest.slice(match[1].length);
-    }
-
-    return {
-        prefix,
-        text: rest,
-    };
+    return original
+        .replace(/\s?if\((.+?)\)/i, '')
+        .replace(/\s?en\((.+?)\)/i, '');
 }
 
 function toStringArray(value) {
@@ -108,53 +91,28 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
         if (
             !runtimeGlobal.Game_Interpreter ||
             !Game_Interpreter.prototype ||
-            typeof Game_Interpreter.prototype.checkChoiceConditions !== 'function'
+            typeof Game_Interpreter.prototype.setupChoices !== 'function'
         ) {
             return;
         }
 
-        const originalCheckChoiceConditions = Game_Interpreter.prototype.checkChoiceConditions;
-        const originalSetupChoices =
-            typeof Game_Interpreter.prototype.setupChoices === 'function'
-                ? Game_Interpreter.prototype.setupChoices
-                : null;
-        const applyChoiceTranslations = this.applyRuntimeChoiceTranslations.bind(this);
+        const originalSetupChoices = Game_Interpreter.prototype.setupChoices;
         const applyChoiceHelpTranslations = this.applyRuntimeChoiceHelpTranslations.bind(this);
 
-        Game_Interpreter.prototype.checkChoiceConditions = function (choices, data, d) {
-            const existingChoiceCount =
-                data && Array.isArray(data.choices) ? data.choices.length : 0;
-
-            const result = originalCheckChoiceConditions.apply(this, arguments);
+        Game_Interpreter.prototype.setupChoices = function () {
+            const result = originalSetupChoices.apply(this, arguments);
 
             try {
-                applyChoiceTranslations(data, existingChoiceCount);
+                applyChoiceHelpTranslations();
             } catch (error) {
                 console.warn(
-                    '[MppChoiceExTranslator] Failed to apply runtime choice translation',
+                    '[MppChoiceExTranslator] Failed to apply runtime choice help translation',
                     error
                 );
             }
 
             return result;
         };
-
-        if (originalSetupChoices) {
-            Game_Interpreter.prototype.setupChoices = function () {
-                const result = originalSetupChoices.apply(this, arguments);
-
-                try {
-                    applyChoiceHelpTranslations();
-                } catch (error) {
-                    console.warn(
-                        '[MppChoiceExTranslator] Failed to apply runtime choice help translation',
-                        error
-                    );
-                }
-
-                return result;
-            };
-        }
 
         runtimeGlobal[RUNTIME_HOOK_GUARD] = true;
     }
@@ -478,13 +436,13 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
                 ? cmd.parameters[0]
                 : [];
         for (let choiceIdx = 0; choiceIdx < choices.length; choiceIdx++) {
-            const parsed = splitChoiceConditionPrefix(choices[choiceIdx]);
-            if (!isUsableText(parsed.text)) {
+            const choiceText = normalizeChoiceDisplayText(choices[choiceIdx]);
+            if (!isUsableText(choiceText)) {
                 continue;
             }
 
             output.push({
-                text: parsed.text,
+                text: choiceText,
                 cacheType: this.getChoiceCacheType(),
                 source: {
                     ...baseMeta,
@@ -501,13 +459,13 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
             Array.isArray(cmd.parameters) && typeof cmd.parameters[1] === 'string'
                 ? cmd.parameters[1]
                 : '';
-        const parsed = splitChoiceConditionPrefix(choiceBranchText);
-        if (!isUsableText(parsed.text)) {
+        const choiceText = normalizeChoiceDisplayText(choiceBranchText);
+        if (!isUsableText(choiceText)) {
             return;
         }
 
         output.push({
-            text: parsed.text,
+            text: choiceText,
             cacheType: this.getChoiceCacheType(),
             source: {
                 ...baseMeta,
