@@ -659,7 +659,11 @@ export class MessageCheat {
             const _Window_Message_shouldBreakHere = Window_Message.prototype.shouldBreakHere;
             Window_Message.prototype.shouldBreakHere = function (textState) {
                 if (TextSpeedCheat.isInstant() && this.canBreakHere(textState)) {
-                    return this.isWaiting();
+                    const waiting =
+                        typeof this.isWaiting === 'function'
+                            ? this.isWaiting()
+                            : !!this.pause || (this._waitCount || 0) > 0;
+                    return waiting;
                 }
 
                 return _Window_Message_shouldBreakHere.call(this, textState);
