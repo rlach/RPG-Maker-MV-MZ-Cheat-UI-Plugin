@@ -98,6 +98,7 @@ export default class LibreTranslateEngine extends BaseTranslationEngine {
             text: 'm',
             message: 'm',
             message_portrait: 'm',
+            scroll_text: 'm',
             speaker: 's',
             choice: 'c',
         };

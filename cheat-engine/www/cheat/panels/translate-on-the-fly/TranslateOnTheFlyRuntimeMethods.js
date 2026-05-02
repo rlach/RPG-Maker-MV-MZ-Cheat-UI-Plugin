@@ -226,6 +226,38 @@ export const translateOnTheFlyRuntimeMethods = {
             };
         };
 
+        const resolveScrollTextCacheKey = (originalText) => {
+            if (typeof originalText !== 'string' || originalText.trim() === '') {
+                return null;
+            }
+
+            return self.getCacheKey(originalText, 'scroll_text');
+        };
+
+        const applyScrollTextFromCache = (scrollWindow, originalText) => {
+            const cacheKey = resolveScrollTextCacheKey(originalText);
+            if (!cacheKey) {
+                return false;
+            }
+
+            self.trackCacheKeyUsage(cacheKey);
+            if (!self.hasUsableCacheValue(cacheKey)) {
+                return false;
+            }
+
+            const translated = self.translationCache.get(cacheKey);
+            if (typeof translated !== 'string') {
+                return false;
+            }
+
+            scrollWindow._text = translated;
+            if (typeof scrollWindow.refresh === 'function') {
+                scrollWindow.refresh();
+            }
+
+            return true;
+        };
+
         const imported = typeof Imported === 'object' && Imported ? Imported : {};
         const hasStrictMessageCore = !!(
             imported.VisuMZ_1_MessageCore ||
@@ -727,6 +759,124 @@ export const translateOnTheFlyRuntimeMethods = {
             }
             Window_Message.prototype._originalTerminateMessage.call(this);
         };
+
+        if (typeof Window_ScrollText !== 'undefined') {
+            if (!Window_ScrollText.prototype._translateOriginalStartMessage) {
+                Window_ScrollText.prototype._translateOriginalStartMessage =
+                    Window_ScrollText.prototype.startMessage;
+            }
+
+            Window_ScrollText.prototype.startMessage = function (...args) {
+                const result = Window_ScrollText.prototype._translateOriginalStartMessage.apply(
+                    this,
+                    args
+                );
+
+                const translationEnabled = self.isTranslationEnabled();
+                const skipping = self.isSkippingMessages();
+                const allowTranslation = translationEnabled && !skipping;
+                const useCacheOnly =
+                    (translationEnabled && skipping) ||
+                    (!translationEnabled && self.translateCacheWhenDisabled);
+
+                if (!allowTranslation && !useCacheOnly) {
+                    return result;
+                }
+
+                const originalText = typeof this._text === 'string' ? this._text : '';
+                this._translateOriginalText = originalText;
+
+                if (applyScrollTextFromCache(this, originalText)) {
+                    return result;
+                }
+
+                if (!allowTranslation) {
+                    return result;
+                }
+
+                const cacheKey = resolveScrollTextCacheKey(originalText);
+                if (!cacheKey) {
+                    return result;
+                }
+
+                if (self.pendingTranslations.has(cacheKey)) {
+                    return result;
+                }
+
+                if (self.failedTranslations.has(cacheKey)) {
+                    const failedTime = self.failedTranslations.get(cacheKey);
+                    const cooldownMs = 5000;
+                    if (Date.now() - failedTime < cooldownMs) {
+                        return result;
+                    }
+
+                    self.failedTranslations.delete(cacheKey);
+                }
+
+                if (!self.batchManager) {
+                    self.batchManager = createTranslationBatchManager(self);
+                }
+
+                self.pendingTranslations.set(cacheKey, true);
+
+                self.batchManager
+                    .runBatchedTranslation(
+                        [
+                            {
+                                kind: 'directItems',
+                                items: [
+                                    {
+                                        type: 'scroll_text',
+                                        id: 'scroll_text_rt_0',
+                                        value: originalText,
+                                        cacheKey,
+                                    },
+                                ],
+                                translationPhaseLabel: 'OTF - translating scroll text',
+                                backgroundJob: false,
+                                itemLimit: self.batchItemsLimit || 20,
+                                charLimit: self.charLimit || 1000,
+                                showSummary: false,
+                            },
+                        ],
+                        {
+                            translationPhaseLabel: 'OTF - translating scroll text',
+                            backgroundJob: false,
+                            showSummary: false,
+                        }
+                    )
+                    .then((batchResult) => {
+                        const translated = self.translationCache.get(cacheKey);
+                        if (
+                            typeof translated === 'string' &&
+                            translated.trim() !== '' &&
+                            this._translateOriginalText === originalText
+                        ) {
+                            this._text = translated;
+                            if (typeof this.refresh === 'function') {
+                                this.refresh();
+                            }
+                            return;
+                        }
+
+                        const failures = Array.isArray(batchResult?.failures)
+                            ? batchResult.failures
+                            : [];
+                        if (failures.some((failure) => failure?.cacheKey === cacheKey)) {
+                            self.failedTranslations.set(cacheKey, Date.now());
+                        }
+                    })
+                    .catch((error) => {
+                        self.failedTranslations.set(cacheKey, Date.now());
+                        console.warn('[TranslateOnTheFly] Failed to translate scroll text', error);
+                    })
+                    .finally(() => {
+                        self.pendingTranslations.delete(cacheKey);
+                    });
+
+                return result;
+            };
+        }
 
         // Hook Game_Message.setChoices to translate choices as soon as they are set
         if (!Game_Message.prototype._originalSetChoices) {

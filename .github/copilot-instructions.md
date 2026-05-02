@@ -46,3 +46,10 @@ When adding a new runtime/store:
 - Plugin translators must rely on `BasePluginTranslator` runtime contracts (`getRuntime`, `isRuntimeTranslationActive`) and must not add local runtime/type guard boilerplate.
 - When introducing new RPG Maker globals/classes/symbols in JS, update `types/rpgmaker-globals.d.ts` in the same PR.
 
+## Unit Test Strategy
+
+- Prefer true unit tests on small extracted modules/functions with explicit inputs/outputs.
+- Avoid DOM simulation (`jsdom`, browser/window mocks of full UI flow) when testing core logic.
+- If code is hard to test without DOM, refactor logic into a pure helper/module first, then test that module.
+- Keep UI/window integration coverage minimal and separate from unit tests.
+

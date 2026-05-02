@@ -20,6 +20,7 @@ export default class DatpmtEngine extends BaseTranslationEngine {
             text: 't',
             message: 't',
             message_portrait: 't',
+            scroll_text: 't',
             speaker: 's',
             choice: 'ch',
         };

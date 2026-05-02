@@ -1,6 +1,8 @@
 const SHOW_TEXT_CODE = 101;
 const SHOW_TEXT_LINE_CODE = 401;
 const SHOW_CHOICES_CODE = 102;
+const SHOW_SCROLL_TEXT_CODE = 105;
+const SHOW_SCROLL_TEXT_LINE_CODE = 405;
 const CHANGE_NAME_CODE = 320;
 const CONTROL_VARIABLES_CODE = 122;
 const VARIABLE_OPERAND_CONSTANT = 0;
@@ -157,6 +159,36 @@ export function extractMessageEntryAt(list, messageCmdIndex) {
         command: cmd,
         hasPortrait,
         speaker,
+        lines,
+        text: lines.join('\n'),
+    };
+}
+
+export function extractScrollTextEntryAt(list, scrollCmdIndex) {
+    if (!Array.isArray(list) || scrollCmdIndex < 0 || scrollCmdIndex >= list.length) {
+        return null;
+    }
+
+    const cmd = list[scrollCmdIndex];
+    if (!cmd || cmd.code !== SHOW_SCROLL_TEXT_CODE) {
+        return null;
+    }
+
+    const lines = [];
+    let nextIndex = scrollCmdIndex + 1;
+    while (
+        nextIndex < list.length &&
+        list[nextIndex] &&
+        list[nextIndex].code === SHOW_SCROLL_TEXT_LINE_CODE
+    ) {
+        lines.push(list[nextIndex].parameters && list[nextIndex].parameters[0]);
+        nextIndex += 1;
+    }
+
+    return {
+        cmdIndex: scrollCmdIndex,
+        nextIndex,
+        command: cmd,
         lines,
         text: lines.join('\n'),
     };
@@ -332,6 +364,30 @@ export function collectEventCommandEntries(list, { transformEntry } = {}) {
                 if (isNonEmptyString(choiceEntry.value)) {
                     entries.push(choiceEntry);
                 }
+            }
+
+            continue;
+        }
+
+        if (cmd.code === SHOW_SCROLL_TEXT_CODE) {
+            const scrollEntry = extractScrollTextEntryAt(list, i);
+            if (!scrollEntry || !isNonEmptyString(scrollEntry.text)) {
+                continue;
+            }
+
+            const textEntry = applyEntryTransform(
+                {
+                    type: 'scroll_text',
+                    value: scrollEntry.text,
+                    cmdIndex: i,
+                    nextIndex: scrollEntry.nextIndex,
+                    command: cmd,
+                },
+                transformEntry
+            );
+
+            if (isNonEmptyString(textEntry.value)) {
+                entries.push(textEntry);
             }
 
             continue;

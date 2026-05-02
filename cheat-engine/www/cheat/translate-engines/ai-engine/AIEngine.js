@@ -470,6 +470,7 @@ class AIEngine extends BaseTranslationEngine {
         if (
             rawType === 'message' ||
             rawType === 'message_portrait' ||
+            rawType === 'scroll_text' ||
             rawType === 'speaker' ||
             rawType === 'choice'
         ) {

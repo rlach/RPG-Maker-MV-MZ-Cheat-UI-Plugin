@@ -159,6 +159,7 @@ export const TYPE_TO_TAG = {
     text: 'm',
     message: 'm',
     message_portrait: 'm',
+    scroll_text: 'm',
     speaker: 'm',
     choice: 'm',
 };

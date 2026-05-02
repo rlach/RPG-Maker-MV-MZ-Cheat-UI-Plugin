@@ -117,7 +117,7 @@ export default class BaseTranslationEngine {
     }
 
     isMessageType(type) {
-        return type === 'message' || type === 'message_portrait';
+        return type === 'message' || type === 'message_portrait' || type === 'scroll_text';
     }
 
     getWrapConfigForType(type) {

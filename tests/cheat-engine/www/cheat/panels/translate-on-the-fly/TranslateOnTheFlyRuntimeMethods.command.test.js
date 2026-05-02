@@ -149,6 +149,23 @@ function installRpgMakerGlobals({ commandsOriginal = [], commands = [] } = {}) {
         }
     }
 
+    class Window_ScrollText {
+        constructor() {
+            this._text = '';
+            this._refreshCount = 0;
+        }
+
+        refresh() {
+            this._refreshCount += 1;
+        }
+
+        startMessage() {
+            this._text = globalThis.$gameMessage.allText();
+            this.refresh();
+            return true;
+        }
+    }
+
     class Window_Selectable {
         refresh() {
             this._selectableRefreshCount = (this._selectableRefreshCount || 0) + 1;
@@ -159,6 +176,7 @@ function installRpgMakerGlobals({ commandsOriginal = [], commands = [] } = {}) {
     globalThis.Game_Variables = Game_Variables;
     globalThis.Game_Interpreter = Game_Interpreter;
     globalThis.Window_Message = Window_Message;
+    globalThis.Window_ScrollText = Window_ScrollText;
     globalThis.Window_Selectable = Window_Selectable;
     globalThis.Window_Command = createCommandWindowClass(Window_Selectable);
     globalThis.DataManager = {
@@ -239,11 +257,18 @@ function createRuntime({
         normalizeSpeakerNameCase(value) {
             return value;
         },
+        isSkippingMessages() {
+            return false;
+        },
     };
 }
 
 function commandKey(runtime, text) {
     return runtime.getCacheKey(text, 'command');
+}
+
+function scrollTextKey(runtime, text) {
+    return runtime.getCacheKey(text, 'scroll_text');
 }
 
 describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
@@ -265,6 +290,7 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         delete globalThis.Game_Variables;
         delete globalThis.Game_Interpreter;
         delete globalThis.Window_Message;
+        delete globalThis.Window_ScrollText;
         delete globalThis.Window_Selectable;
         delete globalThis.Window_Command;
         delete globalThis.DataManager;
@@ -416,5 +442,66 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         expect(commandWindow._list[0].name).toBe('Galeria');
         expect(runtime.translationCache.get(commandKey(runtime, 'Galeria'))).toBe('');
         expect(runtime.lastSeenByCacheKey.has(commandKey(runtime, 'Galeria'))).toBe(true);
+    });
+
+    it('applies cached scroll_text translation when scroll message starts in cache-only mode', () => {
+        installRpgMakerGlobals();
+        globalThis.$gameMessage.allText = () => 'Original scroll line';
+
+        const runtime = createRuntime({
+            translationEnabled: false,
+            translateCacheWhenDisabled: true,
+            cacheEntries: [[`scroll_text:pl-en-Original scroll line`, 'Translated scroll line']],
+        });
+
+        translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
+
+        const scrollWindow = new globalThis.Window_ScrollText();
+        scrollWindow.startMessage();
+
+        expect(scrollWindow._text).toBe('Translated scroll line');
+        expect(runtime.lastSeenByCacheKey.has(scrollTextKey(runtime, 'Original scroll line'))).toBe(
+            true
+        );
+    });
+
+    it('requests translation for uncached scroll_text and refreshes active scroll window', async () => {
+        installRpgMakerGlobals();
+        globalThis.$gameMessage.allText = () => 'Uncached scroll line';
+
+        const runtime = createRuntime({
+            translationEnabled: true,
+        });
+
+        runtime.batchManager.runBatchedTranslation = vi
+            .fn()
+            .mockImplementation(async (entries) => {
+                const item = entries?.[0]?.items?.[0];
+                runtime.translationCache.set(item.cacheKey, 'Scroll translated now');
+                return {
+                    successes: [
+                        {
+                            cacheKey: item.cacheKey,
+                            translated: 'Scroll translated now',
+                            type: 'scroll_text',
+                        },
+                    ],
+                    failures: [],
+                };
+            });
+
+        translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
+
+        const scrollWindow = new globalThis.Window_ScrollText();
+        scrollWindow.startMessage();
+
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(runtime.batchManager.runBatchedTranslation).toHaveBeenCalledTimes(1);
+        expect(scrollWindow._text).toBe('Scroll translated now');
+        expect(runtime.pendingTranslations.has(scrollTextKey(runtime, 'Uncached scroll line'))).toBe(
+            false
+        );
     });
 });
