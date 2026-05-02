@@ -10,6 +10,7 @@ import { EventLabelTranslator } from './translators/EventLabelTranslator.js';
 import { GetInformationTranslator } from './translators/GetInformationTranslator.js';
 import { DestinationWindowTranslator } from './translators/DestinationWindowTranslator.js';
 import { KmsMapActiveMessageTranslator } from './translators/KmsMapActiveMessageTranslator.js';
+import { KekeVariableActorCommandTranslator } from './translators/KekeVariableActorCommandTranslator.js';
 import { ManoInputConfigTranslator } from './translators/ManoInputConfigTranslator.js';
 import { LLStandingPictureTranslator } from './translators/LLStandingPictureTranslator.js';
 import { MgpExternChoicesTranslator } from './translators/MgpExternChoicesTranslator.js';
@@ -51,6 +52,7 @@ class PluginTranslatorRegistry {
             GetInformationTranslator,
             DestinationWindowTranslator,
             KmsMapActiveMessageTranslator,
+            KekeVariableActorCommandTranslator,
             LLStandingPictureTranslator,
             ManoInputConfigTranslator,
             MgpExternChoicesTranslator,
