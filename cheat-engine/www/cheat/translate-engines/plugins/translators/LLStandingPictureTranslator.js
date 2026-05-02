@@ -3,8 +3,8 @@
 
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 
-const RUNTIME_HOOK_GUARD = '__CHEAT_LL_STANDING_PICTURE_TRANSLATOR_HOOKED__';
 const CACHE_TYPE = 'plugin_ll_standing_picture';
+const PLUGIN_NAME_ALIASES = ['LL_StandingPicture', 'LL_StandingPictureMV'];
 
 const LL_STANDING_PICTURE_PLUGIN_TAGS = [
     {
@@ -94,6 +94,10 @@ export class LLStandingPictureTranslator extends BasePluginTranslator {
         return 'LL_StandingPicture';
     }
 
+    getPluginNameAliases() {
+        return PLUGIN_NAME_ALIASES;
+    }
+
     getPluginLabel() {
         return 'LL StandingPicture';
     }
@@ -102,17 +106,37 @@ export class LLStandingPictureTranslator extends BasePluginTranslator {
         return CACHE_TYPE;
     }
 
-    enablePluginTranslation() {
-        if (window[RUNTIME_HOOK_GUARD]) {
-            return;
+    detectPlugin() {
+        if (!Array.isArray(window.$plugins)) {
+            return false;
         }
 
+        const pluginNames = this.getPluginNameAliases()
+            .map((name) =>
+                String(name || '')
+                    .trim()
+                    .toLowerCase()
+            )
+            .filter(Boolean);
+        if (pluginNames.length <= 0) {
+            return false;
+        }
+
+        return window.$plugins.some((plugin) => {
+            if (!plugin || typeof plugin.name !== 'string') {
+                return false;
+            }
+
+            return pluginNames.includes(plugin.name.trim().toLowerCase());
+        });
+    }
+
+    enablePluginTranslation() {
         this.registerPluginCustomTags(LL_STANDING_PICTURE_PLUGIN_TAGS);
-        window[RUNTIME_HOOK_GUARD] = true;
     }
 
     async prepareTranslator() {
-        return Promise.resolve();
+        return;
     }
 
     async buildScanEntries() {
