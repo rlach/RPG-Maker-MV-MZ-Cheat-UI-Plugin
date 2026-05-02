@@ -21,9 +21,9 @@ export function customizeRPGMakerFunctions(mainComponent) {
     }
 
     const CHEAT_WINDOW_SELECTOR =
-        '#cheat-modal, .cheat-confirm-dialog.v-dialog__content--active, .object-translation-dialog.v-dialog__content--active, .object-translation-map-events-dialog.v-dialog__content--active, .object-translation-plugins-dialog.v-dialog__content--active';
+        '#cheat-modal, .v-dialog__content--active .cheat-confirm-dialog, .v-dialog__content--active .object-translation-dialog, .v-dialog__content--active .object-translation-map-events-dialog, .v-dialog__content--active .object-translation-plugins-dialog';
     const CHEAT_UI_EVENT_SELECTOR =
-        '#cheat-modal, #tof-progress-box, .cheat-confirm-dialog .v-card, .object-translation-dialog .v-card, .object-translation-map-events-dialog .v-card, .object-translation-plugins-dialog .v-card';
+        '#cheat-modal, #tof-progress-box, .cheat-confirm-dialog, .cheat-confirm-dialog .v-card, .object-translation-dialog, .object-translation-dialog .v-card, .object-translation-map-events-dialog, .object-translation-map-events-dialog .v-card, .object-translation-plugins-dialog, .object-translation-plugins-dialog .v-card';
 
     const getEventTargetElement = (event) => {
         if (!event) {
