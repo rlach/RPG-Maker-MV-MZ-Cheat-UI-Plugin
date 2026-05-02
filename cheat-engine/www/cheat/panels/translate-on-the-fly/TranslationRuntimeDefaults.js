@@ -38,6 +38,7 @@ export const DEFAULT_DIALOG_MAX_LINE_WIDTH_WITH_PORTRAIT_MV = 44;
 export const DEFAULT_DIALOG_MAX_LINE_WIDTH_WITH_PORTRAIT_MZ = 50;
 export const DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MV = 53;
 export const DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MZ = 59;
+export const DEFAULT_TEXT_WRAP_FONT_SCALE_MULTIPLIER = 0.69;
 
 export function getDefaultDialogMaxLineWidth() {
     return isRpgMakerMv() ? DEFAULT_DIALOG_MAX_LINE_WIDTH_MV : DEFAULT_DIALOG_MAX_LINE_WIDTH_MZ;
@@ -64,6 +65,7 @@ export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
     'maxLineWidth',
     'maxLineWidthWithPortrait',
     'descriptionMaxLineWidth',
+    'textWrapFontScaleMultiplier',
     'translationEngine',
     'translateCacheWhenDisabled',
     'translateImagesInCacheIfAny',
@@ -130,6 +132,7 @@ export const PERSISTED_TRANSLATION_SETTINGS_KEYS = Object.freeze([
     'maxLineWidth',
     'maxLineWidthWithPortrait',
     'descriptionMaxLineWidth',
+    'textWrapFontScaleMultiplier',
     'charLimit',
     'batchItemsLimit',
     'translationEngine',
@@ -160,6 +163,7 @@ export const UI_SYNC_STATE_KEYS = Object.freeze([
     'maxLineWidth',
     'maxLineWidthWithPortrait',
     'descriptionMaxLineWidth',
+    'textWrapFontScaleMultiplier',
     'translationEngine',
     'translateCacheWhenDisabled',
     'translateImagesInCacheIfAny',
@@ -230,6 +234,7 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
         maxLineWidth: getDefaultDialogMaxLineWidth(),
         maxLineWidthWithPortrait: getDefaultDialogMaxLineWidthWithPortrait(),
         descriptionMaxLineWidth: getDefaultDescriptionMaxLineWidth(),
+        textWrapFontScaleMultiplier: DEFAULT_TEXT_WRAP_FONT_SCALE_MULTIPLIER,
         translationEngine: 'mymemory',
         translateCacheWhenDisabled: false,
         translateImagesInCacheIfAny: true,
@@ -348,6 +353,16 @@ export function normalizePersistedTranslationSettings(rawData = {}) {
         typeof normalized.officialNameEnforcementIncludeAllText === 'boolean'
             ? normalized.officialNameEnforcementIncludeAllText
             : defaults.officialNameEnforcementIncludeAllText;
+
+    const parsedTextWrapMultiplier = Number(
+        typeof normalized.textWrapFontScaleMultiplier === 'string'
+            ? normalized.textWrapFontScaleMultiplier.replace(',', '.')
+            : normalized.textWrapFontScaleMultiplier
+    );
+    normalized.textWrapFontScaleMultiplier =
+        Number.isFinite(parsedTextWrapMultiplier) && parsedTextWrapMultiplier > 0
+            ? parsedTextWrapMultiplier
+            : defaults.textWrapFontScaleMultiplier;
 
     return normalized;
 }

@@ -28,7 +28,7 @@ export default {
     <v-card-text class="pb-0">
         Enable this to automatically translate all in-game messages using Google Translate.
     </v-card-text>
-    
+
     <v-card-text class="py-0">
         <v-switch
             v-model="enabled"
@@ -104,7 +104,7 @@ export default {
     </v-card-text>
 
     <v-card-subtitle class="pb-0 mt-4 font-weight-bold">Language Settings</v-card-subtitle>
-    
+
     <v-card-text class="py-0">
         <v-select
             v-model="translationEngine"
@@ -127,7 +127,7 @@ export default {
             @change="onChangeSourceLang"
             class="mb-2">
         </v-select>
-        
+
         <v-select
             v-model="targetLang"
             :items="languageOptions"
@@ -169,7 +169,7 @@ export default {
     </v-card-text>
 
     <v-card-subtitle class="pb-0 mt-4 font-weight-bold">Text Wrapping</v-card-subtitle>
-    
+
     <v-card-text class="py-0">
         <v-switch
             v-model="enableTextWrapping"
@@ -180,7 +180,7 @@ export default {
             @change="onChangeTextWrapping">
         </v-switch>
     </v-card-text>
-    
+
     <v-card-text class="py-0">
         <v-text-field
             v-model.number="maxLineWidth"
@@ -226,6 +226,25 @@ export default {
             @change="onChangeDescriptionMaxWidth"
             @focus="$event.target.select()">
         </v-text-field>
+
+        <v-text-field
+            v-model="textWrapFontScaleMultiplier"
+            label="Text scale width multiplier per \\{ level"
+            outlined
+            dense
+            type="number"
+            min="0.01"
+            step="0.01"
+            hide-details
+            :disabled="!enableTextWrapping"
+            @keydown.self.stop
+            @change="onChangeTextWrapFontScaleMultiplier"
+            @focus="$event.target.select()">
+        </v-text-field>
+
+        <div class="caption mt-1" :class="{ 'text--disabled': !enableTextWrapping }">
+            1 level of \\{ increase: {{ textWrapLevel1RegularWidth }} (regular), {{ textWrapLevel1PortraitWidth }} (portrait). 2 levels: {{ textWrapLevel2RegularWidth }} (regular), {{ textWrapLevel2PortraitWidth }} (portrait)
+        </div>
     </v-card-text>
 
     <v-card-subtitle class="pb-0 mt-4 font-weight-bold">Batching</v-card-subtitle>
@@ -257,7 +276,7 @@ export default {
             @change="onChangeBatchItemsLimit"
         ></v-text-field>
     </v-card-text>
-    
+
     <v-card-subtitle class="pb-0 mt-4 font-weight-bold">Translation Status</v-card-subtitle>
     <v-card-text class="py-0">
         <div class="caption">
@@ -265,7 +284,7 @@ export default {
             <div>Cached Texts: {{cachedCount}}</div>
         </div>
     </v-card-text>
-    
+
     <v-card-text class="py-2">
       <v-btn
         small
@@ -335,6 +354,36 @@ export default {
 
         cachedCount() {
             return this.translationCache ? this.translationCache.size : 0;
+        },
+
+        normalizedTextWrapFontScaleMultiplier() {
+            const parsed = Number(
+                typeof this.textWrapFontScaleMultiplier === 'string'
+                    ? this.textWrapFontScaleMultiplier.replace(',', '.')
+                    : this.textWrapFontScaleMultiplier
+            );
+
+            return Number.isFinite(parsed) && parsed > 0 ? parsed : 0.69;
+        },
+
+        textWrapLevel1RegularWidth() {
+            return Math.floor((Number(this.maxLineWidth) || 0) * this.normalizedTextWrapFontScaleMultiplier);
+        },
+
+        textWrapLevel1PortraitWidth() {
+            return Math.floor(
+                (Number(this.maxLineWidthWithPortrait) || 0) * this.normalizedTextWrapFontScaleMultiplier
+            );
+        },
+
+        textWrapLevel2RegularWidth() {
+            const multiplier = this.normalizedTextWrapFontScaleMultiplier;
+            return Math.floor((Number(this.maxLineWidth) || 0) * multiplier * multiplier);
+        },
+
+        textWrapLevel2PortraitWidth() {
+            const multiplier = this.normalizedTextWrapFontScaleMultiplier;
+            return Math.floor((Number(this.maxLineWidthWithPortrait) || 0) * multiplier * multiplier);
         },
     },
 
@@ -490,6 +539,10 @@ export default {
 
         onChangeDescriptionMaxWidth() {
             return this.callRuntime('onChangeDescriptionMaxWidth');
+        },
+
+        onChangeTextWrapFontScaleMultiplier() {
+            return this.callRuntime('onChangeTextWrapFontScaleMultiplier');
         },
 
         onChangeCharLimit() {

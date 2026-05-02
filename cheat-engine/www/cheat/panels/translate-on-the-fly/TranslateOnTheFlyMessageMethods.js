@@ -182,6 +182,7 @@ export const translateOnTheFlyMessageMethods = {
         return wrapTextByVisibleWidth(text, maxWidth, {
             flattenExistingNewlines: !!(options && options.flattenExistingNewlines),
             tagEntries: this.engine?.tagManager?.tagEntries,
+            fontScaleWidthMultiplier: this.textWrapFontScaleMultiplier,
         });
     },
 

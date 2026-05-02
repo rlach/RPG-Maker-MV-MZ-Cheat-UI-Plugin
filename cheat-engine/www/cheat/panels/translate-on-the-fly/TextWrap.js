@@ -6,6 +6,8 @@ const BRACKET_CLOSE_BY_OPEN = Object.freeze({
 });
 
 const FALLBACK_TAG_RE = /\\[A-Za-z${}|.!><^]+\[[^\]]*\]|\\[A-Za-z${}|.!><^]+/g;
+const ESCAPE_TAG_SYMBOL_RE = /[A-Za-z${}|.!><^]/;
+const DEFAULT_FONT_SCALE_WIDTH_MULTIPLIER = 1;
 
 function escapeRegExp(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -138,6 +140,79 @@ function normalizeLlmPunctuationOnlyBreaks(sourceText, knownEscapeTagRegex) {
     return mergedLines.join('\n');
 }
 
+function resolveFontScaleWidthMultiplier(rawMultiplier) {
+    const parsedMultiplier = Number(rawMultiplier);
+    return Number.isFinite(parsedMultiplier) && parsedMultiplier > 0
+        ? parsedMultiplier
+        : DEFAULT_FONT_SCALE_WIDTH_MULTIPLIER;
+}
+
+function computeVisibleCharWidthCost(fontLevel, multiplier) {
+    return Math.pow(multiplier, 1 - fontLevel);
+}
+
+function tryConsumeEscapeTag(sourceText, startIndex) {
+    if (sourceText[startIndex] !== '\\') {
+        return null;
+    }
+
+    const symbol = sourceText[startIndex + 1];
+    if (!symbol || !ESCAPE_TAG_SYMBOL_RE.test(symbol)) {
+        return null;
+    }
+
+    let cursor = startIndex + 2;
+    while (cursor < sourceText.length && ESCAPE_TAG_SYMBOL_RE.test(sourceText[cursor])) {
+        cursor += 1;
+    }
+
+    const bracketOpen = sourceText[cursor];
+    const bracketClose = BRACKET_CLOSE_BY_OPEN[bracketOpen];
+    if (bracketClose) {
+        const closeIndex = sourceText.indexOf(bracketClose, cursor + 1);
+        if (closeIndex !== -1) {
+            cursor = closeIndex + 1;
+        }
+    }
+
+    return cursor;
+}
+
+function measureTextWidthAndFontLevel(text, startFontLevel, fontScaleWidthMultiplier) {
+    const sourceText = String(text || '');
+    const multiplier = resolveFontScaleWidthMultiplier(fontScaleWidthMultiplier);
+    let fontLevel = Number.isFinite(startFontLevel) ? startFontLevel : 1;
+    let weightedWidth = 0;
+
+    for (let i = 0; i < sourceText.length; ) {
+        if (sourceText[i] === '\\') {
+            const symbol = sourceText[i + 1];
+            if (symbol === '{') {
+                fontLevel += 1;
+                i += 2;
+                continue;
+            }
+
+            if (symbol === '}') {
+                fontLevel -= 1;
+                i += 2;
+                continue;
+            }
+
+            const tagEndIndex = tryConsumeEscapeTag(sourceText, i);
+            if (tagEndIndex !== null) {
+                i = tagEndIndex;
+                continue;
+            }
+        }
+
+        weightedWidth += computeVisibleCharWidthCost(fontLevel, multiplier);
+        i += 1;
+    }
+
+    return { weightedWidth, fontLevel };
+}
+
 export function wrapTextByVisibleWidth(text, maxWidth, options = {}) {
     if (!maxWidth || maxWidth <= 0) {
         return text;
@@ -145,11 +220,17 @@ export function wrapTextByVisibleWidth(text, maxWidth, options = {}) {
 
     const flattenExistingNewlines = !!options.flattenExistingNewlines;
     const knownEscapeTagRegex = buildKnownEscapeTagRegex(options.tagEntries);
+    const fontScaleWidthMultiplier = resolveFontScaleWidthMultiplier(
+        options.fontScaleWidthMultiplier
+    );
     const normalizedSourceText = normalizeSourceText(text, flattenExistingNewlines);
     const sourceText = flattenExistingNewlines
         ? normalizedSourceText
         : normalizeLlmPunctuationOnlyBreaks(normalizedSourceText, knownEscapeTagRegex);
-    const getVisibleLength = (value) => stripKnownEscapeTags(value, knownEscapeTagRegex).length;
+    const getWeightedWidthAndFontLevel = (value, startFontLevel) =>
+        measureTextWidthAndFontLevel(value, startFontLevel, fontScaleWidthMultiplier);
+    const getWeightedWidth = (value, startFontLevel) =>
+        getWeightedWidthAndFontLevel(value, startFontLevel).weightedWidth;
     const isFollowUp = (token) => {
         const visible = stripKnownEscapeTags(token, knownEscapeTagRegex);
         return visible.length === 0 || !/\w/.test(visible);
@@ -157,10 +238,13 @@ export function wrapTextByVisibleWidth(text, maxWidth, options = {}) {
 
     const lines = sourceText.split('\n');
     const wrappedLines = [];
+    let lineStartFontLevel = 1;
 
     for (const line of lines) {
-        if (getVisibleLength(line) <= maxWidth) {
+        const fullLineMetrics = getWeightedWidthAndFontLevel(line, lineStartFontLevel);
+        if (fullLineMetrics.weightedWidth <= maxWidth) {
             wrappedLines.push(line);
+            lineStartFontLevel = fullLineMetrics.fontLevel;
             continue;
         }
 
@@ -175,32 +259,48 @@ export function wrapTextByVisibleWidth(text, maxWidth, options = {}) {
         }
 
         let currentLine = '';
+        let currentLineStartFontLevel = lineStartFontLevel;
+        let currentLineEndFontLevel = currentLineStartFontLevel;
 
         for (const unit of units) {
-            const unitLen = getVisibleLength(unit);
+            const unitMetrics = getWeightedWidthAndFontLevel(unit, currentLineStartFontLevel);
+            const unitLen = unitMetrics.weightedWidth;
 
             if (unitLen > maxWidth) {
                 if (currentLine) {
                     wrappedLines.push(currentLine);
+                    currentLineStartFontLevel = currentLineEndFontLevel;
                     currentLine = '';
                 }
                 wrappedLines.push(unit);
+                currentLineStartFontLevel = unitMetrics.fontLevel;
+                currentLineEndFontLevel = currentLineStartFontLevel;
                 continue;
             }
 
             const testLine = currentLine ? currentLine + ' ' + unit : unit;
-            if (getVisibleLength(testLine) <= maxWidth) {
+            const testLineMetrics = getWeightedWidthAndFontLevel(
+                testLine,
+                currentLineStartFontLevel
+            );
+            if (testLineMetrics.weightedWidth <= maxWidth) {
                 currentLine = testLine;
+                currentLineEndFontLevel = testLineMetrics.fontLevel;
             } else {
                 if (currentLine) {
                     wrappedLines.push(currentLine);
+                    currentLineStartFontLevel = currentLineEndFontLevel;
                 }
                 currentLine = unit;
+                currentLineEndFontLevel = unitMetrics.fontLevel;
             }
         }
 
         if (currentLine) {
             wrappedLines.push(currentLine);
+            lineStartFontLevel = currentLineEndFontLevel;
+        } else {
+            lineStartFontLevel = currentLineStartFontLevel;
         }
     }
 

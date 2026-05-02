@@ -42,7 +42,7 @@ describe('wrapTextByVisibleWidth', () => {
         });
 
         expect(output).toBe(
-            "\\AA[2]\\F1[1](I see, that's why she got lost on such a simple path. What\na silly person, to make a mistake like that)"
+            "\\AA[2]\\F1[1](I see, that's why she got lost on such a simple path.\nWhat a silly person, to make a mistake like that)"
         );
     });
 
@@ -98,5 +98,32 @@ describe('wrapTextByVisibleWidth', () => {
         expect(wrapTextByVisibleWidth(noLlmBreakButNeedsRewrap, 52)).toBe(
             '\\V[23]\n"To ensure a swift defeat, our \\V[23]Warrior unit and\nmembers of the Holy Magic Research Society for\nsupport were hastily assembled as a very little\nforce...."'
         );
+    });
+
+    it('applies width multiplier for text after a single \{ increase', () => {
+        const input = '\\{To jest przykładowy tekst buahahahaha. Co mi teraz zrobisz?';
+        const output = wrapTextByVisibleWidth(input, 60, {
+            fontScaleWidthMultiplier: 0.69,
+        });
+
+        expect(output).toBe('\\{To jest przykładowy tekst buahahahaha. Co\nmi teraz zrobisz?');
+    });
+
+    it('keeps line unwrapped when \} lowers text level and effective width usage', () => {
+        const input = '\\}abcd efgh ijkl';
+        const output = wrapTextByVisibleWidth(input, 10, {
+            fontScaleWidthMultiplier: 0.69,
+        });
+
+        expect(output).toBe('\\}abcd efgh ijkl');
+    });
+
+    it('handles nested \{ and \} levels while wrapping by weighted width', () => {
+        const input = '\\{Alpha \\{Beta Gamma\\} Delta Epsilon Zeta';
+        const output = wrapTextByVisibleWidth(input, 20, {
+            fontScaleWidthMultiplier: 0.69,
+        });
+
+        expect(output).toBe('\\{Alpha \\{Beta\nGamma\\} Delta\nEpsilon Zeta');
     });
 });

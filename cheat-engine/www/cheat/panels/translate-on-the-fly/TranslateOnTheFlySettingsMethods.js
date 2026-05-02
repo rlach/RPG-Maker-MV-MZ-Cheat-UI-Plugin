@@ -1,6 +1,7 @@
 import { TranslateOnTheFlyState } from '../../js/TranslateOnTheFlyState.js';
 import { createEngine } from '../../translate-engines/index.js';
 import {
+    DEFAULT_TEXT_WRAP_FONT_SCALE_MULTIPLIER,
     createPersistedTranslationSettingsDefaults,
     normalizePersistedTranslationSettings,
     serializePersistedTranslationSettings,
@@ -227,6 +228,22 @@ export const translateOnTheFlySettingsMethods = {
     },
 
     onChangeDescriptionMaxWidth() {
+        // Don't clear cache - wrapping is applied on display, not stored in cache
+        this.saveSettings();
+    },
+
+    onChangeTextWrapFontScaleMultiplier() {
+        const parsedMultiplier = Number(
+            typeof this.textWrapFontScaleMultiplier === 'string'
+                ? this.textWrapFontScaleMultiplier.replace(',', '.')
+                : this.textWrapFontScaleMultiplier
+        );
+
+        this.textWrapFontScaleMultiplier =
+            Number.isFinite(parsedMultiplier) && parsedMultiplier > 0
+                ? parsedMultiplier
+                : DEFAULT_TEXT_WRAP_FONT_SCALE_MULTIPLIER;
+
         // Don't clear cache - wrapping is applied on display, not stored in cache
         this.saveSettings();
     },
