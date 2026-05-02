@@ -337,7 +337,10 @@ class ObjectTranslationService {
       const checked = !!this.state.selection[item.id];
       this.state.selection[item.id] = checked;
       if (checked) {
-        selected.push(item.id);
+        const isDryRunOnlyExcludedKind = dryRun && item.id === "cacheEmptyStrings";
+        if (!isDryRunOnlyExcludedKind) {
+          selected.push(item.id);
+        }
       }
     }
 
