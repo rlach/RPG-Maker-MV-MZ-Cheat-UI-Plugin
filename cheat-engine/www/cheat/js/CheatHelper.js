@@ -851,7 +851,8 @@ export class MessageCheat {
                 return;
             }
 
-            const previewLine = '1234567890'.repeat(10);
+            let previewLine = '1234567890'.repeat(10);
+            previewLine = `${previewLine}\n\\{${previewLine}\n\\{${previewLine}`;
 
             if (typeof runtime.replaceMessageText === 'function') {
                 // replaceMessageText also resets the window's _textState

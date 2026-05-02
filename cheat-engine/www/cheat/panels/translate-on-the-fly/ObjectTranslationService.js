@@ -265,26 +265,12 @@ class ObjectTranslationService {
         this.state.mapEventDraftSelection = next;
     }
 
-<<<<<<< HEAD
-    const selected = [];
-    const stats = [...this.state.modalStats];
-    for (const item of stats) {
-      const checked = !!this.state.selection[item.id];
-      this.state.selection[item.id] = checked;
-      if (checked) {
-        const isDryRunOnlyExcludedKind = dryRun && item.id === "cacheEmptyStrings";
-        if (!isDryRunOnlyExcludedKind) {
-          selected.push(item.id);
-        }
-      }
-=======
     deselectAllMaps() {
         const next = { ...this.state.mapEventDraftSelection };
         for (const item of this.state.mapEventDetails) {
             next[item.id] = false;
         }
         this.state.mapEventDraftSelection = next;
->>>>>>> 328ea87 (Reformat with prettier)
     }
 
     saveMapSelection() {
@@ -331,7 +317,10 @@ class ObjectTranslationService {
             const checked = !!this.state.selection[item.id];
             this.state.selection[item.id] = checked;
             if (checked) {
-                selected.push(item.id);
+                const isDryRunOnlyExcludedKind = dryRun && item.id === 'cacheEmptyStrings';
+                if (!isDryRunOnlyExcludedKind) {
+                    selected.push(item.id);
+                }
             }
         }
 
