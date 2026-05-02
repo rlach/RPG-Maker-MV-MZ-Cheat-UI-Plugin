@@ -20,8 +20,10 @@ export function customizeRPGMakerFunctions(mainComponent) {
         return;
     }
 
-    const CHEAT_UI_SELECTOR =
-        '#cheat-modal, #tof-progress-box, .object-translation-dialog .v-card, .object-translation-map-events-dialog .v-card, .object-translation-plugins-dialog .v-card';
+    const CHEAT_WINDOW_SELECTOR =
+        '#cheat-modal, .cheat-confirm-dialog.v-dialog__content--active, .object-translation-dialog.v-dialog__content--active, .object-translation-map-events-dialog.v-dialog__content--active, .object-translation-plugins-dialog.v-dialog__content--active';
+    const CHEAT_UI_EVENT_SELECTOR =
+        '#cheat-modal, #tof-progress-box, .cheat-confirm-dialog .v-card, .object-translation-dialog .v-card, .object-translation-map-events-dialog .v-card, .object-translation-plugins-dialog .v-card';
 
     const getEventTargetElement = (event) => {
         if (!event) {
@@ -45,31 +47,34 @@ export function customizeRPGMakerFunctions(mainComponent) {
         return !!(
             targetEl &&
             typeof targetEl.closest === 'function' &&
-            targetEl.closest(CHEAT_UI_SELECTOR)
+            targetEl.closest(CHEAT_UI_EVENT_SELECTOR)
         );
     };
 
-    const isMouseInsideUiInputBlock = (event) => {
-        if (!isEventFromCheatUi(event)) {
-            return false;
-        }
-
+    const isEventFromProgressBox = (event) => {
         const targetEl = getEventTargetElement(event);
-        if (!targetEl || typeof targetEl.closest !== 'function') {
+        return !!(targetEl && typeof targetEl.closest === 'function' && targetEl.closest('#tof-progress-box'));
+    };
+
+    const isCheatWindowVisible = () => {
+        if (mainComponent && mainComponent.show) {
             return true;
         }
 
-        if (targetEl.closest('#tof-progress-box')) {
+        return !!document.querySelector(CHEAT_WINDOW_SELECTOR);
+    };
+
+    const isMouseInsideUiInputBlock = (event) => {
+        if (isCheatWindowVisible()) {
+            return true;
+        }
+
+        if (isEventFromProgressBox(event)) {
             return Number(event.button) === 0;
         }
 
-        return true;
+        return isEventFromCheatUi(event);
     };
-
-    const isObjectTranslationModalOpen = () =>
-        !!document.querySelector(
-            '.object-translation-dialog.v-dialog__content--active, .object-translation-map-events-dialog.v-dialog__content--active, .object-translation-plugins-dialog.v-dialog__content--active'
-        );
 
     const addWheelDelta = (touchInput, event) => {
         if (touchInput._newState) {
@@ -84,10 +89,9 @@ export function customizeRPGMakerFunctions(mainComponent) {
         }
     };
 
-    // WARN: directly changing engine code can be dangerous
-    // remove preventDefault for game wheel events and let Vue UI consume wheel over cheat modal.
+    // Keep wheel behavior centralized: when a real cheat window is visible, never forward wheel to game.
     TouchInput._onWheel = function (event) {
-        if (!event || isEventFromCheatUi(event)) {
+        if (!event || isCheatWindowVisible()) {
             return;
         }
 
@@ -107,7 +111,7 @@ export function customizeRPGMakerFunctions(mainComponent) {
     if (window.Input && typeof window.Input._onKeyDown === 'function') {
         const Input_onKeyDown = Input._onKeyDown;
         Input._onKeyDown = function (event) {
-            if (isObjectTranslationModalOpen()) {
+            if (isCheatWindowVisible()) {
                 return;
             }
 
@@ -118,7 +122,7 @@ export function customizeRPGMakerFunctions(mainComponent) {
     if (window.Input && typeof window.Input._onKeyUp === 'function') {
         const Input_onKeyUp = Input._onKeyUp;
         Input._onKeyUp = function (event) {
-            if (isObjectTranslationModalOpen()) {
+            if (isCheatWindowVisible()) {
                 return;
             }
 

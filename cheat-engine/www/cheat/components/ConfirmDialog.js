@@ -3,7 +3,12 @@ import { ConfirmDialog } from '../js/DialogHelper.js';
 export default {
     name: 'ConfirmDialog',
     template: `
-  <v-dialog v-model="showDialog" v-if="options" :width="options.width">
+    <v-dialog
+        v-model="showDialog"
+        v-if="options"
+        :width="options.width"
+        content-class="cheat-confirm-dialog"
+    >
     <v-card
         dark 
         class="pt-4">
