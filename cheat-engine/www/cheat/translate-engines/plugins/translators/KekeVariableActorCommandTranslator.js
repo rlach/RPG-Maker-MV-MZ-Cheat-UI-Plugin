@@ -14,50 +14,64 @@ export class KekeVariableActorCommandTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (
-            !window.Window_ActorCommand ||
-            !Window_ActorCommand.prototype ||
-            typeof Window_ActorCommand.prototype.makeCommandListFreeKe !== 'function'
-        ) {
+        if (!window.Window_ActorCommand || !Window_ActorCommand.prototype) {
             return;
         }
 
-        const originalMakeCommandListFreeKe = Window_ActorCommand.prototype.makeCommandListFreeKe;
         const getRuntime = this.getRuntime.bind(this);
         const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
 
-        Window_ActorCommand.prototype.makeCommandListFreeKe = function () {
-            const runtime = getRuntime();
-            if (!isRuntimeTranslationActive(runtime)) {
-                return originalMakeCommandListFreeKe.apply(this, arguments);
-            }
-
+        /**
+         * Temporarily patches skillTypes.indexOf to fall back to the original
+         * (pre-translation) array when a lookup fails, then calls fn(), then
+         * restores indexOf.  This lets Keke's skill-type-name → index resolution
+         * work correctly even after skillTypes has been translated in-place.
+         */
+        const withOriginalSkillTypeIndexOf = (fn) => {
             const currentSkillTypes = window.$dataSystem?.skillTypes;
             const originalSkillTypes = window.$dataSystem?.skillTypesOriginal;
             if (!Array.isArray(currentSkillTypes) || !Array.isArray(originalSkillTypes)) {
-                return originalMakeCommandListFreeKe.apply(this, arguments);
+                return fn();
             }
 
-            const originalIndexOf = currentSkillTypes.indexOf;
-            if (typeof originalIndexOf !== 'function') {
-                return originalMakeCommandListFreeKe.apply(this, arguments);
-            }
-
+            const savedIndexOf = currentSkillTypes.indexOf;
             currentSkillTypes.indexOf = function (searchElement, fromIndex) {
-                const translatedIndex = originalIndexOf.call(this, searchElement, fromIndex);
-                if (translatedIndex !== -1) {
-                    return translatedIndex;
+                const idx = savedIndexOf.call(this, searchElement, fromIndex);
+                if (idx >= 0) {
+                    return idx;
                 }
-
                 return originalSkillTypes.indexOf(searchElement, fromIndex);
             };
 
             try {
-                return originalMakeCommandListFreeKe.apply(this, arguments);
+                return fn();
             } finally {
-                currentSkillTypes.indexOf = originalIndexOf;
+                currentSkillTypes.indexOf = savedIndexOf;
             }
         };
+
+        if (typeof Window_ActorCommand.prototype.makeCommandListFreeKe === 'function') {
+            // Old version (≤1.1.0): skill-type lookup lives in the prototype method.
+            const original = Window_ActorCommand.prototype.makeCommandListFreeKe;
+            Window_ActorCommand.prototype.makeCommandListFreeKe = function () {
+                const runtime = getRuntime();
+                if (!isRuntimeTranslationActive(runtime)) {
+                    return original.apply(this, arguments);
+                }
+                return withOriginalSkillTypeIndexOf(() => original.apply(this, arguments));
+            };
+        } else {
+            // New version (1.2.7+): makeCommandListFree is a private module closure
+            // called from makeCommandList; we patch makeCommandList as the entry point.
+            const original = Window_ActorCommand.prototype.makeCommandList;
+            Window_ActorCommand.prototype.makeCommandList = function () {
+                const runtime = getRuntime();
+                if (!isRuntimeTranslationActive(runtime)) {
+                    return original.apply(this, arguments);
+                }
+                return withOriginalSkillTypeIndexOf(() => original.apply(this, arguments));
+            };
+        }
     }
 
     async prepareTranslator() {
