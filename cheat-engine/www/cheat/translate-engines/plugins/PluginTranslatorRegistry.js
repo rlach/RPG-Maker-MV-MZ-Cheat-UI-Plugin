@@ -24,6 +24,7 @@ import { NrpMapTravelTranslator } from './translators/NrpMapTravelTranslator.js'
 import { OriginMenuStatusTranslator } from './translators/OriginMenuStatusTranslator.js';
 import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTextWindowTranslator.js';
 import { QuestSystemTranslator } from './translators/QuestSystemTranslator.js';
+import { SceneCustomMenuTranslator } from './translators/SceneCustomMenuTranslator.js';
 import { SceneGlossaryTranslator } from './translators/SceneGlossaryTranslator.js';
 import { SHMessageWindowBgTranslator } from './translators/SHMessageWindowBgTranslator.js';
 import { SkillCPSystemTranslator } from './translators/SkillCPSystemTranslator.js';
@@ -66,6 +67,7 @@ class PluginTranslatorRegistry {
             OriginMenuStatusTranslator,
             PandaProgressTextWindowTranslator,
             QuestSystemTranslator,
+            SceneCustomMenuTranslator,
             SceneGlossaryTranslator,
             SHMessageWindowBgTranslator,
             SkillCPSystemTranslator,

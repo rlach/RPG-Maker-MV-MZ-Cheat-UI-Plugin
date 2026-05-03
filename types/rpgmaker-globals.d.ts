@@ -102,6 +102,7 @@ declare interface Window {
     Window_Message?: any;
     Window_MenuCommand?: any;
     Window_TitleCommand?: any;
+    Window_CustomMenuCommand?: any;
     PluginManager?: any;
     Torigoya?: any;
     TRP_CORE?: {
