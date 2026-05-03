@@ -4,6 +4,7 @@ import { CategorySynthesisTranslator } from './translators/CategorySynthesisTran
 import { CbrEroStatusTranslator } from './translators/CbrEroStatusTranslator.js';
 import { ExternMessageTranslator } from './translators/ExternMessageTranslator.js';
 import { CbrEroStatusMvTranslator } from './translators/CbrEroStatusMvTranslator.js';
+import { DarkPlasmaCharacterTextTranslator } from './translators/DarkPlasmaCharacterTextTranslator.js';
 import { DTextPictureTranslator } from './translators/DTextPictureTranslator.js';
 import { DynamicDatabaseTranslator } from './translators/DynamicDatabaseTranslator.js';
 import { EventLabelTranslator } from './translators/EventLabelTranslator.js';
@@ -47,6 +48,7 @@ class PluginTranslatorRegistry {
             CbrEroStatusTranslator,
             ExternMessageTranslator,
             CbrEroStatusMvTranslator,
+            DarkPlasmaCharacterTextTranslator,
             DTextPictureTranslator,
             DynamicDatabaseTranslator,
             EventLabelTranslator,
