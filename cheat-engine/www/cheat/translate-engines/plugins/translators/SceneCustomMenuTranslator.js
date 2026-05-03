@@ -16,6 +16,27 @@ function safeParseJSON(value) {
     }
 }
 
+function normalizeCacheSourceText(value) {
+    return typeof value === 'string' ? value.trim() : '';
+}
+
+function resolveCachedText(runtime, text, cacheType) {
+    const normalizedText = normalizeCacheSourceText(text);
+    if (!normalizedText) {
+        return null;
+    }
+
+    const cacheKey = runtime.getCacheKey(normalizedText, cacheType);
+    runtime.markCacheKeySeen(cacheKey);
+
+    if (!runtime.hasUsableCacheValue(cacheKey)) {
+        return null;
+    }
+
+    const cached = runtime.translationCache.get(cacheKey);
+    return typeof cached === 'string' && cached.trim() ? cached : null;
+}
+
 /**
  * Extract translatable entries from a single command object.
  * @param {object} cmd
@@ -25,11 +46,11 @@ function safeParseJSON(value) {
  */
 function extractCommandEntries(cmd, source, cmdIdx) {
     const entries = [];
-    const cmdText = typeof cmd.Text === 'string' ? cmd.Text.trim() : '';
+    const cmdText = normalizeCacheSourceText(cmd.Text);
     if (cmdText) {
         entries.push({ text: cmdText, kind: 'commandText', source: { ...source, cmdIdx } });
     }
-    const helpText = typeof cmd.HelpText === 'string' ? cmd.HelpText.trim() : '';
+    const helpText = normalizeCacheSourceText(cmd.HelpText);
     if (helpText) {
         entries.push({ text: helpText, kind: 'helpText', source: { ...source, cmdIdx } });
     }
@@ -47,7 +68,7 @@ function extractWindowEntries(win, sceneId, winIdx) {
     const entries = [];
     const source = { sceneId, winIdx };
 
-    const commonHelpText = typeof win.CommonHelpText === 'string' ? win.CommonHelpText.trim() : '';
+    const commonHelpText = normalizeCacheSourceText(win.CommonHelpText);
     if (commonHelpText) {
         entries.push({ text: commonHelpText, kind: 'commonHelpText', source });
     }
@@ -109,7 +130,8 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (!window.Window_CustomMenuCommand || !Window_CustomMenuCommand.prototype) {
+        const WindowCustomMenuCommand = window.Window_CustomMenuCommand;
+        if (!WindowCustomMenuCommand?.prototype) {
             return;
         }
 
@@ -117,8 +139,8 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
         const getRuntime = this.getRuntime.bind(this);
         const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
 
-        const originalDrawItemSub = Window_CustomMenuCommand.prototype.drawItemSub;
-        Window_CustomMenuCommand.prototype.drawItemSub = function (item, rect, index) {
+        const originalDrawItemSub = WindowCustomMenuCommand.prototype.drawItemSub;
+        WindowCustomMenuCommand.prototype.drawItemSub = function (item, rect, index) {
             try {
                 const runtime = getRuntime();
                 if (
@@ -128,18 +150,14 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
                     typeof item.Text === 'string' &&
                     item.Text.trim()
                 ) {
-                    const cacheKey = runtime.getCacheKey(item.Text, cacheType);
-                    runtime.markCacheKeySeen(cacheKey);
-                    if (runtime.hasUsableCacheValue(cacheKey)) {
-                        const cached = runtime.translationCache.get(cacheKey);
-                        if (typeof cached === 'string' && cached.trim()) {
-                            return originalDrawItemSub.call(
-                                this,
-                                { ...item, Text: cached },
-                                rect,
-                                index
-                            );
-                        }
+                    const cached = resolveCachedText(runtime, item.Text, cacheType);
+                    if (cached) {
+                        return originalDrawItemSub.call(
+                            this,
+                            { ...item, Text: cached },
+                            rect,
+                            index
+                        );
                     }
                 }
             } catch (error) {
@@ -151,8 +169,8 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
             return originalDrawItemSub.call(this, item, rect, index);
         };
 
-        const originalFindHelpText = Window_CustomMenuCommand.prototype.findHelpText;
-        Window_CustomMenuCommand.prototype.findHelpText = function () {
+        const originalFindHelpText = WindowCustomMenuCommand.prototype.findHelpText;
+        WindowCustomMenuCommand.prototype.findHelpText = function () {
             const text = originalFindHelpText.call(this);
             if (typeof text !== 'string' || !text.trim()) {
                 return text;
@@ -162,13 +180,8 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
                 if (!runtime || !isRuntimeTranslationActive(runtime)) {
                     return text;
                 }
-                const cacheKey = runtime.getCacheKey(text, cacheType);
-                runtime.markCacheKeySeen(cacheKey);
-                if (!runtime.hasUsableCacheValue(cacheKey)) {
-                    return text;
-                }
-                const cached = runtime.translationCache.get(cacheKey);
-                return typeof cached === 'string' && cached.trim() ? cached : text;
+                const cached = resolveCachedText(runtime, text, cacheType);
+                return cached || text;
             } catch (error) {
                 console.warn(
                     '[SceneCustomMenuTranslator] Failed to apply cached help text translation',
@@ -225,7 +238,7 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
         const entries = [];
 
         for (let sceneIdx = 1; sceneIdx <= 20; sceneIdx++) {
-            const scene = safeParseJSON(params[`Scene${sceneIdx}`]);
+            const scene = /** @type {any} */ (safeParseJSON(params[`Scene${sceneIdx}`]));
             if (scene && typeof scene.Id === 'string' && scene.Id.trim()) {
                 entries.push(...extractSceneEntries(scene));
             }
