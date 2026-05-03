@@ -19,6 +19,13 @@ const TRP_SKIT_PLUGIN_TAGS = [
     },
 ];
 
+const TRP_SKIT_PLUGIN_NAMES = new Set(['trp_skit', 'trp_skitmz']);
+const TRP_SKIT_CONFIG_PLUGIN_NAMES = new Set([
+    'trp_skitconfig',
+    'trp_skit_config',
+    'trp_skitmz_config',
+]);
+
 export class TRPSkitTranslator extends BasePluginTranslator {
     constructor() {
         super();
@@ -31,11 +38,103 @@ export class TRPSkitTranslator extends BasePluginTranslator {
     }
 
     getPluginLabel() {
-        return 'TRP Skit';
+        return 'TRP Skit (MV/MZ)';
+    }
+
+    detectPlugin() {
+        if (!Array.isArray(window.$plugins)) {
+            return false;
+        }
+
+        return window.$plugins.some((plugin) => {
+            const normalizedName = String(plugin?.name || '')
+                .trim()
+                .toLowerCase();
+            return TRP_SKIT_PLUGIN_NAMES.has(normalizedName);
+        });
     }
 
     enablePluginTranslation() {
         this.registerPluginCustomTags(TRP_SKIT_PLUGIN_TAGS);
+        this._installSpeakerNameRuntimeHook();
+    }
+
+    _toTrimmedString(value) {
+        return typeof value === 'string' ? value.trim() : '';
+    }
+
+    _resolveCachedSpeaker(runtime, speakerName) {
+        const normalizedName = this._toTrimmedString(speakerName);
+        if (!normalizedName) {
+            return '';
+        }
+
+        const cacheKey = runtime.getCacheKey(normalizedName, 'speaker');
+        if (!runtime.hasUsableCacheValue(cacheKey)) {
+            return '';
+        }
+
+        const cached = runtime.translationCache.get(cacheKey);
+        return this._toTrimmedString(cached);
+    }
+
+    _syncSpeakerFields(gameMessage, translatedName) {
+        gameMessage._spekaerDisplayName = translatedName;
+        if (this._toTrimmedString(gameMessage._speakerName)) {
+            gameMessage._speakerName = translatedName;
+        }
+    }
+
+    _resolveSpeakerFallback(gameMessage, resolvedName) {
+        const speakerField = this._toTrimmedString(gameMessage._speakerName);
+        if (!speakerField || speakerField === resolvedName) {
+            return '';
+        }
+
+        gameMessage._spekaerDisplayName = speakerField;
+        return speakerField;
+    }
+
+    _installSpeakerNameRuntimeHook() {
+        if (!window.Game_Message || !Game_Message.prototype) {
+            return;
+        }
+
+        const getRuntime = this.getRuntime.bind(this);
+        const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
+        const resolveCachedSpeaker = this._resolveCachedSpeaker.bind(this);
+        const toTrimmedString = this._toTrimmedString.bind(this);
+        const syncSpeakerFields = this._syncSpeakerFields.bind(this);
+        const resolveSpeakerFallback = this._resolveSpeakerFallback.bind(this);
+        const originalSpeakerName = Game_Message.prototype.speakerName;
+
+        if (typeof originalSpeakerName !== 'function') {
+            return;
+        }
+
+        Game_Message.prototype.speakerName = function () {
+            const resolved = originalSpeakerName.call(this);
+            const resolvedName = toTrimmedString(resolved);
+            const runtime = getRuntime();
+
+            if (!isRuntimeTranslationActive(runtime)) {
+                return resolved;
+            }
+
+            const cachedSpeaker = resolveCachedSpeaker(runtime, resolvedName);
+            if (cachedSpeaker) {
+                // TRP_SkitMZ renders via _spekaerDisplayName when useNameBox=true.
+                syncSpeakerFields(this, cachedSpeaker);
+                return cachedSpeaker;
+            }
+
+            const fallbackSpeaker = resolveSpeakerFallback(this, resolvedName);
+            if (fallbackSpeaker) {
+                return fallbackSpeaker;
+            }
+
+            return resolved;
+        };
     }
 
     // ---------------------------------------------------------------------------
@@ -95,8 +194,12 @@ export class TRPSkitTranslator extends BasePluginTranslator {
         }
 
         const configPlugin = window.$plugins.find(
-            (p) =>
-                p && typeof p.name === 'string' && p.name.trim().toLowerCase() === 'trp_skitconfig'
+            (plugin) =>
+                TRP_SKIT_CONFIG_PLUGIN_NAMES.has(
+                    String(plugin?.name || '')
+                        .trim()
+                        .toLowerCase()
+                )
         );
 
         const raw = configPlugin?.parameters?.SkitActorSettings;
