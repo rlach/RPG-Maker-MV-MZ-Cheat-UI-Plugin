@@ -8,8 +8,19 @@ const QUEST_DATA_TEXT_FIELDS = [
     'Difficulty',
     'Place',
     'TimeLimit',
-    'Detail',
-    'HiddenDetail',
+];
+
+const QUEST_DETAIL_FIELDS = [
+    {
+        noteField: 'DetailNote',
+        legacyField: 'Detail',
+        outputField: 'Detail',
+    },
+    {
+        noteField: 'HiddenDetailNote',
+        legacyField: 'HiddenDetail',
+        outputField: 'HiddenDetail',
+    },
 ];
 
 const TEXT_COMMAND_FIELDS = new Set([
@@ -48,6 +59,20 @@ function parseJsonSafely(value, fallback) {
 
 function getRuntime() {
     return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
+}
+
+function resolveQuestDetailText(noteValue, legacyValue) {
+    const noteText = parseJsonSafely(noteValue, noteValue);
+    if (isUsableText(noteText)) {
+        return noteText;
+    }
+
+    const legacyText = parseJsonSafely(legacyValue, legacyValue);
+    if (isUsableText(legacyText)) {
+        return legacyText;
+    }
+
+    return '';
 }
 
 export class QuestSystemTranslator extends BasePluginTranslator {
@@ -229,6 +254,30 @@ export class QuestSystemTranslator extends BasePluginTranslator {
         }
     }
 
+    appendQuestDetailEntries(quest, scope, questIndex, output) {
+        for (const detailField of QUEST_DETAIL_FIELDS) {
+            const detailText = resolveQuestDetailText(
+                quest[detailField.noteField],
+                quest[detailField.legacyField]
+            );
+            if (!isUsableText(detailText)) {
+                continue;
+            }
+
+            output.push({
+                text: detailText,
+                source: {
+                    ...scope,
+                    group: 'QuestDatas',
+                    questIndex,
+                    field: detailField.outputField,
+                    noteField: detailField.noteField,
+                    legacyField: detailField.legacyField,
+                },
+            });
+        }
+    }
+
     appendQuestDataEntries(rawQuestDatas, scope, output) {
         const parsedQuestDatas = parseJsonSafely(rawQuestDatas, []);
         if (!Array.isArray(parsedQuestDatas)) {
@@ -274,6 +323,8 @@ export class QuestSystemTranslator extends BasePluginTranslator {
                     });
                 }
             }
+
+            this.appendQuestDetailEntries(quest, scope, questIndex, output);
 
             this.appendRewardEntries(quest.Rewards, { ...scope, questIndex }, output);
         }
