@@ -121,6 +121,7 @@ export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
     'dryRunExecutedAtLeastOnce',
     'cacheEmptyStringsRepeatUntilSuccess',
     'nonOtfTranslationProcess',
+    'askLlmToAddToKnowledge',
 ]);
 
 export const PERSISTED_TRANSLATION_SETTINGS_KEYS = Object.freeze([
@@ -152,6 +153,7 @@ export const PERSISTED_TRANSLATION_SETTINGS_KEYS = Object.freeze([
     'officialNameEnforcementIncludeAllText',
     'dryRunExecutedAtLeastOnce',
     'cacheEmptyStringsRepeatUntilSuccess',
+    'askLlmToAddToKnowledge',
 ]);
 
 export const UI_SYNC_STATE_KEYS = Object.freeze([
@@ -202,6 +204,7 @@ export const UI_SYNC_STATE_KEYS = Object.freeze([
     'objectTranslationSelectedMapIds',
     'objectTranslationTypeOrder',
     'enabledPluginTranslators',
+    'askLlmToAddToKnowledge',
 ]);
 
 export const UI_SYNC_TO_ONLY_STATE_KEYS = Object.freeze([
@@ -300,6 +303,7 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
         queueCompletionScope: null,
         dryRunExecutedAtLeastOnce: false,
         cacheEmptyStringsRepeatUntilSuccess: false,
+        askLlmToAddToKnowledge: true,
         nonOtfTranslationProcess: {
             active: false,
             label: '',

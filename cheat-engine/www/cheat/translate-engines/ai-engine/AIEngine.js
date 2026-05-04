@@ -24,6 +24,18 @@ import {
     REQUEST_CANCEL_REASON,
 } from './constants.js';
 import { stripThinkBlocks, preprocessPayloadForLlm } from './utils.js';
+import {
+    findRelevantEntries,
+    buildKnowledgeHints,
+    buildKbaseInstruction,
+    extractKbaseEntries,
+    stripKbaseFromMap,
+} from '../../js/KnowledgeBase.js';
+import {
+    getKnowledgeEntries,
+    mergeKnowledgeEntries,
+    ensureKnowledgeForLangPair,
+} from '../../js/KnowledgeBaseRuntime.js';
 
 class AIEngine extends BaseTranslationEngine {
     constructor(panel) {
@@ -743,6 +755,29 @@ class AIEngine extends BaseTranslationEngine {
             );
 
             // 2. BUILD REQUEST PAYLOAD
+            // Build knowledge hints from matching knowledge base entries
+            const preprocessedTexts = itemData.map((item) => item.preprocessed);
+            ensureKnowledgeForLangPair(
+                this.panel.sourceLang || 'ja',
+                this.panel.targetLang || 'en'
+            );
+            const knowledgeEntries = getKnowledgeEntries();
+            const relevantKnowledge = findRelevantEntries(knowledgeEntries, preprocessedTexts);
+            const knowledgeHints = buildKnowledgeHints(relevantKnowledge);
+
+            let knowledgePromptPart = '';
+            if (knowledgeHints) {
+                knowledgePromptPart = ` Knowledge base of proper names and terms that MUST be used for consistency: ${knowledgeHints}.`;
+            }
+
+            const askLlmForKbase = !!(this.panel && this.panel.askLlmToAddToKnowledge);
+            let kbaseInstructionPart = '';
+            if (askLlmForKbase) {
+                kbaseInstructionPart = ' ' + buildKbaseInstruction();
+                // Allow kbase as an extra key in streaming guardrails
+                expectedKeys.push('kbase');
+            }
+
             const payload = {
                 model: this.selectedModel,
                 messages: [
@@ -752,7 +787,7 @@ class AIEngine extends BaseTranslationEngine {
                     },
                     {
                         role: 'system',
-                        content: `Translate video game text from ${sourceName} to ${targetName}. Return only flat one-line JSON object with exactly the same keys as input. No markdown, no comments, no extra keys, no missing keys, no duplicate keys, no arrays, no pretty formatting. Preserve every [b=tag] exactly and keep tag order unchanged. The only exception are tags with <values> like this - [b=na<しえる>]. In this case the <value> can be translated, but otherwise don't modify the tag. Keys with the same prefix+index are context-linked fields of one entity (example: i0n and i0d are the same item's name and description), so translate them consistently. Official name translations, they HAVE to be used for consistency with existing material, don't make up your own translations: ${nameHints}. The names might contain additional info, like gender, in brackets. Use it for additional context.`,
+                        content: `Translate video game text from ${sourceName} to ${targetName}. Return only flat one-line JSON object with exactly the same keys as input. No markdown, no comments, no extra keys, no missing keys, no duplicate keys, no arrays, no pretty formatting. Preserve every [b=tag] exactly and keep tag order unchanged. The only exception are tags with <values> like this - [b=na<しえる>]. In this case the <value> can be translated, but otherwise don't modify the tag. Keys with the same prefix+index are context-linked fields of one entity (example: i0n and i0d are the same item's name and description), so translate them consistently. Official name translations, they HAVE to be used for consistency with existing material, don't make up your own translations: ${nameHints}.${knowledgePromptPart} The names might contain additional info, like gender, in brackets. Use it for additional context.${kbaseInstructionPart}`,
                     },
                     // {
                     //     role: 'user',
@@ -897,6 +932,20 @@ class AIEngine extends BaseTranslationEngine {
             }
 
             // 5. VALIDATION
+            // Extract kbase entries before shape validation so they don't interfere
+            if (askLlmForKbase && translatedMap) {
+                const kbaseEntries = extractKbaseEntries(translatedMap);
+                if (kbaseEntries.length > 0) {
+                    mergeKnowledgeEntries(kbaseEntries);
+                    console.log(
+                        '[AIEngine] Merged',
+                        kbaseEntries.length,
+                        'knowledge base entries from LLM response'
+                    );
+                }
+                stripKbaseFromMap(translatedMap);
+            }
+
             let shapeCheck = this.validationService.validateTranslatedMapShape(
                 translatedMap,
                 itemData

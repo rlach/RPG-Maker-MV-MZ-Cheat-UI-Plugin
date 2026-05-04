@@ -57,6 +57,25 @@ export class BasePluginTranslator extends BasePhase {
     }
 
     /**
+     * Called after a translation batch completes, allowing plugin translators
+     * to extract domain-specific knowledge from the batch results.
+     * Override in subclasses to populate the knowledge base.
+     * @param {Object} _query - The batch query context (pendingItems, options, etc.)
+     * @param {Object} _response - The batch response (successes, failures, batchMeta)
+     */
+    manageKnowledgeBase(_query, _response) {
+        // No-op by default. Plugin translators can override.
+    }
+
+    setData({ panel, pendingItems, successes, failures, batchMeta, options }) {
+        super.setData({ panel, successes, failures });
+        this.manageKnowledgeBase(
+            { pendingItems, options },
+            { successes, failures, batchMeta }
+        );
+    }
+
+    /**
      * Generate unique hook guard name for this plugin translator
      * @private
      * @returns {string} Hook name (e.g., 'PLUGIN_MY_PLUGIN_TRANSLATOR_HOOK')

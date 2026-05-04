@@ -13,6 +13,7 @@ import { translateOnTheFlyFlowMethods } from './TranslateOnTheFlyFlowMethods.js'
 import { translateOnTheFlyRuntimeMethods } from './TranslateOnTheFlyRuntimeMethods.js';
 import { objectTranslationRuntimeMethods } from './ObjectTranslationModalMethods.js';
 import { translateOnTheFlyCoreMethods } from './TranslateOnTheFlyCoreMethods.js';
+import { ensureKnowledgeForLangPair } from '../../js/KnowledgeBaseRuntime.js';
 import {
     createTranslationRuntimeStateDefaults,
     UI_SYNC_STATE_KEYS,
@@ -95,6 +96,11 @@ class TranslationRuntime {
 
         this._initialized = true;
         this.installWindowAliases();
+
+        // Initialize knowledge base for current language pair
+        if (this.sourceLang && this.targetLang) {
+            ensureKnowledgeForLangPair(this.sourceLang, this.targetLang);
+        }
 
         if (this.translateCacheWhenDisabled) {
             console.log('[TranslateOnTheFly] Applying cached translations to data objects');

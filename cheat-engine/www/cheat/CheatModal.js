@@ -14,6 +14,7 @@ import TranslateOnTheFlyPanel from './panels/TranslateOnTheFlyPanel.js';
 import TranslateNamesPanel from './panels/TranslateNamesPanel.js';
 import TranslateCacheManagerPanel from './panels/TranslateCacheManagerPanel.js';
 import TranslateImagesPanel from './panels/TranslateImagesPanel.js';
+import TranslateKnowledgePanel from './panels/TranslateKnowledgePanel.js';
 import TranslateTagManagerPanel from './panels/TranslateTagManagerPanel.js';
 import HacksPanel from './panels/HacksPanel.js';
 import { CHEAT_WINDOW_MANAGER } from './js/CheatWindowManager.js';
@@ -38,17 +39,18 @@ export default {
         TranslateNamesPanel,
         TranslateCacheManagerPanel,
         TranslateImagesPanel,
+        TranslateKnowledgePanel,
         TranslateTagManagerPanel,
         HacksPanel,
     },
 
     template: `
-<v-card 
+<v-card
     dark
     class="z-index-cheat-0 resizable-overlay"
-    :width="overlayWidth" 
+    :width="overlayWidth"
     :height="overlayHeight">
-    <v-row 
+    <v-row
         class="fill-height ma-0 pa-0">
         <div
             :style="'width: ' + navWidth + 'px;'"
@@ -191,6 +193,11 @@ export default {
                             component: 'translate-cache-manager-panel',
                         },
                         {
+                            name: 'Knowledge',
+                            icon: 'mdi-book-open-variant',
+                            component: 'translate-knowledge-panel',
+                        },
+                        {
                             name: 'Images',
                             icon: 'mdi-folder-image',
                             component: 'translate-images-panel',
@@ -289,7 +296,7 @@ export default {
         if (this.resizeObserver && this.$el) {
             try {
                 this.resizeObserver.unobserve(this.$el);
-            } catch (e) {}
+            } catch (_e) { /* observer cleanup */ }
         }
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
