@@ -2,6 +2,7 @@ import { BatchChunker } from './BatchChunker.js';
 import { ErrorRecoveryStrategy } from './ErrorRecoveryStrategy.js';
 import { BatchProgressTracker } from './BatchProgressTracker.js';
 import { BatchSummaryReporter } from './BatchSummaryReporter.js';
+import { PLUGIN_TRANSLATOR_REGISTRY } from '../plugins/PluginTranslatorRegistry.js';
 
 export class TranslationBatchManager {
     constructor(panel) {
@@ -53,6 +54,28 @@ export class TranslationBatchManager {
             const reason = failure && failure.cancelReason;
             return reason === 'background_preempted' || reason === 'request_aborted';
         });
+    }
+
+    _notifyPluginKnowledgeBase(successes, failures) {
+        if (!Array.isArray(successes) || successes.length === 0) {
+            return;
+        }
+
+        const translators = PLUGIN_TRANSLATOR_REGISTRY.getDetectedTranslatorInstances();
+        for (const translator of translators) {
+            try {
+                translator.manageKnowledgeBase(
+                    {},
+                    { successes, failures }
+                );
+            } catch (error) {
+                console.warn(
+                    '[TranslationBatchManager] manageKnowledgeBase failed for',
+                    translator.getPluginName(),
+                    error
+                );
+            }
+        }
     }
 
     isQueueAbortRequested() {
@@ -571,6 +594,9 @@ export class TranslationBatchManager {
                         options: entryOptions,
                     });
                 }
+
+                // Let all detected plugin translators inspect batch results for knowledge extraction
+                this._notifyPluginKnowledgeBase(successes, failures);
 
                 if (!dryRun && this.panel) {
                     this.panel.recordBatchThroughputSample(

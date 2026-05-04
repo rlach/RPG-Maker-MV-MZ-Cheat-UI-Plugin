@@ -170,6 +170,50 @@ function isGlossaryCategoryTag(tagName) {
     return /^SG(?:カテゴリ|Category)$/i.test(String(tagName || '').trim());
 }
 
+/**
+ * Extract SG category pairs from original → translated decoded text.
+ * Both texts contain decoded XML tags like <SGカテゴリ:武器> or <SGCategory:Arms>.
+ * Category values may be comma-separated lists; items are paired positionally.
+ */
+function extractCategoryKnowledge(originalText, translatedText, output) {
+    if (
+        typeof originalText !== 'string' ||
+        typeof translatedText !== 'string' ||
+        !Array.isArray(output)
+    ) {
+        return;
+    }
+
+    const originalTags = parseNoteTagEntries(originalText);
+    const translatedTags = parseNoteTagEntries(translatedText);
+
+    const originalCategories = originalTags.filter((t) => isGlossaryCategoryTag(t.tag));
+    const translatedCategories = translatedTags.filter((t) => isGlossaryCategoryTag(t.tag));
+
+    const count = Math.min(originalCategories.length, translatedCategories.length);
+    for (let i = 0; i < count; i++) {
+        const origValues = originalCategories[i].value
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean);
+        const transValues = translatedCategories[i].value
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean);
+
+        const pairCount = Math.min(origValues.length, transValues.length);
+        for (let j = 0; j < pairCount; j++) {
+            if (origValues[j] !== transValues[j]) {
+                output.push({
+                    key: origValues[j],
+                    translation: transValues[j],
+                    info: 'SceneGlossary category',
+                });
+            }
+        }
+    }
+}
+
 function findPluginEntry(pluginName) {
     if (!Array.isArray(window.$plugins)) {
         return null;
@@ -766,39 +810,15 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
             return;
         }
 
-        // Build a set of original category text values from scan entries
-        const categoryValues = new Set();
-        for (const entry of this._scanEntries) {
-            if (
-                entry &&
-                entry.meta &&
-                isGlossaryCategoryTag(entry.meta.tagName) &&
-                typeof entry.text === 'string' &&
-                entry.text.trim()
-            ) {
-                categoryValues.add(entry.text.trim());
-            }
-        }
-
-        if (categoryValues.size === 0) {
-            return;
-        }
-
         const entries = [];
         for (const item of successes) {
-            const original = typeof item.value === 'string' ? item.value.trim() : '';
-            const translated = typeof item.translated === 'string' ? item.translated.trim() : '';
-            if (original && translated && categoryValues.has(original)) {
-                entries.push({
-                    key: original,
-                    translation: translated,
-                    info: 'SceneGlossary category',
-                    plugin: this.getPluginName(),
-                });
-            }
+            extractCategoryKnowledge(item.value, item.translated, entries);
         }
 
         if (entries.length > 0) {
+            for (const entry of entries) {
+                entry.plugin = this.getPluginName();
+            }
             mergeKnowledgeEntries(entries);
         }
     }

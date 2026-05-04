@@ -25,23 +25,41 @@ describe('SceneGlossaryTranslator.manageKnowledgeBase', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         translator = new SceneGlossaryTranslator();
-
-        // Inject mock scan entries directly
-        translator._scanEntries = [
-            { text: '武器', meta: { tagName: 'SGカテゴリ' } },
-            { text: '防具', meta: { tagName: 'SGCategory' } },
-            { text: 'Long description text here', meta: { tagName: 'SG説明' } },
-        ];
     });
 
-    it('extracts category pairs from successes and merges into knowledge', () => {
+    it('extracts category pairs from decoded tag text in batch successes', () => {
         translator.manageKnowledgeBase(
             {},
             {
                 successes: [
-                    { value: '武器', translated: 'Weapons' },
-                    { value: '防具', translated: 'Armor' },
-                    { value: 'Long description text here', translated: 'Long description translated' },
+                    {
+                        value: '<SGカテゴリ:魔物図鑑>モンスターの説明文',
+                        translated: '<SGカテゴリ:Monster Manual>Monster description text',
+                    },
+                ],
+            }
+        );
+
+        expect(mergeKnowledgeEntries).toHaveBeenCalledOnce();
+        const entries = mergeKnowledgeEntries.mock.calls[0][0];
+        expect(entries).toHaveLength(1);
+        expect(entries[0]).toEqual({
+            key: '魔物図鑑',
+            translation: 'Monster Manual',
+            info: 'SceneGlossary category',
+            plugin: 'SceneGlossary',
+        });
+    });
+
+    it('extracts comma-separated category values positionally', () => {
+        translator.manageKnowledgeBase(
+            {},
+            {
+                successes: [
+                    {
+                        value: '<SGカテゴリ:武器,防具>',
+                        translated: '<SGCategory:Weapons,Armor>',
+                    },
                 ],
             }
         );
@@ -63,30 +81,15 @@ describe('SceneGlossaryTranslator.manageKnowledgeBase', () => {
         });
     });
 
-    it('does nothing when successes is empty', () => {
-        translator.manageKnowledgeBase({}, { successes: [] });
-        expect(mergeKnowledgeEntries).not.toHaveBeenCalled();
-    });
-
-    it('does nothing when no category scan entries exist', () => {
-        translator._scanEntries = [
-            { text: 'description only', meta: { tagName: 'SG説明' } },
-        ];
-
-        translator.manageKnowledgeBase(
-            {},
-            { successes: [{ value: 'description only', translated: 'translated' }] }
-        );
-
-        expect(mergeKnowledgeEntries).not.toHaveBeenCalled();
-    });
-
-    it('skips successes without matching category values', () => {
+    it('ignores non-category SG tags', () => {
         translator.manageKnowledgeBase(
             {},
             {
                 successes: [
-                    { value: 'unknown text', translated: 'something' },
+                    {
+                        value: '<SG説明:長い説明文テスト>',
+                        translated: '<SG説明:Long description test>',
+                    },
                 ],
             }
         );
@@ -94,8 +97,68 @@ describe('SceneGlossaryTranslator.manageKnowledgeBase', () => {
         expect(mergeKnowledgeEntries).not.toHaveBeenCalled();
     });
 
+    it('does nothing when successes contain no SG tags', () => {
+        translator.manageKnowledgeBase(
+            {},
+            {
+                successes: [
+                    { value: 'plain text', translated: 'translated text' },
+                ],
+            }
+        );
+
+        expect(mergeKnowledgeEntries).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when successes is empty', () => {
+        translator.manageKnowledgeBase({}, { successes: [] });
+        expect(mergeKnowledgeEntries).not.toHaveBeenCalled();
+    });
+
     it('handles null response gracefully', () => {
         translator.manageKnowledgeBase({}, null);
         expect(mergeKnowledgeEntries).not.toHaveBeenCalled();
+    });
+
+    it('skips identical original and translated category values', () => {
+        translator.manageKnowledgeBase(
+            {},
+            {
+                successes: [
+                    {
+                        value: '<SGカテゴリ:ABC>',
+                        translated: '<SGカテゴリ:ABC>',
+                    },
+                ],
+            }
+        );
+
+        expect(mergeKnowledgeEntries).not.toHaveBeenCalled();
+    });
+
+    it('handles multiple successes with tags across different items', () => {
+        translator.manageKnowledgeBase(
+            {},
+            {
+                successes: [
+                    {
+                        value: 'text <SGカテゴリ:武器> more text',
+                        translated: 'text <SGカテゴリ:Weapons> more text',
+                    },
+                    {
+                        value: '<SGCategory:防具>',
+                        translated: '<SGCategory:Armor>',
+                    },
+                ],
+            }
+        );
+
+        expect(mergeKnowledgeEntries).toHaveBeenCalledOnce();
+        const entries = mergeKnowledgeEntries.mock.calls[0][0];
+        expect(entries).toHaveLength(2);
+        expect(entries[0].key).toBe('武器');
+        expect(entries[0].translation).toBe('Weapons');
+        expect(entries[1].key).toBe('防具');
+        expect(entries[1].translation).toBe('Armor');
     });
 });

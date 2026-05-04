@@ -67,14 +67,6 @@ export class BasePluginTranslator extends BasePhase {
         // No-op by default. Plugin translators can override.
     }
 
-    setData({ panel, pendingItems, successes, failures, batchMeta, options }) {
-        super.setData({ panel, successes, failures });
-        this.manageKnowledgeBase(
-            { pendingItems, options },
-            { successes, failures, batchMeta }
-        );
-    }
-
     /**
      * Generate unique hook guard name for this plugin translator
      * @private
