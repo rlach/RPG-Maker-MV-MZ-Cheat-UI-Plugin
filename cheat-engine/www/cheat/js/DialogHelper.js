@@ -4,6 +4,3 @@ export class ConfirmDialog {
     static close() {}
 }
 
-function foobar() {
-    return 'foobar';
-}

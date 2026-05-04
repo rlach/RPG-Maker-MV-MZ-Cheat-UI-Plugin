@@ -14,7 +14,6 @@ const MESSAGE_SKIP_PLUGIN_NAME = 'MessageSkip';
 const MESSAGE_SKIP_SWITCH_KEYS = ['SkipSwitchId', 'スキップスイッチ'];
 
 function hasOwn(source, key) {
-    // eslint-disable-next-line prefer-object-has-own
     return Object.prototype.hasOwnProperty.call(source, key);
 }
 

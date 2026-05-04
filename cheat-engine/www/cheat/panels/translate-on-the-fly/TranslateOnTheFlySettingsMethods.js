@@ -1,5 +1,6 @@
 import { TranslateOnTheFlyState } from '../../js/TranslateOnTheFlyState.js';
 import { createEngine } from '../../translate-engines/index.js';
+import { ensureKnowledgeForLangPair } from '../../js/KnowledgeBaseRuntime.js';
 import {
     DEFAULT_TEXT_WRAP_FONT_SCALE_MULTIPLIER,
     createPersistedTranslationSettingsDefaults,
@@ -159,12 +160,14 @@ export const translateOnTheFlySettingsMethods = {
         // Don't clear cache - keys contain source/target lang, so they don't conflict
         this.saveSettings();
         this.notifyCacheRuntime('settings-language');
+        ensureKnowledgeForLangPair(this.sourceLang, this.targetLang);
     },
 
     onChangeTargetLang() {
         // Don't clear cache - keys contain source/target lang, so they don't conflict
         this.saveSettings();
         this.notifyCacheRuntime('settings-language');
+        ensureKnowledgeForLangPair(this.sourceLang, this.targetLang);
     },
 
     onChangeTranslationEngine() {

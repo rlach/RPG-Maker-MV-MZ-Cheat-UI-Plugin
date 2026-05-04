@@ -87,7 +87,7 @@ export class CurrentEvent extends BasePhase {
         const fullEvent = !!request.fullEvent;
         const maxDepth = fullEvent ? request.maxDepth : 0;
 
-        if (!!request.forceRefreshCache) {
+        if (request.forceRefreshCache) {
             const refreshKeys = [];
             if (originalText && originalText.trim()) {
                 refreshKeys.push(

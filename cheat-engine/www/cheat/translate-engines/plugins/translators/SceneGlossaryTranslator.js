@@ -1,4 +1,5 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
+import { mergeKnowledgeEntries } from '../../../js/KnowledgeBaseRuntime.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_SCENE_GLOSSARY_TRANSLATOR_HOOKED__';
 const NOTE_CACHE_TYPE = 'item_note';
@@ -169,6 +170,50 @@ function isGlossaryCategoryTag(tagName) {
     return /^SG(?:カテゴリ|Category)$/i.test(String(tagName || '').trim());
 }
 
+/**
+ * Extract SG category pairs from original → translated decoded text.
+ * Both texts contain decoded XML tags like <SGカテゴリ:武器> or <SGCategory:Arms>.
+ * Category values may be comma-separated lists; items are paired positionally.
+ */
+function extractCategoryKnowledge(originalText, translatedText, output) {
+    if (
+        typeof originalText !== 'string' ||
+        typeof translatedText !== 'string' ||
+        !Array.isArray(output)
+    ) {
+        return;
+    }
+
+    const originalTags = parseNoteTagEntries(originalText);
+    const translatedTags = parseNoteTagEntries(translatedText);
+
+    const originalCategories = originalTags.filter((t) => isGlossaryCategoryTag(t.tag));
+    const translatedCategories = translatedTags.filter((t) => isGlossaryCategoryTag(t.tag));
+
+    const count = Math.min(originalCategories.length, translatedCategories.length);
+    for (let i = 0; i < count; i++) {
+        const origValues = originalCategories[i].value
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean);
+        const transValues = translatedCategories[i].value
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean);
+
+        const pairCount = Math.min(origValues.length, transValues.length);
+        for (let j = 0; j < pairCount; j++) {
+            if (origValues[j] !== transValues[j]) {
+                output.push({
+                    key: origValues[j],
+                    translation: transValues[j],
+                    info: 'SceneGlossary category',
+                });
+            }
+        }
+    }
+}
+
 function findPluginEntry(pluginName) {
     if (!Array.isArray(window.$plugins)) {
         return null;
@@ -247,14 +292,6 @@ function buildMetaPatchFromNoteText(noteText) {
     }
 
     return patch;
-}
-
-function restoreOriginalGlossaryMeta(item) {
-    if (!item || typeof item !== 'object') {
-        return;
-    }
-
-    item.meta = { ...getOriginalItemMeta(item) };
 }
 
 function applyTranslatedGlossaryMeta(translator, item) {
@@ -387,96 +424,6 @@ function appendEntriesFromParameters(parameters, scope, output) {
             },
             'plugin_scene_glossary'
         );
-    }
-}
-
-function appendGlossaryTextTagEntry(tagName, value, sourceKey, index, itemId, output) {
-    if (
-        !(
-            isGlossaryDescriptionTag(tagName) ||
-            isGlossaryCommonDescriptionTag(tagName) ||
-            isGlossaryNotYetDescriptionTag(tagName)
-        )
-    ) {
-        return false;
-    }
-
-    pushScanEntry(
-        output,
-        value,
-        {
-            scope: sourceKey,
-            index,
-            itemId,
-            tagName,
-        },
-        'plugin_scene_glossary'
-    );
-
-    return true;
-}
-
-function appendGlossaryCategoryTagEntries(tagName, value, sourceKey, index, itemId, output) {
-    if (!isGlossaryCategoryTag(tagName)) {
-        return;
-    }
-
-    const categories = value
-        .split(',')
-        .map((category) => category.trim())
-        .filter((category) => !!category);
-
-    for (let categoryIndex = 0; categoryIndex < categories.length; categoryIndex++) {
-        pushScanEntry(
-            output,
-            categories[categoryIndex],
-            {
-                scope: sourceKey,
-                index,
-                itemId,
-                tagName,
-                categoryIndex,
-            },
-            'plugin_scene_glossary'
-        );
-    }
-}
-
-function appendEntriesFromDatabaseItem(item, index, sourceKey, output) {
-    if (!item || typeof item !== 'object') {
-        return;
-    }
-
-    const noteText = getOriginalItemNote(item);
-    if (!isUsableText(noteText)) {
-        return;
-    }
-
-    const tagEntries = parseNoteTagEntries(noteText);
-    if (!tagEntries.length) {
-        return;
-    }
-
-    const itemId = Number(item.id) || 0;
-    for (const tagEntry of tagEntries) {
-        const tagName = tagEntry.tag;
-        const value = tagEntry.value;
-
-        if (appendGlossaryTextTagEntry(tagName, value, sourceKey, index, itemId, output)) {
-            continue;
-        }
-
-        appendGlossaryCategoryTagEntries(tagName, value, sourceKey, index, itemId, output);
-    }
-}
-
-function appendEntriesFromDatabaseArray(databaseArray, sourceKey, output) {
-    if (!Array.isArray(databaseArray) || !Array.isArray(output)) {
-        return;
-    }
-
-    for (let index = 0; index < databaseArray.length; index++) {
-        appendEntriesFromDatabaseItem(databaseArray[index], index, sourceKey, output);
     }
 }
 
@@ -855,5 +802,24 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
             totalStrings,
             leftStrings,
         };
+    }
+
+    manageKnowledgeBase(_query, response) {
+        const successes = response && response.successes;
+        if (!Array.isArray(successes) || successes.length === 0) {
+            return;
+        }
+
+        const entries = [];
+        for (const item of successes) {
+            extractCategoryKnowledge(item.value, item.translated, entries);
+        }
+
+        if (entries.length > 0) {
+            for (const entry of entries) {
+                entry.plugin = this.getPluginName();
+            }
+            mergeKnowledgeEntries(entries);
+        }
     }
 }

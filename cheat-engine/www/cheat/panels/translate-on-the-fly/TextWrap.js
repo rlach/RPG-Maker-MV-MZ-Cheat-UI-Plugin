@@ -229,8 +229,6 @@ export function wrapTextByVisibleWidth(text, maxWidth, options = {}) {
         : normalizeLlmPunctuationOnlyBreaks(normalizedSourceText, knownEscapeTagRegex);
     const getWeightedWidthAndFontLevel = (value, startFontLevel) =>
         measureTextWidthAndFontLevel(value, startFontLevel, fontScaleWidthMultiplier);
-    const getWeightedWidth = (value, startFontLevel) =>
-        getWeightedWidthAndFontLevel(value, startFontLevel).weightedWidth;
     const isFollowUp = (token) => {
         const visible = stripKnownEscapeTags(token, knownEscapeTagRegex);
         return visible.length === 0 || !/\w/.test(visible);

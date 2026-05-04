@@ -1,5 +1,3 @@
-import { Alert } from '../js/AlertHelper.js';
-import { MessageCheat, GeneralCheat } from '../js/CheatHelper.js';
 import { TranslateOnTheFlyState } from '../js/TranslateOnTheFlyState.js';
 import { AIEngine } from '../translate-engines/index.js';
 import { ensureTranslationRuntime } from './translate-on-the-fly/TranslationRuntime.js';

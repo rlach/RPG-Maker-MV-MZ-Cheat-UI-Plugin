@@ -698,7 +698,6 @@ class GlobalShortcut {
         // if nwjs environment, read shortcut settings from file
         if (isNwjsEnvironment()) {
             const fs = require('fs');
-            const path = require('path');
 
             try {
                 // read settings file
@@ -759,7 +758,7 @@ class GlobalShortcut {
             // remove previous settings file
             try {
                 fs.unlinkSync(this.shortcutSettingsFile);
-            } catch (e) {}
+            } catch (e) { /* empty */ }
 
             // create parent directory if not exists
             const parentDir = path.dirname(this.shortcutSettingsFile);
@@ -782,7 +781,7 @@ class GlobalShortcut {
             // remove settings file
             try {
                 require('fs').unlinkSync(this.shortcutSettingsFile);
-            } catch (e) {}
+            } catch (e) { /* empty */ }
 
             this.initialize();
         }
