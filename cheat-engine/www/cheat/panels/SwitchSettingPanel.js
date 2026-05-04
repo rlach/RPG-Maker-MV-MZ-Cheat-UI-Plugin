@@ -63,7 +63,7 @@ export default {
             </v-switch>
         </template>
     </v-data-table>
-    
+
     <v-tooltip
         bottom>
         <span>Reload from game data</span>
@@ -151,7 +151,7 @@ export default {
 
         allSwitchOn() {
             const hasTurnOff = this.filteredTableItems.find((item) => item.value === false);
-            return !!!hasTurnOff;
+            return !hasTurnOff;
         },
 
         allSwitchIcon() {

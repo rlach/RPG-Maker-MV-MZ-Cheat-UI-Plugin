@@ -566,16 +566,6 @@ export const translateOnTheFlyFlowMethods = {
             candidates.push($gameTroop._interpreter);
         }
 
-        // Helper to recursively find deepest child interpreter
-        const getDeepestChild = (interp) => {
-            if (!interp) return null;
-            if (interp._childInterpreter) {
-                const child = getDeepestChild(interp._childInterpreter);
-                return child || interp;
-            }
-            return interp;
-        };
-
         // Expand candidates to include all child interpreters recursively
         const expandedCandidates = [];
         for (const candidate of candidates) {

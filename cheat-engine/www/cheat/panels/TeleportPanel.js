@@ -1,5 +1,4 @@
 import { TRANSLATE_SETTINGS, TRANSLATOR } from '../js/TranslateHelper.js';
-import { Alert } from '../js/AlertHelper.js';
 import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
 
 export default {
@@ -76,7 +75,7 @@ export default {
                 bottom>
                 <span>Teleport</span>
                 <template v-slot:activator="{ on, attrs }">
-                
+
                     <v-btn
                         color="green"
                         x-small
@@ -158,7 +157,6 @@ export default {
 
     methods: {
         async initializeVariables() {
-            const rawDataMapInfos = $dataMapInfos.filter((mapInfo) => !!mapInfo);
             const mapNames = await this.getMapNames($dataMapInfos);
 
             this.maps = $dataMapInfos

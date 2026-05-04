@@ -20,7 +20,6 @@ export class RetryHandler {
     async handleJsonError(options) {
         const {
             strategy,
-            originalPayload,
             previousResponse,
             itemData,
             isBackgroundJob,

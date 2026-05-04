@@ -19,7 +19,7 @@ export default {
         ObjectTranslationModalHost,
     },
     template: `
-<div 
+<div
     class="pa-2"
     ref="rootDiv">
     <v-fade-transition leave-absolute>
@@ -276,7 +276,7 @@ export default {
                         3000
                     );
                 }
-            } catch (err) {}
+            } catch (err) { /* empty */ }
         },
 
         escapeHtml(text) {
@@ -288,7 +288,7 @@ export default {
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
-                .replace(/\"/g, '&quot;')
+                .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
         },
 

@@ -4,8 +4,6 @@
  * Checks shape, language, and prevents hallucinations
  */
 
-import { StreamJsonParser } from './StreamJsonParser.js';
-
 export class ValidationService {
     constructor(aiEngine) {
         this.aiEngine = aiEngine; // Reference to AIEngine for requestChatCompletion
