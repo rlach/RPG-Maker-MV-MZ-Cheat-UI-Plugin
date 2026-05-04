@@ -1,12 +1,22 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_SCENE_GLOSSARY_TRANSLATOR_HOOKED__';
-const ITEM_NOTE_CACHE_TYPE = 'item_note';
+const NOTE_CACHE_TYPE = 'item_note';
 
-// All SceneGlossary note-field tags that need to be protected during LLM translation.
-// XML-style with NONE bracket means the format is <TagSymbol:value>.
-// maskValue:true  → value is opaque (filename / enum); LLM never sees or changes it.
-// maskValue:false → value is translatable text that the LLM is allowed to modify.
+const GLOSSARY_TEXT_FIELDS = [
+    'CommandName',
+    'GlossaryHelp',
+    'CategoryHelp',
+    'ConfirmHelp',
+    'UsingHelp',
+    'CompleteMessage',
+    'ConfirmUse',
+    'ConfirmNoUse',
+    'VisibleItemNotYet',
+];
+
+const HAS_OWN_PROPERTY = Object.prototype.hasOwnProperty;
+
 const SCENE_GLOSSARY_PLUGIN_TAGS = (() => {
     const xmlCustom = (description, tagSymbol, maskValue) => ({
         description,
@@ -17,136 +27,701 @@ const SCENE_GLOSSARY_PLUGIN_TAGS = (() => {
         maskValue,
         requiredConsistency: true,
     });
-    const xmlNumeric = (description, tagSymbol) => ({
-        description,
-        tagSymbol,
-        style: 'xml',
-        type: 'withNumericParameter',
-        requiredConsistency: true,
-    });
-    const xmlFlag = (description, tagSymbol) => ({
-        description,
-        tagSymbol,
-        style: 'xml',
-        type: 'withoutParameter',
-        requiredConsistency: true,
-    });
 
     const tags = [
-        // Description — translatable text, pages 1–3
         xmlCustom('SG description (ja)', 'SG説明', false),
         xmlCustom('SG description (en)', 'SGDescription', false),
-        xmlCustom('SG description page2 (ja)', 'SG説明2', false),
-        xmlCustom('SG description page2 (en)', 'SGDescription2', false),
-        xmlCustom('SG description page3 (ja)', 'SG説明3', false),
-        xmlCustom('SG description page3 (en)', 'SGDescription3', false),
-
-        // Glossary screen / type selector — must be preserved
-        xmlNumeric('SG type/screen index (ja)', 'SG種別'),
-        xmlNumeric('SG type/screen index (en)', 'SGType'),
-
-        // Display order — must be preserved
-        xmlNumeric('SG display order (ja)', 'SG表示順'),
-        xmlNumeric('SG display order (en)', 'SGOrder'),
-
-        // Category — translatable text
+        xmlCustom('SG common description (ja)', 'SG共通説明', false),
+        xmlCustom('SG common description (en)', 'SGCommonDescription', false),
+        xmlCustom('SG not-yet description (ja)', 'SG未入手説明', false),
+        xmlCustom('SG not-yet description (en)', 'SGNotYetDescription', false),
         xmlCustom('SG category (ja)', 'SGカテゴリ', false),
         xmlCustom('SG category (en)', 'SGCategory', false),
-
-        // Auto-register exclusion flag — no value
-        xmlFlag('SG manual exclusion flag (ja)', 'SG手動'),
-        xmlFlag('SG manual exclusion flag (en)', 'SGManual'),
-
-        // Picture filenames — must NOT be translated, pages 1–3
-        xmlCustom('SG picture filename (ja)', 'SGピクチャ', true),
-        xmlCustom('SG picture filename (en)', 'SGPicture', true),
-        xmlCustom('SG picture filename page2 (ja)', 'SGピクチャ2', true),
-        xmlCustom('SG picture filename page2 (en)', 'SGPicture2', true),
-        xmlCustom('SG picture filename page3 (ja)', 'SGピクチャ3', true),
-        xmlCustom('SG picture filename page3 (en)', 'SGPicture3', true),
-
-        // Picture position enum (top/bottom/text/under) — must be preserved
-        xmlCustom('SG picture position (ja)', 'SGピクチャ位置', true),
-        xmlCustom('SG picture position (en)', 'SGPicturePosition', true),
-        xmlCustom('SG picture position page2 (ja)', 'SGピクチャ位置2', true),
-        xmlCustom('SG picture position page2 (en)', 'SGPicturePosition2', true),
-
-        // Picture alignment enum (left/center/right) — must be preserved
-        xmlCustom('SG picture align (ja)', 'SGピクチャ揃え', true),
-        xmlCustom('SG picture align (en)', 'SGPictureAlign', true),
-        xmlCustom('SG picture align page2 (ja)', 'SGピクチャ揃え2', true),
-        xmlCustom('SG picture align page2 (en)', 'SGPictureAlign2', true),
-
-        // Picture scale (float value) — use customParameter+mask to handle floats
-        xmlCustom('SG picture scale (ja)', 'SGピクチャ拡大率', true),
-        xmlCustom('SG picture scale (en)', 'SGPictureScale', true),
     ];
+
+    for (let index = 2; index <= 5; index++) {
+        const pageTags = [
+            xmlCustom(`SG description page${index} (ja)`, `SG説明${index}`, false),
+            xmlCustom(`SG description page${index} (en)`, `SGDescription${index}`, false),
+            xmlCustom(`SG common description page${index} (ja)`, `SG共通説明${index}`, false),
+            xmlCustom(
+                `SG common description page${index} (en)`,
+                `SGCommonDescription${index}`,
+                false
+            ),
+            xmlCustom(
+                `SG not-yet description page${index} (ja)`,
+                `SG未入手説明${index}`,
+                false
+            ),
+            xmlCustom(
+                `SG not-yet description page${index} (en)`,
+                `SGNotYetDescription${index}`,
+                false
+            ),
+        ];
+        tags.push(...pageTags);
+    }
 
     return tags;
 })();
-
-function getRuntime() {
-    return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
-}
 
 function isUsableText(value) {
     return typeof value === 'string' && value.trim() !== '';
 }
 
-function extractGlossaryDescriptionEntries(noteText) {
+function hasOwn(object, key) {
+    if (!object || (typeof object !== 'object' && typeof object !== 'function')) {
+        return false;
+    }
+
+    return typeof Object.hasOwn === 'function'
+        ? Object.hasOwn(object, key)
+        : HAS_OWN_PROPERTY.call(object, key);
+}
+
+function parseJsonSafely(value, fallback) {
+    if (typeof value !== 'string') {
+        return value ?? fallback;
+    }
+
+    const normalized = value.trim();
+    if (!normalized) {
+        return fallback;
+    }
+
+    try {
+        return JSON.parse(normalized);
+    } catch {
+        return fallback;
+    }
+}
+
+function parseStructArray(rawValue) {
+    const parsed = parseJsonSafely(rawValue, []);
+    if (!Array.isArray(parsed)) {
+        return [];
+    }
+
+    const result = [];
+    for (const item of parsed) {
+        const parsedItem = parseJsonSafely(item, item);
+        if (parsedItem && typeof parsedItem === 'object' && !Array.isArray(parsedItem)) {
+            result.push(parsedItem);
+        }
+    }
+
+    return result;
+}
+
+function parseStringArray(rawValue) {
+    const parsed = parseJsonSafely(rawValue, []);
+    if (!Array.isArray(parsed)) {
+        return [];
+    }
+
+    const result = [];
+    for (const item of parsed) {
+        const text = typeof item === 'string' ? item.trim() : '';
+        if (text) {
+            result.push(text);
+        }
+    }
+
+    return result;
+}
+
+function parseNoteTagEntries(noteText) {
     const result = [];
     const text = String(noteText || '');
     if (!text.trim()) {
         return result;
     }
 
-    const extractedKeys = new Set();
-    const regex = /<\s*(SG(?:説明|Description)\d*)\s*:\s*([\s\S]*?)>/gi;
+    const regex = /<\s*(SG[^:\s>]+)\s*:\s*([\s\S]*?)>/gi;
     let match = null;
-
     while ((match = regex.exec(text)) !== null) {
-        const key = String(match[1] || '').trim();
-        const value = String(match[2] || '');
-        if (!key || !isUsableText(value)) {
+        const tag = String(match[1] || '').trim();
+        const value = String(match[2] || '').trim();
+        if (!tag || !isUsableText(value)) {
             continue;
         }
 
-        result.push({ key, value });
-        extractedKeys.add(key.toLowerCase());
-    }
-
-    // Fallback for malformed notes where SG description tag is not closed with ">".
-    const startRegex = /<\s*(SG(?:説明|Description)\d*)\s*:/gi;
-    const starts = [];
-    let startMatch = null;
-    while ((startMatch = startRegex.exec(text)) !== null) {
-        starts.push({
-            key: String(startMatch[1] || '').trim(),
-            valueStart: startRegex.lastIndex,
-            startIndex: startMatch.index,
-        });
-    }
-
-    for (let i = 0; i < starts.length; i++) {
-        const current = starts[i];
-        const key = current && current.key ? current.key : '';
-        if (!key || extractedKeys.has(key.toLowerCase())) {
-            continue;
-        }
-
-        const nextStart = i + 1 < starts.length ? starts[i + 1].startIndex : text.length;
-        let value = text.slice(current.valueStart, nextStart);
-        value = value.replace(/\r?\n>\s*$/, '').trim();
-
-        if (!isUsableText(value)) {
-            continue;
-        }
-
-        result.push({ key, value });
-        extractedKeys.add(key.toLowerCase());
+        result.push({ tag, value });
     }
 
     return result;
+}
+
+function isGlossaryDescriptionTag(tagName) {
+    return /^SG(?:説明|Description)\d*$/i.test(String(tagName || '').trim());
+}
+
+function isGlossaryCommonDescriptionTag(tagName) {
+    return /^SG(?:共通説明|CommonDescription)\d*$/i.test(String(tagName || '').trim());
+}
+
+function isGlossaryNotYetDescriptionTag(tagName) {
+    return /^SG(?:未入手説明|NotYetDescription)\d*$/i.test(String(tagName || '').trim());
+}
+
+function isGlossaryCategoryTag(tagName) {
+    return /^SG(?:カテゴリ|Category)$/i.test(String(tagName || '').trim());
+}
+
+function findPluginEntry(pluginName) {
+    if (!Array.isArray(window.$plugins)) {
+        return null;
+    }
+
+    const needle = String(pluginName || '')
+        .trim()
+        .toLowerCase();
+    if (!needle) {
+        return null;
+    }
+
+    return (
+        window.$plugins.find((entry) => {
+            if (!entry || typeof entry.name !== 'string') {
+                return false;
+            }
+
+            return entry.name.trim().toLowerCase() === needle;
+        }) || null
+    );
+}
+
+function getOriginalItemNote(item) {
+    if (!item || typeof item !== 'object') {
+        return '';
+    }
+
+    const originalMap =
+        item._translateOriginal && typeof item._translateOriginal === 'object'
+            ? item._translateOriginal
+            : null;
+
+    if (originalMap && isUsableText(originalMap.note)) {
+        return originalMap.note;
+    }
+
+    return isUsableText(item.note) ? item.note : '';
+}
+
+function getOriginalItemMeta(item) {
+    if (!item || typeof item !== 'object') {
+        return {};
+    }
+
+    if (!hasOwn(item, '__CHEAT_ORIGINAL_SCENE_GLOSSARY_META__')) {
+        Object.defineProperty(item, '__CHEAT_ORIGINAL_SCENE_GLOSSARY_META__', {
+            value: { ...(item.meta && typeof item.meta === 'object' ? item.meta : {}) },
+            configurable: true,
+            enumerable: false,
+            writable: true,
+        });
+    }
+
+    return item.__CHEAT_ORIGINAL_SCENE_GLOSSARY_META__ || {};
+}
+
+function buildMetaPatchFromNoteText(noteText) {
+    const patch = {};
+    const tagEntries = parseNoteTagEntries(noteText);
+
+    for (const tagEntry of tagEntries) {
+        const tagName = String(tagEntry.tag || '').trim();
+        if (!tagName.startsWith('SG') || !isUsableText(tagEntry.value)) {
+            continue;
+        }
+
+        if (
+            isGlossaryDescriptionTag(tagName) ||
+            isGlossaryCommonDescriptionTag(tagName) ||
+            isGlossaryNotYetDescriptionTag(tagName) ||
+            isGlossaryCategoryTag(tagName)
+        ) {
+            patch[tagName] = tagEntry.value;
+        }
+    }
+
+    return patch;
+}
+
+function restoreOriginalGlossaryMeta(item) {
+    if (!item || typeof item !== 'object') {
+        return;
+    }
+
+    item.meta = { ...getOriginalItemMeta(item) };
+}
+
+function applyTranslatedGlossaryMeta(translator, item) {
+    if (!item || typeof item !== 'object') {
+        return;
+    }
+
+    const runtime = translator.getRuntime();
+    const originalMeta = getOriginalItemMeta(item);
+    if (!runtime || !translator.isRuntimeTranslationActive(runtime)) {
+        item.meta = { ...originalMeta };
+        return;
+    }
+
+    const originalNote = getOriginalItemNote(item);
+    if (!isUsableText(originalNote)) {
+        item.meta = { ...originalMeta };
+        return;
+    }
+
+    const cacheKey = runtime.getCacheKey(originalNote, NOTE_CACHE_TYPE);
+    runtime.markCacheKeySeen(cacheKey);
+
+    if (!runtime.hasUsableCacheValue(cacheKey)) {
+        item.meta = { ...originalMeta };
+        return;
+    }
+
+    const translatedNote = runtime.translationCache.get(cacheKey);
+    if (!isUsableText(translatedNote)) {
+        item.meta = { ...originalMeta };
+        return;
+    }
+
+    const patch = buildMetaPatchFromNoteText(translatedNote);
+    item.meta = Object.keys(patch).length > 0 ? { ...originalMeta, ...patch } : { ...originalMeta };
+}
+
+function pushScanEntry(output, text, source, cacheType) {
+    if (!Array.isArray(output) || !isUsableText(text)) {
+        return;
+    }
+
+    output.push({ text, source, cacheType });
+}
+
+function getGlossaryPageSuffix(pageIndex) {
+    const index = Number(pageIndex) || 0;
+    return index > 0 ? String(index + 1) : '';
+}
+
+function getGlossaryDescriptionTagCandidates(pageIndex) {
+    const suffix = getGlossaryPageSuffix(pageIndex);
+    return [`SG説明${suffix}`, `SGDescription${suffix}`];
+}
+
+function extractDescriptionFromNoteText(noteText, pageIndex) {
+    if (!isUsableText(noteText)) {
+        return '';
+    }
+
+    const wanted = new Set(
+        getGlossaryDescriptionTagCandidates(pageIndex).map((name) => name.toLowerCase())
+    );
+    const tagEntries = parseNoteTagEntries(noteText);
+    for (const tagEntry of tagEntries) {
+        const tagName = String(tagEntry.tag || '').trim().toLowerCase();
+        if (!wanted.has(tagName)) {
+            continue;
+        }
+
+        const value = String(tagEntry.value || '').trim();
+        if (value) {
+            return value;
+        }
+    }
+
+    return '';
+}
+
+function appendEntriesFromGlossaryInfo(glossaryInfoList, scope, output) {
+    if (!Array.isArray(glossaryInfoList) || !Array.isArray(output)) {
+        return;
+    }
+
+    for (let glossaryIndex = 0; glossaryIndex < glossaryInfoList.length; glossaryIndex++) {
+        const glossaryInfo = glossaryInfoList[glossaryIndex];
+        if (!glossaryInfo || typeof glossaryInfo !== 'object' || Array.isArray(glossaryInfo)) {
+            continue;
+        }
+
+        for (const field of GLOSSARY_TEXT_FIELDS) {
+            const text = typeof glossaryInfo[field] === 'string' ? glossaryInfo[field] : '';
+            if (!isUsableText(text)) {
+                continue;
+            }
+
+            const cacheType = field === 'CommandName' ? 'command' : 'plugin_scene_glossary';
+            pushScanEntry(
+                output,
+                text,
+                {
+                    scope,
+                    field,
+                    glossaryIndex,
+                },
+                cacheType
+            );
+        }
+    }
+}
+
+function appendEntriesFromParameters(parameters, scope, output) {
+    if (!parameters || typeof parameters !== 'object' || !Array.isArray(output)) {
+        return;
+    }
+
+    const glossaryInfoList = parseStructArray(parameters.GlossaryInfo);
+    appendEntriesFromGlossaryInfo(glossaryInfoList, scope, output);
+
+    const categoryOrderList = parseStringArray(parameters.CategoryOrder);
+    for (let categoryIndex = 0; categoryIndex < categoryOrderList.length; categoryIndex++) {
+        pushScanEntry(
+            output,
+            categoryOrderList[categoryIndex],
+            {
+                scope,
+                field: 'CategoryOrder',
+                categoryIndex,
+            },
+            'plugin_scene_glossary'
+        );
+    }
+}
+
+function appendGlossaryTextTagEntry(tagName, value, sourceKey, index, itemId, output) {
+    if (
+        !(
+            isGlossaryDescriptionTag(tagName) ||
+            isGlossaryCommonDescriptionTag(tagName) ||
+            isGlossaryNotYetDescriptionTag(tagName)
+        )
+    ) {
+        return false;
+    }
+
+    pushScanEntry(
+        output,
+        value,
+        {
+            scope: sourceKey,
+            index,
+            itemId,
+            tagName,
+        },
+        'plugin_scene_glossary'
+    );
+
+    return true;
+}
+
+function appendGlossaryCategoryTagEntries(tagName, value, sourceKey, index, itemId, output) {
+    if (!isGlossaryCategoryTag(tagName)) {
+        return;
+    }
+
+    const categories = value
+        .split(',')
+        .map((category) => category.trim())
+        .filter((category) => !!category);
+
+    for (let categoryIndex = 0; categoryIndex < categories.length; categoryIndex++) {
+        pushScanEntry(
+            output,
+            categories[categoryIndex],
+            {
+                scope: sourceKey,
+                index,
+                itemId,
+                tagName,
+                categoryIndex,
+            },
+            'plugin_scene_glossary'
+        );
+    }
+}
+
+function appendEntriesFromDatabaseItem(item, index, sourceKey, output) {
+    if (!item || typeof item !== 'object') {
+        return;
+    }
+
+    const noteText = getOriginalItemNote(item);
+    if (!isUsableText(noteText)) {
+        return;
+    }
+
+    const tagEntries = parseNoteTagEntries(noteText);
+    if (!tagEntries.length) {
+        return;
+    }
+
+    const itemId = Number(item.id) || 0;
+    for (const tagEntry of tagEntries) {
+        const tagName = tagEntry.tag;
+        const value = tagEntry.value;
+
+        if (appendGlossaryTextTagEntry(tagName, value, sourceKey, index, itemId, output)) {
+            continue;
+        }
+
+        appendGlossaryCategoryTagEntries(tagName, value, sourceKey, index, itemId, output);
+    }
+}
+
+function appendEntriesFromDatabaseArray(databaseArray, sourceKey, output) {
+    if (!Array.isArray(databaseArray) || !Array.isArray(output)) {
+        return;
+    }
+
+    for (let index = 0; index < databaseArray.length; index++) {
+        appendEntriesFromDatabaseItem(databaseArray[index], index, sourceKey, output);
+    }
+}
+
+function applyRuntimeTranslation(runtime, text, cacheTypes) {
+    if (!isUsableText(text)) {
+        return text;
+    }
+
+    const list = Array.isArray(cacheTypes) ? cacheTypes : [];
+    for (const cacheType of list) {
+        if (!isUsableText(cacheType)) {
+            continue;
+        }
+
+        const cacheKey = runtime.getCacheKey(text, cacheType);
+        runtime.markCacheKeySeen(cacheKey);
+
+        if (!runtime.hasUsableCacheValue(cacheKey)) {
+            continue;
+        }
+
+        const cached = runtime.translationCache.get(cacheKey);
+        if (isUsableText(cached)) {
+            return cached;
+        }
+    }
+
+    return text;
+}
+
+function resolveRuntimeTranslation(translator, text, cacheTypes) {
+    const runtime = translator.getRuntime();
+    if (
+        !runtime ||
+        !translator.isRuntimeTranslationActive(runtime) ||
+        !isUsableText(text) ||
+        !(runtime.translationCache instanceof Map)
+    ) {
+        return text;
+    }
+
+    return applyRuntimeTranslation(runtime, text, cacheTypes);
+}
+
+function patchGlossaryDescription(translator) {
+    if (
+        !window.Window_Glossary ||
+        !Window_Glossary.prototype ||
+        typeof Window_Glossary.prototype.getDescription !== 'function'
+    ) {
+        return;
+    }
+
+    const originalGetDescription = Window_Glossary.prototype.getDescription;
+    Window_Glossary.prototype.getDescription = function (index) {
+        applyTranslatedGlossaryMeta(translator, this._itemData);
+        const description = originalGetDescription.apply(this, arguments);
+
+        try {
+            return isUsableText(description)
+                ? resolveRuntimeTranslation(translator, description, [translator.getCacheType()])
+                : extractDescriptionFromNoteText(getOriginalItemNote(this._itemData), index);
+        } catch (error) {
+            console.warn(
+                '[SceneGlossaryTranslator] Failed to apply glossary description translation',
+                error
+            );
+            return description;
+        }
+    };
+
+    if (typeof Window_Glossary.prototype.getMetaContents === 'function') {
+        const originalGetMetaContents = Window_Glossary.prototype.getMetaContents;
+        Window_Glossary.prototype.getMetaContents = function () {
+            applyTranslatedGlossaryMeta(translator, this._itemData);
+            return originalGetMetaContents.apply(this, arguments);
+        };
+    }
+}
+
+function patchGlossaryCategoryWindow(translator) {
+    if (
+        !window.Window_GlossaryCategory ||
+        !Window_GlossaryCategory.prototype ||
+        typeof Window_GlossaryCategory.prototype.drawItem !== 'function'
+    ) {
+        return;
+    }
+
+    const originalDrawItem = Window_GlossaryCategory.prototype.drawItem;
+    Window_GlossaryCategory.prototype.drawItem = function (index) {
+        const hasData = Array.isArray(this._data) && index >= 0 && index < this._data.length;
+        const originalText = hasData && typeof this._data[index] === 'string' ? this._data[index] : '';
+
+        try {
+            if (hasData && isUsableText(originalText)) {
+                const translated = resolveRuntimeTranslation(translator, originalText, [
+                    translator.getCacheType(),
+                ]);
+                if (translated !== originalText) {
+                    this._data[index] = translated;
+                    const result = originalDrawItem.apply(this, arguments);
+                    this._data[index] = originalText;
+                    return result;
+                }
+            }
+        } catch (error) {
+            console.warn(
+                '[SceneGlossaryTranslator] Failed to apply glossary category translation',
+                error
+            );
+        }
+
+        return originalDrawItem.apply(this, arguments);
+    };
+}
+
+function patchGlossaryPartyMessages(translator) {
+    if (!window.Game_Party || !Game_Party.prototype) {
+        return;
+    }
+
+    if (typeof Game_Party.prototype.getGlossaryCategory === 'function') {
+        const originalGetGlossaryCategory = Game_Party.prototype.getGlossaryCategory;
+        Game_Party.prototype.getGlossaryCategory = function (item) {
+            applyTranslatedGlossaryMeta(translator, item);
+            return originalGetGlossaryCategory.apply(this, arguments);
+        };
+    }
+
+    if (typeof Game_Party.prototype.getGlossaryHelpMessages === 'function') {
+        const originalGetGlossaryHelpMessages = Game_Party.prototype.getGlossaryHelpMessages;
+        Game_Party.prototype.getGlossaryHelpMessages = function () {
+            const result = originalGetGlossaryHelpMessages.apply(this, arguments);
+            if (!Array.isArray(result)) {
+                return result;
+            }
+
+            try {
+                return result.map((text) =>
+                    resolveRuntimeTranslation(translator, text, [translator.getCacheType()])
+                );
+            } catch (error) {
+                console.warn(
+                    '[SceneGlossaryTranslator] Failed to apply glossary help text translation',
+                    error
+                );
+                return result;
+            }
+        };
+    }
+
+    if (typeof Game_Party.prototype.getGlossaryConfirmMessages === 'function') {
+        const originalGetGlossaryConfirmMessages = Game_Party.prototype.getGlossaryConfirmMessages;
+        Game_Party.prototype.getGlossaryConfirmMessages = function () {
+            const result = originalGetGlossaryConfirmMessages.apply(this, arguments);
+            if (!Array.isArray(result)) {
+                return result;
+            }
+
+            try {
+                return result.map((text) =>
+                    resolveRuntimeTranslation(translator, text, [translator.getCacheType()])
+                );
+            } catch (error) {
+                console.warn(
+                    '[SceneGlossaryTranslator] Failed to apply glossary confirm text translation',
+                    error
+                );
+                return result;
+            }
+        };
+    }
+
+    if (typeof Game_Party.prototype.getGlossaryCompleteMessage === 'function') {
+        const originalGetGlossaryCompleteMessage = Game_Party.prototype.getGlossaryCompleteMessage;
+        Game_Party.prototype.getGlossaryCompleteMessage = function () {
+            const result = originalGetGlossaryCompleteMessage.apply(this, arguments);
+            try {
+                return resolveRuntimeTranslation(translator, result, [translator.getCacheType()]);
+            } catch (error) {
+                console.warn(
+                    '[SceneGlossaryTranslator] Failed to apply glossary complete message translation',
+                    error
+                );
+                return result;
+            }
+        };
+    }
+
+    if (typeof Game_Party.prototype.getTextItemNotYet === 'function') {
+        const originalGetTextItemNotYet = Game_Party.prototype.getTextItemNotYet;
+        Game_Party.prototype.getTextItemNotYet = function () {
+            const result = originalGetTextItemNotYet.apply(this, arguments);
+            try {
+                return resolveRuntimeTranslation(translator, result, [translator.getCacheType()]);
+            } catch (error) {
+                console.warn(
+                    '[SceneGlossaryTranslator] Failed to apply glossary hidden item text translation',
+                    error
+                );
+                return result;
+            }
+        };
+    }
+}
+
+function patchGlossaryMenuCommand(translator) {
+    if (
+        !window.Window_MenuCommand ||
+        !Window_MenuCommand.prototype ||
+        typeof Window_MenuCommand.prototype.addOriginalCommands !== 'function'
+    ) {
+        return;
+    }
+
+    const originalAddOriginalCommands = Window_MenuCommand.prototype.addOriginalCommands;
+    Window_MenuCommand.prototype.addOriginalCommands = function () {
+        const result = originalAddOriginalCommands.apply(this, arguments);
+
+        try {
+            const list = Array.isArray(this._list) ? this._list : [];
+            for (const command of list) {
+                if (!command || !isUsableText(command.symbol) || !isUsableText(command.name)) {
+                    continue;
+                }
+
+                if (!/^glossary\d*$/i.test(command.symbol)) {
+                    continue;
+                }
+
+                command.name = resolveRuntimeTranslation(translator, command.name, [
+                    'command',
+                    translator.getCacheType(),
+                ]);
+            }
+        } catch (error) {
+            console.warn(
+                '[SceneGlossaryTranslator] Failed to apply glossary menu command translation',
+                error
+            );
+        }
+
+        return result;
+    };
 }
 
 export class SceneGlossaryTranslator extends BasePluginTranslator {
@@ -169,133 +744,16 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
         return 'plugin_scene_glossary';
     }
 
-    getOriginalItemNote(item) {
-        if (!item || typeof item !== 'object') {
-            return '';
-        }
-
-        const originalMap =
-            item._translateOriginal && typeof item._translateOriginal === 'object'
-                ? item._translateOriginal
-                : null;
-
-        if (originalMap && isUsableText(originalMap.note)) {
-            return originalMap.note;
-        }
-
-        return isUsableText(item.note) ? item.note : '';
-    }
-
-    buildMetaPatchFromTranslatedNote(translatedNote) {
-        const patch = {};
-        const entries = extractGlossaryDescriptionEntries(translatedNote);
-
-        for (const entry of entries) {
-            const suffixMatch = /^SG(?:説明|Description)(\d*)$/i.exec(entry.key);
-            const suffix = suffixMatch ? suffixMatch[1] || '' : '';
-            patch[`SG説明${suffix}`] = entry.value;
-            patch[`SGDescription${suffix}`] = entry.value;
-        }
-
-        return patch;
-    }
-
-    applyGlossaryTranslation(item) {
-        if (!item || typeof item !== 'object') {
-            return;
-        }
-
-        const runtime = getRuntime();
-        if (
-            !runtime ||
-            typeof runtime.getCacheKey !== 'function' ||
-            typeof runtime.hasUsableCacheValue !== 'function' ||
-            !(runtime.translationCache instanceof Map)
-        ) {
-            return;
-        }
-
-        const originalNote = this.getOriginalItemNote(item);
-        if (!isUsableText(originalNote)) {
-            return;
-        }
-
-        const cacheKey = runtime.getCacheKey(originalNote, ITEM_NOTE_CACHE_TYPE);
-        runtime.markCacheKeySeen?.(cacheKey);
-
-        if (!runtime.hasUsableCacheValue(cacheKey)) {
-            return;
-        }
-
-        const translatedNote = runtime.translationCache.get(cacheKey);
-        if (!isUsableText(translatedNote)) {
-            return;
-        }
-
-        const patch = this.buildMetaPatchFromTranslatedNote(translatedNote);
-        if (!Object.keys(patch).length) {
-            return;
-        }
-
-        const baseMeta = item.meta && typeof item.meta === 'object' ? item.meta : {};
-        item.meta = {
-            ...baseMeta,
-            ...patch,
-        };
-    }
-
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
             return;
         }
 
-        if (
-            !window.Scene_Glossary ||
-            !Scene_Glossary.prototype ||
-            typeof Scene_Glossary.prototype.createGlossaryWindow !== 'function'
-        ) {
-            return;
-        }
-
-        // Register SceneGlossary-specific tags with the translation engine so that
-        // all <SG...:value> tags in item notes are properly encoded/decoded during
-        // LLM translation instead of being left as raw text.
         this.registerPluginCustomTags(SCENE_GLOSSARY_PLUGIN_TAGS);
-
-        const translator = this;
-        const originalCreateGlossaryWindow = Scene_Glossary.prototype.createGlossaryWindow;
-
-        Scene_Glossary.prototype.createGlossaryWindow = function () {
-            const result = originalCreateGlossaryWindow.apply(this, arguments);
-            const glossaryWindow = this._glossaryWindow;
-
-            if (
-                !glossaryWindow ||
-                typeof glossaryWindow.refresh !== 'function' ||
-                glossaryWindow.__cheatSceneGlossaryRefreshHooked
-            ) {
-                return result;
-            }
-
-            const originalRefresh = glossaryWindow.refresh;
-            glossaryWindow.refresh = function (item) {
-                try {
-                    const targetItem = item || this._itemData || null;
-                    translator.applyGlossaryTranslation(targetItem);
-                } catch (error) {
-                    console.warn(
-                        '[SceneGlossaryTranslator] Failed to apply glossary translation in refresh',
-                        error
-                    );
-                }
-
-                return originalRefresh.apply(this, arguments);
-            };
-
-            glossaryWindow.__cheatSceneGlossaryRefreshHooked = true;
-            return result;
-        };
-
+        patchGlossaryDescription(this);
+        patchGlossaryCategoryWindow(this);
+        patchGlossaryPartyMessages(this);
+        patchGlossaryMenuCommand(this);
         window[RUNTIME_HOOK_GUARD] = true;
     }
 
@@ -328,14 +786,74 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
     }
 
     buildScanEntries() {
-        return [];
+        const entries = [];
+
+        const pluginEntry = findPluginEntry(this.getPluginName());
+        if (pluginEntry?.parameters) {
+            appendEntriesFromParameters(pluginEntry.parameters, 'pluginEntryParameter', entries);
+        }
+
+        if (window.PluginManager && typeof PluginManager.parameters === 'function') {
+            const runtimeParameters = PluginManager.parameters(this.getPluginName());
+            appendEntriesFromParameters(
+                runtimeParameters,
+                'runtimePluginManagerParameter',
+                entries
+            );
+        }
+
+        return entries;
     }
 
-    collectUntranslated() {
-        return [];
+    buildUniquePendingItems(panel) {
+        const byCacheKey = new Map();
+
+        for (const entry of this._scanEntries) {
+            const text = typeof entry.text === 'string' ? entry.text : '';
+            if (!isUsableText(text)) {
+                continue;
+            }
+
+            const cacheType = isUsableText(entry.cacheType) ? entry.cacheType : this.getCacheType();
+            const cacheKey = panel.getCacheKey(text, cacheType);
+            if (!byCacheKey.has(cacheKey)) {
+                byCacheKey.set(cacheKey, {
+                    type: cacheType,
+                    id: `plugin_scene_glossary_${cacheType}_${byCacheKey.size}`,
+                    value: text,
+                    cacheKey,
+                });
+            }
+        }
+
+        return Array.from(byCacheKey.values());
     }
 
-    countPluginAmountSync() {
-        return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
+    collectUntranslated({ panel }) {
+        if (!panel || typeof panel.getCacheKey !== 'function') {
+            return [];
+        }
+
+        const items = this.buildUniquePendingItems(panel);
+        return items.filter((item) => !panel.hasUsableCacheValue(item.cacheKey));
+    }
+
+    countPluginAmountSync({ panel }) {
+        if (!panel || typeof panel.getCacheKey !== 'function') {
+            return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
+        }
+
+        const items = this.buildUniquePendingItems(panel);
+        const totalStrings = items.length;
+        const leftStrings = items.filter(
+            (item) => !panel.hasUsableCacheValue(item.cacheKey)
+        ).length;
+
+        return {
+            total: totalStrings,
+            left: leftStrings,
+            totalStrings,
+            leftStrings,
+        };
     }
 }
