@@ -7,6 +7,13 @@ import {
     getSystemMessageCacheKey,
     getSystemMessagesSource,
 } from '../../translate-engines/translation-phases/SystemMessageCacheRules.js';
+import { ensureRootWindowStateValue } from '../../js/RootWindowState.js';
+
+const MAP_DATA_CACHE_KEY = '__CHEAT_MAP_DATA_CACHE__';
+
+function getMapDataCache() {
+    return ensureRootWindowStateValue(MAP_DATA_CACHE_KEY, () => new Map());
+}
 
 const DEFAULT_OBJECT_TRANSLATION_TYPE_DEFS = Object.freeze([
     { id: 'mapEvents', label: 'Map events' },
@@ -39,12 +46,24 @@ export function loadMapDataById(mapId) {
         return Promise.reject(new Error('Invalid map id'));
     }
 
-    const dataManager = globalThis.DataManager;
-    if (dataManager && typeof dataManager.loadDataFile === 'function') {
-        return loadMapDataViaDataManager(dataManager, safeMapId);
+    const cache = getMapDataCache();
+    const cached = cache.get(safeMapId);
+    if (cached) {
+        return Promise.resolve(cached);
     }
 
-    return loadMapDataViaXhr(safeMapId);
+    const promise = (() => {
+        const dataManager = globalThis.DataManager;
+        if (dataManager && typeof dataManager.loadDataFile === 'function') {
+            return loadMapDataViaDataManager(dataManager, safeMapId);
+        }
+        return loadMapDataViaXhr(safeMapId);
+    })();
+
+    return promise.then((mapData) => {
+        cache.set(safeMapId, mapData);
+        return mapData;
+    });
 }
 
 function loadMapDataViaDataManager(dataManager, mapId) {

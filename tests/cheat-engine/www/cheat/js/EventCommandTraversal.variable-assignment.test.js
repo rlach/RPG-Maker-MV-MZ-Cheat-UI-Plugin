@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { collectVariableAssignmentEntries } from '../../../../../../cheat-engine/www/cheat/js/EventCommandTraversal.js';
+import { collectVariableAssignmentEntries } from '../../../../../cheat-engine/www/cheat/js/EventCommandTraversal.js';
 
 describe('EventCommandTraversal variable assignments', () => {
     it('collects script operand string literal assignments for selected variables', () => {
