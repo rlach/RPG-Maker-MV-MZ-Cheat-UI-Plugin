@@ -1,4 +1,5 @@
 import { collectVariableAssignmentEntries } from '../../js/EventCommandTraversal.js';
+import { loadMapDataById } from '../../panels/translate-on-the-fly/ObjectTranslationModalMethods.js';
 import { BasePhase } from './BasePhase.js';
 
 const VARIABLE_VALUE_CACHE_TYPE = 'variable_value';
@@ -38,61 +39,49 @@ export class Variables extends BasePhase {
 
     static getMarkedVariableIdSet(panel) {
         const safeIds = panel ? panel.getSafeVariableTranslationIds() : [];
-        return new Set(
-            safeIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
-        );
+        return new Set(safeIds.map(Number).filter((id) => Number.isInteger(id) && id > 0));
     }
 
-    static loadMapDataSync(mapId) {
-        const safeMapId = Number(mapId) || 0;
-        if (safeMapId <= 0) {
-            return null;
-        }
-
-        try {
-            // @ts-ignore Node built-in available in NW.js runtime.
-            const fileSystem = require('fs');
-            // @ts-ignore Node built-in available in NW.js runtime.
-            const pathModule = require('path');
-            const fileName = `Map${String(safeMapId).padStart(3, '0')}.json`;
-            const filePath = pathModule.resolve('./data', fileName);
-            if (!fileSystem.existsSync(filePath)) {
-                return null;
-            }
-
-            return JSON.parse(fileSystem.readFileSync(filePath, 'utf-8'));
-        } catch (error) {
-            console.warn(`[Variables] Failed to load map ${safeMapId}`, error);
-            return null;
-        }
+    static countMarkedVariables(panel) {
+        return Variables.getMarkedVariableIdSet(panel).size;
     }
 
     static collectListEntries(list, allowedVariableIds) {
         return collectVariableAssignmentEntries(list, { allowedVariableIds });
     }
 
-    static collectMapEntries(panel, allowedVariableIds) {
+    static collectMapPageEntries(entries, event, allowedVariableIds) {
+        if (!event || !Array.isArray(event.pages)) {
+            return;
+        }
+
+        for (const page of event.pages) {
+            if (!page || !Array.isArray(page.list)) {
+                continue;
+            }
+
+            entries.push(...Variables.collectListEntries(page.list, allowedVariableIds));
+        }
+    }
+
+    static async collectMapEntries(panel, allowedVariableIds) {
         const entries = [];
         const validMaps = panel ? panel.getValidMapInfos() : [];
 
         for (const mapInfo of validMaps) {
-            const mapData = Variables.loadMapDataSync(mapInfo.id);
+            let mapData = null;
+            try {
+                mapData = await loadMapDataById(mapInfo.id);
+            } catch (error) {
+                console.warn(`[Variables] Failed to load map ${mapInfo.id}`, error);
+            }
+
             if (!mapData || !Array.isArray(mapData.events)) {
                 continue;
             }
 
             for (const event of mapData.events) {
-                if (!event || !Array.isArray(event.pages)) {
-                    continue;
-                }
-
-                for (const page of event.pages) {
-                    if (!page || !Array.isArray(page.list)) {
-                        continue;
-                    }
-
-                    entries.push(...Variables.collectListEntries(page.list, allowedVariableIds));
-                }
+                Variables.collectMapPageEntries(entries, event, allowedVariableIds);
             }
         }
 
@@ -139,18 +128,7 @@ export class Variables extends BasePhase {
         return entries;
     }
 
-    static buildScanResult(panel) {
-        const allowedVariableIds = Variables.getMarkedVariableIdSet(panel);
-        if (allowedVariableIds.size === 0) {
-            return Variables.createEmptyScanResult();
-        }
-
-        const allEntries = [
-            ...Variables.collectCommonEventEntries(allowedVariableIds),
-            ...Variables.collectTroopEntries(allowedVariableIds),
-            ...Variables.collectMapEntries(panel, allowedVariableIds),
-        ];
-
+    static mergeEntriesIntoUniqueItems(panel, allEntries) {
         const uniqueItemsMap = new Map();
         for (const entry of allEntries) {
             if (!entry || typeof entry.value !== 'string' || entry.value.trim() === '') {
@@ -192,6 +170,21 @@ export class Variables extends BasePhase {
         };
     }
 
+    static async buildScanResult(panel) {
+        const allowedVariableIds = Variables.getMarkedVariableIdSet(panel);
+        if (allowedVariableIds.size === 0) {
+            return Variables.createEmptyScanResult();
+        }
+
+        const allEntries = [
+            ...Variables.collectCommonEventEntries(allowedVariableIds),
+            ...Variables.collectTroopEntries(allowedVariableIds),
+            ...(await Variables.collectMapEntries(panel, allowedVariableIds)),
+        ];
+
+        return Variables.mergeEntriesIntoUniqueItems(panel, allEntries);
+    }
+
     getKind() {
         return 'variables';
     }
@@ -201,7 +194,7 @@ export class Variables extends BasePhase {
     }
 
     async createEntries({ panel }) {
-        const scanResult = Variables.buildScanResult(panel);
+        const scanResult = await Variables.buildScanResult(panel);
         if (scanResult.total <= 0) {
             return [];
         }
@@ -215,12 +208,12 @@ export class Variables extends BasePhase {
     }
 
     countAmountSync({ panel }) {
-        const scanResult = Variables.buildScanResult(panel);
+        const configuredVariableCount = Variables.countMarkedVariables(panel);
         return {
-            total: scanResult.total,
-            left: scanResult.left,
-            totalStrings: scanResult.totalStrings,
-            leftStrings: scanResult.leftStrings,
+            total: configuredVariableCount,
+            left: configuredVariableCount,
+            totalStrings: configuredVariableCount,
+            leftStrings: configuredVariableCount,
         };
     }
 

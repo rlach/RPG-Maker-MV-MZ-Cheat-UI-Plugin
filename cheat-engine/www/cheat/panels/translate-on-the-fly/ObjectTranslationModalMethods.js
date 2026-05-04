@@ -494,7 +494,9 @@ export const objectTranslationRuntimeMethods = {
             this.batchManager = createTranslationBatchManager(this);
         }
 
-        const defs = /** @type {Array<{id:string}>} */ (this.getObjectTranslationTypeDefs());
+        const defs = /** @type {Array<{id:string,label?:string,metaText?:string}>} */ (
+            this.getObjectTranslationTypeDefs()
+        );
         const countedByKind = new Map(
             this.batchManager
                 .countAmountSync(defs.map((def) => ({ kind: def.id })))
@@ -503,12 +505,25 @@ export const objectTranslationRuntimeMethods = {
 
         return defs.map((def) => {
             const counted = countedByKind.get(def.id) || {};
+            const total = Math.max(0, Number(counted.total) || 0);
+            const left = Math.max(0, Number(counted.left) || 0);
+            const totalStrings = Math.max(0, Number(counted.totalStrings) || 0);
+            const leftStrings = Math.max(0, Number(counted.leftStrings) || 0);
+            const isVariables = def.id === 'variables';
+            const hasConfiguredVariables = isVariables && total > 0;
+            const variablesNoun = total === 1 ? 'variable' : 'variables';
+            const variablesMetaText = hasConfiguredVariables
+                ? `${total} ${variablesNoun}`
+                : def.metaText;
+
             return {
                 ...def,
-                total: Math.max(0, Number(counted.total) || 0),
-                left: Math.max(0, Number(counted.left) || 0),
-                totalStrings: Math.max(0, Number(counted.totalStrings) || 0),
-                leftStrings: Math.max(0, Number(counted.leftStrings) || 0),
+                label: hasConfiguredVariables ? 'Variables' : def.label,
+                metaText: variablesMetaText,
+                total,
+                left,
+                totalStrings,
+                leftStrings,
             };
         });
     },
