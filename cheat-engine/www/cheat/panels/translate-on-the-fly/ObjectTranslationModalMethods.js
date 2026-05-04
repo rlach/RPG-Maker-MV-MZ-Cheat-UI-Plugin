@@ -34,13 +34,82 @@ const DEFAULT_OBJECT_TRANSLATION_TYPE_DEFS = Object.freeze([
 ]);
 
 export function loadMapDataById(mapId) {
-    return new Promise((resolve, reject) => {
-        const safeMapId = Number(mapId) || 0;
-        if (safeMapId <= 0) {
-            reject(new Error('Invalid map id'));
-            return;
-        }
+    const safeMapId = Number(mapId) || 0;
+    if (safeMapId <= 0) {
+        return Promise.reject(new Error('Invalid map id'));
+    }
 
+    const dataManager = globalThis.DataManager;
+    if (dataManager && typeof dataManager.loadDataFile === 'function') {
+        return loadMapDataViaDataManager(dataManager, safeMapId);
+    }
+
+    return loadMapDataViaXhr(safeMapId);
+}
+
+function loadMapDataViaDataManager(dataManager, mapId) {
+    return new Promise((resolve, reject) => {
+        const filename = `Map${String(mapId).padStart(3, '0')}.json`;
+        const tempName = `__cheatMapLoad_${mapId}_${Date.now()}_${Math.random()
+            .toString(36)
+            .slice(2, 8)}`;
+        const startedAt = Date.now();
+        const pollMs = 16;
+        const timeoutMs = 15000;
+
+        const cleanup = () => {
+            try {
+                delete window[tempName];
+            } catch {
+                window[tempName] = null;
+            }
+        };
+
+        const rejectWithError = (message) => {
+            cleanup();
+            reject(new Error(message));
+        };
+
+        const checkLoaded = () => {
+            const loadedMap = window[tempName];
+            if (loadedMap) {
+                cleanup();
+                resolve(loadedMap);
+                return;
+            }
+
+            const errors = Array.isArray(dataManager._errors) ? dataManager._errors : [];
+            const errorIndex = errors.findIndex(
+                (error) => error && error.name === tempName && error.src === filename
+            );
+
+            if (errorIndex >= 0) {
+                const [loadError] = errors.splice(errorIndex, 1);
+                const url = loadError && loadError.url ? loadError.url : `data/${filename}`;
+                rejectWithError(`Failed to load map ${mapId}: ${url}`);
+                return;
+            }
+
+            if (Date.now() - startedAt >= timeoutMs) {
+                rejectWithError(`Timed out while loading map ${mapId}`);
+                return;
+            }
+
+            setTimeout(checkLoaded, pollMs);
+        };
+
+        try {
+            dataManager.loadDataFile(tempName, filename);
+            checkLoaded();
+        } catch (error) {
+            cleanup();
+            reject(error);
+        }
+    });
+}
+
+function loadMapDataViaXhr(safeMapId) {
+    return new Promise((resolve, reject) => {
         const filename = `Map${String(safeMapId).padStart(3, '0')}.json`;
         const xhr = new XMLHttpRequest();
         xhr.open('GET', `data/${filename}`, true);
