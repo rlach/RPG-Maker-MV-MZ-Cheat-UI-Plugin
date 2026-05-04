@@ -3,9 +3,7 @@ import { BasePluginTranslator } from '../BasePluginTranslator.js';
 const COMMAND_CACHE_TYPE = 'command';
 const QUEST_ENTRY_KEY_REGEX = /^Quest\s+\d+$/i;
 
-const PLAIN_PARAMETER_CONFIGS = [
-    { key: 'Quest Command', cacheType: COMMAND_CACHE_TYPE },
-];
+const PLAIN_PARAMETER_CONFIGS = [{ key: 'Quest Command', cacheType: COMMAND_CACHE_TYPE }];
 
 const CATEGORY_WINDOW_FIELD_CONFIGS = [
     { key: 'Available Text', cacheType: COMMAND_CACHE_TYPE },
@@ -571,8 +569,9 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
             !klass.prototype.__CHEAT_YEP_QUEST_JOURNAL_DRAW_DATA_HOOKED__
         ) {
             klass.prototype.drawQuestData = function () {
-                Window_QuestData._questDataFmt =
-                    JSON.parse(Yanfly.Param.QuestDataWindow['Quest Data Format'] || '');
+                Window_QuestData._questDataFmt = JSON.parse(
+                    Yanfly.Param.QuestDataWindow['Quest Data Format'] || ''
+                );
                 const questData = $dataQuests[this._questId];
                 if (!questData) return;
                 const runtime = getRuntime();
@@ -582,10 +581,7 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
                 let title = questData.name;
                 title = title.replaceAll(/\\I\[\d+\]/gi, '').trim();
                 title = title.replaceAll(/\\C\[\d+\]/gi, '').trim();
-                title = resolveCachedText(runtime, title, [
-                    COMMAND_CACHE_TYPE,
-                    getCacheType(),
-                ]);
+                title = resolveCachedText(runtime, title, [COMMAND_CACHE_TYPE, getCacheType()]);
                 const difficulty = resolveCachedText(runtime, questData.difficulty, [
                     getCacheType(),
                 ]);

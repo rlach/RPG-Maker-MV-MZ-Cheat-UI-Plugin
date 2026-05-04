@@ -27,6 +27,7 @@ import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTe
 import { QuestSystemTranslator } from './translators/QuestSystemTranslator.js';
 import { SceneCustomMenuTranslator } from './translators/SceneCustomMenuTranslator.js';
 import { SceneGlossaryTranslator } from './translators/SceneGlossaryTranslator.js';
+import { SetMessageFontSizeTranslator } from './translators/SetMessageFontSizeTranslator.js';
 import { SHMessageWindowBgTranslator } from './translators/SHMessageWindowBgTranslator.js';
 import { SkillCPSystemTranslator } from './translators/SkillCPSystemTranslator.js';
 import { TextPictureTranslator } from './translators/TextPictureTranslator.js';
@@ -73,6 +74,7 @@ class PluginTranslatorRegistry {
             QuestSystemTranslator,
             SceneCustomMenuTranslator,
             SceneGlossaryTranslator,
+            SetMessageFontSizeTranslator,
             SHMessageWindowBgTranslator,
             SkillCPSystemTranslator,
             TextPictureTranslator,
@@ -120,6 +122,11 @@ class PluginTranslatorRegistry {
     }
 
     async runDetection(context = {}) {
+        // Phase 1 (sync): instantiate all translators and run detection immediately.
+        // This ensures translatorInstances + detectedPluginNames are populated before
+        // any async work begins, so resolveMessageCacheSourceText never misses a
+        // translator due to a slow prepareTranslator() call on an earlier entry.
+        const detectedTranslators = [];
         for (const TranslatorClass of this.translatorClasses) {
             const translator = new TranslatorClass();
             const pluginName = String(translator.getPluginName() || '').trim();
@@ -135,7 +142,11 @@ class PluginTranslatorRegistry {
             }
 
             this.detectedPluginNames.add(pluginName);
+            detectedTranslators.push({ pluginName, translator });
+        }
 
+        // Phase 2 (async): prepare detected translators sequentially.
+        for (const { pluginName, translator } of detectedTranslators) {
             try {
                 await translator.prepareTranslator();
             } catch (error) {
