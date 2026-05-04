@@ -1,5 +1,31 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Mock heavy transitive imports to keep this a true unit test.
+// PluginTranslatorRegistry pulls in every plugin translator (some reference `window` at module scope).
+vi.mock(
+    '../../../../../../cheat-engine/www/cheat/translate-engines/plugins/PluginTranslatorRegistry.js',
+    () => ({
+        PLUGIN_TRANSLATOR_REGISTRY: {
+            ensureDetectionStarted: vi.fn(),
+            ensureDetectionCompleted: vi.fn().mockResolvedValue(undefined),
+            getDetectedTranslatorInstances: vi.fn(() => []),
+            getDetectedPluginSummaries: vi.fn(() => []),
+            normalizeMessageCacheSources: vi.fn(),
+        },
+    })
+);
+
+vi.mock(
+    '../../../../../../cheat-engine/www/cheat/translate-engines/batch-manager/TranslationBatchManagerFactory.js',
+    () => ({
+        createTranslationBatchManager: vi.fn(() => ({
+            runBatchedTranslation: vi.fn().mockResolvedValue({ successes: [], failures: [] }),
+            applyDataOnLifecycle: vi.fn(),
+            register: vi.fn(),
+        })),
+    })
+);
+
 import { translateOnTheFlyRuntimeMethods } from '../../../../../../cheat-engine/www/cheat/panels/translate-on-the-fly/TranslateOnTheFlyRuntimeMethods.js';
 
 function getCanonicalSystemCommandName(commandName) {
@@ -495,8 +521,12 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         const scrollWindow = new globalThis.Window_ScrollText();
         scrollWindow.startMessage();
 
-        await Promise.resolve();
-        await Promise.resolve();
+        // The scroll text translation goes through an async chain:
+        // runBatchedTranslation() → .then() → .catch() → .finally()
+        // Each step needs a microtask tick to resolve.
+        for (let i = 0; i < 10; i++) {
+            await Promise.resolve();
+        }
 
         expect(runtime.batchManager.runBatchedTranslation).toHaveBeenCalledTimes(1);
         expect(scrollWindow._text).toBe('Scroll translated now');
