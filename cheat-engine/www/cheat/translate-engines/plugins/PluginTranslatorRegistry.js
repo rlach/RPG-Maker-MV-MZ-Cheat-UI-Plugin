@@ -32,6 +32,7 @@ import { SkillCPSystemTranslator } from './translators/SkillCPSystemTranslator.j
 import { TextPictureTranslator } from './translators/TextPictureTranslator.js';
 import { TMMenuLabelTranslator } from './translators/TMMenuLabelTranslator.js';
 import { TMNamePopTranslator } from './translators/TMNamePopTranslator.js';
+import { TMStatusMenuExTranslator } from './translators/TMStatusMenuExTranslator.js';
 import { TorigoyaAchievement2Translator } from './translators/TorigoyaAchievement2Translator.js';
 import { TorigoyaAchievementTranslator } from './translators/TorigoyaAchievementTranslator.js';
 import { TorigoyaNotifyMessageTranslator } from './translators/TorigoyaNotifyMessageTranslator.js';
@@ -76,6 +77,7 @@ class PluginTranslatorRegistry {
             TextPictureTranslator,
             TMMenuLabelTranslator,
             TMNamePopTranslator,
+            TMStatusMenuExTranslator,
             TorigoyaAchievement2Translator,
             TorigoyaAchievementTranslator,
             TorigoyaNotifyMessageTranslator,
