@@ -40,6 +40,7 @@ import { TRPSkitTranslator } from './translators/TrpSkitTranslator.js';
 import { YedWordWrapTranslator } from './translators/YedWordWrapTranslator.js';
 import { YEPCoreEngineScriptTranslator } from './translators/YEPCoreEngineScriptTranslator.js';
 import { YepMessageCoreTranslator } from './translators/YepMessageCoreTranslator.js';
+import { YepQuestJournalTranslator } from './translators/YepQuestJournalTranslator.js';
 
 class PluginTranslatorRegistry {
     constructor() {
@@ -85,6 +86,7 @@ class PluginTranslatorRegistry {
             YedWordWrapTranslator,
             YEPCoreEngineScriptTranslator,
             YepMessageCoreTranslator,
+            YepQuestJournalTranslator,
         ];
         this.translatorInstances = new Map();
         this.detectedPluginNames = new Set();
