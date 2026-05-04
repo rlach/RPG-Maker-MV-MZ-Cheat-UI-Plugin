@@ -64,8 +64,33 @@ export function customizeRPGMakerFunctions(mainComponent) {
         return !!document.querySelector(CHEAT_WINDOW_SELECTOR);
     };
 
+    let inputReleasedForBlockingSession = false;
+
+    const releaseGameInputStateOnceForBlockingSession = () => {
+        const isBlockingActive = isCheatWindowVisible();
+        if (!isBlockingActive) {
+            inputReleasedForBlockingSession = false;
+            return false;
+        }
+
+        if (inputReleasedForBlockingSession) {
+            return true;
+        }
+
+        if (window.Input && typeof window.Input.clear === 'function') {
+            window.Input.clear();
+        }
+
+        if (window.TouchInput && typeof window.TouchInput.clear === 'function') {
+            window.TouchInput.clear();
+        }
+
+        inputReleasedForBlockingSession = true;
+        return true;
+    };
+
     const isMouseInsideUiInputBlock = (event) => {
-        if (isCheatWindowVisible()) {
+        if (releaseGameInputStateOnceForBlockingSession()) {
             return true;
         }
 
@@ -91,7 +116,7 @@ export function customizeRPGMakerFunctions(mainComponent) {
 
     // Keep wheel behavior centralized: when a real cheat window is visible, never forward wheel to game.
     TouchInput._onWheel = function (event) {
-        if (!event || isCheatWindowVisible()) {
+        if (!event || releaseGameInputStateOnceForBlockingSession()) {
             return;
         }
 
@@ -111,7 +136,7 @@ export function customizeRPGMakerFunctions(mainComponent) {
     if (window.Input && typeof window.Input._onKeyDown === 'function') {
         const Input_onKeyDown = Input._onKeyDown;
         Input._onKeyDown = function (event) {
-            if (isCheatWindowVisible()) {
+            if (releaseGameInputStateOnceForBlockingSession()) {
                 return;
             }
 
@@ -122,7 +147,7 @@ export function customizeRPGMakerFunctions(mainComponent) {
     if (window.Input && typeof window.Input._onKeyUp === 'function') {
         const Input_onKeyUp = Input._onKeyUp;
         Input._onKeyUp = function (event) {
-            if (isCheatWindowVisible()) {
+            if (releaseGameInputStateOnceForBlockingSession()) {
                 return;
             }
 
