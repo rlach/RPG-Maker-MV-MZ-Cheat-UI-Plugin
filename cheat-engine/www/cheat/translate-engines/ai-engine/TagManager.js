@@ -24,6 +24,10 @@ const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 const ESCAPE_PREFIX_PATTERN = '(?:\\\\|\\u001b)';
 const SPACE_RUN_TRIGGER_THRESHOLD = LLM_MAX_CONSECUTIVE_IDENTICAL_CHARS + 1;
 const ESCAPE_TAG_SYMBOL_START_CLASS = 'A-Za-z${}|.!><^';
+const LONG_RUN_TAG_CONFIGS = Object.freeze([
+    { tagId: 'sp', character: ' ' },
+    { tagId: 'sw', character: '　' },
+]);
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -40,6 +44,7 @@ export class TagManager {
         this.allowNewlineMismatch = false;
         this.tagEntries = [];
         this.customParameterEntries = [];
+        this.longRunEntries = [];
         this.simpleNEntry = {
             key: 'simpleN',
             description: 'simpleN',
@@ -49,17 +54,59 @@ export class TagManager {
             prePattern: /\n/g,
             postPattern: /\[b=sn\]/g,
         };
-        this.spaceRunEntry = {
-            key: 'spaceRun',
-            description: 'spaceRun',
-            tagId: 'sp',
-            requiredConsistency: true,
-            prePattern: new RegExp(` {${SPACE_RUN_TRIGGER_THRESHOLD},}`, 'g'),
-            postPattern: /\[b=sp(\d+)\]/gi,
-        };
+        this.spaceRunEntry = null;
         this.baseTagConfigs = TAG_CONFIGS.map(cloneTagConfig);
         this.customTagConfigs = [];
         this.initializeTagRegistry();
+    }
+
+    buildNormalizedLongRunTagConfigs() {
+        const normalized = [];
+        const seenCharacters = new Set();
+
+        for (const config of LONG_RUN_TAG_CONFIGS) {
+            const character = typeof config?.character === 'string' ? config.character : '';
+            if (!character || seenCharacters.has(character)) {
+                continue;
+            }
+
+            const tagId =
+                typeof config?.tagId === 'string'
+                    ? config.tagId
+                          .trim()
+                          .toLowerCase()
+                          .replace(/[^a-z0-9]/g, '')
+                          .slice(0, 2)
+                    : '';
+
+            normalized.push({
+                character,
+                tagId,
+            });
+            seenCharacters.add(character);
+        }
+
+        return normalized;
+    }
+
+    createLongRunEntry(config, tagId, index) {
+        const character = config.character;
+        const codePoint = character.codePointAt(0);
+        const safeCodePoint = Number.isFinite(codePoint)
+            ? codePoint.toString(16).toUpperCase()
+            : `IDX${index}`;
+        const escapedCharacter = escapeRegExp(character);
+        const key = `longRun${safeCodePoint}`;
+
+        return {
+            key,
+            description: `longRun:${safeCodePoint}`,
+            tagId,
+            character,
+            requiredConsistency: true,
+            prePattern: new RegExp(`${escapedCharacter}{${SPACE_RUN_TRIGGER_THRESHOLD},}`, 'g'),
+            postPattern: new RegExp(`\\[b=${tagId}(\\d+)\\]`, 'gi'),
+        };
     }
 
     setBaseTagConfigs(baseTagConfigs = []) {
@@ -78,9 +125,19 @@ export class TagManager {
 
     initializeTagRegistry() {
         const configs = [...this.baseTagConfigs, ...this.customTagConfigs];
+        const longRunTagConfigs = this.buildNormalizedLongRunTagConfigs();
         const usedTagIds = new Set();
+        const usedLongRunTagIds = new Set();
+
+        for (const config of longRunTagConfigs) {
+            if (config.tagId && config.tagId.length === 2) {
+                usedTagIds.add(config.tagId);
+            }
+        }
+
         this.tagEntries = [];
         this.customParameterEntries = [];
+        this.longRunEntries = [];
 
         for (let i = 0; i < configs.length; i++) {
             const config = this.validateAndNormalizeConfig(configs[i], i);
@@ -111,22 +168,23 @@ export class TagManager {
             postPattern: new RegExp(`\\[b=${simpleNId}\\]`, 'g'),
         };
 
-        const spaceRunId = this.generateUniqueTagId(
-            {
-                description: 'spaceRun',
-            },
-            usedTagIds
-        );
-        usedTagIds.add(spaceRunId);
+        this.longRunEntries = longRunTagConfigs.map((config, index) => {
+            let tagId = config.tagId;
+            if (!tagId || tagId.length !== 2 || usedLongRunTagIds.has(tagId)) {
+                tagId = this.generateUniqueTagId(
+                    {
+                        description: `longRun${index}`,
+                    },
+                    usedTagIds
+                );
+            }
 
-        this.spaceRunEntry = {
-            key: 'spaceRun',
-            description: 'spaceRun',
-            tagId: spaceRunId,
-            requiredConsistency: true,
-            prePattern: new RegExp(` {${SPACE_RUN_TRIGGER_THRESHOLD},}`, 'g'),
-            postPattern: new RegExp(`\\[b=${spaceRunId}(\\d+)\\]`, 'gi'),
-        };
+            usedTagIds.add(tagId);
+            usedLongRunTagIds.add(tagId);
+            return this.createLongRunEntry(config, tagId, index);
+        });
+
+        this.spaceRunEntry = this.longRunEntries[0] || null;
     }
 
     validateAndNormalizeConfig(config, index) {
@@ -386,14 +444,17 @@ export class TagManager {
         tagCounts[this.simpleNEntry.key] = newlineMatches.length;
         result = result.replace(this.simpleNEntry.prePattern, `[b=${this.simpleNEntry.tagId}]`);
 
-        const expectedSpaceRunLengths = [];
-        const spaceRunMatches = result.match(this.spaceRunEntry.prePattern) || [];
-        tagCounts[this.spaceRunEntry.key] = spaceRunMatches.length;
-        result = result.replace(this.spaceRunEntry.prePattern, (spaces) => {
-            expectedSpaceRunLengths.push(spaces.length);
-            return `[b=${this.spaceRunEntry.tagId}${spaces.length}]`;
-        });
-        caseMap.expectedSpaceRunLengths = expectedSpaceRunLengths;
+        caseMap.expectedLongRunLengthsByTagKey = {};
+        for (const entry of this.longRunEntries) {
+            const expectedRunLengths = [];
+            const runMatches = result.match(entry.prePattern) || [];
+            tagCounts[entry.key] = runMatches.length;
+            result = result.replace(entry.prePattern, (run) => {
+                expectedRunLengths.push(run.length);
+                return `[b=${entry.tagId}${run.length}]`;
+            });
+            caseMap.expectedLongRunLengthsByTagKey[entry.key] = expectedRunLengths;
+        }
 
         return { preprocessedText: result, tagCounts, caseMap };
     }
@@ -498,20 +559,25 @@ export class TagManager {
         actualCounts[this.simpleNEntry.key] = simpleNMatches.length;
         result = result.replace(this.simpleNEntry.postPattern, () => '\n');
 
-        const expectedSpaceRunLengths = (caseMap && caseMap.expectedSpaceRunLengths) || [];
-        const actualSpaceRunLengths = [];
-        const spaceRunMatches = result.match(this.spaceRunEntry.postPattern) || [];
-        actualCounts[this.spaceRunEntry.key] = spaceRunMatches.length;
-        result = result.replace(this.spaceRunEntry.postPattern, (match, runLengthText) => {
-            const runLength = Number(runLengthText);
-            actualSpaceRunLengths.push(runLength);
+        const expectedLongRunLengthsByTagKey =
+            (caseMap && caseMap.expectedLongRunLengthsByTagKey) || {};
+        const actualLongRunLengthsByTagKey = {};
+        for (const entry of this.longRunEntries) {
+            const actualRunLengths = [];
+            const runMatches = result.match(entry.postPattern) || [];
+            actualCounts[entry.key] = runMatches.length;
+            result = result.replace(entry.postPattern, (match, runLengthText) => {
+                const runLength = Number(runLengthText);
+                actualRunLengths.push(runLength);
 
-            if (!Number.isSafeInteger(runLength) || runLength < 0) {
-                return match;
-            }
+                if (!Number.isSafeInteger(runLength) || runLength < 0) {
+                    return match;
+                }
 
-            return ' '.repeat(runLength);
-        });
+                return entry.character.repeat(runLength);
+            });
+            actualLongRunLengthsByTagKey[entry.key] = actualRunLengths;
+        }
 
         const originalHadClosingBTag = !!(caseMap && caseMap.hasLiteralClosingBTag);
         if (!originalHadClosingBTag && /\[\/b\]/i.test(result)) {
@@ -561,13 +627,16 @@ export class TagManager {
             valid = false;
         }
 
-        const spaceRunsValid =
-            expectedSpaceRunLengths.length === actualSpaceRunLengths.length &&
-            expectedSpaceRunLengths.every((length, index) => {
-                return actualSpaceRunLengths[index] === length;
-            });
+        const longRunsValid = this.longRunEntries.every((entry) => {
+            const expectedRuns = expectedLongRunLengthsByTagKey[entry.key] || [];
+            const actualRuns = actualLongRunLengthsByTagKey[entry.key] || [];
+            return (
+                expectedRuns.length === actualRuns.length &&
+                expectedRuns.every((length, index) => actualRuns[index] === length)
+            );
+        });
 
-        if (!spaceRunsValid) {
+        if (!longRunsValid) {
             valid = false;
         }
 
@@ -593,8 +662,8 @@ export class TagManager {
 
             console.warn('[TagManager] Tag count mismatch:', {
                 differences,
-                expectedSpaceRunLengths,
-                actualSpaceRunLengths,
+                expectedLongRunLengthsByTagKey,
+                actualLongRunLengthsByTagKey,
             });
         }
 
