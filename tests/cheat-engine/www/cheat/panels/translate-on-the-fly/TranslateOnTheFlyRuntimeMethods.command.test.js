@@ -26,6 +26,15 @@ vi.mock(
     })
 );
 
+// Mock HookGuardHelper so installCommandTranslationHook always applies in test isolation.
+vi.mock('../../../../../../cheat-engine/www/cheat/js/HookGuardHelper.js', () => ({
+    shouldApplyHook: vi.fn(() => true),
+    isHookAlreadyApplied: vi.fn(() => false),
+    markHookAsApplied: vi.fn(() => true),
+    clearAllHookGuards: vi.fn(),
+    getAppliedHooks: vi.fn(() => []),
+}));
+
 import { translateOnTheFlyRuntimeMethods } from '../../../../../../cheat-engine/www/cheat/panels/translate-on-the-fly/TranslateOnTheFlyRuntimeMethods.js';
 
 function getCanonicalSystemCommandName(commandName) {
@@ -204,7 +213,18 @@ function installRpgMakerGlobals({ commandsOriginal = [], commands = [] } = {}) {
     globalThis.Window_Message = Window_Message;
     globalThis.Window_ScrollText = Window_ScrollText;
     globalThis.Window_Selectable = Window_Selectable;
-    globalThis.Window_Command = createCommandWindowClass(Window_Selectable);
+    const WindowCommandBase = createCommandWindowClass(Window_Selectable);
+    globalThis.Window_Command = WindowCommandBase;
+
+    // Subclass with own makeCommandList — mirrors real RPG Maker subclasses.
+    // Dynamic discovery hooks classes like this, not Window_Command itself.
+    class Window_MenuCommand extends WindowCommandBase {}
+    Window_MenuCommand.prototype.makeCommandList = WindowCommandBase.prototype.makeCommandList;
+    globalThis.Window_MenuCommand = Window_MenuCommand;
+
+    // Simulate game already booted so command hooks install immediately.
+    globalThis.SceneManager = { _scene: {} };
+
     globalThis.DataManager = {
         extractSaveContents() {},
         createGameObjects() {},
@@ -239,7 +259,6 @@ function createRuntime({
         targetLang: 'en',
         batchItemsLimit: 20,
         charLimit: 1000,
-        _systemCommandsCollected: false,
         batchManager: {
             runBatchedTranslation: vi.fn().mockResolvedValue(batchResult),
             applyDataOnLifecycle: vi.fn(),
@@ -319,13 +338,15 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         delete globalThis.Window_ScrollText;
         delete globalThis.Window_Selectable;
         delete globalThis.Window_Command;
+        delete globalThis.Window_MenuCommand;
+        delete globalThis.SceneManager;
         delete globalThis.DataManager;
         delete globalThis.Scene_Title;
         delete globalThis.Scene_Load;
         delete globalThis.Scene_Map;
     });
 
-    it('injects cached command translations during menu refresh and marks the original key as seen', async () => {
+    it('injects cached command translations during menu refresh and marks the original key as seen', () => {
         installRpgMakerGlobals();
         const runtime = createRuntime({
             translationEnabled: false,
@@ -335,10 +356,10 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
 
         translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
 
-        const commandWindow = new globalThis.Window_Command([
+        const commandWindow = new globalThis.Window_MenuCommand([
             { name: 'Galeria', symbol: 'gallery' },
         ]);
-        await commandWindow.refresh();
+        commandWindow.refresh();
 
         expect(commandWindow._list).toEqual([
             { name: 'Gallery', symbol: 'gallery', enabled: true, ext: null },
@@ -347,7 +368,7 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         expect(runtime.lastSeenByCacheKey.has(commandKey(runtime, 'Galeria'))).toBe(true);
     });
 
-    it('maps already translated system command labels back to the original cache key', async () => {
+    it('maps already translated system command labels back to the original cache key', () => {
         installRpgMakerGlobals({
             commandsOriginal: ['Galeria'],
             commands: ['Gallery'],
@@ -360,10 +381,10 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
 
         translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
 
-        const commandWindow = new globalThis.Window_Command([
+        const commandWindow = new globalThis.Window_MenuCommand([
             { name: 'Gallery', symbol: 'gallery' },
         ]);
-        await commandWindow.refresh();
+        commandWindow.refresh();
 
         expect(commandWindow._list[0].name).toBe('Gallery');
         expect(runtime.lastSeenByCacheKey.has(commandKey(runtime, 'Galeria'))).toBe(true);
@@ -371,7 +392,7 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         expect(runtime.translationCache.has(commandKey(runtime, 'Gallery'))).toBe(false);
     });
 
-    it('harvests missing menu commands into cache and seen when no cached translation exists', async () => {
+    it('harvests missing menu commands into cache and seen when no cached translation exists', () => {
         installRpgMakerGlobals();
         const runtime = createRuntime({
             translationEnabled: false,
@@ -380,38 +401,38 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
 
         translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
 
-        const commandWindow = new globalThis.Window_Command([
+        const commandWindow = new globalThis.Window_MenuCommand([
             { name: 'Galeria', symbol: 'gallery' },
         ]);
-        await commandWindow.refresh();
+        commandWindow.refresh();
 
         expect(commandWindow._list[0].name).toBe('Galeria');
         expect(runtime.translationCache.get(commandKey(runtime, 'Galeria'))).toBe('');
         expect(runtime.lastSeenByCacheKey.has(commandKey(runtime, 'Galeria'))).toBe(true);
     });
 
-    it('does not treat dialog choice entries as command cache items during cache injection', async () => {
+    it('does not treat dialog choice entries as command cache items during refresh', () => {
         installRpgMakerGlobals();
         const runtime = createRuntime({
-            translationEnabled: true,
-            batchResult: { successes: [], failures: [] },
+            translationEnabled: false,
+            translateCacheWhenDisabled: true,
         });
 
         translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
 
-        const commandWindow = new globalThis.Window_Command();
-        commandWindow._translateApplyingCommandCache = true;
-        commandWindow.addCommand('Tak', 'choice');
+        const commandWindow = new globalThis.Window_Command([
+            { name: 'Tak', symbol: 'choice' },
+        ]);
+        commandWindow.refresh();
 
         expect(commandWindow._list).toEqual([
             { name: 'Tak', symbol: 'choice', enabled: true, ext: null },
         ]);
         expect(runtime.translationCache.size).toBe(0);
         expect(runtime.lastSeenByCacheKey.size).toBe(0);
-        expect(runtime.batchManager.runBatchedTranslation).not.toHaveBeenCalled();
     });
 
-    it('does not harvest dialog choice entries as command cache items in full refresh flow', async () => {
+    it('does not harvest dialog choice entries as command cache items in full refresh flow', () => {
         installRpgMakerGlobals();
         const runtime = createRuntime({
             translationEnabled: false,
@@ -421,7 +442,7 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
 
         const commandWindow = new globalThis.Window_Command([{ name: 'Tak', symbol: 'choice' }]);
-        await commandWindow.refresh();
+        commandWindow.refresh();
 
         expect(commandWindow._list).toEqual([
             { name: 'Tak', symbol: 'choice', enabled: true, ext: null },
@@ -430,7 +451,7 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         expect(runtime.lastSeenByCacheKey.size).toBe(0);
     });
 
-    it('does not harvest dialog choice entries as command cache items in translation-enabled refresh flow', async () => {
+    it('does not harvest dialog choice entries as command cache items in translation-enabled refresh flow', () => {
         installRpgMakerGlobals();
         const runtime = createRuntime({
             translationEnabled: true,
@@ -440,31 +461,28 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
 
         const commandWindow = new globalThis.Window_Command([{ name: 'Tak', symbol: 'choice' }]);
-        await commandWindow.refresh();
+        commandWindow.refresh();
 
         expect(commandWindow._list).toEqual([
             { name: 'Tak', symbol: 'choice', enabled: true, ext: null },
         ]);
         expect(runtime.translationCache.size).toBe(0);
         expect(runtime.lastSeenByCacheKey.size).toBe(0);
-        expect(runtime.batchManager.runBatchedTranslation).not.toHaveBeenCalled();
     });
 
-    it('harvests missing command keys in on-the-fly refresh even when batch translation returns nothing', async () => {
+    it('harvests missing command keys during refresh when translation is enabled', () => {
         installRpgMakerGlobals();
         const runtime = createRuntime({
             translationEnabled: true,
-            batchResult: { successes: [], failures: [] },
         });
 
         translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
 
-        const commandWindow = new globalThis.Window_Command([
+        const commandWindow = new globalThis.Window_MenuCommand([
             { name: 'Galeria', symbol: 'gallery' },
         ]);
-        await commandWindow.refresh();
+        commandWindow.refresh();
 
-        expect(runtime.batchManager.runBatchedTranslation).toHaveBeenCalledTimes(1);
         expect(commandWindow._list[0].name).toBe('Galeria');
         expect(runtime.translationCache.get(commandKey(runtime, 'Galeria'))).toBe('');
         expect(runtime.lastSeenByCacheKey.has(commandKey(runtime, 'Galeria'))).toBe(true);

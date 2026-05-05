@@ -1,11 +1,5 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 
-const RUNTIME_HOOK_GUARD = '__CHEAT_MOG_BATTLE_COMMANDS_TRANSLATOR_HOOKED__';
-
-function resolveTranslationRuntime() {
-    return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
-}
-
 function buildTranslatedToOriginalCommandMap(runtime) {
     const translatedToOriginal = new Map();
 
@@ -37,17 +31,14 @@ function buildTranslatedToOriginalCommandMap(runtime) {
         }
 
         if (!translatedToOriginal.has(translatedName)) {
-            translatedToOriginal.set(translatedName, {
-                originalName,
-                cacheKey,
-            });
+            translatedToOriginal.set(translatedName, originalName);
         }
     }
 
     return translatedToOriginal;
 }
 
-function swapTranslatedCommandNamesWithOriginal(commandList, translatedToOriginal, runtime) {
+function swapToOriginalNames(commandList, translatedToOriginal) {
     if (!Array.isArray(commandList) || translatedToOriginal.size === 0) {
         return [];
     }
@@ -60,34 +51,21 @@ function swapTranslatedCommandNamesWithOriginal(commandList, translatedToOrigina
             continue;
         }
 
-        const match = translatedToOriginal.get(currentName);
-        if (!match?.originalName || match.originalName === command.name) {
+        const originalName = translatedToOriginal.get(currentName);
+        if (!originalName || originalName === command.name) {
             continue;
         }
 
-        replacedEntries.push({
-            command,
-            previousName: command.name,
-        });
-        command.name = match.originalName;
-
-        if (typeof runtime?.markCacheKeySeen === 'function') {
-            runtime.markCacheKeySeen(match.cacheKey);
-        }
+        replacedEntries.push({ command, previousName: command.name });
+        command.name = originalName;
     }
 
     return replacedEntries;
 }
 
 function restoreCommandNames(replacedEntries) {
-    if (!Array.isArray(replacedEntries)) {
-        return;
-    }
-
     for (const entry of replacedEntries) {
-        if (entry?.command) {
-            entry.command.name = entry.previousName;
-        }
+        entry.command.name = entry.previousName;
     }
 }
 
@@ -105,13 +83,8 @@ export class MogBattleCommandsTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (window[RUNTIME_HOOK_GUARD]) {
-            return;
-        }
-
         if (
-            !window.Window_ActorCommand ||
-            !Window_ActorCommand.prototype ||
+            !globalThis.Window_ActorCommand ||
             typeof Window_ActorCommand.prototype.load_com_images !== 'function'
         ) {
             return;
@@ -119,17 +92,16 @@ export class MogBattleCommandsTranslator extends BasePluginTranslator {
 
         const originalLoadComImages = Window_ActorCommand.prototype.load_com_images;
 
+        // MOG_BattleCommands looks up command names to find matching icon images.
+        // Since our makeCommandList hook translates names in-place, we temporarily
+        // swap them back to originals during load_com_images, then restore.
         Window_ActorCommand.prototype.load_com_images = function () {
-            const runtime = resolveTranslationRuntime();
+            const runtime = BasePluginTranslator.ensureGlobalRuntimeContract();
             let replacedEntries = [];
 
             try {
                 const translatedToOriginal = buildTranslatedToOriginalCommandMap(runtime);
-                replacedEntries = swapTranslatedCommandNamesWithOriginal(
-                    this._list,
-                    translatedToOriginal,
-                    runtime
-                );
+                replacedEntries = swapToOriginalNames(this._list, translatedToOriginal);
             } catch (error) {
                 console.warn(
                     '[MogBattleCommandsTranslator] Failed to resolve original command names for icon loading',
@@ -143,8 +115,6 @@ export class MogBattleCommandsTranslator extends BasePluginTranslator {
                 restoreCommandNames(replacedEntries);
             }
         };
-
-        window[RUNTIME_HOOK_GUARD] = true;
     }
 
     async prepareTranslator() {

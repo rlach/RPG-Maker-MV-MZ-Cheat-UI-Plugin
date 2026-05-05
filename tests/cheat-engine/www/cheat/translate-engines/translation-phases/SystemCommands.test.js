@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { SystemCommands } from '../../../../../../../cheat-engine/www/cheat/translate-engines/translation-phases/SystemCommands.js';
+import { SystemCommands } from '../../../../../../cheat-engine/www/cheat/translate-engines/translation-phases/SystemCommands.js';
 
 function createPanelStub() {
     return {
