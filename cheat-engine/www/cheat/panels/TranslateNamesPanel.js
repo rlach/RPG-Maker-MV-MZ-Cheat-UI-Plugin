@@ -287,6 +287,10 @@ export default {
                     pattern: '^【([^【】]+)】\n',
                     example: '【Char Name】\nThe text being spoken.',
                 },
+                {
+                    pattern: '\\c\\[\\d+\\]([^\\[]+)\\c\\[\\d+\\]\n',
+                    example: '\\c[23]Char Name\\c[0]\nThe text being spoken.',
+                },
             ],
             tableHeaders: [
                 {
