@@ -213,7 +213,18 @@ function installRpgMakerGlobals({ commandsOriginal = [], commands = [] } = {}) {
     globalThis.Window_Message = Window_Message;
     globalThis.Window_ScrollText = Window_ScrollText;
     globalThis.Window_Selectable = Window_Selectable;
-    globalThis.Window_Command = createCommandWindowClass(Window_Selectable);
+    const WindowCommandBase = createCommandWindowClass(Window_Selectable);
+    globalThis.Window_Command = WindowCommandBase;
+
+    // Subclass with own makeCommandList — mirrors real RPG Maker subclasses.
+    // Dynamic discovery hooks classes like this, not Window_Command itself.
+    class Window_MenuCommand extends WindowCommandBase {}
+    Window_MenuCommand.prototype.makeCommandList = WindowCommandBase.prototype.makeCommandList;
+    globalThis.Window_MenuCommand = Window_MenuCommand;
+
+    // Simulate game already booted so command hooks install immediately.
+    globalThis.SceneManager = { _scene: {} };
+
     globalThis.DataManager = {
         extractSaveContents() {},
         createGameObjects() {},
@@ -327,6 +338,8 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         delete globalThis.Window_ScrollText;
         delete globalThis.Window_Selectable;
         delete globalThis.Window_Command;
+        delete globalThis.Window_MenuCommand;
+        delete globalThis.SceneManager;
         delete globalThis.DataManager;
         delete globalThis.Scene_Title;
         delete globalThis.Scene_Load;
@@ -343,7 +356,7 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
 
         translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
 
-        const commandWindow = new globalThis.Window_Command([
+        const commandWindow = new globalThis.Window_MenuCommand([
             { name: 'Galeria', symbol: 'gallery' },
         ]);
         commandWindow.refresh();
@@ -368,7 +381,7 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
 
         translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
 
-        const commandWindow = new globalThis.Window_Command([
+        const commandWindow = new globalThis.Window_MenuCommand([
             { name: 'Gallery', symbol: 'gallery' },
         ]);
         commandWindow.refresh();
@@ -388,7 +401,7 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
 
         translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
 
-        const commandWindow = new globalThis.Window_Command([
+        const commandWindow = new globalThis.Window_MenuCommand([
             { name: 'Galeria', symbol: 'gallery' },
         ]);
         commandWindow.refresh();
@@ -465,7 +478,7 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
 
         translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
 
-        const commandWindow = new globalThis.Window_Command([
+        const commandWindow = new globalThis.Window_MenuCommand([
             { name: 'Galeria', symbol: 'gallery' },
         ]);
         commandWindow.refresh();

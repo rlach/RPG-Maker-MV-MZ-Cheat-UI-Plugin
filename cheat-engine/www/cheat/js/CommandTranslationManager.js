@@ -94,25 +94,43 @@ export function collectUntranslatedCommands(commandList, runtime) {
 }
 
 /**
- * All RPG Maker MV/MZ window classes that override makeCommandList.
- * Each one must be hooked individually because RPG Maker prototype inheritance
- * means subclass overrides shadow the base Window_Command.prototype.makeCommandList —
- * patching the base has no effect on subclasses that define their own.
+ * Discovers all Window_Command subclasses that define their own makeCommandList.
+ * Scans globalThis for Window_* constructors whose prototype chain includes
+ * Window_Command.prototype. Window_Command itself is excluded — its
+ * makeCommandList is a no-op, so only subclasses that actually build commands matter.
+ *
+ * @returns {Function[]} Array of constructor functions to hook
  */
-const COMMAND_WINDOW_CLASSES = [
-    'Window_Command',
-    'Window_TitleCommand',
-    'Window_MenuCommand',
-    'Window_ItemCategory',
-    'Window_SkillType',
-    'Window_EquipCommand',
-    'Window_Options',
-    'Window_ShopCommand',
-    'Window_ChoiceList',
-    'Window_PartyCommand',
-    'Window_ActorCommand',
-    'Window_GameEnd',
-];
+export function discoverCommandWindowClasses() {
+    const windowCommand = globalThis.Window_Command;
+    if (!windowCommand) {
+        return [];
+    }
+
+    const classes = [];
+
+    for (const key of Object.getOwnPropertyNames(globalThis)) {
+        if (!key.startsWith('Window_')) {
+            continue;
+        }
+
+        try {
+            const value = globalThis[key];
+            if (
+                typeof value === 'function' &&
+                value !== windowCommand &&
+                value.prototype instanceof windowCommand &&
+                Object.prototype.hasOwnProperty.call(value.prototype, 'makeCommandList')
+            ) {
+                classes.push(value);
+            }
+        } catch (_) {
+            // Some globalThis properties may throw on access
+        }
+    }
+
+    return classes;
+}
 
 /**
  * Wraps makeCommandList on a single window class prototype.
@@ -129,9 +147,20 @@ function hookMakeCommandList(windowClass, runtime) {
 }
 
 /**
- * Installs the makeCommandList hook on all known Window_Command subclasses.
- * Each subclass overrides makeCommandList on its own prototype, so we must
- * patch each one individually. Uses HookGuardHelper to prevent double-installation.
+ * Hooks makeCommandList on every discovered Window_Command subclass.
+ */
+function hookDiscoveredCommandWindows(runtime) {
+    const classes = discoverCommandWindowClasses();
+    for (const cls of classes) {
+        hookMakeCommandList(cls, runtime);
+    }
+}
+
+/**
+ * Installs makeCommandList hooks on all Window_Command subclasses.
+ * Defers installation to Scene_Boot.prototype.start — the earliest lifecycle
+ * point where all scripts (core + plugins) are guaranteed to be loaded.
+ * If Scene_Boot already started or is unavailable, hooks immediately.
  *
  * @param {object} runtime - The translation runtime
  */
@@ -140,10 +169,20 @@ export function installCommandTranslationHook(runtime) {
         return;
     }
 
-    for (const className of COMMAND_WINDOW_CLASSES) {
-        const windowClass = globalThis[className];
-        if (windowClass && typeof windowClass.prototype.makeCommandList === 'function') {
-            hookMakeCommandList(windowClass, runtime);
-        }
+    const sceneBoot = globalThis.Scene_Boot;
+
+    // If Scene_Boot is unavailable or the game already booted past it,
+    // all scripts are loaded — hook immediately.
+    if (!sceneBoot || (globalThis.SceneManager && globalThis.SceneManager._scene)) {
+        hookDiscoveredCommandWindows(runtime);
+        return;
     }
+
+    // Defer to Scene_Boot.start — runs after all core + plugin scripts are loaded
+    // but before any command windows are created.
+    const originalStart = sceneBoot.prototype.start;
+    sceneBoot.prototype.start = function () {
+        hookDiscoveredCommandWindows(runtime);
+        originalStart.apply(this, arguments);
+    };
 }

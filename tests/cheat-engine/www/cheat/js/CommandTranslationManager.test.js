@@ -7,6 +7,7 @@ vi.mock('../../../../../cheat-engine/www/cheat/js/HookGuardHelper.js', () => ({
 import {
     applyTranslationsToCommands,
     collectUntranslatedCommands,
+    discoverCommandWindowClasses,
     installCommandTranslationHook,
 } from '../../../../../cheat-engine/www/cheat/js/CommandTranslationManager.js';
 import { shouldApplyHook } from '../../../../../cheat-engine/www/cheat/js/HookGuardHelper.js';
@@ -192,23 +193,70 @@ describe('collectUntranslatedCommands', () => {
     });
 });
 
+describe('discoverCommandWindowClasses', () => {
+    beforeEach(() => {
+        globalThis.Window_Command = function () {};
+        globalThis.Window_Command.prototype.makeCommandList = function () {};
+
+        globalThis.Window_TitleCommand = function () {};
+        globalThis.Window_TitleCommand.prototype = Object.create(globalThis.Window_Command.prototype);
+        globalThis.Window_TitleCommand.prototype.constructor = globalThis.Window_TitleCommand;
+        globalThis.Window_TitleCommand.prototype.makeCommandList = function () {
+            this._list = [{ name: 'ニューゲーム', symbol: 'newGame', enabled: true, ext: null }];
+        };
+
+        // Subclass WITHOUT own makeCommandList — inherits no-op from base
+        globalThis.Window_HorzCommand = function () {};
+        globalThis.Window_HorzCommand.prototype = Object.create(
+            globalThis.Window_Command.prototype
+        );
+        globalThis.Window_HorzCommand.prototype.constructor = globalThis.Window_HorzCommand;
+    });
+
+    afterEach(() => {
+        delete globalThis.Window_Command;
+        delete globalThis.Window_TitleCommand;
+        delete globalThis.Window_HorzCommand;
+    });
+
+    it('discovers subclasses with own makeCommandList', () => {
+        const classes = discoverCommandWindowClasses();
+
+        expect(classes).toContain(globalThis.Window_TitleCommand);
+    });
+
+    it('excludes Window_Command itself', () => {
+        const classes = discoverCommandWindowClasses();
+
+        expect(classes).not.toContain(globalThis.Window_Command);
+    });
+
+    it('excludes subclasses that inherit makeCommandList without overriding', () => {
+        const classes = discoverCommandWindowClasses();
+
+        expect(classes).not.toContain(globalThis.Window_HorzCommand);
+    });
+
+    it('returns empty array when Window_Command does not exist', () => {
+        delete globalThis.Window_Command;
+
+        expect(discoverCommandWindowClasses()).toEqual([]);
+    });
+});
+
 describe('installCommandTranslationHook', () => {
-    let originalBaseMakeCommandList;
     let originalTitleMakeCommandList;
 
     beforeEach(() => {
         shouldApplyHook.mockReturnValue(true);
 
-        // Simulate RPG Maker prototype chain:
-        // Window_Command (base) -> Window_TitleCommand (subclass with own makeCommandList)
         globalThis.Window_Command = function () {};
-        globalThis.Window_Command.prototype.makeCommandList = function () {
-            this._list = [{ name: 'ベース', symbol: 'base', enabled: true, ext: null }];
-        };
-        originalBaseMakeCommandList = globalThis.Window_Command.prototype.makeCommandList;
+        globalThis.Window_Command.prototype.makeCommandList = function () {};
 
         globalThis.Window_TitleCommand = function () {};
-        globalThis.Window_TitleCommand.prototype = Object.create(globalThis.Window_Command.prototype);
+        globalThis.Window_TitleCommand.prototype = Object.create(
+            globalThis.Window_Command.prototype
+        );
         globalThis.Window_TitleCommand.prototype.constructor = globalThis.Window_TitleCommand;
         globalThis.Window_TitleCommand.prototype.makeCommandList = function () {
             this._list = [
@@ -217,16 +265,20 @@ describe('installCommandTranslationHook', () => {
             ];
         };
         originalTitleMakeCommandList = globalThis.Window_TitleCommand.prototype.makeCommandList;
+
+        // Simulate game already booted (immediate mode)
+        globalThis.SceneManager = { _scene: {} };
     });
 
     afterEach(() => {
         delete globalThis.Window_Command;
         delete globalThis.Window_TitleCommand;
-        delete globalThis.Window_MenuCommand;
+        delete globalThis.SceneManager;
+        delete globalThis.Scene_Boot;
         vi.restoreAllMocks();
     });
 
-    it('patches makeCommandList on subclass to apply translations', () => {
+    it('hooks subclass makeCommandList when game already booted', () => {
         const runtime = createRuntime({
             translateCacheWhenDisabled: true,
             cacheEntries: [
@@ -245,19 +297,31 @@ describe('installCommandTranslationHook', () => {
         expect(instance._list[1].name).toBe('Continue');
     });
 
-    it('also patches the base Window_Command prototype', () => {
+    it('defers hooking to Scene_Boot.start when game has not booted yet', () => {
+        delete globalThis.SceneManager;
+        globalThis.Scene_Boot = function () {};
+        globalThis.Scene_Boot.prototype.start = function () {};
+
         const runtime = createRuntime({
             translateCacheWhenDisabled: true,
-            cacheEntries: [['command:ja-en-ベース', 'Base']],
+            cacheEntries: [['command:ja-en-ニューゲーム', 'New Game']],
         });
 
         installCommandTranslationHook(runtime);
 
-        const instance = new globalThis.Window_Command();
+        // Not hooked yet — Scene_Boot.start hasn't fired
+        expect(globalThis.Window_TitleCommand.prototype.makeCommandList).toBe(
+            originalTitleMakeCommandList
+        );
+
+        // Simulate boot
+        globalThis.Scene_Boot.prototype.start();
+
+        // Now hooked
+        const instance = new globalThis.Window_TitleCommand();
         instance._list = [];
         instance.makeCommandList();
-
-        expect(instance._list[0].name).toBe('Base');
+        expect(instance._list[0].name).toBe('New Game');
     });
 
     it('does not patch when shouldApplyHook returns false', () => {
@@ -266,8 +330,9 @@ describe('installCommandTranslationHook', () => {
         const runtime = createRuntime({ translationEnabled: true });
         installCommandTranslationHook(runtime);
 
-        expect(globalThis.Window_Command.prototype.makeCommandList).toBe(originalBaseMakeCommandList);
-        expect(globalThis.Window_TitleCommand.prototype.makeCommandList).toBe(originalTitleMakeCommandList);
+        expect(globalThis.Window_TitleCommand.prototype.makeCommandList).toBe(
+            originalTitleMakeCommandList
+        );
     });
 
     it('calls original makeCommandList to populate the list', () => {
@@ -285,10 +350,14 @@ describe('installCommandTranslationHook', () => {
         ]);
     });
 
-    it('skips window classes that do not exist at hook time', () => {
-        // Window_MenuCommand not defined — should not throw
+    it('does not hook Window_Command base class itself', () => {
+        const originalBaseMakeCommandList = globalThis.Window_Command.prototype.makeCommandList;
         const runtime = createRuntime({ translationEnabled: true });
 
-        expect(() => installCommandTranslationHook(runtime)).not.toThrow();
+        installCommandTranslationHook(runtime);
+
+        expect(globalThis.Window_Command.prototype.makeCommandList).toBe(
+            originalBaseMakeCommandList
+        );
     });
 });
