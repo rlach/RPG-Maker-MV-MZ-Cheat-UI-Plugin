@@ -522,17 +522,17 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
         if (
             ANY_WINDOW.Window_MenuCommand &&
             ANY_WINDOW.Window_MenuCommand.prototype &&
-            typeof ANY_WINDOW.Window_MenuCommand.prototype.addMainCommands === 'function'
+            typeof ANY_WINDOW.Window_MenuCommand.prototype.makeCommandList === 'function'
         ) {
             const menuCommandCtor = ANY_WINDOW.Window_MenuCommand;
-            const originalAddMainCommands = menuCommandCtor.prototype.addMainCommands;
+            const originalMakeCommandList = menuCommandCtor.prototype.makeCommandList;
 
-            menuCommandCtor.prototype.addMainCommands = function () {
-                const result = originalAddMainCommands.apply(this, arguments);
+            menuCommandCtor.prototype.makeCommandList = function () {
+                const result = originalMakeCommandList.apply(this, arguments);
 
                 try {
                     const runtime = translator.getRuntime();
-                    debugLog('hook addMainCommands called', {
+                    debugLog('hook makeCommandList called', {
                         active: translator.isRuntimeTranslationActive(runtime),
                         listCount: Array.isArray(this._list) ? this._list.length : -1,
                     });
