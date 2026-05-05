@@ -13,6 +13,7 @@ class ObjectTranslationService {
     constructor() {
         this.state = makeObservable({
             dialogVisible: false,
+            modalDataGathering: false,
             modalStats: [],
             selection: {},
             cacheEmptyStringsRepeatUntilSuccess: false,
@@ -61,78 +62,86 @@ class ObjectTranslationService {
             return;
         }
 
-        const stats = runtime.getObjectTranslationStats();
-        const commonEventsStats =
-            stats.find((item) => item.id === 'commonEvents') || runtime.countCommonEventsStats();
-        const mapEventsStats =
-            stats.find((item) => item.id === 'mapEvents') || runtime.countMapEventsStats();
-        const selectedMapIds = runtime.getSelectedObjectTranslationMapIds();
-        const pluginDetails = await runtime.buildObjectTranslationPluginDetails();
-        const selectedPluginsCount = pluginDetails.filter((item) => item && item.selected).length;
-
-        this.state.modalStats = stats
-            .map((item) => {
-                if (item.id === 'commonEvents') {
-                    return {
-                        ...item,
-                        metaText: `${commonEventsStats.leftStrings} of ${commonEventsStats.totalStrings}`,
-                        total: commonEventsStats.totalStrings,
-                        left: commonEventsStats.leftStrings,
-                    };
-                }
-
-                if (item.id === 'mapEvents') {
-                    return {
-                        ...item,
-                        metaText: runtime.getObjectTranslationMapEventsMetaText(
-                            mapEventsStats.total,
-                            selectedMapIds.length
-                        ),
-                        total: mapEventsStats.total,
-                    };
-                }
-
-                if (item.id === 'plugins') {
-                    return {
-                        ...item,
-                        total: pluginDetails.length,
-                        left: pluginDetails.filter((entry) => entry.leftStrings > 0).length,
-                        totalStrings: pluginDetails.reduce(
-                            (acc, entry) => acc + (Number(entry.totalStrings) || 0),
-                            0
-                        ),
-                        leftStrings: pluginDetails.reduce(
-                            (acc, entry) => acc + (Number(entry.leftStrings) || 0),
-                            0
-                        ),
-                        metaText: runtime.getObjectTranslationPluginsMetaText(
-                            pluginDetails.length,
-                            selectedPluginsCount
-                        ),
-                    };
-                }
-
-                return {
-                    ...item,
-                    metaText: '',
-                };
-            })
-            .filter((item) => item.id !== 'plugins' || pluginDetails.length > 0);
-
-        const nextSelection = {};
-        for (const item of this.state.modalStats) {
-            if (typeof this.state.selection[item.id] === 'boolean') {
-                nextSelection[item.id] = this.state.selection[item.id];
-            } else {
-                nextSelection[item.id] = item.left > 0;
-            }
-        }
-        this.state.selection = nextSelection;
-
-        this.state.cacheEmptyStringsRepeatUntilSuccess =
-            !!runtime.cacheEmptyStringsRepeatUntilSuccess;
-
         this.state.dialogVisible = true;
+        this.state.modalDataGathering = true;
+
+        try {
+            const stats = runtime.getObjectTranslationStats();
+            const commonEventsStats =
+                stats.find((item) => item.id === 'commonEvents') || runtime.countCommonEventsStats();
+            const mapEventsStats =
+                stats.find((item) => item.id === 'mapEvents') || runtime.countMapEventsStats();
+            const selectedMapIds = runtime.getSelectedObjectTranslationMapIds();
+            const pluginDetails = await runtime.buildObjectTranslationPluginDetails();
+            const selectedPluginsCount = pluginDetails.filter((item) => item && item.selected).length;
+
+            this.state.modalStats = stats
+                .map((item) => {
+                    if (item.id === 'commonEvents') {
+                        return {
+                            ...item,
+                            metaText: `${commonEventsStats.leftStrings} of ${commonEventsStats.totalStrings}`,
+                            total: commonEventsStats.totalStrings,
+                            left: commonEventsStats.leftStrings,
+                        };
+                    }
+
+                    if (item.id === 'mapEvents') {
+                        return {
+                            ...item,
+                            metaText: runtime.getObjectTranslationMapEventsMetaText(
+                                mapEventsStats.total,
+                                selectedMapIds.length
+                            ),
+                            total: mapEventsStats.total,
+                        };
+                    }
+
+                    if (item.id === 'plugins') {
+                        return {
+                            ...item,
+                            total: pluginDetails.length,
+                            left: pluginDetails.filter((entry) => entry.leftStrings > 0).length,
+                            totalStrings: pluginDetails.reduce(
+                                (acc, entry) => acc + (Number(entry.totalStrings) || 0),
+                                0
+                            ),
+                            leftStrings: pluginDetails.reduce(
+                                (acc, entry) => acc + (Number(entry.leftStrings) || 0),
+                                0
+                            ),
+                            metaText: runtime.getObjectTranslationPluginsMetaText(
+                                pluginDetails.length,
+                                selectedPluginsCount
+                            ),
+                        };
+                    }
+
+                    return {
+                        ...item,
+                        metaText: '',
+                    };
+                })
+                .filter((item) => item.id !== 'plugins' || pluginDetails.length > 0);
+
+            const nextSelection = {};
+            for (const item of this.state.modalStats) {
+                if (typeof this.state.selection[item.id] === 'boolean') {
+                    nextSelection[item.id] = this.state.selection[item.id];
+                } else {
+                    nextSelection[item.id] = item.left > 0;
+                }
+            }
+            this.state.selection = nextSelection;
+
+            this.state.cacheEmptyStringsRepeatUntilSuccess =
+                !!runtime.cacheEmptyStringsRepeatUntilSuccess;
+        } catch (error) {
+            this.state.dialogVisible = false;
+            throw error;
+        } finally {
+            this.state.modalDataGathering = false;
+        }
     }
 
     setCacheEmptyStringsRepeatUntilSuccess(value) {
@@ -145,6 +154,9 @@ class ObjectTranslationService {
     }
 
     closeModal() {
+        if (this.state.modalDataGathering) {
+            return;
+        }
         this.state.dialogVisible = false;
     }
 

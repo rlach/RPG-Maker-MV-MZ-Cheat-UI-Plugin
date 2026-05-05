@@ -7,6 +7,7 @@ export default {
 <div>
   <v-dialog
     v-model="objectTranslationDialogVisible"
+    :persistent="objectTranslationDataGathering"
     max-width="640"
     content-class="object-translation-dialog"
     @keydown.stop
@@ -17,6 +18,18 @@ export default {
   >
     <v-card dark>
       <v-card-title class="subtitle-1 font-weight-bold">Mass Translation</v-card-title>
+      <template v-if="objectTranslationDataGathering">
+        <v-card-text class="pt-6 pb-8 d-flex flex-column align-center justify-center" style="min-height: 240px;">
+          <div class="subtitle-2 mb-4">Gathering data</div>
+          <v-progress-circular
+            indeterminate
+            color="primary"
+            size="48"
+            width="4"
+          ></v-progress-circular>
+        </v-card-text>
+      </template>
+      <template v-else>
       <v-card-text class="caption pb-1">Select what to translate. Counts show remaining objects and total.</v-card-text>
       <v-card-text class="pt-1">
         <template
@@ -84,6 +97,7 @@ export default {
         <v-btn text color="orange" @click="startObjectTranslationFromModal(true)">Dry Run</v-btn>
         <v-btn text color="primary" @click="startObjectTranslationFromModal(false)">Start</v-btn>
       </v-card-actions>
+      </template>
     </v-card>
   </v-dialog>
 
@@ -224,6 +238,9 @@ export default {
                 return this.service.state.dialogVisible;
             },
             set(value) {
+            if (this.service.state.modalDataGathering) {
+              return;
+            }
                 this.service.state.dialogVisible = !!value;
             },
         },
@@ -266,6 +283,10 @@ export default {
 
         objectTranslationModalStats() {
             return this.service.state.modalStats;
+        },
+
+        objectTranslationDataGathering() {
+          return !!this.service.state.modalDataGathering;
         },
 
         objectTranslationSelection() {
@@ -351,10 +372,16 @@ export default {
         },
 
         closeObjectTranslationModal() {
+          if (this.objectTranslationDataGathering) {
+            return;
+          }
             this.service.closeModal();
         },
 
         startObjectTranslationFromModal(dryRun = false) {
+          if (this.objectTranslationDataGathering) {
+            return;
+          }
             this.service.startObjectTranslationFromModal(!!dryRun);
         },
 
@@ -391,6 +418,12 @@ export default {
         },
 
         onItemDragStart(event, index) {
+          if (this.objectTranslationDataGathering) {
+            if (event) {
+              event.preventDefault();
+            }
+            return;
+          }
             const item = this.objectTranslationModalStats[index];
             if (item && item.noDragDrop) {
                 if (event) {
