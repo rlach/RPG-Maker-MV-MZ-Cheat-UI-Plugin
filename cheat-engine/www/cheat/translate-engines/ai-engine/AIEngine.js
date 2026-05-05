@@ -17,6 +17,7 @@ import {
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_BANNED_PHRASES_TEXT,
     TYPE_TO_TAG,
+    TAG_CONFIGS,
     TAG_BRACKET_OPTIONS,
     TAG_TYPE_OPTIONS,
     TAG_STYLE_OPTIONS,
@@ -61,6 +62,7 @@ class AIEngine extends BaseTranslationEngine {
         this._aiFixRecursionMaxDepth = 0;
         this.customTags = [];
         this.pluginTags = []; // auto-registered by plugin translators, not user-editable
+        this.tagReservedWidthOverrides = {};
         this.customTagTypeOptions = [...TAG_TYPE_OPTIONS];
         this.customTagBracketOptions = [...TAG_BRACKET_OPTIONS];
         this.customTagStyleOptions = [...TAG_STYLE_OPTIONS];
@@ -195,6 +197,12 @@ class AIEngine extends BaseTranslationEngine {
                     this.setCustomTags(v);
                 },
             },
+            aiTagReservedWidthOverrides: {
+                get: () => this.tagReservedWidthOverrides,
+                set: (v) => {
+                    this.setTagReservedWidthOverrides(v);
+                },
+            },
             aiCustomTagTypeOptions: {
                 get: () => this.customTagTypeOptions,
             },
@@ -278,6 +286,12 @@ class AIEngine extends BaseTranslationEngine {
             style: config.style === 'xml' ? 'xml' : 'escape',
         };
 
+        const parsedReservedWidth = Number(config.reservedWidth);
+        normalized.reservedWidth =
+            Number.isFinite(parsedReservedWidth) && parsedReservedWidth > 0
+                ? Math.floor(parsedReservedWidth)
+                : 0;
+
         if (normalized.type === 'withCustomParameter') {
             normalized.bracket = String(
                 config.bracket || (normalized.style === 'xml' ? 'none' : '<')
@@ -288,14 +302,102 @@ class AIEngine extends BaseTranslationEngine {
         return normalized;
     }
 
+    normalizeTagReservedWidthOverrides(overrides = {}) {
+        if (!overrides || typeof overrides !== 'object') {
+            return {};
+        }
+
+        const normalized = {};
+        Object.entries(overrides).forEach(([key, value]) => {
+            const trimmedKey = String(key || '').trim();
+            if (!trimmedKey) {
+                return;
+            }
+            const parsedReservedWidth = Number(value);
+            const reservedWidth =
+                Number.isFinite(parsedReservedWidth) && parsedReservedWidth > 0
+                    ? Math.floor(parsedReservedWidth)
+                    : 0;
+            if (reservedWidth > 0) {
+                normalized[trimmedKey] = reservedWidth;
+            }
+        });
+
+        return normalized;
+    }
+
+    buildTagReservedWidthOverrideKey(tagConfig = {}, source = 'default', pluginName = '') {
+        const safeSource = String(source || 'default').trim().toLowerCase();
+        const safeStyle = tagConfig.style === 'xml' ? 'xml' : 'escape';
+        const safeType = String(tagConfig.type || '').trim();
+        const safeSymbol = String(tagConfig.tagSymbol || '').trim();
+        const safeBracket =
+            safeType === 'withCustomParameter'
+                ? String(tagConfig.bracket || (safeStyle === 'xml' ? 'none' : '<')).trim()
+                : '';
+        const sourcePart =
+            safeSource === 'plugin'
+                ? `plugin:${String(pluginName || '').trim().toLowerCase()}`
+                : safeSource;
+
+        return `${sourcePart}|${safeStyle}|${safeType}|${safeSymbol}|${safeBracket}`;
+    }
+
+    resolveTagReservedWidth(tagConfig = {}, source = 'default', pluginName = '') {
+        const baseReservedWidth = this.normalizeCustomTagConfig(tagConfig).reservedWidth;
+        const key = this.buildTagReservedWidthOverrideKey(tagConfig, source, pluginName);
+        const overrideValue = this.tagReservedWidthOverrides[key];
+        const parsedOverride = Number(overrideValue);
+        const hasOverride = Number.isFinite(parsedOverride) && parsedOverride > 0;
+        return hasOverride ? Math.floor(parsedOverride) : baseReservedWidth;
+    }
+
+    setTagReservedWidthOverride(tagConfig = {}, source = 'default', pluginName = '', reservedWidth = 0) {
+        const key = this.buildTagReservedWidthOverrideKey(tagConfig, source, pluginName);
+        const nextReservedWidth = this.normalizeCustomTagConfig({ reservedWidth }).reservedWidth;
+        const baseReservedWidth = this.normalizeCustomTagConfig(tagConfig).reservedWidth;
+        const nextOverrides = { ...this.tagReservedWidthOverrides };
+
+        if (nextReservedWidth === baseReservedWidth) {
+            delete nextOverrides[key];
+        } else {
+            nextOverrides[key] = nextReservedWidth;
+        }
+
+        this.tagReservedWidthOverrides = this.normalizeTagReservedWidthOverrides(nextOverrides);
+        this._refreshTagManager();
+    }
+
+    applyTagReservedWidth(tagConfig, source, pluginName) {
+        return {
+            ...tagConfig,
+            reservedWidth: this.resolveTagReservedWidth(tagConfig, source, pluginName),
+        };
+    }
+
     /** Merge plugin + user custom tags and push to TagManager. */
     _refreshTagManager() {
-        this.tagManager.setCustomTagConfigs([...this.pluginTags, ...this.customTags]);
+        const defaultTags = TAG_CONFIGS.map((tag) => {
+            return this.applyTagReservedWidth(tag, 'default', '');
+        });
+        const pluginTags = (this.pluginTags || []).map((tag) => {
+            return this.applyTagReservedWidth(tag, 'plugin', tag._pluginName || '');
+        });
+        const customTags = (this.customTags || []).map((tag) => {
+            return this.applyTagReservedWidth(tag, 'custom', '');
+        });
+        this.tagManager.setBaseTagConfigs(defaultTags);
+        this.tagManager.setCustomTagConfigs([...pluginTags, ...customTags]);
     }
 
     setCustomTags(tags) {
         const safeTags = Array.isArray(tags) ? tags : [];
         this.customTags = safeTags.map((tag) => this.normalizeCustomTagConfig(tag));
+        this._refreshTagManager();
+    }
+
+    setTagReservedWidthOverrides(overrides) {
+        this.tagReservedWidthOverrides = this.normalizeTagReservedWidthOverrides(overrides);
         this._refreshTagManager();
     }
 

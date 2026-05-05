@@ -145,7 +145,7 @@ export class ConfigManager {
                class="mt-2"
                hide-details
              ></v-checkbox>
-           
+
              <v-select
                v-model="aiInvalidJsonHandlingStrategy"
                :items="aiInvalidJsonHandlingStrategyOptions"
@@ -233,7 +233,7 @@ export class ConfigManager {
                class="mb-2"
                hide-details
              ></v-checkbox>
-           
+
              <v-textarea
                v-model="aiSystemPrompt"
                label="System prompt"
@@ -292,6 +292,7 @@ export class ConfigManager {
             aiFixRecursionMaxDepth: this.aiEngine._aiFixRecursionMaxDepth,
             useJsonFixer: this.aiEngine.useJsonFixer,
             aiCustomTags: this.aiEngine.customTags,
+            aiTagReservedWidthOverrides: this.aiEngine.tagReservedWidthOverrides,
             aiCustomTagTypeOptions: this.aiEngine.customTagTypeOptions,
             aiCustomTagBracketOptions: this.aiEngine.customTagBracketOptions,
             aiCustomTagStyleOptions: this.aiEngine.customTagStyleOptions,
@@ -370,6 +371,19 @@ export class ConfigManager {
             removeAiCustomTag: this._createPersistedHandler(
                 (index) => {
                     this.aiEngine.removeCustomTag(index);
+                },
+                {
+                    syncPanel: true,
+                }
+            ),
+            updateAiTagReservedWidth: this._createPersistedHandler(
+                (source, tagConfig, reservedWidth, pluginName = '') => {
+                    this.aiEngine.setTagReservedWidthOverride(
+                        tagConfig,
+                        source,
+                        pluginName,
+                        reservedWidth
+                    );
                 },
                 {
                     syncPanel: true,

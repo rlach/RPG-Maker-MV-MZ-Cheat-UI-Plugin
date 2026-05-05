@@ -22,6 +22,26 @@ const KNOWN_BACKSLASH_TAGS = [
     },
 ];
 
+const KNOWN_TAGS_WITH_RESERVED_WIDTH = [
+    {
+        tagSymbol: 'N',
+        type: 'withNumericParameter',
+        reservedWidth: 6,
+    },
+    {
+        tagSymbol: 'C',
+        type: 'withNumericParameter',
+        reservedWidth: 0,
+    },
+    {
+        tagSymbol: 'X',
+        type: 'withCustomParameter',
+        bracket: '[',
+        bracketClose: ']',
+        reservedWidth: 5,
+    },
+];
+
 describe('wrapTextByVisibleWidth', () => {
     it('does not split when visible width is within limit and known backslash tags are zero-width', () => {
         const input = "\\AA[2]\\F1[1](I see, that's why she got lost on such a simple path)";
@@ -125,5 +145,23 @@ describe('wrapTextByVisibleWidth', () => {
         });
 
         expect(output).toBe('\\{Alpha \\{Beta\nGamma\\} Delta\nEpsilon Zeta');
+    });
+
+    it('counts reserved width for built-in numeric tags', () => {
+        const input = '\\N[1]\\C[23] I like apples\\C[0]';
+        const output = wrapTextByVisibleWidth(input, 19, {
+            tagEntries: KNOWN_TAGS_WITH_RESERVED_WIDTH,
+        });
+
+        expect(output).toBe('\\N[1]\\C[23] I like\napples\\C[0]');
+    });
+
+    it('counts reserved width for custom parameter tags', () => {
+        const input = '\\X[foo] alpha beta';
+        const output = wrapTextByVisibleWidth(input, 12, {
+            tagEntries: KNOWN_TAGS_WITH_RESERVED_WIDTH,
+        });
+
+        expect(output).toBe('\\X[foo] alpha\nbeta');
     });
 });

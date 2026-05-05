@@ -9,6 +9,11 @@ const FALLBACK_TAG_RE = /\\[A-Za-z${}|.!><^]+\[[^\]]*\]|\\[A-Za-z${}|.!><^]+/g;
 const ESCAPE_TAG_SYMBOL_RE = /[A-Za-z${}|.!><^]/;
 const DEFAULT_FONT_SCALE_WIDTH_MULTIPLIER = 1;
 
+function normalizeReservedWidth(value) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+}
+
 function escapeRegExp(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -47,7 +52,11 @@ function buildKnownEscapeTagRegex(tagEntries) {
         const escapedPrefix = `\\\\${escapedSymbol}`;
 
         if (entry.type === 'withNumericParameter') {
-            parameterized.push(new RegExp(`${escapedPrefix}\\[(\\d+)\\]`, 'gi'));
+            parameterized.push({
+                globalPattern: new RegExp(`${escapedPrefix}\\[(\\d+)\\]`, 'gi'),
+                exactPattern: new RegExp(`^${escapedPrefix}\\[(\\d+)\\]$`, 'i'),
+                reservedWidth: normalizeReservedWidth(entry.reservedWidth),
+            });
             return;
         }
 
@@ -61,16 +70,27 @@ function buildKnownEscapeTagRegex(tagEntries) {
                 const escapedOpen = escapeRegExp(open);
                 const escapedClose = escapeRegExp(close);
                 parameterized.push(
-                    new RegExp(
-                        `${escapedPrefix}${escapedOpen}[^${escapedClose}]*${escapedClose}`,
-                        'gi'
-                    )
+                    {
+                        globalPattern: new RegExp(
+                            `${escapedPrefix}${escapedOpen}[^${escapedClose}]*${escapedClose}`,
+                            'gi'
+                        ),
+                        exactPattern: new RegExp(
+                            `^${escapedPrefix}${escapedOpen}[^${escapedClose}]*${escapedClose}$`,
+                            'i'
+                        ),
+                        reservedWidth: normalizeReservedWidth(entry.reservedWidth),
+                    }
                 );
             }
             return;
         }
 
-        withoutParameter.push(new RegExp(escapedPrefix, 'gi'));
+        withoutParameter.push({
+            globalPattern: new RegExp(escapedPrefix, 'gi'),
+            exactPattern: new RegExp(`^${escapedPrefix}$`, 'i'),
+            reservedWidth: normalizeReservedWidth(entry.reservedWidth),
+        });
     });
 
     return { parameterized, withoutParameter };
@@ -80,11 +100,11 @@ function stripKnownEscapeTags(str, knownEscapeTagRegex) {
     let output = String(str || '');
 
     if (knownEscapeTagRegex) {
-        knownEscapeTagRegex.parameterized.forEach((pattern) => {
-            output = output.replace(pattern, '');
+        knownEscapeTagRegex.parameterized.forEach((matcher) => {
+            output = output.replace(matcher.globalPattern, '');
         });
-        knownEscapeTagRegex.withoutParameter.forEach((pattern) => {
-            output = output.replace(pattern, '');
+        knownEscapeTagRegex.withoutParameter.forEach((matcher) => {
+            output = output.replace(matcher.globalPattern, '');
         });
         return output;
     }
@@ -151,7 +171,27 @@ function computeVisibleCharWidthCost(fontLevel, multiplier) {
     return Math.pow(multiplier, 1 - fontLevel);
 }
 
-function tryConsumeEscapeTag(sourceText, startIndex) {
+function resolveKnownEscapeTagReservedWidth(tagText, knownEscapeTagRegex) {
+    if (!knownEscapeTagRegex || typeof tagText !== 'string' || !tagText) {
+        return 0;
+    }
+
+    for (const matcher of knownEscapeTagRegex.parameterized) {
+        if (matcher.exactPattern.test(tagText)) {
+            return matcher.reservedWidth;
+        }
+    }
+
+    for (const matcher of knownEscapeTagRegex.withoutParameter) {
+        if (matcher.exactPattern.test(tagText)) {
+            return matcher.reservedWidth;
+        }
+    }
+
+    return 0;
+}
+
+function tryConsumeEscapeTag(sourceText, startIndex, knownEscapeTagRegex) {
     if (sourceText[startIndex] !== '\\') {
         return null;
     }
@@ -175,10 +215,21 @@ function tryConsumeEscapeTag(sourceText, startIndex) {
         }
     }
 
-    return cursor;
+    return {
+        endIndex: cursor,
+        reservedWidth: resolveKnownEscapeTagReservedWidth(
+            sourceText.slice(startIndex, cursor),
+            knownEscapeTagRegex
+        ),
+    };
 }
 
-function measureTextWidthAndFontLevel(text, startFontLevel, fontScaleWidthMultiplier) {
+function measureTextWidthAndFontLevel(
+    text,
+    startFontLevel,
+    fontScaleWidthMultiplier,
+    knownEscapeTagRegex
+) {
     const sourceText = String(text || '');
     const multiplier = resolveFontScaleWidthMultiplier(fontScaleWidthMultiplier);
     let fontLevel = Number.isFinite(startFontLevel) ? startFontLevel : 1;
@@ -199,9 +250,11 @@ function measureTextWidthAndFontLevel(text, startFontLevel, fontScaleWidthMultip
                 continue;
             }
 
-            const tagEndIndex = tryConsumeEscapeTag(sourceText, i);
-            if (tagEndIndex !== null) {
-                i = tagEndIndex;
+            const consumedTag = tryConsumeEscapeTag(sourceText, i, knownEscapeTagRegex);
+            if (consumedTag !== null) {
+                weightedWidth +=
+                    consumedTag.reservedWidth * computeVisibleCharWidthCost(fontLevel, multiplier);
+                i = consumedTag.endIndex;
                 continue;
             }
         }
@@ -228,7 +281,12 @@ export function wrapTextByVisibleWidth(text, maxWidth, options = {}) {
         ? normalizedSourceText
         : normalizeLlmPunctuationOnlyBreaks(normalizedSourceText, knownEscapeTagRegex);
     const getWeightedWidthAndFontLevel = (value, startFontLevel) =>
-        measureTextWidthAndFontLevel(value, startFontLevel, fontScaleWidthMultiplier);
+        measureTextWidthAndFontLevel(
+            value,
+            startFontLevel,
+            fontScaleWidthMultiplier,
+            knownEscapeTagRegex
+        );
     const isFollowUp = (token) => {
         const visible = stripKnownEscapeTags(token, knownEscapeTagRegex);
         return visible.length === 0 || !/\w/.test(visible);

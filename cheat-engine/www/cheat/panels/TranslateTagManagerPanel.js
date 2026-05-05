@@ -1,4 +1,4 @@
-import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
+import { getRowsPerPage, setRowsPerPage as setTableRowsPerPage } from '../js/TableSettings.js';
 import { ensureTranslationRuntime } from './translate-on-the-fly/TranslationRuntime.js';
 import { TAG_CONFIGS } from '../translate-engines/ai-engine/constants.js';
 
@@ -92,10 +92,10 @@ export default {
 
         <template v-slot:item.actions="{ item }">
             <div class="d-flex align-center justify-center">
+                <v-btn icon x-small color="primary" @click="openEditTagDialog(item)">
+                    <v-icon small>mdi-pencil</v-icon>
+                </v-btn>
                 <template v-if="item.tagSource === 'custom'">
-                    <v-btn icon x-small color="primary" @click="openEditCustomTagDialog(item.tag, item.customIndex)">
-                        <v-icon small>mdi-pencil</v-icon>
-                    </v-btn>
                     <v-btn icon x-small color="error" @click="removeCustomTag(item.customIndex)">
                         <v-icon small>mdi-delete</v-icon>
                     </v-btn>
@@ -160,6 +160,19 @@ export default {
                     class="mt-0 mb-2"
                 ></v-checkbox>
 
+                <v-text-field
+                    v-model.number="customTagForm.reservedWidth"
+                    type="number"
+                    min="0"
+                    step="1"
+                    label="Reserved width"
+                    outlined
+                    dense
+                    hide-details
+                    @keydown.stop
+                    class="mb-2"
+                ></v-text-field>
+
                 <template v-if="customTagForm.type === 'withCustomParameter'">
                     <v-select
                         v-model="customTagForm.bracket"
@@ -184,6 +197,33 @@ export default {
                 <v-spacer></v-spacer>
                 <v-btn text color="grey" @click="closeCustomTagDialog">Cancel</v-btn>
                 <v-btn text color="primary" @click="saveCustomTag">Save</v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="reservedWidthDialogVisible" max-width="420" @keydown.stop>
+        <v-card dark class="pt-2">
+            <v-card-title class="subtitle-1 font-weight-bold">
+                Edit Reserved Width
+            </v-card-title>
+            <v-card-text>
+                <div class="caption mb-2">{{ reservedWidthDialogTagDisplay }}</div>
+                <v-text-field
+                    v-model.number="reservedWidthForm.reservedWidth"
+                    type="number"
+                    min="0"
+                    step="1"
+                    label="Reserved width"
+                    outlined
+                    dense
+                    hide-details
+                    @keydown.stop
+                ></v-text-field>
+            </v-card-text>
+            <v-card-actions>
+                <v-spacer></v-spacer>
+                <v-btn text color="grey" @click="closeReservedWidthDialog">Cancel</v-btn>
+                <v-btn text color="primary" @click="saveReservedWidth">Save</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
@@ -282,6 +322,16 @@ export default {
                 style: 'escape',
                 bracket: '<',
                 maskValue: false,
+                reservedWidth: 0,
+            },
+
+            reservedWidthDialogVisible: false,
+            reservedWidthDialogTagDisplay: '',
+            reservedWidthForm: {
+                tagSource: 'default',
+                pluginName: '',
+                tagConfig: null,
+                reservedWidth: 0,
             },
 
             // Static options (populated from runtime engine or fallback defaults)
@@ -338,11 +388,8 @@ export default {
         rowsPerPage(val) {
             const parsed = Number(val);
             if (!Number.isFinite(parsed) || parsed <= 0) return;
-            if (parsed !== val) {
-                this.rowsPerPage = parsed;
-                return;
-            }
-            setRowsPerPage(parsed);
+            if (parsed !== val) return;
+            setTableRowsPerPage(parsed);
             this.saveTableState();
         },
         page() {
@@ -405,7 +452,11 @@ export default {
                     tagDisplay: this.formatTagDisplay(tag),
                     tagSource: 'default',
                     description: tag.description,
-                    tag,
+                    tag: {
+                        ...tag,
+                        reservedWidth: this.resolveEffectiveReservedWidth(tag, 'default', ''),
+                    },
+                    pluginName: '',
                     customIndex: -1,
                 });
             }
@@ -419,7 +470,15 @@ export default {
                         tagDisplay: this.formatTagDisplay(tag),
                         tagSource: 'plugin',
                         description: `${pluginName}: ${tag.description}`,
-                        tag,
+                        tag: {
+                            ...tag,
+                            reservedWidth: this.resolveEffectiveReservedWidth(
+                                tag,
+                                'plugin',
+                                pluginName
+                            ),
+                        },
+                        pluginName,
                         customIndex: -1,
                     });
                 }
@@ -435,7 +494,11 @@ export default {
                     tagDisplay: this.formatTagDisplay(tag),
                     tagSource: 'custom',
                     description: tag.description,
-                    tag,
+                    tag: {
+                        ...tag,
+                        reservedWidth: this.resolveEffectiveReservedWidth(tag, 'custom', ''),
+                    },
+                    pluginName: '',
                     customIndex: idx,
                 });
             });
@@ -473,6 +536,15 @@ export default {
                 return `\\${sym}${open}…${close}`;
             }
             return `\\${sym}`;
+        },
+
+        resolveEffectiveReservedWidth(tag, source, pluginName) {
+            const engine = this.runtime && this.runtime.engine;
+            if (engine && typeof engine.resolveTagReservedWidth === 'function') {
+                return engine.resolveTagReservedWidth(tag, source, pluginName || '');
+            }
+
+            return this.normalizeReservedWidthInput(tag && tag.reservedWidth);
         },
 
         callRuntime(methodName, ...args) {
@@ -528,6 +600,19 @@ export default {
 
         // ---- Custom Tag CRUD ----
 
+        openEditTagDialog(item) {
+            if (!item || !item.tag) {
+                return;
+            }
+
+            if (item.tagSource === 'custom') {
+                this.openEditCustomTagDialog(item.tag, item.customIndex);
+                return;
+            }
+
+            this.openReservedWidthDialog(item);
+        },
+
         openAddCustomTagDialog() {
             this.customTagEditIndex = -1;
             this.customTagForm = {
@@ -538,6 +623,7 @@ export default {
                 style: 'escape',
                 bracket: '<',
                 maskValue: false,
+                reservedWidth: 0,
             };
             this.customTagDialogVisible = true;
         },
@@ -552,8 +638,42 @@ export default {
                 style: String(tag.style || 'escape'),
                 bracket: String(tag.bracket || '<'),
                 maskValue: !!tag.maskValue,
+                reservedWidth: this.normalizeReservedWidthInput(tag.reservedWidth),
             };
             this.customTagDialogVisible = true;
+        },
+
+        openReservedWidthDialog(item) {
+            this.reservedWidthDialogTagDisplay = item.tagDisplay;
+            this.reservedWidthForm = {
+                tagSource: item.tagSource,
+                pluginName: item.pluginName || '',
+                tagConfig: item.tag,
+                reservedWidth: this.normalizeReservedWidthInput(item.tag.reservedWidth),
+            };
+            this.reservedWidthDialogVisible = true;
+        },
+
+        closeReservedWidthDialog() {
+            this.reservedWidthDialogVisible = false;
+        },
+
+        normalizeReservedWidthInput(value) {
+            const parsed = Number(value);
+            return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+        },
+
+        saveReservedWidth() {
+            const { tagSource, pluginName, tagConfig } = this.reservedWidthForm;
+            this.callRuntime(
+                'updateAiTagReservedWidth',
+                tagSource,
+                tagConfig,
+                this.normalizeReservedWidthInput(this.reservedWidthForm.reservedWidth),
+                pluginName || ''
+            );
+            this.callRuntime('bindEngineConfigTo', this.runtime);
+            this.closeReservedWidthDialog();
         },
 
         closeCustomTagDialog() {
@@ -567,6 +687,7 @@ export default {
                 type: String(this.customTagForm.type || 'withNumericParameter'),
                 requiredConsistency: !!this.customTagForm.requiredConsistency,
                 style: String(this.customTagForm.style || 'escape'),
+                reservedWidth: this.normalizeReservedWidthInput(this.customTagForm.reservedWidth),
             };
             if (payload.type === 'withCustomParameter') {
                 payload.bracket = String(
@@ -655,6 +776,7 @@ export default {
                     bracket: 'none',
                     maskValue: false,
                     requiredConsistency: false,
+                    reservedWidth: 0,
                 };
             }
 
@@ -688,6 +810,7 @@ export default {
                     bracket,
                     maskValue: false,
                     requiredConsistency: false,
+                    reservedWidth: 0,
                 };
             }
 
@@ -699,6 +822,7 @@ export default {
                 bracket: '<',
                 maskValue: false,
                 requiredConsistency: false,
+                reservedWidth: 0,
             };
         },
 

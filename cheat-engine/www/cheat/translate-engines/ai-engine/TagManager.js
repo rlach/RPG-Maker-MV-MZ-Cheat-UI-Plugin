@@ -38,7 +38,34 @@ export class TagManager {
     constructor(panel) {
         this.panel = panel;
         this.allowNewlineMismatch = false;
+        this.tagEntries = [];
+        this.customParameterEntries = [];
+        this.simpleNEntry = {
+            key: 'simpleN',
+            description: 'simpleN',
+            tagId: 'sn',
+            requiredConsistency: false,
+            addSpace: false,
+            prePattern: /\n/g,
+            postPattern: /\[b=sn\]/g,
+        };
+        this.spaceRunEntry = {
+            key: 'spaceRun',
+            description: 'spaceRun',
+            tagId: 'sp',
+            requiredConsistency: true,
+            prePattern: new RegExp(` {${SPACE_RUN_TRIGGER_THRESHOLD},}`, 'g'),
+            postPattern: /\[b=sp(\d+)\]/gi,
+        };
+        this.baseTagConfigs = TAG_CONFIGS.map(cloneTagConfig);
         this.customTagConfigs = [];
+        this.initializeTagRegistry();
+    }
+
+    setBaseTagConfigs(baseTagConfigs = []) {
+        this.baseTagConfigs = Array.isArray(baseTagConfigs)
+            ? baseTagConfigs.map(cloneTagConfig)
+            : TAG_CONFIGS.map(cloneTagConfig);
         this.initializeTagRegistry();
     }
 
@@ -50,7 +77,7 @@ export class TagManager {
     }
 
     initializeTagRegistry() {
-        const configs = [...TAG_CONFIGS, ...this.customTagConfigs];
+        const configs = [...this.baseTagConfigs, ...this.customTagConfigs];
         const usedTagIds = new Set();
         this.tagEntries = [];
         this.customParameterEntries = [];
@@ -154,6 +181,11 @@ export class TagManager {
         }
 
         normalized.addSpace = !!normalized.addSpace;
+        const parsedReservedWidth = Number(normalized.reservedWidth);
+        normalized.reservedWidth =
+            Number.isFinite(parsedReservedWidth) && parsedReservedWidth > 0
+                ? Math.floor(parsedReservedWidth)
+                : 0;
         return normalized;
     }
 

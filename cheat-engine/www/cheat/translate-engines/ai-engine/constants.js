@@ -54,18 +54,21 @@ export const TAG_CONFIGS = [
         description: 'Will be replaced with the value of the nth variable.',
         type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
         tagSymbol: 'V',
+        reservedWidth: 6,
         requiredConsistency: true,
     },
     {
         description: 'Will be replaced with the name of the nth actor.',
         type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
         tagSymbol: 'N',
+        reservedWidth: 6,
         requiredConsistency: true,
     },
     {
         description: 'Will be replaced by the name of the nth (arranged order) party member.',
         type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
         tagSymbol: 'P',
+        reservedWidth: 6,
         requiredConsistency: true,
     },
     {
