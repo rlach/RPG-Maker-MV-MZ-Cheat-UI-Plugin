@@ -193,27 +193,62 @@ describe('collectUntranslatedCommands', () => {
 });
 
 describe('installCommandTranslationHook', () => {
-    let originalMakeCommandList;
+    let originalBaseMakeCommandList;
+    let originalTitleMakeCommandList;
 
     beforeEach(() => {
         shouldApplyHook.mockReturnValue(true);
 
+        // Simulate RPG Maker prototype chain:
+        // Window_Command (base) -> Window_TitleCommand (subclass with own makeCommandList)
         globalThis.Window_Command = function () {};
         globalThis.Window_Command.prototype.makeCommandList = function () {
-            this._list = [{ name: 'アイテム', symbol: 'item', enabled: true, ext: null }];
+            this._list = [{ name: 'ベース', symbol: 'base', enabled: true, ext: null }];
         };
-        originalMakeCommandList = globalThis.Window_Command.prototype.makeCommandList;
+        originalBaseMakeCommandList = globalThis.Window_Command.prototype.makeCommandList;
+
+        globalThis.Window_TitleCommand = function () {};
+        globalThis.Window_TitleCommand.prototype = Object.create(globalThis.Window_Command.prototype);
+        globalThis.Window_TitleCommand.prototype.constructor = globalThis.Window_TitleCommand;
+        globalThis.Window_TitleCommand.prototype.makeCommandList = function () {
+            this._list = [
+                { name: 'ニューゲーム', symbol: 'newGame', enabled: true, ext: null },
+                { name: 'コンティニュー', symbol: 'continue', enabled: true, ext: null },
+            ];
+        };
+        originalTitleMakeCommandList = globalThis.Window_TitleCommand.prototype.makeCommandList;
     });
 
     afterEach(() => {
         delete globalThis.Window_Command;
+        delete globalThis.Window_TitleCommand;
+        delete globalThis.Window_MenuCommand;
         vi.restoreAllMocks();
     });
 
-    it('patches makeCommandList to apply translations after original runs', () => {
+    it('patches makeCommandList on subclass to apply translations', () => {
         const runtime = createRuntime({
             translateCacheWhenDisabled: true,
-            cacheEntries: [['command:ja-en-アイテム', 'Items']],
+            cacheEntries: [
+                ['command:ja-en-ニューゲーム', 'New Game'],
+                ['command:ja-en-コンティニュー', 'Continue'],
+            ],
+        });
+
+        installCommandTranslationHook(runtime);
+
+        const instance = new globalThis.Window_TitleCommand();
+        instance._list = [];
+        instance.makeCommandList();
+
+        expect(instance._list[0].name).toBe('New Game');
+        expect(instance._list[1].name).toBe('Continue');
+    });
+
+    it('also patches the base Window_Command prototype', () => {
+        const runtime = createRuntime({
+            translateCacheWhenDisabled: true,
+            cacheEntries: [['command:ja-en-ベース', 'Base']],
         });
 
         installCommandTranslationHook(runtime);
@@ -222,7 +257,7 @@ describe('installCommandTranslationHook', () => {
         instance._list = [];
         instance.makeCommandList();
 
-        expect(instance._list[0].name).toBe('Items');
+        expect(instance._list[0].name).toBe('Base');
     });
 
     it('does not patch when shouldApplyHook returns false', () => {
@@ -231,7 +266,8 @@ describe('installCommandTranslationHook', () => {
         const runtime = createRuntime({ translationEnabled: true });
         installCommandTranslationHook(runtime);
 
-        expect(globalThis.Window_Command.prototype.makeCommandList).toBe(originalMakeCommandList);
+        expect(globalThis.Window_Command.prototype.makeCommandList).toBe(originalBaseMakeCommandList);
+        expect(globalThis.Window_TitleCommand.prototype.makeCommandList).toBe(originalTitleMakeCommandList);
     });
 
     it('calls original makeCommandList to populate the list', () => {
@@ -239,12 +275,20 @@ describe('installCommandTranslationHook', () => {
 
         installCommandTranslationHook(runtime);
 
-        const instance = new globalThis.Window_Command();
+        const instance = new globalThis.Window_TitleCommand();
         instance._list = [];
         instance.makeCommandList();
 
         expect(instance._list).toEqual([
-            { name: 'アイテム', symbol: 'item', enabled: true, ext: null },
+            { name: 'ニューゲーム', symbol: 'newGame', enabled: true, ext: null },
+            { name: 'コンティニュー', symbol: 'continue', enabled: true, ext: null },
         ]);
+    });
+
+    it('skips window classes that do not exist at hook time', () => {
+        // Window_MenuCommand not defined — should not throw
+        const runtime = createRuntime({ translationEnabled: true });
+
+        expect(() => installCommandTranslationHook(runtime)).not.toThrow();
     });
 });

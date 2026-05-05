@@ -94,9 +94,44 @@ export function collectUntranslatedCommands(commandList, runtime) {
 }
 
 /**
- * Installs the makeCommandList hook on Window_Command.prototype.
- * After the original makeCommandList runs, applies cached translations to this._list.
- * Uses HookGuardHelper to prevent double-installation in separate window.
+ * All RPG Maker MV/MZ window classes that override makeCommandList.
+ * Each one must be hooked individually because RPG Maker prototype inheritance
+ * means subclass overrides shadow the base Window_Command.prototype.makeCommandList —
+ * patching the base has no effect on subclasses that define their own.
+ */
+const COMMAND_WINDOW_CLASSES = [
+    'Window_Command',
+    'Window_TitleCommand',
+    'Window_MenuCommand',
+    'Window_ItemCategory',
+    'Window_SkillType',
+    'Window_EquipCommand',
+    'Window_Options',
+    'Window_ShopCommand',
+    'Window_ChoiceList',
+    'Window_PartyCommand',
+    'Window_ActorCommand',
+    'Window_GameEnd',
+];
+
+/**
+ * Wraps makeCommandList on a single window class prototype.
+ * After the original runs, applies cached translations to this._list.
+ */
+function hookMakeCommandList(windowClass, runtime) {
+    const proto = windowClass.prototype;
+    const original = proto.makeCommandList;
+
+    proto.makeCommandList = function () {
+        original.apply(this, arguments);
+        applyTranslationsToCommands(this._list, runtime);
+    };
+}
+
+/**
+ * Installs the makeCommandList hook on all known Window_Command subclasses.
+ * Each subclass overrides makeCommandList on its own prototype, so we must
+ * patch each one individually. Uses HookGuardHelper to prevent double-installation.
  *
  * @param {object} runtime - The translation runtime
  */
@@ -105,10 +140,10 @@ export function installCommandTranslationHook(runtime) {
         return;
     }
 
-    const originalMakeCommandList = Window_Command.prototype.makeCommandList;
-
-    Window_Command.prototype.makeCommandList = function () {
-        originalMakeCommandList.apply(this, arguments);
-        applyTranslationsToCommands(this._list, runtime);
-    };
+    for (const className of COMMAND_WINDOW_CLASSES) {
+        const windowClass = globalThis[className];
+        if (windowClass && typeof windowClass.prototype.makeCommandList === 'function') {
+            hookMakeCommandList(windowClass, runtime);
+        }
+    }
 }
