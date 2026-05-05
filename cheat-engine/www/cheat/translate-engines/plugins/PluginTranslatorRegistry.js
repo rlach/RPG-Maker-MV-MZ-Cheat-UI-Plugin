@@ -41,6 +41,8 @@ import { QuestSystemTranslator } from './translators/QuestSystemTranslator.js';
 import { ResidentWindowTranslator } from './translators/ResidentWindowTranslator.js';
 import { SceneCustomMenuTranslator } from './translators/SceneCustomMenuTranslator.js';
 import { SceneGlossaryTranslator } from './translators/SceneGlossaryTranslator.js';
+import { SabaSimpleScenarioTranslator } from './translators/SabaSimpleScenarioTranslator.js';
+import { SabaTachieTranslator } from './translators/SabaTachieTranslator.js';
 import { SaveNameInputTranslator } from './translators/SaveNameInputTranslator.js';
 import { SetMessageFontSizeTranslator } from './translators/SetMessageFontSizeTranslator.js';
 import { SHMessageWindowBgTranslator } from './translators/SHMessageWindowBgTranslator.js';
@@ -104,6 +106,8 @@ class PluginTranslatorRegistry {
             ResidentWindowTranslator,
             SceneCustomMenuTranslator,
             SceneGlossaryTranslator,
+            SabaSimpleScenarioTranslator,
+            SabaTachieTranslator,
             SaveNameInputTranslator,
             SetMessageFontSizeTranslator,
             SHMessageWindowBgTranslator,
@@ -222,15 +226,55 @@ class PluginTranslatorRegistry {
         });
     }
 
+    normalizeMessageCacheContext(context) {
+        return context && typeof context === 'object' ? context : {};
+    }
+
+    coerceMessageSourceText(value) {
+        if (typeof value === 'string') {
+            return value;
+        }
+
+        if (value === null || value === undefined) {
+            return '';
+        }
+
+        return String(value);
+    }
+
+    shouldSkipTranslatorMessageNormalization(translator, runtime) {
+        return (
+            !translator ||
+            typeof translator.resolveMessageCacheSourceText !== 'function' ||
+            !translator.isActive({ panel: runtime })
+        );
+    }
+
+    applyTranslatorMessageNormalization(translator, context, runtime, resolvedText) {
+        try {
+            const nextValue = translator.resolveMessageCacheSourceText({
+                ...context,
+                runtime,
+                text: resolvedText,
+            });
+
+            if (typeof nextValue === 'string' && nextValue !== resolvedText) {
+                return nextValue;
+            }
+        } catch (error) {
+            console.warn(
+                `[PluginTranslatorRegistry] Failed to normalize message cache source for ${translator.getPluginName()}`,
+                error
+            );
+        }
+
+        return resolvedText;
+    }
+
     resolveMessageCacheSourceText(context = {}) {
-        const contextObject = context && typeof context === 'object' ? context : {};
+        const contextObject = this.normalizeMessageCacheContext(context);
         const runtime = contextObject['runtime'] || null;
-        const sourceText =
-            typeof contextObject['text'] === 'string'
-                ? contextObject['text']
-                : contextObject['text'] !== null && contextObject['text'] !== undefined
-                  ? String(contextObject['text'])
-                  : '';
+        const sourceText = this.coerceMessageSourceText(contextObject['text']);
 
         if (!sourceText) {
             return sourceText;
@@ -241,7 +285,7 @@ class PluginTranslatorRegistry {
         let resolvedText = sourceText;
         const translators = this.getDetectedTranslatorInstances();
         for (const translator of translators) {
-            if (!translator || typeof translator.resolveMessageCacheSourceText !== 'function') {
+            if (this.shouldSkipTranslatorMessageNormalization(translator, runtime)) {
                 continue;
             }
 
