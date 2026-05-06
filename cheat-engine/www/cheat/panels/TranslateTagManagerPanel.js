@@ -29,7 +29,7 @@ export default {
             :title="!isAiEngine ? 'Only available with AI translation engine' : ''"
             @click="openFindUnknownTags">
             <v-icon small left>mdi-magnify-scan</v-icon>
-            Find possible unknown tags
+            Find unknown tags
         </v-btn>
         <v-btn
             v-if="isAiEngine"
@@ -38,7 +38,7 @@ export default {
             color="primary"
             @click="openAddCustomTagDialog">
             <v-icon small left>mdi-plus</v-icon>
-            Add custom tag
+            Add tag
         </v-btn>
     </v-card-title>
 

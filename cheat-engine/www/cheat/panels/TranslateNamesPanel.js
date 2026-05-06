@@ -9,32 +9,8 @@ export default {
 
     template: `
 <v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
-    <v-card-title class="subtitle-1 font-weight-bold">Actor Names</v-card-title>
+    <v-card-title class="subtitle-1 font-weight-bold">Names Manager</v-card-title>
     <v-card-text class="py-0">
-        <div class="caption">
-            Actor names from the database and names extracted from game messages (e.g. MZ \\N&lt;name&gt; format).
-            Edit translations; translated names are sent to the AI as official hints.
-        </div>
-        <div class="mt-2 d-flex align-center">
-            <v-text-field
-                v-model="filter"
-                label="Filter"
-                dense
-                hide-details
-                clearable
-                @keydown.stop
-                style="max-width: 220px;">
-            </v-text-field>
-            <v-spacer></v-spacer>
-            <v-btn
-                small outlined color="green" class="ml-2"
-                :loading="translating"
-                :disabled="translating || untranslatedCount === 0"
-                @click="translateNames">
-                <v-icon small left>mdi-translate</v-icon>
-                Translate names ({{ untranslatedCount }})
-            </v-btn>
-        </div>
         <div class="mt-2 d-flex align-center">
             <v-text-field
                 v-model="namePattern"
@@ -48,39 +24,6 @@ export default {
                 <v-icon small left>mdi-format-list-bulleted</v-icon>
                 Select pattern
             </v-btn>
-        </div>
-        <div class="mt-2 d-flex align-center">
-            <v-btn small outlined color="primary" @click="lookForNamesInCache">
-                <v-icon small left>mdi-magnify</v-icon>
-                Look for names in cache
-            </v-btn>
-            <v-btn
-                small
-                outlined
-                color="error"
-                class="ml-2"
-                :disabled="cacheOnlyCount === 0"
-                @click="confirmRemoveAllCacheOnlyEntries">
-                <v-icon small left>mdi-trash-can-outline</v-icon>
-                Remove all cache names ({{ cacheOnlyCount }})
-            </v-btn>
-        </div>
-        <div class="mt-2 d-flex align-center">
-            <v-btn
-                small
-                outlined
-                color="teal"
-                @click="applyTranslatedNamesToDbActors">
-                <v-icon small left>mdi-account-check</v-icon>
-                Apply translated names to DB Actors
-            </v-btn>
-            <v-checkbox
-                v-model="applyOnlyActorsWithOriginalNames"
-                class="ml-3 mt-0 pt-0"
-                dense
-                hide-details
-                label="Only actors with original names">
-            </v-checkbox>
         </div>
         <div class="mt-2 d-flex align-center">
             <v-select
@@ -101,6 +44,91 @@ export default {
                 hide-details
                 label="Include all text, not just regex">
             </v-checkbox>
+        </div>
+        <div class="mt-2 d-flex align-center">
+            <span class="caption mr-2">Names:</span>
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on, attrs }">
+                    <v-btn
+                        small
+                        outlined
+                        color="primary"
+                        v-bind="attrs"
+                        v-on="on"
+                        @click="lookForNamesInCache">
+                        <v-icon small left>mdi-magnify</v-icon>
+                        Search
+                    </v-btn>
+                </template>
+                <span>Look for names in cache</span>
+            </v-tooltip>
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on, attrs }">
+                    <v-btn
+                        small outlined color="green" class="ml-2"
+                        :loading="translating"
+                        :disabled="translating || untranslatedCount === 0"
+                        v-bind="attrs"
+                        v-on="on"
+                        @click="translateNames">
+                        <v-icon small left>mdi-translate</v-icon>
+                        Translate ({{ untranslatedCount }})
+                    </v-btn>
+                </template>
+                <span>Translate names</span>
+            </v-tooltip>
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on, attrs }">
+                    <v-btn
+                        small
+                        outlined
+                        color="error"
+                        class="ml-2"
+                        :disabled="cacheOnlyCount === 0"
+                        v-bind="attrs"
+                        v-on="on"
+                        @click="confirmRemoveAllCacheOnlyEntries">
+                        <v-icon small left>mdi-trash-can-outline</v-icon>
+                        Remove ({{ cacheOnlyCount }})
+                    </v-btn>
+                </template>
+                <span>Remove all cache names</span>
+            </v-tooltip>
+        </div>
+        <div class="mt-2 d-flex align-center">
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on, attrs }">
+                    <v-btn
+                        small
+                        outlined
+                        color="teal"
+                        v-bind="attrs"
+                        v-on="on"
+                        @click="applyTranslatedNamesToDbActors">
+                        <v-icon small left>mdi-account-check</v-icon>
+                        Apply translations
+                    </v-btn>
+                </template>
+                <span>Apply translated names to actors from the database.</span>
+            </v-tooltip>
+            <v-checkbox
+                v-model="applyOnlyActorsWithOriginalNames"
+                class="ml-3 mt-0 pt-0"
+                dense
+                hide-details
+                label="Only actors with original names">
+            </v-checkbox>
+        </div>
+        <div class="mt-2 d-flex align-center">
+            <v-text-field
+                v-model="filter"
+                label="Filter"
+                dense
+                hide-details
+                clearable
+                @keydown.stop
+                style="max-width: 220px;">
+            </v-text-field>
         </div>
     </v-card-text>
 
