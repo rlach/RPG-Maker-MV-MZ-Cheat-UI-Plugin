@@ -1,5 +1,5 @@
 import { BasePhase } from './BasePhase.js';
-import { discoverCommandWindowClasses } from '../../js/CommandTranslationManager.js';
+import { discoverCommandWindowClasses, ORIGINAL_MAKE_COMMAND_LIST } from '../../js/CommandTranslationManager.js';
 
 export class SystemCommands extends BasePhase {
     /** @type {SystemCommands | null} */
@@ -67,7 +67,8 @@ export class SystemCommands extends BasePhase {
                 collector._handlers = {};
 
                 collector.clearCommandList();
-                collector.makeCommandList();
+                const originalFn = cls.prototype[ORIGINAL_MAKE_COMMAND_LIST];
+                (originalFn || collector.makeCommandList).call(collector);
 
                 const list = Array.isArray(collector._list) ? collector._list : [];
                 for (const entry of list) {

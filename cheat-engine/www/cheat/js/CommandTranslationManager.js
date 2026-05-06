@@ -133,12 +133,21 @@ export function discoverCommandWindowClasses() {
 }
 
 /**
+ * Property name used to store the original (pre-hook) makeCommandList on prototypes.
+ * Accessible by SystemCommands to call the unhooked version during command gathering.
+ */
+export const ORIGINAL_MAKE_COMMAND_LIST = '_cheat_originalMakeCommandList';
+
+/**
  * Wraps makeCommandList on a single window class prototype.
  * After the original runs, applies cached translations to this._list.
+ * Stores the original function under ORIGINAL_MAKE_COMMAND_LIST for external access.
  */
 function hookMakeCommandList(windowClass, runtime) {
     const proto = windowClass.prototype;
     const original = proto.makeCommandList;
+
+    proto[ORIGINAL_MAKE_COMMAND_LIST] = original;
 
     proto.makeCommandList = function () {
         original.apply(this, arguments);
