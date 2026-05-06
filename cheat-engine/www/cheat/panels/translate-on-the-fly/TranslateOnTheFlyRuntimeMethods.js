@@ -1,5 +1,8 @@
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
-import { installCommandTranslationHook } from '../../js/CommandTranslationManager.js';
+import {
+    installCommandTranslationHook,
+    isTranslationActive,
+} from '../../js/CommandTranslationManager.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../../translate-engines/plugins/PluginTranslatorRegistry.js';
 
 export const translateOnTheFlyRuntimeMethods = {
@@ -247,6 +250,10 @@ export const translateOnTheFlyRuntimeMethods = {
         const shouldHookInterpreterCommands = !hasStrictMessageCore;
 
         const applyCachedActorNameFromCommand320 = (params) => {
+            if (!isTranslationActive(self)) {
+                return;
+            }
+
             if (!Array.isArray(params) || !window.$gameActors) {
                 return;
             }
@@ -350,39 +357,33 @@ export const translateOnTheFlyRuntimeMethods = {
                 Game_Interpreter.prototype._translateOriginalCommand101 =
                     Game_Interpreter.prototype.command101;
             }
-
             Game_Interpreter.prototype.command101 = function (...args) {
                 if (window.$gameMessage && !$gameMessage.isBusy()) {
                     markCurrentMessageAsEventOrigin('command101', this);
                 }
-
                 return Game_Interpreter.prototype._translateOriginalCommand101.apply(this, args);
             };
-
             if (!Game_Interpreter.prototype._translateOriginalCommand102) {
                 Game_Interpreter.prototype._translateOriginalCommand102 =
                     Game_Interpreter.prototype.command102;
             }
-
             Game_Interpreter.prototype.command102 = function (...args) {
                 if (window.$gameMessage && !$gameMessage.isBusy()) {
                     markCurrentMessageAsEventOrigin('command102', this);
                 }
-
                 return Game_Interpreter.prototype._translateOriginalCommand102.apply(this, args);
             };
-
             if (!Game_Interpreter.prototype._translateOriginalCommand320) {
                 Game_Interpreter.prototype._translateOriginalCommand320 =
                     Game_Interpreter.prototype.command320;
             }
-
             Game_Interpreter.prototype.command320 = function (...args) {
+                console.log('Intercepted command 320 with args', args);
                 const result = Game_Interpreter.prototype._translateOriginalCommand320.apply(
                     this,
                     args
                 );
-
+                console.log('Result of original command 320', result);
                 // MZ command signature is command320(params).
                 // Prefer explicit args[0], then fall back to current command parameters.
                 const params = Array.isArray(args[0])
@@ -390,6 +391,7 @@ export const translateOnTheFlyRuntimeMethods = {
                     : this.currentCommand && this.currentCommand()
                       ? this.currentCommand().parameters
                       : null;
+                console.log('Applying cached actor name from command 320 with params', params);
                 applyCachedActorNameFromCommand320(params);
                 return result;
             };

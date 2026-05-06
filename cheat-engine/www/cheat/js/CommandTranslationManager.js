@@ -6,7 +6,7 @@ const COMMAND_HOOK_NAME = 'CHEAT_COMMAND_TRANSLATION_HOOK';
  * Returns whether any translation mode is active on the runtime
  * (full OTF, cache-only, or background batch process).
  */
-function isTranslationActive(runtime) {
+export function isTranslationActive(runtime) {
     return (
         runtime.isTranslationEnabled() ||
         !!runtime.translateCacheWhenDisabled ||

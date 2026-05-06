@@ -276,7 +276,9 @@ export default {
                         3000
                     );
                 }
-            } catch (err) { /* empty */ }
+            } catch (err) {
+                /* empty */
+            }
         },
 
         escapeHtml(text) {
