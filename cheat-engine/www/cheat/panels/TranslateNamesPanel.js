@@ -122,18 +122,21 @@ export default {
         <div class="mt-2 d-flex align-center">
             <v-text-field
                 v-model="filter"
-                label="Filter"
+                label="Search"
+                solo
                 dense
                 hide-details
                 clearable
-                @keydown.stop
+                background-color="grey darken-3"
+                @keydown.self.stop
+                @focus="$event.target.select()"
                 style="max-width: 220px;">
             </v-text-field>
         </div>
     </v-card-text>
 
     <v-dialog v-model="patternPickerOpen" max-width="860">
-        <v-card>
+        <v-card dark>
             <v-card-title class="subtitle-1 font-weight-bold">
                 Select name pattern
             </v-card-title>
@@ -144,9 +147,9 @@ export default {
                 <v-simple-table dense>
                     <thead>
                         <tr>
-                            <th class="text-left caption" style="width: 40%;">Pattern</th>
-                            <th class="text-left caption">Example</th>
-                            <th class="text-right caption" style="width: 92px;"></th>
+                            <th class="text-left caption white--text" style="width: 40%;">Pattern</th>
+                            <th class="text-left caption white--text">Example</th>
+                            <th class="text-right caption white--text" style="width: 92px;"></th>
                         </tr>
                     </thead>
                     <tbody>
