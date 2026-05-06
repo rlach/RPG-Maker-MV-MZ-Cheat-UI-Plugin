@@ -715,16 +715,12 @@ export class StreamGuardrails {
             if (state.bestIsComplete && analysis.scan.objects?.length > 0) {
                 const trailingText = analysis.scan.trailingText || '';
                 if (trailingText.length > 0) {
-                    // Stream continued after complete JSON found
-                    const trailingNonWhitespace = trailingText.trim().length > 0;
-                    if (trailingNonWhitespace) {
-                        state.cancelReason = STREAM_CANCEL_REASON.COMPLETE_JSON_CONTINUED;
-                        return {
-                            shouldCancel: true,
-                            cancelReason: state.cancelReason,
-                            bestMap: state.bestMap,
-                        };
-                    }
+                    state.cancelReason = STREAM_CANCEL_REASON.COMPLETE_JSON_CONTINUED;
+                    return {
+                        shouldCancel: true,
+                        cancelReason: state.cancelReason,
+                        bestMap: state.bestMap,
+                    };
                 }
             }
         }
