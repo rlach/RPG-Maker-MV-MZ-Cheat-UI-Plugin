@@ -2,12 +2,15 @@ import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../panels/translate-on-the-fly/ObjectTranslationModalMethods.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_MPP_CHOICE_EX_TRANSLATOR_HOOKED__';
+const MPP_CHOICE_EX_PLUGIN_NAME = 'mpp_choiceex';
 const DEFAULT_CHOICE_HELP_COMMANDS = [
     'ChoiceHelp',
     '<ChoiceHelp>',
     '選択肢ヘルプ',
     '<選択肢ヘルプ>',
 ];
+const MPP_CHOICE_EX_OP1_PLUGIN_NAME = 'mpp_choiceex_op1';
+const MPP_CHOICE_EX_OP1_ADD_CHOICE_COMMANDS = new Set(['addcustomchoice', '選択肢追加']);
 
 const runtimeGlobal = /** @type {any} */ (globalThis);
 
@@ -24,6 +27,10 @@ function getRuntime() {
 function normalizeChoiceDisplayText(choiceText) {
     const original = String(choiceText || '');
     return original.replace(/\s?if\((.+?)\)/i, '').replace(/\s?en\((.+?)\)/i, '');
+}
+
+function normalizeCommandName(value) {
+    return String(value || '').trim().toLowerCase();
 }
 
 function toStringArray(value) {
@@ -65,6 +72,20 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
 
     getPluginName() {
         return 'MPP_ChoiceEX';
+    }
+
+    detectPlugin() {
+        if (!Array.isArray(runtimeGlobal.$plugins)) {
+            return false;
+        }
+
+        return runtimeGlobal.$plugins.some((plugin) => {
+            const pluginName = normalizeCommandName(plugin?.name);
+            return (
+                pluginName === MPP_CHOICE_EX_PLUGIN_NAME ||
+                pluginName === MPP_CHOICE_EX_OP1_PLUGIN_NAME
+            );
+        });
     }
 
     getPluginLabel() {
@@ -426,8 +447,78 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
                 this.collectChoiceBranchItem(cmd, baseMeta, output, cmdIdx, code);
             } else if (code === 108) {
                 this.collectChoiceHelpItem(list, cmd, baseMeta, output, cmdIdx, code);
+            } else if (code === 357) {
+                this.collectOp1MZAddChoiceItem(cmd, baseMeta, output, cmdIdx, code);
+            } else if (code === 356) {
+                this.collectOp1MVAddChoiceItem(cmd, baseMeta, output, cmdIdx, code);
             }
         }
+    }
+
+    collectOp1MZAddChoiceItem(cmd, baseMeta, output, cmdIdx, code) {
+        const parameters = Array.isArray(cmd.parameters) ? cmd.parameters : [];
+        const pluginName = normalizeCommandName(parameters[0]);
+        if (pluginName !== MPP_CHOICE_EX_OP1_PLUGIN_NAME) {
+            return;
+        }
+
+        const commandName = normalizeCommandName(parameters[1]);
+        if (!MPP_CHOICE_EX_OP1_ADD_CHOICE_COMMANDS.has(commandName)) {
+            return;
+        }
+
+        const args = parameters[3] && typeof parameters[3] === 'object' ? parameters[3] : null;
+        const choiceText = normalizeChoiceDisplayText(args?.choiceText);
+        if (!isUsableText(choiceText)) {
+            return;
+        }
+
+        output.push({
+            text: choiceText,
+            cacheType: this.getChoiceCacheType(),
+            source: {
+                ...baseMeta,
+                cmdIdx,
+                code,
+                op1Command: 'addCustomChoice',
+            },
+        });
+    }
+
+    collectOp1MVAddChoiceItem(cmd, baseMeta, output, cmdIdx, code) {
+        const commandLine =
+            Array.isArray(cmd.parameters) && typeof cmd.parameters[0] === 'string'
+                ? cmd.parameters[0]
+                : '';
+        if (!commandLine.trim()) {
+            return;
+        }
+
+        const parts = commandLine.trim().split(/\s+/);
+        const commandName = normalizeCommandName(parts.shift());
+        if (!MPP_CHOICE_EX_OP1_ADD_CHOICE_COMMANDS.has(commandName)) {
+            return;
+        }
+
+        if (parts.length < 2) {
+            return;
+        }
+
+        const choiceText = normalizeChoiceDisplayText(parts.slice(1, -1).join(' ').trim());
+        if (!isUsableText(choiceText)) {
+            return;
+        }
+
+        output.push({
+            text: choiceText,
+            cacheType: this.getChoiceCacheType(),
+            source: {
+                ...baseMeta,
+                cmdIdx,
+                code,
+                op1Command: 'AddCustomChoice',
+            },
+        });
     }
 
     collectShowChoiceItems(cmd, baseMeta, output, cmdIdx, code) {
