@@ -64,10 +64,7 @@ export class TranslationBatchManager {
         const translators = PLUGIN_TRANSLATOR_REGISTRY.getDetectedTranslatorInstances();
         for (const translator of translators) {
             try {
-                translator.manageKnowledgeBase(
-                    {},
-                    { successes, failures }
-                );
+                translator.manageKnowledgeBase({}, { successes, failures });
             } catch (error) {
                 console.warn(
                     '[TranslationBatchManager] manageKnowledgeBase failed for',
@@ -177,7 +174,7 @@ export class TranslationBatchManager {
         }
 
         if (kind === 'mapEvents') {
-            targetSet.add('text');
+            targetSet.add('message');
             return;
         }
 
