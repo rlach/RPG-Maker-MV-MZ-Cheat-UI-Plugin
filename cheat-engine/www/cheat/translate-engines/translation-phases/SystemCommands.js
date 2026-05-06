@@ -55,16 +55,24 @@ export class SystemCommands extends BasePhase {
     }
 
     collectMenuCommandNames() {
-        const collector = Object.create(Window_MenuCommand.prototype);
-        collector._list = [];
-        collector._handlers = {};
+        try {
+            const collector = Object.create(Window_MenuCommand.prototype);
+            collector._list = [];
+            collector._handlers = {};
 
-        collector.clearCommandList();
-        collector.makeCommandList();
+            collector.clearCommandList();
+            collector.makeCommandList();
 
-        const list = Array.isArray(collector._list) ? collector._list : [];
-        const names = list.map((entry) => entry?.name);
-        return this.normalizeCommandList(names);
+            const list = Array.isArray(collector._list) ? collector._list : [];
+            const names = list.map((entry) => entry?.name);
+            return this.normalizeCommandList(names);
+        } catch (error) {
+            console.warn(
+                '[SystemCommands] collectMenuCommandNames failed (plugin override may require game state):',
+                error?.message || error
+            );
+            return [];
+        }
     }
 
     appendMenuCommands(mergedSource, menuCommandNames, currentCommands, originalCommands) {
