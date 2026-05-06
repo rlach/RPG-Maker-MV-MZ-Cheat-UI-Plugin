@@ -34,6 +34,7 @@ declare const TouchInput: any;
 
 declare const Game_Actor: any;
 declare const Game_CharacterBase: any;
+declare const Game_Chronus: any;
 declare const Game_Event: any;
 declare const Game_Party: any;
 declare const Game_Interpreter: any;
