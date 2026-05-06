@@ -1,4 +1,5 @@
 import { BasePhase } from './BasePhase.js';
+import { discoverCommandWindowClasses } from '../../js/CommandTranslationManager.js';
 
 export class SystemCommands extends BasePhase {
     /** @type {SystemCommands | null} */
@@ -54,25 +55,34 @@ export class SystemCommands extends BasePhase {
         return normalized;
     }
 
-    collectMenuCommandNames() {
-        try {
-            const collector = Object.create(Window_MenuCommand.prototype);
-            collector._list = [];
-            collector._handlers = {};
+    collectCommandWindowNames() {
+        const classes = discoverCommandWindowClasses();
+        const allNames = [];
+        const seen = new Set();
 
-            collector.clearCommandList();
-            collector.makeCommandList();
+        for (const cls of classes) {
+            try {
+                const collector = Object.create(cls.prototype);
+                collector._list = [];
+                collector._handlers = {};
 
-            const list = Array.isArray(collector._list) ? collector._list : [];
-            const names = list.map((entry) => entry?.name);
-            return this.normalizeCommandList(names);
-        } catch (error) {
-            console.warn(
-                '[SystemCommands] collectMenuCommandNames failed (plugin override may require game state):',
-                error?.message || error
-            );
-            return [];
+                collector.clearCommandList();
+                collector.makeCommandList();
+
+                const list = Array.isArray(collector._list) ? collector._list : [];
+                for (const entry of list) {
+                    const name = entry?.name;
+                    if (name && typeof name === 'string' && name.trim() && !seen.has(name)) {
+                        seen.add(name);
+                        allNames.push(name);
+                    }
+                }
+            } catch (_) {
+                // Some window classes require game state (battle scene, shop, etc.) — skip silently
+            }
         }
+
+        return this.normalizeCommandList(allNames);
     }
 
     appendMenuCommands(mergedSource, menuCommandNames, currentCommands, originalCommands) {
@@ -107,7 +117,7 @@ export class SystemCommands extends BasePhase {
             : null;
         const defaultSource = originalCommands || currentCommands;
 
-        const menuCommandNames = this.collectMenuCommandNames();
+        const menuCommandNames = this.collectCommandWindowNames();
         if (!menuCommandNames.length) {
             return defaultSource;
         }
