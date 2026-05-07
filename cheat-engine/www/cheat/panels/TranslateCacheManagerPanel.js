@@ -16,6 +16,7 @@ const cacheManagerTableStateMemory = {
     page: 1,
     searchInput: '',
     selectedTypeFilter: '',
+    searchIn: 'both',
 };
 
 export default {
@@ -53,37 +54,79 @@ export default {
         :sort-desc.sync="sortDesc"
         :items-per-page.sync="rowsPerPage">
         <template v-slot:top>
-          <div class="d-flex align-center" style="gap: 8px;">
-            <v-text-field
-              v-model="searchInput"
-              label="Search original / translation"
-              solo
-              dense
-              hide-details
-              background-color="grey darken-3"
-              @keydown.self.stop>
-            </v-text-field>
-            <v-select
-              v-model="selectedTypeFilter"
-              :items="typeFilterOptions"
-              label="Type"
-              item-text="text"
-              item-value="value"
-              solo
-              dense
-              clearable
-              hide-details
-              background-color="grey darken-3"
-              style="max-width: 220px;"
-              @keydown.self.stop>
-            </v-select>
-            <v-btn
-              icon
-              color="error"
-              :disabled="matchingFilterEntryCount <= 0"
-              @click="confirmClearTranslationsMatchingFilter">
-              <v-icon small>mdi-delete</v-icon>
-            </v-btn>
+          <div>
+            <div class="d-flex align-center" style="gap: 8px;">
+              <v-text-field
+                v-model="searchInput"
+                :label="searchFieldLabel"
+                solo
+                dense
+                hide-details
+                background-color="grey darken-3"
+                @keydown.self.stop>
+              </v-text-field>
+              <v-select
+                v-model="selectedTypeFilter"
+                :items="typeFilterOptions"
+                label="Type"
+                item-text="text"
+                item-value="value"
+                solo
+                dense
+                clearable
+                hide-details
+                background-color="grey darken-3"
+                style="max-width: 220px;"
+                @keydown.self.stop>
+              </v-select>
+              <v-tooltip bottom>
+                <template v-slot:activator="{ on, attrs }">
+                  <v-btn icon small v-bind="attrs" v-on="on" @click="searchExpanded = !searchExpanded">
+                    <v-icon small>{{ searchExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                  </v-btn>
+                </template>
+                <span>{{ searchExpanded ? 'Hide options' : 'More options' }}</span>
+              </v-tooltip>
+            </div>
+            <div v-if="searchExpanded" class="d-flex align-center mt-1" style="gap: 8px;">
+              <v-text-field
+                v-model="replaceInput"
+                label="Replace"
+                solo
+                dense
+                hide-details
+                background-color="grey darken-3"
+                @keydown.self.stop>
+              </v-text-field>
+              <v-btn
+                small
+                color="primary"
+                :disabled="replaceButtonDisabled"
+                @click="performReplace">
+                Replace
+              </v-btn>
+              <span class="caption grey--text text--lighten-1" style="white-space: nowrap;">Search in:</span>
+              <v-select
+                v-model="searchIn"
+                :items="searchInOptions"
+                item-text="text"
+                item-value="value"
+                solo
+                dense
+                hide-details
+                background-color="grey darken-3"
+                style="max-width: 180px;"
+                @keydown.self.stop>
+              </v-select>
+              <v-btn
+                icon
+                small
+                color="error"
+                :disabled="matchingFilterEntryCount <= 0"
+                @click="confirmClearTranslationsMatchingFilter">
+                <v-icon small>mdi-delete</v-icon>
+              </v-btn>
+            </div>
           </div>
         </template>
 
@@ -99,12 +142,13 @@ export default {
             <div
                 class="caption white--text"
                 style="white-space: pre-wrap; word-break: break-word;"
-                v-text="item.original">
+                v-html="highlightText(item.original, searchHighlightTerm, 'original')">
             </div>
         </template>
 
         <template v-slot:item.translation="{ item }">
             <v-textarea
+                v-if="editingKey === item.key"
                 :value="getDraftValue(item)"
                 :rows="getRowLineCount(item, getDraftValue(item))"
                 auto-grow
@@ -115,39 +159,68 @@ export default {
                 @input="onTranslationInput(item, $event)"
                 @keydown.stop>
             </v-textarea>
+            <div
+                v-else
+                class="caption white--text"
+                style="white-space: pre-wrap; word-break: break-word;"
+                v-html="highlightText(item.translation, searchHighlightTerm, 'translation')">
+            </div>
         </template>
 
         <template v-slot:item.actionsSort="{ item }">
-            <div class="d-flex align-center justify-center">
-                <v-tooltip bottom>
-                    <span>Copy original text</span>
-                    <template v-slot:activator="{ on, attrs }">
-                        <v-btn
-                            icon
-                            x-small
-                            color="primary"
-                            v-bind="attrs"
-                            v-on="on"
-                            @click="copyOriginal(item)">
-                            <v-icon small>mdi-content-copy</v-icon>
-                        </v-btn>
-                    </template>
-                </v-tooltip>
-
-                <v-tooltip bottom>
-                    <span>Remove translation</span>
-                    <template v-slot:activator="{ on, attrs }">
-                        <v-btn
-                            icon
-                            x-small
-                            color="error"
-                            v-bind="attrs"
-                            v-on="on"
-                            @click="clearTranslation(item)">
-                            <v-icon small>mdi-close</v-icon>
-                        </v-btn>
-                    </template>
-                </v-tooltip>
+            <div class="d-flex align-center justify-center" style="gap: 2px;">
+                <template v-if="editingKey === item.key">
+                    <v-btn icon x-small color="success" @click="saveEdit">
+                        <v-icon small>mdi-check</v-icon>
+                    </v-btn>
+                    <v-btn icon x-small color="grey" @click="cancelEdit">
+                        <v-icon small>mdi-close</v-icon>
+                    </v-btn>
+                </template>
+                <template v-else>
+                    <v-tooltip bottom>
+                        <span>Edit translation</span>
+                        <template v-slot:activator="{ on, attrs }">
+                            <v-btn
+                                icon
+                                x-small
+                                color="primary"
+                                v-bind="attrs"
+                                v-on="on"
+                                @click="startEdit(item)">
+                                <v-icon small>mdi-pencil</v-icon>
+                            </v-btn>
+                        </template>
+                    </v-tooltip>
+                    <v-tooltip bottom>
+                        <span>Copy original text</span>
+                        <template v-slot:activator="{ on, attrs }">
+                            <v-btn
+                                icon
+                                x-small
+                                color="primary"
+                                v-bind="attrs"
+                                v-on="on"
+                                @click="copyOriginal(item)">
+                                <v-icon small>mdi-content-copy</v-icon>
+                            </v-btn>
+                        </template>
+                    </v-tooltip>
+                    <v-tooltip bottom>
+                        <span>Remove translation</span>
+                        <template v-slot:activator="{ on, attrs }">
+                            <v-btn
+                                icon
+                                x-small
+                                color="error"
+                                v-bind="attrs"
+                                v-on="on"
+                                @click="clearTranslation(item)">
+                                <v-icon small>mdi-close</v-icon>
+                            </v-btn>
+                        </template>
+                    </v-tooltip>
+                </template>
             </div>
         </template>
     </v-data-table>
@@ -163,6 +236,10 @@ export default {
             sortBy: 'seenSort',
             sortDesc: true,
             selectedTypeFilter: '',
+            searchExpanded: false,
+            replaceInput: '',
+            searchIn: 'both',
+            editingKey: null,
             sourceLang: 'ja',
             targetLang: 'en',
             entries: [],
@@ -194,7 +271,7 @@ export default {
                 {
                     text: 'Actions',
                     value: 'actionsSort',
-                    width: 92,
+                    width: 100,
                 },
             ],
         };
@@ -288,6 +365,10 @@ export default {
         selectedTypeFilter() {
             this.saveTableState();
         },
+
+        searchIn() {
+            this.saveTableState();
+        },
     },
 
     computed: {
@@ -322,6 +403,32 @@ export default {
             return [{ text: '', value: '' }].concat(
                 sortedTypes.map((type) => ({ text: type, value: type }))
             );
+        },
+
+        searchFieldLabel() {
+            if (this.searchIn === 'original') {
+                return 'Search original';
+            }
+            if (this.searchIn === 'translation') {
+                return 'Search translation';
+            }
+            return 'Search original / translation';
+        },
+
+        searchInOptions() {
+            return [
+                { text: 'Both', value: 'both' },
+                { text: 'Original', value: 'original' },
+                { text: 'Translation', value: 'translation' },
+            ];
+        },
+
+        replaceButtonDisabled() {
+            return !this.searchInput.trim() || this.searchIn === 'translation';
+        },
+
+        searchHighlightTerm() {
+            return this.search;
         },
     },
 
@@ -498,6 +605,12 @@ export default {
             if (typeof state.selectedTypeFilter === 'string') {
                 this.selectedTypeFilter = this.normalizeTypeFilterValue(state.selectedTypeFilter);
             }
+            if (
+                typeof state.searchIn === 'string' &&
+                ['both', 'original', 'translation'].includes(state.searchIn)
+            ) {
+                this.searchIn = state.searchIn;
+            }
         },
 
         saveTableState() {
@@ -506,9 +619,12 @@ export default {
             cacheManagerTableStateMemory.page = this.page;
             cacheManagerTableStateMemory.searchInput = this.searchInput;
             cacheManagerTableStateMemory.selectedTypeFilter = this.selectedTypeFilter;
+            cacheManagerTableStateMemory.searchIn = this.searchIn;
         },
 
         flushPendingCacheEdits(reason = 'unknown') {
+            this.editingKey = null;
+
             const draftEntries = Object.entries(this.draftByKey || {});
             if (!draftEntries.length) {
                 return;
@@ -601,6 +717,7 @@ export default {
         getEntriesMatchingFilter(searchValue, selectedType = '') {
             const search = this.normalizeCacheValue(searchValue);
             const term = search === null ? '' : String(search).trim().toLowerCase();
+            const searchIn = this.searchIn;
             return (this.entries || []).filter((entry) => {
                 if (!this.matchesTypeFilter(entry, selectedType)) {
                     return false;
@@ -610,14 +727,20 @@ export default {
                     return true;
                 }
 
-                return (
-                    this.normalizeCacheValue(entry && entry.original)
-                        .toLowerCase()
-                        .includes(term) ||
-                    this.normalizeCacheValue(entry && entry.translation)
-                        .toLowerCase()
-                        .includes(term)
-                );
+                const matchesOriginal = this.normalizeCacheValue(entry && entry.original)
+                    .toLowerCase()
+                    .includes(term);
+                const matchesTranslation = this.normalizeCacheValue(entry && entry.translation)
+                    .toLowerCase()
+                    .includes(term);
+
+                if (searchIn === 'original') {
+                    return matchesOriginal;
+                }
+                if (searchIn === 'translation') {
+                    return matchesTranslation;
+                }
+                return matchesOriginal || matchesTranslation;
             });
         },
 
@@ -774,6 +897,95 @@ export default {
                     runtime.endNonOtfTranslationProcess();
                 }
             }
+        },
+
+        startEdit(item) {
+            if (this.editingKey && this.editingKey !== item.key) {
+                this.flushPendingCacheEdits('start-edit-switch');
+            }
+            this.editingKey = item.key;
+            this.$set(this.draftByKey, item.key, this.normalizeCacheValue(this.getDraftValue(item)));
+        },
+
+        saveEdit() {
+            this.flushPendingCacheEdits('save-edit');
+        },
+
+        cancelEdit() {
+            if (this.editingKey) {
+                this.$delete(this.draftByKey, this.editingKey);
+            }
+            this.editingKey = null;
+        },
+
+        performReplace() {
+            const searchTerm = this.normalizeCacheValue(this.searchInput).trim();
+            if (!searchTerm) {
+                return;
+            }
+
+            const replaceWith = this.normalizeCacheValue(this.replaceInput);
+            const matching = this.getEntriesMatchingFilter(this.searchInput, this.selectedTypeFilter);
+            const regex = new RegExp(this.escapeRegex(searchTerm), 'gi');
+
+            const changedKeys = [];
+            for (const entry of matching) {
+                if (!entry || !entry.key) {
+                    continue;
+                }
+
+                const currentTranslation = this.normalizeCacheValue(entry.translation);
+                const newTranslation = currentTranslation.replace(regex, replaceWith);
+                if (newTranslation !== currentTranslation) {
+                    this.translationCache.set(entry.key, newTranslation);
+                    changedKeys.push(entry.key);
+                }
+            }
+
+            if (!changedKeys.length) {
+                return;
+            }
+
+            const runtime = ensureTranslationRuntime();
+            runtime.persistCache(changedKeys);
+            runtime.notifyCacheRuntime('cache-manager-replace');
+            this.refreshEntries();
+        },
+
+        escapeHtml(text) {
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        },
+
+        escapeRegex(str) {
+            return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        },
+
+        highlightText(text, term, fieldType) {
+            const normalized = this.normalizeCacheValue(text);
+            const escapedText = this.escapeHtml(normalized);
+
+            if (!term || !term.trim()) {
+                return escapedText;
+            }
+
+            const searchIn = this.searchIn;
+            if (fieldType === 'original' && searchIn === 'translation') {
+                return escapedText;
+            }
+            if (fieldType === 'translation' && searchIn === 'original') {
+                return escapedText;
+            }
+
+            const escapedTerm = this.escapeRegex(this.escapeHtml(term.trim()));
+            const regex = new RegExp(`(${escapedTerm})`, 'gi');
+            return escapedText.replace(
+                regex,
+                '<span style="background-color:#ffc107;color:#111;border-radius:2px;padding:0 2px;">$1</span>'
+            );
         },
 
         async copyOriginal(item) {
