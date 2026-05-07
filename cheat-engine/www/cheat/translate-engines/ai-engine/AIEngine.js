@@ -299,6 +299,9 @@ class AIEngine extends BaseTranslationEngine {
             normalized.maskValue = !!config.maskValue;
         }
 
+        normalized.alwaysTranslate = config.alwaysTranslate === true;
+        normalized.alwaysAddToKnowledgeBase = config.alwaysAddToKnowledgeBase === true;
+
         return normalized;
     }
 
