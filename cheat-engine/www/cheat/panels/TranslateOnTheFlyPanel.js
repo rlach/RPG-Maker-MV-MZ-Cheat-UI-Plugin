@@ -65,15 +65,6 @@ export default {
         </v-switch>
 
         <v-switch
-            v-model="translateGameObjects"
-            label="Translate game objects in the background"
-            dense
-            hide-details
-            @click.self.stop
-            @change="onChangeTranslateGameObjects">
-        </v-switch>
-
-        <v-switch
             v-model="cancelBackgroundForOnTheFly"
             label="Allow cancelling of background translations when on-the-fly is needed"
             dense
@@ -433,10 +424,6 @@ export default {
 
         onChangeTryTranslateAhead() {
             return this.callRuntime('onChangeTryTranslateAhead');
-        },
-
-        onChangeTranslateGameObjects() {
-            return this.callRuntime('onChangeTranslateGameObjects');
         },
 
         onChangeCancelBackgroundForOnTheFly() {

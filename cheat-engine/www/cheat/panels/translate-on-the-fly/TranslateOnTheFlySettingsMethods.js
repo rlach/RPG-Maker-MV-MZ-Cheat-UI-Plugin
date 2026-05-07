@@ -127,10 +127,6 @@ export const translateOnTheFlySettingsMethods = {
         this.saveSettings();
     },
 
-    onChangeTranslateGameObjects() {
-        this.saveSettings();
-    },
-
     onChangeCancelBackgroundForOnTheFly() {
         this.saveSettings();
     },
