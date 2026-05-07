@@ -9,6 +9,7 @@ import { DarkPlasmaCharacterTextTranslator } from './translators/DarkPlasmaChara
 import { DTextPictureTranslator } from './translators/DTextPictureTranslator.js';
 import { DynamicDatabaseTranslator } from './translators/DynamicDatabaseTranslator.js';
 import { EventLabelTranslator } from './translators/EventLabelTranslator.js';
+import { ExtraWindowTranslator } from './translators/ExtraWindowTranslator.js';
 import { GetInformationTranslator } from './translators/GetInformationTranslator.js';
 import { DestinationWindowTranslator } from './translators/DestinationWindowTranslator.js';
 import { KmsMapActiveMessageTranslator } from './translators/KmsMapActiveMessageTranslator.js';
@@ -58,6 +59,7 @@ class PluginTranslatorRegistry {
             DTextPictureTranslator,
             DynamicDatabaseTranslator,
             EventLabelTranslator,
+            ExtraWindowTranslator,
             GetInformationTranslator,
             DestinationWindowTranslator,
             KmsMapActiveMessageTranslator,
