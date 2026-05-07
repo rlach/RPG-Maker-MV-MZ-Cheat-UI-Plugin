@@ -122,6 +122,7 @@ export default {
         <div class="mt-2 d-flex align-center">
             <v-text-field
                 v-model="filter"
+                class="flex-grow-1"
                 label="Search"
                 solo
                 dense
@@ -129,8 +130,7 @@ export default {
                 clearable
                 background-color="grey darken-3"
                 @keydown.self.stop
-                @focus="$event.target.select()"
-                style="max-width: 220px;">
+                @focus="$event.target.select()">
             </v-text-field>
         </div>
     </v-card-text>
