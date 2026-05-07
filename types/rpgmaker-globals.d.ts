@@ -55,6 +55,7 @@ declare const Spriteset_Base: any;
 declare const Sprite: any;
 declare const Window_Base: any;
 declare const Window_Selectable: any;
+declare const Window_SavefileList: any;
 declare const Window_Message: any;
 declare const Window_Command: any;
 declare const Window_MenuCommand: any;
