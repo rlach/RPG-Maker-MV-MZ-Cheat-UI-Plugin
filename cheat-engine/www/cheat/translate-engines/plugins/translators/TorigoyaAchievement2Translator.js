@@ -428,6 +428,7 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
                         translatedDescription,
                         runtime
                     ),
+                    meta: {},
                 });
             };
         }
