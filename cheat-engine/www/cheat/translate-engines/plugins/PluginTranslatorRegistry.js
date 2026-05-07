@@ -15,6 +15,7 @@ import { DestinationWindowTranslator } from './translators/DestinationWindowTran
 import { KmsMapActiveMessageTranslator } from './translators/KmsMapActiveMessageTranslator.js';
 import { KekeVariableActorCommandTranslator } from './translators/KekeVariableActorCommandTranslator.js';
 import { ManoInputConfigTranslator } from './translators/ManoInputConfigTranslator.js';
+import { LLMenuScreenTranslator } from './translators/LLMenuScreenTranslator.js';
 import { LLStandingPictureTranslator } from './translators/LLStandingPictureTranslator.js';
 import { MgpExternChoicesTranslator } from './translators/MgpExternChoicesTranslator.js';
 import { MogBattleCommandsTranslator } from './translators/MogBattleCommandsTranslator.js';
@@ -65,6 +66,7 @@ class PluginTranslatorRegistry {
             DestinationWindowTranslator,
             KmsMapActiveMessageTranslator,
             KekeVariableActorCommandTranslator,
+            LLMenuScreenTranslator,
             LLStandingPictureTranslator,
             ManoInputConfigTranslator,
             MgpExternChoicesTranslator,
