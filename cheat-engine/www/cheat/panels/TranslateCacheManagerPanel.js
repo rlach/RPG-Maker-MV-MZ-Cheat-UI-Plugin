@@ -163,7 +163,7 @@ export default {
                 v-else
                 class="caption white--text"
                 style="white-space: pre-wrap; word-break: break-word;"
-                v-html="highlightText(item.translation, searchHighlightTerm, 'translation')">
+                v-html="highlightText(getDraftValue(item), searchHighlightTerm, 'translation')">
             </div>
         </template>
 
