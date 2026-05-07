@@ -16,6 +16,7 @@ const TRP_SKIT_PLUGIN_TAGS = [
         bracket: TAG_BRACKET.ANGLE,
         maskValue: false,
         requiredConsistency: true,
+        alwaysTranslate: true,
     },
 ];
 

@@ -189,7 +189,23 @@ export default {
                         v-model="customTagForm.maskValue"
                         label="Mask value (preserve exact value, LLM cannot change it)"
                         hide-details
-                        class="mt-0"
+                        class="mt-0 mb-2"
+                    ></v-checkbox>
+
+                    <v-checkbox
+                        v-model="customTagForm.alwaysTranslate"
+                        :disabled="customTagForm.maskValue"
+                        label="Prompt LLM to always translate"
+                        hide-details
+                        class="mt-0 mb-2"
+                    ></v-checkbox>
+
+                    <v-checkbox
+                        v-model="customTagForm.alwaysAddToKnowledgeBase"
+                        :disabled="customTagForm.maskValue"
+                        label="Ask LLM to always add translations to knowledge base"
+                        hide-details
+                        class="mt-0 mb-2"
                     ></v-checkbox>
                 </template>
             </v-card-text>
@@ -323,6 +339,8 @@ export default {
                 bracket: '<',
                 maskValue: false,
                 reservedWidth: 0,
+                alwaysTranslate: false,
+                alwaysAddToKnowledgeBase: false,
             },
 
             reservedWidthDialogVisible: false,
@@ -624,6 +642,8 @@ export default {
                 bracket: '<',
                 maskValue: false,
                 reservedWidth: 0,
+                alwaysTranslate: false,
+                alwaysAddToKnowledgeBase: false,
             };
             this.customTagDialogVisible = true;
         },
@@ -639,6 +659,8 @@ export default {
                 bracket: String(tag.bracket || '<'),
                 maskValue: !!tag.maskValue,
                 reservedWidth: this.normalizeReservedWidthInput(tag.reservedWidth),
+                alwaysTranslate: !!tag.alwaysTranslate,
+                alwaysAddToKnowledgeBase: !!tag.alwaysAddToKnowledgeBase,
             };
             this.customTagDialogVisible = true;
         },
@@ -681,6 +703,10 @@ export default {
         },
 
         saveCustomTag() {
+            const maskValue =
+                this.customTagForm.type === 'withCustomParameter'
+                    ? !!this.customTagForm.maskValue
+                    : false;
             const payload = {
                 description: String(this.customTagForm.description || '').trim(),
                 tagSymbol: String(this.customTagForm.tagSymbol || '').trim(),
@@ -688,12 +714,17 @@ export default {
                 requiredConsistency: !!this.customTagForm.requiredConsistency,
                 style: String(this.customTagForm.style || 'escape'),
                 reservedWidth: this.normalizeReservedWidthInput(this.customTagForm.reservedWidth),
+                alwaysTranslate: !maskValue && !!this.customTagForm.alwaysTranslate,
+                alwaysAddToKnowledgeBase:
+                    !maskValue &&
+                    this.customTagForm.type === 'withCustomParameter' &&
+                    !!this.customTagForm.alwaysAddToKnowledgeBase,
             };
-            if (payload.type === 'withCustomParameter') {
+            if (this.customTagForm.type === 'withCustomParameter') {
                 payload.bracket = String(
                     this.customTagForm.bracket || (payload.style === 'xml' ? 'none' : '<')
                 );
-                payload.maskValue = !!this.customTagForm.maskValue;
+                payload.maskValue = maskValue;
             }
 
             if (this.customTagEditIndex >= 0) {

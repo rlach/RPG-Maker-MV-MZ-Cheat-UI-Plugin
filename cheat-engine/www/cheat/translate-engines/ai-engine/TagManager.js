@@ -299,6 +299,19 @@ export class TagManager {
             Number.isFinite(parsedReservedWidth) && parsedReservedWidth > 0
                 ? Math.floor(parsedReservedWidth)
                 : 0;
+
+        // alwaysTranslate: only valid for non-masked withCustomParameter or withoutParameter
+        // (not applicable when maskValue is true — value is not sent to LLM)
+        const isMasked =
+            normalized.type === TAG_TYPE.WITH_CUSTOM_PARAMETER && normalized.maskValue === true;
+        normalized.alwaysTranslate = !isMasked && normalized.alwaysTranslate === true;
+
+        // alwaysAddToKnowledgeBase: only valid for withCustomParameter (non-masked, non-numeric)
+        const supportsKbase =
+            !isMasked && normalized.type === TAG_TYPE.WITH_CUSTOM_PARAMETER;
+        normalized.alwaysAddToKnowledgeBase =
+            supportsKbase && normalized.alwaysAddToKnowledgeBase === true;
+
         return normalized;
     }
 
@@ -867,6 +880,50 @@ export class TagManager {
         }
 
         return null;
+    }
+
+    /**
+     * Get all tag entries whose `alwaysTranslate` flag is set and whose encoded pattern
+     * appears in at least one of the provided preprocessed texts.
+     * Returns an array of `b=tagId` strings for use in the LLM prompt.
+     * @param {string[]} preprocessedTexts
+     * @returns {string[]}
+     */
+    getAlwaysTranslateTagIds(preprocessedTexts) {
+        const texts = Array.isArray(preprocessedTexts) ? preprocessedTexts : [];
+        const result = [];
+        for (const entry of this.tagEntries) {
+            if (!entry.alwaysTranslate) {
+                continue;
+            }
+            const needle = `[b=${entry.tagId}`;
+            if (texts.some((t) => typeof t === 'string' && t.includes(needle))) {
+                result.push(`b=${entry.tagId}`);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Get all tag entries whose `alwaysAddToKnowledgeBase` flag is set and whose encoded
+     * pattern appears in at least one of the provided preprocessed texts.
+     * Returns an array of `b=tagId` strings for use in the LLM prompt.
+     * @param {string[]} preprocessedTexts
+     * @returns {string[]}
+     */
+    getAlwaysAddToKnowledgeBaseTagIds(preprocessedTexts) {
+        const texts = Array.isArray(preprocessedTexts) ? preprocessedTexts : [];
+        const result = [];
+        for (const entry of this.tagEntries) {
+            if (!entry.alwaysAddToKnowledgeBase) {
+                continue;
+            }
+            const needle = `[b=${entry.tagId}`;
+            if (texts.some((t) => typeof t === 'string' && t.includes(needle))) {
+                result.push(`b=${entry.tagId}`);
+            }
+        }
+        return result;
     }
 
     /**

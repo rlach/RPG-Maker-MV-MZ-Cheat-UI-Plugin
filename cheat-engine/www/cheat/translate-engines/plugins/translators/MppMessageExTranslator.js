@@ -181,6 +181,7 @@ const MPP_MESSAGE_EX_PLUGIN_TAGS = [
         bracket: '[',
         maskValue: false,
         requiredConsistency: true,
+        alwaysTranslate: true,
     },
     {
         description: 'MPP MessageEX grouped text',

@@ -29,6 +29,12 @@ const SCENE_GLOSSARY_PLUGIN_TAGS = (() => {
         requiredConsistency: true,
     });
 
+    const xmlCategoryTag = (description, tagSymbol) => ({
+        ...xmlCustom(description, tagSymbol, false),
+        alwaysTranslate: true,
+        alwaysAddToKnowledgeBase: true,
+    });
+
     const tags = [
         xmlCustom('SG description (ja)', 'SG説明', false),
         xmlCustom('SG description (en)', 'SGDescription', false),
@@ -36,8 +42,8 @@ const SCENE_GLOSSARY_PLUGIN_TAGS = (() => {
         xmlCustom('SG common description (en)', 'SGCommonDescription', false),
         xmlCustom('SG not-yet description (ja)', 'SG未入手説明', false),
         xmlCustom('SG not-yet description (en)', 'SGNotYetDescription', false),
-        xmlCustom('SG category (ja)', 'SGカテゴリ', false),
-        xmlCustom('SG category (en)', 'SGCategory', false),
+        xmlCategoryTag('SG category (ja)', 'SGカテゴリ'),
+        xmlCategoryTag('SG category (en)', 'SGCategory'),
     ];
 
     for (let index = 2; index <= 5; index++) {

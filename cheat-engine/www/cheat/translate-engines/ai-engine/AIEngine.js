@@ -886,6 +886,16 @@ class AIEngine extends BaseTranslationEngine {
                 expectedKeys.push('kbase');
             }
 
+            const alwaysTranslateTagIds = this.tagManager.getAlwaysTranslateTagIds(preprocessedTexts);
+            const alwaysTranslatePart = alwaysTranslateTagIds.length > 0
+                ? ` Make sure to ALWAYS translate to target language contents of following tags: ${alwaysTranslateTagIds.join(', ')}.`
+                : '';
+
+            const alwaysKbaseTagIds = this.tagManager.getAlwaysAddToKnowledgeBaseTagIds(preprocessedTexts);
+            const alwaysKbasePart = alwaysKbaseTagIds.length > 0
+                ? ` When translating following tags always put all translations into knowledge base: ${alwaysKbaseTagIds.join(', ')}.`
+                : '';
+
             const payload = {
                 model: this.selectedModel,
                 messages: [
@@ -895,7 +905,7 @@ class AIEngine extends BaseTranslationEngine {
                     },
                     {
                         role: 'system',
-                        content: `Translate video game text from ${sourceName} to ${targetName}. Return only flat one-line JSON object with exactly the same keys as input. No markdown, no comments, no extra keys, no missing keys, no duplicate keys, no arrays, no pretty formatting. Preserve every [b=tag] exactly and keep tag order unchanged. The only exception are tags with <values> like this - [b=na<しえる>]. In this case the <value> can be translated, but otherwise don't modify the tag. Keys with the same prefix+index are context-linked fields of one entity (example: i0n and i0d are the same item's name and description), so translate them consistently. Official name translations, they HAVE to be used for consistency with existing material, don't make up your own translations: ${nameHints}.${knowledgePromptPart} The names might contain additional info, like gender, in brackets. Use it for additional context.${kbaseInstructionPart}`,
+                        content: `Translate video game text from ${sourceName} to ${targetName}. Return only flat one-line JSON object with exactly the same keys as input. No markdown, no comments, no extra keys, no missing keys, no duplicate keys, no arrays, no pretty formatting. Preserve every [b=tag] exactly and keep tag order unchanged. The only exception are tags with <values> like this - [b=na<しえる>]. In this case the <value> can be translated, but otherwise don't modify the tag. Keys with the same prefix+index are context-linked fields of one entity (example: i0n and i0d are the same item's name and description), so translate them consistently. Official name translations, they HAVE to be used for consistency with existing material, don't make up your own translations: ${nameHints}.${knowledgePromptPart} The names might contain additional info, like gender, in brackets. Use it for additional context.${alwaysTranslatePart}${kbaseInstructionPart}${alwaysKbasePart}`,
                     },
                     // {
                     //     role: 'user',
