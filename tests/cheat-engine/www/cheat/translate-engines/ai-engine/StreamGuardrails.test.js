@@ -574,6 +574,29 @@ describe('checkGuardrails', () => {
                 expect(result.bestMap).toHaveProperty(key);
             }
         });
+
+        it('cancels when JSON is structurally closed but missing expected keys, then LLM loops', () => {
+            // 100 expected keys but JSON only contains 73 of them
+            const allKeys = Array.from({ length: 100 }, (_, i) => `m${i}`);
+            const partialMap = Object.fromEntries(
+                allKeys.slice(0, 73).map((k, i) => [k, `Translation ${i}`])
+            );
+            const json = JSON.stringify(partialMap);
+
+            const state = makeState(allKeys);
+            // JSON is structurally complete but bestIsComplete is false (27 keys missing)
+            check(state, json);
+            expect(state.bestIsComplete).toBe(false);
+
+            // LLM continues with garbage after the closed JSON
+            const looped =
+                json + ',\n"kbaseCodeableConcept' + 'CodeableConcept'.repeat(800);
+            const result = check(state, looped);
+            expect(result.shouldCancel).toBe(true);
+            expect(result.cancelReason).toBe(STREAM_CANCEL_REASON.COMPLETE_JSON_CONTINUED);
+            // The 73 keys we got are still preserved
+            expect(Object.keys(result.bestMap).length).toBe(73);
+        });
     });
 
     // -------------------------------------------------------------------

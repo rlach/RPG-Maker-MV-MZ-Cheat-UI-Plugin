@@ -710,18 +710,20 @@ export class StreamGuardrails {
         // Update best candidate
         if (analysis.candidateMap) {
             this.updateBestState(state, analysis.candidateMap);
+        }
 
-            // Check: already found complete JSON, but stream continues
-            if (state.bestIsComplete && analysis.scan.objects?.length > 0) {
-                const trailingText = analysis.scan.trailingText || '';
-                if (trailingText.length > 0) {
-                    state.cancelReason = STREAM_CANCEL_REASON.COMPLETE_JSON_CONTINUED;
-                    return {
-                        shouldCancel: true,
-                        cancelReason: state.cancelReason,
-                        bestMap: state.bestMap,
-                    };
-                }
+        // Check: found a structurally complete JSON object, but stream continues.
+        // Cancel regardless of whether all expected keys are present —
+        // nothing useful can follow a closed top-level object.
+        if (analysis.scan.objects?.length > 0) {
+            const trailingText = analysis.scan.trailingText || '';
+            if (trailingText.length > 0) {
+                state.cancelReason = STREAM_CANCEL_REASON.COMPLETE_JSON_CONTINUED;
+                return {
+                    shouldCancel: true,
+                    cancelReason: state.cancelReason,
+                    bestMap: state.bestMap,
+                };
             }
         }
 
