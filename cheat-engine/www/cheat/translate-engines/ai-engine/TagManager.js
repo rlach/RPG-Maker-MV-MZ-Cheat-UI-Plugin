@@ -123,11 +123,58 @@ export class TagManager {
         this.initializeTagRegistry();
     }
 
+    getPatternSignature(config) {
+        const symbol = String(config.tagSymbol || '').toLowerCase();
+        const type = config.type || '';
+        const style = config.style || TAG_STYLE.ESCAPE;
+        const bracket = config.type === TAG_TYPE.WITH_CUSTOM_PARAMETER ? (config.bracket || '') : '';
+        return `${style}:${type}:${symbol}:${bracket}`;
+    }
+
+    /**
+     * Returns a Set of normalized detection patterns that are already covered by
+     * registered tag entries. Used by the unknown tag scanner to filter false positives.
+     * Pattern format matches scanForUnknownTags output: e.g. "\\FF[…]", "\\V[N]", "\\G"
+     */
+    getRegisteredDetectionPatterns() {
+        const patterns = new Set();
+        for (const entry of this.tagEntries) {
+            const sym = String(entry.tagSymbol || '').toUpperCase();
+            if (!sym) continue;
+
+            if (entry.style === TAG_STYLE.XML) {
+                // XML tags are not detected by ESC_TAG_RE, skip
+                continue;
+            }
+
+            if (entry.type === TAG_TYPE.WITHOUT_PARAMETER) {
+                patterns.add(`\\${sym}`);
+            } else if (entry.type === TAG_TYPE.WITH_NUMERIC_PARAMETER) {
+                patterns.add(`\\${sym}[N]`);
+            } else if (entry.type === TAG_TYPE.WITH_CUSTOM_PARAMETER) {
+                const bracket = entry.bracket || '[';
+                const closeBracket = BRACKET_CLOSE_BY_OPEN[bracket] || ']';
+                if (bracket === '[') {
+                    patterns.add(`\\${sym}[N]`);
+                    patterns.add(`\\${sym}[…]`);
+                } else if (bracket === '<') {
+                    patterns.add(`\\${sym}<…>`);
+                } else if (bracket === '(') {
+                    patterns.add(`\\${sym}(…)`);
+                } else if (bracket === '{') {
+                    patterns.add(`\\${sym}{…}`);
+                }
+            }
+        }
+        return patterns;
+    }
+
     initializeTagRegistry() {
         const configs = [...this.baseTagConfigs, ...this.customTagConfigs];
         const longRunTagConfigs = this.buildNormalizedLongRunTagConfigs();
         const usedTagIds = new Set();
         const usedLongRunTagIds = new Set();
+        const usedPatternSignatures = new Set();
 
         for (const config of longRunTagConfigs) {
             if (config.tagId && config.tagId.length === 2) {
@@ -141,6 +188,14 @@ export class TagManager {
 
         for (let i = 0; i < configs.length; i++) {
             const config = this.validateAndNormalizeConfig(configs[i], i);
+
+            // Deduplicate: skip entries with same effective regex pattern signature
+            const patternSignature = this.getPatternSignature(config);
+            if (usedPatternSignatures.has(patternSignature)) {
+                continue;
+            }
+            usedPatternSignatures.add(patternSignature);
+
             const tagId = this.generateUniqueTagId(config, usedTagIds);
             const entry = this.createTagEntry(config, tagId, i);
             this.tagEntries.push(entry);

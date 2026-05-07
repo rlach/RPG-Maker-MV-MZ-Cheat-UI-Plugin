@@ -528,6 +528,12 @@ class AIEngine extends BaseTranslationEngine {
             }
         }
 
+        // Filter out patterns already covered by registered tags
+        const registeredPatterns = this.tagManager.getRegisteredDetectionPatterns();
+        for (const pattern of registeredPatterns) {
+            counts.delete(pattern);
+        }
+
         return Array.from(counts.entries())
             .map(([pattern, count]) => ({ pattern, count }))
             .sort((a, b) => b.count - a.count);
