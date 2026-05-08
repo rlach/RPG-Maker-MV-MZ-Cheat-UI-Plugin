@@ -490,7 +490,7 @@ class AIEngine extends BaseTranslationEngine {
         };
 
         const recordEsc = (sym, numVal, sqVal, angVal, roundVal, curlyVal) => {
-            const normalizedSym = String(sym || '').toUpperCase();
+            const normalizedSym = String(sym || '');
             let pattern;
             if (numVal !== undefined) {
                 pattern = `\\${normalizedSym}[N]`;

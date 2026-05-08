@@ -139,7 +139,7 @@ export class TagManager {
     getRegisteredDetectionPatterns() {
         const patterns = new Set();
         for (const entry of this.tagEntries) {
-            const sym = String(entry.tagSymbol || '').toUpperCase();
+            const sym = String(entry.tagSymbol || '');
             if (!sym) continue;
 
             if (entry.style === TAG_STYLE.XML) {
