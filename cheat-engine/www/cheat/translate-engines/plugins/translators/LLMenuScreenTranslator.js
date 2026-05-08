@@ -4,8 +4,11 @@ const CACHE_TYPE = 'plugin_ll_menu_screen';
 
 // Plugin names: the Base plugin holds the picture list; Custom holds the menu layout + help texts.
 // We detect by either, but read params from Custom.
+// MV variants use the same names with an 'MV' suffix; parameter structure is identical.
 const PLUGIN_NAME_CUSTOM = 'LL_MenuScreenCustom';
 const PLUGIN_NAME_BASE = 'LL_MenuScreenBase';
+const PLUGIN_NAME_CUSTOM_MV = 'LL_MenuScreenCustomMV';
+const PLUGIN_NAME_BASE_MV = 'LL_MenuScreenBaseMV';
 
 // Static label fields in LL_MenuScreenCustom that may contain Japanese text.
 const LABEL_PARAM_FIELDS = [
@@ -63,6 +66,8 @@ export class LLMenuScreenTranslator extends BasePluginTranslator {
 
         const lowerCustom = PLUGIN_NAME_CUSTOM.toLowerCase();
         const lowerBase = PLUGIN_NAME_BASE.toLowerCase();
+        const lowerCustomMV = PLUGIN_NAME_CUSTOM_MV.toLowerCase();
+        const lowerBaseMV = PLUGIN_NAME_BASE_MV.toLowerCase();
 
         return window.$plugins.some((plugin) => {
             if (!plugin || typeof plugin.name !== 'string') {
@@ -70,7 +75,8 @@ export class LLMenuScreenTranslator extends BasePluginTranslator {
             }
 
             const lower = plugin.name.trim().toLowerCase();
-            return lower === lowerCustom || lower === lowerBase;
+            return lower === lowerCustom || lower === lowerBase ||
+                   lower === lowerCustomMV || lower === lowerBaseMV;
         });
     }
 
@@ -80,13 +86,15 @@ export class LLMenuScreenTranslator extends BasePluginTranslator {
         }
 
         const lowerCustom = PLUGIN_NAME_CUSTOM.toLowerCase();
+        const lowerCustomMV = PLUGIN_NAME_CUSTOM_MV.toLowerCase();
 
         return (
             window.$plugins.find((plugin) => {
                 if (!plugin || typeof plugin.name !== 'string') {
                     return false;
                 }
-                return plugin.name.trim().toLowerCase() === lowerCustom;
+                const lower = plugin.name.trim().toLowerCase();
+                return lower === lowerCustom || lower === lowerCustomMV;
             }) || null
         );
     }
