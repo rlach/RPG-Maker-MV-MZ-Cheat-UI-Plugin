@@ -86,7 +86,7 @@ function extractSceneEntries(scene) {
         return entries;
     }
     for (let winIdx = 0; winIdx < windowList.length; winIdx++) {
-        const win = safeParseJSON(windowList[winIdx]);
+        const win = parseJsonSafely(windowList[winIdx]);
         if (win) {
             entries.push(...extractWindowEntries(win, sceneId, winIdx));
         }

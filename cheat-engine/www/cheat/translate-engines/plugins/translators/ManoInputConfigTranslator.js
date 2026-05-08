@@ -115,37 +115,6 @@ function extractKeyconfigCommand(raw) {
     return typeof obj.text === 'string' ? extractMultiLangString(obj.text) : '';
 }
 
-/**
- * Resolve a text string through the translation cache.
- * Marks the cache key as seen on every call (like other plugin translators do).
- *
- * @param {string} text
- * @param {object} runtime
- * @returns {string}
- */
-function resolveFromCache(text, runtime) {
-    if (!isUsableText(text)) {
-        return text;
-    }
-
-    if (
-        !runtime
-    ) {
-        return text;
-    }
-
-    const cacheKey = runtime.getCacheKey(text, CACHE_TYPE);
-
-    runtime.trackCacheKeyUsage(cacheKey);
-
-    if (!runtime.hasUsableCacheValue(cacheKey)) {
-        return text;
-    }
-
-    const cached = runtime.translationCache.get(cacheKey);
-    return isUsableText(cached) ? cached : text;
-}
-
 export class ManoInputConfigTranslator extends BasePluginTranslator {
     constructor() {
         super();
@@ -164,6 +133,34 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
 
     getCacheType() {
         return CACHE_TYPE;
+    }
+
+    /**
+     * Resolve a text string through the translation cache.
+     * Marks the cache key as seen on every call.
+     *
+     * @param {string} text
+     * @param {object} runtime
+     * @returns {string}
+     */
+    resolveFromCache(text, runtime) {
+        if (!this.isUsableText(text)) {
+            return text;
+        }
+
+        if (!runtime) {
+            return text;
+        }
+
+        const cacheKey = runtime.getCacheKey(text, CACHE_TYPE);
+        runtime.trackCacheKeyUsage(cacheKey);
+
+        if (!runtime.hasUsableCacheValue(cacheKey)) {
+            return text;
+        }
+
+        const cached = runtime.translationCache.get(cacheKey);
+        return this.isUsableText(cached) ? cached : text;
     }
 
     // ─── Runtime hooks ────────────────────────────────────────────────────────
@@ -197,6 +194,10 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
      * namespace, so we can hook them directly without scene interception.
      */
     _hookMV() {
+        const getRuntimeFromTranslator = () => this.getRuntime();
+        const isTranslatorUsableText = (text) => this.isUsableText(text);
+        const resolveFromTranslatorCache = (text, runtime = getRuntimeFromTranslator()) =>
+            this.resolveFromCache(text, runtime);
         const manoNs = window['Mano_InputConfig'];
         if (!manoNs) {
             return;
@@ -215,7 +216,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
                 kcProto.drawCommand = function (commandName, rect) {
                     let translated = commandName;
                     try {
-                        translated = resolveFromCache(commandName, getRuntime());
+                        translated = resolveFromTranslatorCache(commandName);
                     } catch (_) {
                         /* noop */
                     }
@@ -234,14 +235,19 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
                     const origMethod = kcProto[methodName];
                     kcProto[methodName] = function (...args) {
                         const origDrawText = this.drawText;
+                        if (typeof origDrawText !== 'function') {
+                            return origMethod.call(this, ...args);
+                        }
+                        const callOriginalDrawText = (text, ...rest) =>
+                            Reflect.apply(origDrawText, this, [text, ...rest]);
                         this.drawText = (text, ...rest) => {
                             let translated = text;
                             try {
-                                translated = resolveFromCache(text, getRuntime());
+                                translated = resolveFromTranslatorCache(text);
                             } catch (_) {
                                 /* noop */
                             }
-                            return origDrawText.call(this, translated, ...rest);
+                            return callOriginalDrawText(translated, ...rest);
                         };
                         try {
                             return origMethod.call(this, ...args);
@@ -264,7 +270,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
                 proto.symbolText = function (index) {
                     const text = origSymbolText.call(this, index);
                     try {
-                        return resolveFromCache(text, getRuntime());
+                        return resolveFromTranslatorCache(text);
                     } catch (_) {
                         return text;
                     }
@@ -282,7 +288,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
                     }
                     const origName = command.name;
                     try {
-                        command.name = resolveFromCache(origName, getRuntime());
+                        command.name = resolveFromTranslatorCache(origName);
                     } catch (_) {
                         /* noop */
                     }
@@ -306,14 +312,19 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
                     const origMethod = proto[methodName];
                     proto[methodName] = function (...args) {
                         const origDrawText = this.drawText;
+                        if (typeof origDrawText !== 'function') {
+                            return origMethod.call(this, ...args);
+                        }
+                        const callOriginalDrawText = (text, ...rest) =>
+                            Reflect.apply(origDrawText, this, [text, ...rest]);
                         this.drawText = (text, ...rest) => {
                             let translated = text;
                             try {
-                                translated = resolveFromCache(text, getRuntime());
+                                translated = resolveFromTranslatorCache(text);
                             } catch (_) {
                                 /* noop */
                             }
-                            return origDrawText.call(this, translated, ...rest);
+                            return callOriginalDrawText(translated, ...rest);
                         };
                         try {
                             return origMethod.call(this, ...args);
@@ -343,8 +354,8 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
                 try {
                     // After the original call, re-translate whatever text was set.
                     const currentText = this._helpWindow._text || '';
-                    if (isUsableText(currentText)) {
-                        const translated = resolveFromCache(currentText, getRuntime());
+                    if (isTranslatorUsableText(currentText)) {
+                        const translated = resolveFromTranslatorCache(currentText);
                         if (translated !== currentText) {
                             this._helpWindow.setText(translated);
                         }
@@ -367,7 +378,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
             WindowInputSymbolList.prototype.symbolName = function (index) {
                 const text = origSymbolName.call(this, index);
                 try {
-                    return resolveFromCache(text, getRuntime());
+                    return resolveFromTranslatorCache(text);
                 } catch (_) {
                     return text;
                 }
@@ -381,6 +392,9 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
      * menu are translated at draw time.
      */
     _hookOptionsCommandName() {
+        const getRuntimeFromTranslator = () => this.getRuntime();
+        const resolveFromTranslatorCache = (text, runtime = getRuntimeFromTranslator()) =>
+            this.resolveFromCache(text, runtime);
         if (
             !window.Window_Options ||
             !Window_Options.prototype ||
@@ -394,8 +408,8 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
         Window_Options.prototype.commandName = function (index) {
             const name = original.call(this, index);
             try {
-                const runtime = getRuntime();
-                return resolveFromCache(name, runtime);
+                const runtime = getRuntimeFromTranslator();
+                return resolveFromTranslatorCache(name, runtime);
             } catch (error) {
                 console.warn(
                     '[ManoInputConfigTranslator] Failed to translate Options commandName',
@@ -413,6 +427,9 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
      * command button labels (apply / rollback / reset / exit / WASD etc.).
      */
     _hookKeyConfigDrawCommand() {
+        const getRuntimeFromTranslator = () => this.getRuntime();
+        const resolveFromTranslatorCache = (text, runtime = getRuntimeFromTranslator()) =>
+            this.resolveFromCache(text, runtime);
         const manoNs = window['Mano_InputConfig'];
         if (!manoNs) {
             return;
@@ -432,8 +449,8 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
         WindowKeyConfig.prototype.drawCommandXX = function (commandName, rect) {
             let translated = commandName;
             try {
-                const runtime = getRuntime();
-                translated = resolveFromCache(commandName, runtime);
+                const runtime = getRuntimeFromTranslator();
+                translated = resolveFromTranslatorCache(commandName, runtime);
             } catch (error) {
                 console.warn(
                     '[ManoInputConfigTranslator] Failed to translate drawCommandXX',
@@ -546,6 +563,9 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
      * @param {object|null} windowInstance
      */
     _patchGamepadWindow(windowInstance) {
+        const getRuntimeFromTranslator = () => this.getRuntime();
+        const resolveFromTranslatorCache = (text, runtime = getRuntimeFromTranslator()) =>
+            this.resolveFromCache(text, runtime);
         if (!windowInstance) {
             return;
         }
@@ -574,18 +594,18 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
             let patchedRight = rawRight;
 
             try {
-                const runtime = getRuntime();
+                const runtime = getRuntimeFromTranslator();
 
                 // Translate command leftText (e.g. "設定を保存", "やめる")
                 if (typeof rawLeft === 'string' && rawLeft.trim()) {
-                    patchedLeft = resolveFromCache(rawLeft, runtime);
+                    patchedLeft = resolveFromTranslatorCache(rawLeft, runtime);
                 }
 
                 // Translate symbol part of rightText – format is ":symbolName"
                 if (typeof rawRight === 'string' && rawRight.startsWith(':')) {
                     const symbolName = rawRight.slice(1);
                     if (symbolName.trim()) {
-                        const translated = resolveFromCache(symbolName, runtime);
+                        const translated = resolveFromTranslatorCache(symbolName, runtime);
                         patchedRight = ':' + translated;
                     }
                 }
@@ -638,6 +658,9 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
      * @param {object|null} windowInstance
      */
     _patchSymbolListWindow(windowInstance) {
+        const getRuntimeFromTranslator = () => this.getRuntime();
+        const resolveFromTranslatorCache = (text, runtime = getRuntimeFromTranslator()) =>
+            this.resolveFromCache(text, runtime);
         if (!windowInstance) {
             return;
         }
@@ -660,8 +683,8 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
 
             let translated;
             try {
-                const runtime = getRuntime();
-                translated = resolveFromCache(symbolObject.name(), runtime);
+                const runtime = getRuntimeFromTranslator();
+                translated = resolveFromTranslatorCache(symbolObject.name(), runtime);
             } catch (error) {
                 console.warn(
                     '[ManoInputConfigTranslator] drawSymbolObject translation failed',
@@ -776,7 +799,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
 
         for (const field of plainFields) {
             const value = params[field];
-            if (isUsableText(value)) {
+            if (this.isUsableText(value)) {
                 output.push({ text: value, source: { scope, field } });
             }
         }
@@ -786,7 +809,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
             const raw = params[field];
             if (typeof raw === 'string' && raw.trim()) {
                 const text = noteOrString(raw);
-                if (isUsableText(text)) {
+                if (this.isUsableText(text)) {
                     output.push({ text, source: { scope, field } });
                 }
             }
@@ -814,7 +837,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
         // ── struct<MultiLangString> parameters ───────────────────────────────
         for (const field of ['mapperDelete', 'gamepadConfigCommandText', 'keyConfigCommandText']) {
             const text = extractMultiLangString(params[field]);
-            if (isUsableText(text)) {
+            if (this.isUsableText(text)) {
                 output.push({ text, source: { scope, field } });
             }
         }
@@ -822,7 +845,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
         // ── struct<MultiLangNote> parameters ─────────────────────────────────
         for (const field of ['GamepadIsNotConnectedText', 'needButtonDetouchText']) {
             const text = extractMultiLangNote(params[field]);
-            if (isUsableText(text)) {
+            if (this.isUsableText(text)) {
                 output.push({ text, source: { scope, field } });
             }
         }
@@ -841,18 +864,18 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
         for (const field of basicSymbolFields) {
             const extracted = extractBasicSymbol(params[field]);
 
-            if (isUsableText(extracted.name)) {
+            if (this.isUsableText(extracted.name)) {
                 output.push({ text: extracted.name, source: { scope, field, subField: 'name' } });
             }
 
-            if (isUsableText(extracted.keyText)) {
+            if (this.isUsableText(extracted.keyText)) {
                 output.push({
                     text: extracted.keyText,
                     source: { scope, field, subField: 'keyText' },
                 });
             }
 
-            if (isUsableText(extracted.helpText)) {
+            if (this.isUsableText(extracted.helpText)) {
                 output.push({
                     text: extracted.helpText,
                     source: { scope, field, subField: 'helpText' },
@@ -871,7 +894,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
             'exit',
         ]) {
             const text = extractKeyconfigCommand(params[field]);
-            if (isUsableText(text)) {
+            if (this.isUsableText(text)) {
                 output.push({ text, source: { scope, field } });
             }
         }
@@ -889,7 +912,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
 
                     const nameText =
                         typeof item.name === 'string' ? extractMultiLangString(item.name) : '';
-                    if (isUsableText(nameText)) {
+                    if (this.isUsableText(nameText)) {
                         output.push({
                             text: nameText,
                             source: { scope, field: 'extendsMapper', index: i, subField: 'name' },
@@ -900,7 +923,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
                         typeof item.helpText === 'string'
                             ? extractMultiLangString(item.helpText)
                             : '';
-                    if (isUsableText(helpText)) {
+                    if (this.isUsableText(helpText)) {
                         output.push({
                             text: helpText,
                             source: {
@@ -945,7 +968,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
         // Mano_InputConfig also defines some translatable labels in code literals
         // rather than plugin parameters (e.g. createButtonLayoutChangeCommand).
         for (const text of STATIC_PLUGIN_TEXTS) {
-            if (isUsableText(text)) {
+            if (this.isUsableText(text)) {
                 entries.push({
                     text,
                     source: {
@@ -993,7 +1016,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 

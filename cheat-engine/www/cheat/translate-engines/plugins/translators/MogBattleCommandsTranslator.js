@@ -84,7 +84,7 @@ export class MogBattleCommandsTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (
-            !globalThis.Window_ActorCommand ||
+            !Window_ActorCommand ||
             typeof Window_ActorCommand.prototype.load_com_images !== 'function'
         ) {
             return;

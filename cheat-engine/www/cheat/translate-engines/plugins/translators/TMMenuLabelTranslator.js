@@ -78,13 +78,11 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
     }
 
     resolveRuntimeTranslation(text, runtime) {
-        if (!isUsableText(text)) {
+        if (!this.isUsableText(text)) {
             return text;
         }
 
-        if (
-            !runtime
-        ) {
+        if (!runtime) {
             return text;
         }
 
@@ -97,7 +95,7 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
         }
 
         const cached = runtime.translationCache.get(cacheKey);
-        return isUsableText(cached) ? cached : text;
+        return this.isUsableText(cached) ? cached : text;
     }
 
     enablePluginTranslation() {
@@ -105,8 +103,7 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
             return;
         }
 
-        const SceneMenuCtor = window['Scene_Menu'];
-        if (!SceneMenuCtor || !SceneMenuCtor.prototype) {
+        if (!SceneMenuCtor?.prototype) {
             return;
         }
 
@@ -136,7 +133,7 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
             proto.drawMenuLabel = function (x, y, label, value) {
                 try {
                     if (label && typeof label === 'object') {
-                        const runtime = getRuntime();
+                        const runtime = this.getRuntime();
                         const translatedName = translator.resolveRuntimeTranslation(
                             label.name,
                             runtime
@@ -252,7 +249,7 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 

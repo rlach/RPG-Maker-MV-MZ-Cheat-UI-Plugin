@@ -3,13 +3,7 @@ import { parseJsonSafely } from './TranslatorHelpers.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_QUEST_SYSTEM_TRANSLATOR_HOOKED__';
 
-const QUEST_DATA_TEXT_FIELDS = [
-    'Title',
-    'Requester',
-    'Difficulty',
-    'Place',
-    'TimeLimit',
-];
+const QUEST_DATA_TEXT_FIELDS = ['Title', 'Requester', 'Difficulty', 'Place', 'TimeLimit'];
 
 const QUEST_DETAIL_FIELDS = [
     {
@@ -57,37 +51,6 @@ export class QuestSystemTranslator extends BasePluginTranslator {
         this._scanPrepared = false;
         this._scanEntries = [];
         this._scanPromise = null;
-        this._debugLogCount = 0;
-        this._debugLogLimit = 500;
-        this._debugSuppressedNoticeShown = false;
-        this._debugSeenHitKeys = new Set();
-        this._debugSeenMissKeys = new Set();
-        this._debugSeenDrawTextCtors = new Set();
-        this._debugSeenDrawTextExCtors = new Set();
-        this._debugInstalledLogged = false;
-    }
-
-    isDebugEnabled() {
-        return window.__CHEAT_DEBUG_QUEST_SYSTEM_TRANSLATOR !== false;
-    }
-
-    debugLog(...args) {
-        if (!this.isDebugEnabled()) {
-            return;
-        }
-
-        if (this._debugLogCount >= this._debugLogLimit) {
-            if (!this._debugSuppressedNoticeShown) {
-                this._debugSuppressedNoticeShown = true;
-                console.log(
-                    '[QuestSystemTranslator][debug] log limit reached; suppressing further logs'
-                );
-            }
-            return;
-        }
-
-        this._debugLogCount += 1;
-        console.log('[QuestSystemTranslator][debug]', ...args);
     }
 
     getCtorName(instance) {
@@ -326,29 +289,10 @@ export class QuestSystemTranslator extends BasePluginTranslator {
         runtime.trackCacheKeyUsage(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
-            if (!this._debugSeenMissKeys.has(cacheKey)) {
-                this._debugSeenMissKeys.add(cacheKey);
-                this.debugLog('cache miss', {
-                    cacheType,
-                    cacheKey,
-                    existsInMap: runtime.translationCache.has(cacheKey),
-                    text: this.formatPreview(text),
-                });
-            }
-
             return null;
         }
 
         const cached = runtime.translationCache.get(cacheKey);
-        if (!this._debugSeenHitKeys.has(cacheKey)) {
-            this._debugSeenHitKeys.add(cacheKey);
-            this.debugLog('cache hit', {
-                cacheType,
-                cacheKey,
-                original: this.formatPreview(text),
-                translated: this.formatPreview(cached),
-            });
-        }
 
         return this.isUsableText(cached) ? cached : text;
     }
@@ -359,10 +303,6 @@ export class QuestSystemTranslator extends BasePluginTranslator {
         }
 
         if (!runtime) {
-            this.debugLog('runtime unavailable', {
-                hasRuntime: false,
-                text: this.formatPreview(text),
-            });
             return text;
         }
 
@@ -396,7 +336,6 @@ export class QuestSystemTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
-            this.debugLog('hook install skipped; already installed');
             return;
         }
 
@@ -407,24 +346,6 @@ export class QuestSystemTranslator extends BasePluginTranslator {
         const shouldTranslateWindow = (instance) => this.shouldTranslateWindow(instance);
         const formatPreview = (text) => this.formatPreview(text);
         const getRuntime = () => this.getRuntime();
-        const logDrawTextCtor = (instance) => {
-            const ctorName = getCtorName(instance);
-            if (this._debugSeenDrawTextCtors.has(ctorName)) {
-                return;
-            }
-
-            this._debugSeenDrawTextCtors.add(ctorName);
-            this.debugLog('drawText caller detected', { ctorName });
-        };
-        const logDrawTextExCtor = (instance) => {
-            const ctorName = getCtorName(instance);
-            if (this._debugSeenDrawTextExCtors.has(ctorName)) {
-                return;
-            }
-
-            this._debugSeenDrawTextExCtors.add(ctorName);
-            this.debugLog('drawTextEx caller detected', { ctorName });
-        };
         const translateWithRuntime = (value) => {
             const runtime = getRuntime();
             return translateRuntimeText(value, runtime);
@@ -493,7 +414,6 @@ export class QuestSystemTranslator extends BasePluginTranslator {
             };
 
             klass.prototype[guardKey] = true;
-            this.debugLog('installed makeCommandList hook', { className });
         };
         const installQuestStateTextHook = () => {
             const questDataClass = window.QuestSystemAlias?.QuestData;
@@ -524,7 +444,6 @@ export class QuestSystemTranslator extends BasePluginTranslator {
             };
 
             questDataClass.prototype[guardKey] = true;
-            this.debugLog('installed QuestData.stateText hook');
         };
         const installQuestWindowMethodDrawTextHook = (className, methodName) => {
             const klass = getQuestClass(className);
@@ -568,7 +487,6 @@ export class QuestSystemTranslator extends BasePluginTranslator {
             };
 
             klass.prototype[guardKey] = true;
-            this.debugLog('installed method drawText hook', { className, methodName });
         };
         const installQuestUiHooks = () => {
             installQuestWindowMethodDrawTextHook('Window_QuestDetail', 'drawTitle');
@@ -590,16 +508,6 @@ export class QuestSystemTranslator extends BasePluginTranslator {
             installQuestUiHooks();
         };
 
-        if (!this._debugInstalledLogged) {
-            this._debugInstalledLogged = true;
-            this.debugLog('installing hooks', {
-                hasWindowBase: !!window.Window_Base,
-                hasDrawText: !!window.Window_Base?.prototype?.drawText,
-                hasDrawTextEx: !!window.Window_Base?.prototype?.drawTextEx,
-                hasMenuCommand: !!window.Window_MenuCommand?.prototype?.addOriginalCommands,
-            });
-        }
-
         if (
             window.Window_Base &&
             Window_Base.prototype &&
@@ -618,7 +526,6 @@ export class QuestSystemTranslator extends BasePluginTranslator {
                     ensureQuestSpecificHooks();
 
                     const ctorName = getCtorName(this);
-                    logDrawTextCtor(this);
                     const runtime = getRuntime();
                     translatedText = translateRuntimeText(text, runtime, [
                         pluginCacheType,
@@ -664,7 +571,6 @@ export class QuestSystemTranslator extends BasePluginTranslator {
                     ensureQuestSpecificHooks();
 
                     const ctorName = getCtorName(this);
-                    logDrawTextExCtor(this);
                     const runtime = getRuntime();
                     translatedText = translateRuntimeText(text, runtime, [
                         pluginCacheType,
@@ -824,7 +730,6 @@ export class QuestSystemTranslator extends BasePluginTranslator {
         ensureQuestSpecificHooks();
 
         window[RUNTIME_HOOK_GUARD] = true;
-        this.debugLog('hooks installed', { guard: RUNTIME_HOOK_GUARD });
     }
 
     async prepareTranslator() {
@@ -888,7 +793,9 @@ export class QuestSystemTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            const cacheType = this.isUsableText(entry.cacheType) ? entry.cacheType : this.getCacheType();
+            const cacheType = this.isUsableText(entry.cacheType)
+                ? entry.cacheType
+                : this.getCacheType();
             const cacheKey = panel.getCacheKey(text, cacheType);
             if (!byCacheKey.has(cacheKey)) {
                 byCacheKey.set(cacheKey, {

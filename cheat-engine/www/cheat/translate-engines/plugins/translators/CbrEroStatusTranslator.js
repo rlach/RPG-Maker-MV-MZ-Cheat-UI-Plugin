@@ -30,9 +30,7 @@ function buildTranslatedDataLine(line, translator, runtime, cacheType) {
         return line;
     }
 
-    if (
-        !runtime
-    ) {
+    if (!runtime) {
         return line;
     }
 

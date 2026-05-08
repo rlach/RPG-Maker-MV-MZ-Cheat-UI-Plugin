@@ -121,9 +121,7 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
         }
 
         const runtime = this.getRuntime();
-        if (
-            !runtime
-        ) {
+        if (!runtime) {
             return text;
         }
 
@@ -137,11 +135,11 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
         }
 
         const cached = runtime.translationCache.get(cacheKey);
-        return isUsableText(cached) ? cached : text;
+        return this.isUsableText(cached) ? cached : text;
     }
 
     translateIfSkillCpField(text, fields) {
-        if (!isUsableText(text) || !Array.isArray(fields) || fields.length === 0) {
+        if (!this.isUsableText(text) || !Array.isArray(fields) || fields.length === 0) {
             return text;
         }
 
@@ -358,7 +356,7 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 

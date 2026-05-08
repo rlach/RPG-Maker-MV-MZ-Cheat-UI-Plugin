@@ -52,6 +52,7 @@ declare const Scene_HelpWindow: any;
 declare const Scene_Title: any;
 declare const Scene_Save: any;
 declare const Scene_Load: any;
+declare const Scene_Menu: any;
 
 declare const Spriteset_Base: any;
 declare const Sprite: any;
@@ -64,11 +65,18 @@ declare const Window_MenuCommand: any;
 declare const Window_ScrollText: any;
 declare const Window_BattleLog: any;
 declare const Window_TitleCommand: any;
+declare const Window_Options: any;
+declare const Window_Help: any;
+declare const Window_ActorCommand: any;
 
+declare const Game_Picture: any;
+declare const Spriteset_Map: any;
 declare const PluginManager: any;
 declare const Utils: any;
 declare const Imported: any;
 declare function require(name: string): any;
+
+declare const Bitmap: any;
 
 declare interface Window {
     nw?: any;
@@ -77,6 +85,7 @@ declare interface Window {
     $externMessage?: any;
     $gameMessage?: any;
     $gameParty?: any;
+    $gameSystem?: any;
     $gameActors?: any;
     $dataMap?: any;
     $dataActors?: any;
@@ -85,6 +94,12 @@ declare interface Window {
     $dataTroops?: any;
     $dataSystem?: any;
     $plugins?: any[];
+    $gameVariables?: any;
+    $dataItems: any;
+    $dataWeapons: any;
+    $dataArmors: any;
+    $dataSkills: any;
+    Bitmap?: any;
     __ensureTranslationRuntime?: () => any;
     __TranslationRuntime?: any;
     __ensureTranslateOnTheFlyRuntime?: () => any;
@@ -95,18 +110,28 @@ declare interface Window {
     GameSpeedCheat?: any;
     SpeedCheat?: any;
     SceneCheat?: any;
+    Scene_Base?: any;
+    Scene_Menu?: any;
+    SceneManager?: any;
     MessageCheat?: any;
     Game_Message?: any;
     Game_Screen?: any;
     Game_System?: any;
+    Game_Picture?: any;
     Game_Event?: any;
     Game_CharacterBase?: any;
     Game_Interpreter?: any;
+    Spriteset_Map?: any;
     DataManager?: any;
     Scene_Map?: any;
+    Window_Base?: any;
     Window_Message?: any;
+    Window_SavefileList?: any;
+    Window_Options?: any;
     Window_MenuCommand?: any;
+    Window_ActorCommand?: any;
     Window_TitleCommand?: any;
+    Window_Help?: any;
     Window_CustomMenuCommand?: any;
     PluginManager?: any;
     Torigoya?: any;
