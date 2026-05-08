@@ -1,4 +1,5 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
+import { parseJsonSafely } from './TranslatorHelpers.js';
 
 const COMMAND_CACHE_TYPE = 'command';
 const QUEST_ENTRY_KEY_REGEX = /^Quest\s+\d+$/i;
@@ -45,27 +46,6 @@ const QUEST_FIELD_CONFIGS = [
     { key: 'Subtext', array: true },
 ];
 
-function isUsableText(value) {
-    return typeof value === 'string' && value.trim() !== '';
-}
-
-function parseJsonSafely(value, fallback) {
-    if (typeof value !== 'string') {
-        return value ?? fallback;
-    }
-
-    const normalized = value.trim();
-    if (!normalized) {
-        return fallback;
-    }
-
-    try {
-        return JSON.parse(normalized);
-    } catch {
-        return fallback;
-    }
-}
-
 function normalizeNoteValue(value) {
     let result = value;
     for (let i = 0; i < 3; i++) {
@@ -80,7 +60,7 @@ function normalizeNoteValue(value) {
     return typeof result === 'string' ? result : '';
 }
 
-function parseNoteArray(rawValue) {
+function parseNoteArray(rawValue, translator) {
     const parsed = parseJsonSafely(rawValue, []);
     if (!Array.isArray(parsed)) {
         return [];
@@ -89,7 +69,7 @@ function parseNoteArray(rawValue) {
     const output = [];
     for (const entry of parsed) {
         const normalized = normalizeNoteValue(entry);
-        if (isUsableText(normalized)) {
+        if (translator.isUsableText(normalized)) {
             output.push(normalized);
         }
     }
@@ -161,7 +141,7 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
     }
 
     addEntry(output, text, source, cacheType = this.getCacheType()) {
-        if (!Array.isArray(output) || !isUsableText(text)) {
+        if (!Array.isArray(output) || !this.isUsableText(text)) {
             return;
         }
 
@@ -179,7 +159,7 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
 
         for (const config of fieldConfigs) {
             const fieldValue = objectValue[config.key];
-            if (!isUsableText(fieldValue)) {
+            if (!this.isUsableText(fieldValue)) {
                 continue;
             }
 
@@ -256,7 +236,7 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
 
     appendQuestEntries(output, sourceScope, parameters) {
         const appendQuestField = (questKey, fieldConfig, fieldValue) => {
-            if (!isUsableText(fieldValue)) {
+            if (!this.isUsableText(fieldValue)) {
                 return;
             }
 
@@ -361,7 +341,7 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
     }
 
     resolveCachedText(runtime, text, cacheTypes = [this.getCacheType()]) {
-        if (!isUsableText(text)) {
+        if (!this.isUsableText(text)) {
             return text;
         }
 
@@ -371,13 +351,13 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
 
         for (const cacheType of cacheTypes) {
             const cacheKey = runtime.getCacheKey(text, cacheType);
-            runtime.markCacheKeySeen(cacheKey);
+            runtime.trackCacheKeyUsage(cacheKey);
             if (!runtime.hasUsableCacheValue(cacheKey)) {
                 continue;
             }
 
             const cached = runtime.translationCache.get(cacheKey);
-            if (isUsableText(cached)) {
+            if (this.isUsableText(cached)) {
                 return cached;
             }
         }
@@ -396,7 +376,7 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
         }
 
         for (const command of windowInstance._list) {
-            if (!command || !isUsableText(command.name)) {
+            if (!command || !this.isUsableText(command.name)) {
                 continue;
             }
 
@@ -656,11 +636,11 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
-            const cacheType = isUsableText(entry.cacheType) ? entry.cacheType : this.getCacheType();
+            const cacheType = this.isUsableText(entry.cacheType) ? entry.cacheType : this.getCacheType();
             const cacheKey = panel.getCacheKey(text, cacheType);
 
             if (!byCacheKey.has(cacheKey)) {
@@ -677,7 +657,7 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -686,7 +666,7 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

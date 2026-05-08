@@ -1,20 +1,9 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
+import { parseJsonSafely } from './TranslatorHelpers.js';
 
 const ACHIEVEMENT_TEXT_FIELDS = ['title', 'description', 'hint'];
 const PARAMETER_TEXT_FIELDS = ['popupMessage', 'titleMenuText', 'achievementMenuHiddenTitle'];
 const PLUGIN_NAME_ALIASES = ['TorigoyaMZ_Achievement2', 'Torigoya_Achievement2'];
-
-function parseJsonSafely(value, fallback) {
-    if (typeof value !== 'string') {
-        return value ?? fallback;
-    }
-
-    try {
-        return JSON.parse(value);
-    } catch (error) {
-        return fallback;
-    }
-}
 
 function normalizePluginText(value) {
     if (typeof value !== 'string') {
@@ -57,12 +46,8 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
         return 'plugin_torigoya_achievement2';
     }
 
-    getRuntime() {
-        return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
-    }
-
     translateRuntimeText(text, runtime) {
-        if (!runtime || typeof runtime.getCacheKey !== 'function') {
+        if (!runtime) {
             return text;
         }
 
@@ -90,11 +75,9 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
         for (const candidate of candidates) {
             const cacheKey = runtime.getCacheKey(candidate, this.getCacheType());
 
-            runtime.markCacheKeySeen?.(cacheKey);
+            runtime.trackCacheKeyUsage(cacheKey);
 
             if (
-                !(runtime.translationCache instanceof Map) ||
-                typeof runtime.hasUsableCacheValue !== 'function' ||
                 !runtime.hasUsableCacheValue(cacheKey)
             ) {
                 continue;
@@ -535,7 +518,7 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -544,7 +527,7 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

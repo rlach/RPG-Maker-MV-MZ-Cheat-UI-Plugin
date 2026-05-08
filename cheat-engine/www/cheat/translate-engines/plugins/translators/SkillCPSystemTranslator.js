@@ -7,19 +7,6 @@ const COMMAND_CACHE_TYPE = 'command';
 const MENU_TITLE_FIELD = 'Menu Skill Setting Title';
 const PARAM_FIELDS = ['CP Name', 'Set Name', 'No Equip Slot Name', MENU_TITLE_FIELD];
 
-function isUsableText(value) {
-    return typeof value === 'string' && value.trim() !== '';
-}
-
-function getRuntime() {
-    const ensureRuntime = window.__ensureTranslationRuntime;
-    if (typeof ensureRuntime === 'function') {
-        return ensureRuntime();
-    }
-
-    return window.__TranslationRuntime || null;
-}
-
 export class SkillCPSystemTranslator extends BasePluginTranslator {
     constructor() {
         super();
@@ -88,7 +75,7 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
 
         for (const field of PARAM_FIELDS) {
             const text = typeof parameters[field] === 'string' ? parameters[field] : '';
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
@@ -109,7 +96,7 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
         if (pluginEntry && pluginEntry.parameters && typeof pluginEntry.parameters === 'object') {
             for (const field of PARAM_FIELDS) {
                 const value = pluginEntry.parameters[field];
-                if (!result.has(field) && isUsableText(value)) {
+                if (!result.has(field) && this.isUsableText(value)) {
                     result.set(field, value);
                 }
             }
@@ -119,7 +106,7 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
         if (runtimeParameters) {
             for (const field of PARAM_FIELDS) {
                 const value = runtimeParameters[field];
-                if (!result.has(field) && isUsableText(value)) {
+                if (!result.has(field) && this.isUsableText(value)) {
                     result.set(field, value);
                 }
             }
@@ -129,16 +116,13 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
     }
 
     resolveRuntimeTranslation(text, field) {
-        if (!isUsableText(text)) {
+        if (!this.isUsableText(text)) {
             return text;
         }
 
-        const runtime = getRuntime();
+        const runtime = this.getRuntime();
         if (
-            !runtime ||
-            typeof runtime.getCacheKey !== 'function' ||
-            typeof runtime.hasUsableCacheValue !== 'function' ||
-            !(runtime.translationCache instanceof Map)
+            !runtime
         ) {
             return text;
         }
@@ -146,7 +130,7 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
         const cacheType = this.getCacheTypeByField(field);
         const cacheKey = runtime.getCacheKey(text, cacheType);
 
-        runtime.markCacheKeySeen?.(cacheKey);
+        runtime.trackCacheKeyUsage(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             return text;
@@ -395,7 +379,7 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -404,7 +388,7 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

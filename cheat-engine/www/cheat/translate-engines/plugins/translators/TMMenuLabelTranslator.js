@@ -13,19 +13,6 @@ const PARAM_FIELDS = [
     'labelDFooter',
 ];
 
-function isUsableText(value) {
-    return typeof value === 'string' && value.trim() !== '';
-}
-
-function getRuntime() {
-    const ensureRuntime = window['__ensureTranslationRuntime'];
-    if (typeof ensureRuntime === 'function') {
-        return ensureRuntime();
-    }
-
-    return window['__TranslationRuntime'] || null;
-}
-
 export class TMMenuLabelTranslator extends BasePluginTranslator {
     constructor() {
         super();
@@ -76,7 +63,7 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
 
         for (const field of PARAM_FIELDS) {
             const text = typeof parameters[field] === 'string' ? parameters[field] : '';
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
@@ -96,17 +83,14 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
         }
 
         if (
-            !runtime ||
-            typeof runtime.getCacheKey !== 'function' ||
-            typeof runtime.hasUsableCacheValue !== 'function' ||
-            !(runtime.translationCache instanceof Map)
+            !runtime
         ) {
             return text;
         }
 
         const cacheKey = runtime.getCacheKey(text, this.getCacheType());
 
-        runtime.markCacheKeySeen?.(cacheKey);
+        runtime.trackCacheKeyUsage(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             return text;
@@ -287,7 +271,7 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -296,7 +280,7 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

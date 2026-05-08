@@ -24,10 +24,6 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
         return CACHE_TYPE;
     }
 
-    getRuntime() {
-        return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
-    }
-
     normalizeArgsObject(value) {
         return value && typeof value === 'object' ? value : null;
     }
@@ -38,17 +34,14 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
         }
 
         if (
-            !runtime ||
-            typeof runtime.getCacheKey !== 'function' ||
-            typeof runtime.hasUsableCacheValue !== 'function' ||
-            !(runtime.translationCache instanceof Map)
+            !runtime
         ) {
             return text;
         }
 
         const cacheKey = runtime.getCacheKey(text, this.getCacheType());
 
-        runtime.markCacheKeySeen?.(cacheKey);
+        runtime.trackCacheKeyUsage(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             return text;
@@ -306,7 +299,7 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -315,7 +308,7 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

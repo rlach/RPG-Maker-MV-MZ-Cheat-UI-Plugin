@@ -93,13 +93,9 @@ export class YedWordWrapTranslator extends BasePluginTranslator {
                     return originalWrapText.call(this, text, maxWidth, options);
                 }
 
-                if (
-                    activeRuntime &&
-                    typeof activeRuntime.getCacheKey === 'function' &&
-                    typeof activeRuntime.markCacheKeySeen === 'function'
-                ) {
+                if (activeRuntime) {
                     const cacheKey = activeRuntime.getCacheKey(sourceText, cacheType);
-                    activeRuntime.markCacheKeySeen(cacheKey);
+                    activeRuntime.trackCacheKeyUsage(cacheKey);
                 }
 
                 const tokens = tokenizeByBrTag(sourceText);

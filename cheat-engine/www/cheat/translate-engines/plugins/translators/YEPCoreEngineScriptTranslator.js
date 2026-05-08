@@ -52,7 +52,7 @@ function resolveCachedTranslation(runtime, sourceText, cacheType) {
     for (const candidate of candidates) {
         const cacheKey = runtime.getCacheKey(candidate, cacheType);
 
-        runtime.markCacheKeySeen?.(cacheKey);
+        runtime.trackCacheKeyUsage(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             continue;
@@ -360,9 +360,6 @@ export class YEPCoreEngineScriptTranslator extends BasePluginTranslator {
     static applyCachedTranslationsToGameVariables(runtime, cacheType) {
         if (
             !runtime ||
-            typeof runtime.getCacheKey !== 'function' ||
-            typeof runtime.hasUsableCacheValue !== 'function' ||
-            !(runtime.translationCache instanceof Map) ||
             !window.$gameVariables ||
             !Array.isArray($gameVariables._data)
         ) {
@@ -572,7 +569,7 @@ export class YEPCoreEngineScriptTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -581,7 +578,7 @@ export class YEPCoreEngineScriptTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

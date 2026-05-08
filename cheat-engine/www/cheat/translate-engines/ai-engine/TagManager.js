@@ -127,7 +127,7 @@ export class TagManager {
         const symbol = String(config.tagSymbol || '').toLowerCase();
         const type = config.type || '';
         const style = config.style || TAG_STYLE.ESCAPE;
-        const bracket = config.type === TAG_TYPE.WITH_CUSTOM_PARAMETER ? (config.bracket || '') : '';
+        const bracket = config.type === TAG_TYPE.WITH_CUSTOM_PARAMETER ? config.bracket || '' : '';
         return `${style}:${type}:${symbol}:${bracket}`;
     }
 
@@ -153,7 +153,6 @@ export class TagManager {
                 patterns.add(`\\${sym}[N]`);
             } else if (entry.type === TAG_TYPE.WITH_CUSTOM_PARAMETER) {
                 const bracket = entry.bracket || '[';
-                const closeBracket = BRACKET_CLOSE_BY_OPEN[bracket] || ']';
                 if (bracket === '[') {
                     patterns.add(`\\${sym}[N]`);
                     patterns.add(`\\${sym}[…]`);
@@ -307,8 +306,7 @@ export class TagManager {
         normalized.alwaysTranslate = !isMasked && normalized.alwaysTranslate === true;
 
         // alwaysAddToKnowledgeBase: only valid for withCustomParameter (non-masked, non-numeric)
-        const supportsKbase =
-            !isMasked && normalized.type === TAG_TYPE.WITH_CUSTOM_PARAMETER;
+        const supportsKbase = !isMasked && normalized.type === TAG_TYPE.WITH_CUSTOM_PARAMETER;
         normalized.alwaysAddToKnowledgeBase =
             supportsKbase && normalized.alwaysAddToKnowledgeBase === true;
 

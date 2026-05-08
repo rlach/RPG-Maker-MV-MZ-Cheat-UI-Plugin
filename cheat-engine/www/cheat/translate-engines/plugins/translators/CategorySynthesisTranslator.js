@@ -170,10 +170,6 @@ const CATEGORY_SYNTHESIS_PLUGIN_TAGS = Object.freeze([
     },
 ]);
 
-function isUsableText(value) {
-    return typeof value === 'string' && value.trim() !== '';
-}
-
 function normalizePluginName(value) {
     return String(value || '')
         .trim()
@@ -241,11 +237,11 @@ function getCurrentSynthesisCategoryState() {
             : '';
 
     let selectedCategory = '';
-    if (isUsableText(scene?._recipeWindow?._category)) {
+    if (typeof scene?._recipeWindow?._category === 'string' && scene._recipeWindow._category.trim() !== '') {
         selectedCategory = String(scene._recipeWindow._category);
     } else if (typeof scene?._categoryWindow?.category === 'function') {
         const value = scene._categoryWindow.category();
-        if (isUsableText(value)) {
+        if (typeof value === 'string' && value.trim() !== '') {
             selectedCategory = String(value);
         }
     }
@@ -293,7 +289,7 @@ function normalizeCategoryToken(value) {
 }
 
 function extractIconIndex(value) {
-    if (!isUsableText(value)) {
+    if (!(typeof value === 'string' && value.trim() !== '')) {
         return 0;
     }
 
@@ -369,7 +365,7 @@ function toCanonicalCategoryKey(value) {
 }
 
 function splitCsvValues(value) {
-    if (!isUsableText(value)) {
+    if (!(typeof value === 'string' && value.trim() !== '')) {
         return [];
     }
 
@@ -495,7 +491,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
         if (pluginEntry?.parameters && typeof pluginEntry.parameters === 'object') {
             for (const fieldConfig of PARAM_FIELD_CONFIGS) {
                 const raw = pluginEntry.parameters[fieldConfig.field];
-                if (isUsableText(raw) && !map.has(fieldConfig.field)) {
+                if (this.isUsableText(raw) && !map.has(fieldConfig.field)) {
                     map.set(fieldConfig.field, raw);
                 }
             }
@@ -505,7 +501,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
         if (runtimeParameters && typeof runtimeParameters === 'object') {
             for (const fieldConfig of PARAM_FIELD_CONFIGS) {
                 const raw = runtimeParameters[fieldConfig.field];
-                if (isUsableText(raw) && !map.has(fieldConfig.field)) {
+                if (this.isUsableText(raw) && !map.has(fieldConfig.field)) {
                     map.set(fieldConfig.field, raw);
                 }
             }
@@ -521,7 +517,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
 
         for (const fieldConfig of PARAM_FIELD_CONFIGS) {
             const raw = sourceTextByField.get(fieldConfig.field);
-            if (!isUsableText(raw)) {
+            if (!this.isUsableText(raw)) {
                 continue;
             }
 
@@ -529,7 +525,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
                 const values = splitCsvValues(raw);
                 for (let i = 0; i < values.length; i++) {
                     const value = values[i];
-                    if (!isUsableText(value)) {
+                    if (!this.isUsableText(value)) {
                         continue;
                     }
 
@@ -585,7 +581,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
                 const key = String(segment.key || '').trim();
                 const value = String(segment.value || '').trim();
 
-                if (!key || !isUsableText(value)) {
+                if (!key || !this.isUsableText(value)) {
                     continue;
                 }
 
@@ -701,33 +697,30 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
     }
 
     resolveCachedText(runtime, text, cacheType) {
-        if (!isUsableText(text)) {
+        if (!this.isUsableText(text)) {
             return text;
         }
 
         if (
-            !runtime ||
-            typeof runtime.getCacheKey !== 'function' ||
-            typeof runtime.hasUsableCacheValue !== 'function' ||
-            !(runtime.translationCache instanceof Map)
+            !runtime
         ) {
             return text;
         }
 
         const cacheKey = runtime.getCacheKey(text, cacheType);
 
-        runtime.markCacheKeySeen?.(cacheKey);
+        runtime.trackCacheKeyUsage(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             return text;
         }
 
         const cached = runtime.translationCache.get(cacheKey);
-        return isUsableText(cached) ? cached : text;
+        return this.isUsableText(cached) ? cached : text;
     }
 
     resolveTextWithNumTemplate(runtime, value, sourceTemplate, cacheType) {
-        if (!isUsableText(value) || !isUsableText(sourceTemplate)) {
+        if (!this.isUsableText(value) || !this.isUsableText(sourceTemplate)) {
             return value;
         }
 
@@ -743,7 +736,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
         }
 
         const translatedTemplate = this.resolveCachedText(runtime, sourceTemplate, cacheType);
-        if (!isUsableText(translatedTemplate) || translatedTemplate === sourceTemplate) {
+        if (!this.isUsableText(translatedTemplate) || translatedTemplate === sourceTemplate) {
             return value;
         }
 
@@ -756,7 +749,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
     }
 
     translateKnownPluginText(runtime, text) {
-        if (!isUsableText(text)) {
+        if (!this.isUsableText(text)) {
             return text;
         }
 
@@ -764,7 +757,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
 
         for (const fieldConfig of PARAM_FIELD_CONFIGS) {
             const sourceValue = sourceTextByField.get(fieldConfig.field);
-            if (!isUsableText(sourceValue)) {
+            if (!this.isUsableText(sourceValue)) {
                 continue;
             }
 
@@ -823,7 +816,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
             translated.add(source);
 
             const translatedCategory = this.resolveCachedText(runtime, source, COMMAND_CACHE_TYPE);
-            if (isUsableText(translatedCategory)) {
+            if (this.isUsableText(translatedCategory)) {
                 translated.add(translatedCategory);
             }
         }
@@ -835,7 +828,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
         const tokens = new Set();
 
         for (const entry of this._scanEntries) {
-            if (!entry || entry.role !== 'category' || !isUsableText(entry.text)) {
+            if (!entry || entry.role !== 'category' || !this.isUsableText(entry.text)) {
                 continue;
             }
 
@@ -856,7 +849,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
         const knownTokens = this.getKnownCategoryTokens();
 
         for (const token of knownTokens) {
-            if (!isUsableText(token)) {
+            if (!this.isUsableText(token)) {
                 continue;
             }
 
@@ -888,7 +881,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
         const knownTokens = this.getKnownCategoryTokens();
 
         for (const token of knownTokens) {
-            if (!isUsableText(token)) {
+            if (!this.isUsableText(token)) {
                 continue;
             }
 
@@ -905,7 +898,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
             displays.add(String(token));
 
             const translated = this.resolveCachedText(runtime, token, COMMAND_CACHE_TYPE);
-            if (isUsableText(translated)) {
+            if (this.isUsableText(translated)) {
                 displays.add(String(translated));
             }
 
@@ -917,7 +910,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
 
                 const canonicalDisplays = byCanonical.get(canonical);
                 canonicalDisplays.add(String(token));
-                if (isUsableText(translated)) {
+                if (this.isUsableText(translated)) {
                     canonicalDisplays.add(String(translated));
                 }
             }
@@ -966,7 +959,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
             const seen = new Set();
 
             const pushUnique = (value) => {
-                if (!isUsableText(value)) {
+                if (!translator.isUsableText(value)) {
                     return;
                 }
 
@@ -1111,7 +1104,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
     }
 
     hasCategoryMatch(runtime, item, category) {
-        if (!isUsableText(category) || !item || typeof DataManager === 'undefined') {
+        if (!this.isUsableText(category) || !item || typeof DataManager === 'undefined') {
             return false;
         }
 
@@ -1470,7 +1463,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
                 const helpWindow = this._synthesisWindow._helpWindow;
                 const currentHelpText =
                     typeof helpWindow._text === 'string' ? helpWindow._text : '';
-                if (!isUsableText(currentHelpText)) {
+                if (!translator.isUsableText(currentHelpText)) {
                     return result;
                 }
 
@@ -1532,7 +1525,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
@@ -1552,7 +1545,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -1561,7 +1554,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

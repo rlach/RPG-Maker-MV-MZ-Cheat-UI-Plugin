@@ -1,17 +1,5 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
-
-function parseJsonSafely(value, fallback) {
-    if (typeof value !== 'string') {
-        return fallback;
-    }
-
-    try {
-        return JSON.parse(value);
-    } catch (error) {
-        console.warn('[ExtraWindowTranslator] Failed to parse JSON payload', error);
-        return fallback;
-    }
-}
+import { parseJsonSafely } from './TranslatorHelpers.js';
 
 function normalizeWindowListEntry(rawEntry) {
     if (!rawEntry) {
@@ -132,7 +120,7 @@ export class ExtraWindowTranslator extends BasePluginTranslator {
                 }
 
                 const cacheKey = runtime.getCacheKey(sourceText, cacheType);
-                runtime.markCacheKeySeen(cacheKey);
+                runtime.trackCacheKeyUsage(cacheKey);
 
                 if (!runtime.hasUsableCacheValue(cacheKey)) {
                     return original.apply(this, arguments);
@@ -238,7 +226,7 @@ export class ExtraWindowTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -247,7 +235,7 @@ export class ExtraWindowTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

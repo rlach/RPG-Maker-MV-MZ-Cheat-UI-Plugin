@@ -189,7 +189,7 @@ export const translateOnTheFlyCoreMethods = {
 
         const lookupKeys = this.getMessageCacheLookupKeys(text, options);
         for (const cacheKey of lookupKeys) {
-            this.markCacheKeySeen(cacheKey);
+            this.trackCacheKeyUsage(cacheKey, { harvestMissing: false });
 
             if (!this.hasUsableCacheValue(cacheKey)) {
                 continue;

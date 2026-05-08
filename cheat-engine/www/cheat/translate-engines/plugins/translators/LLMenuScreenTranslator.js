@@ -209,7 +209,7 @@ export class LLMenuScreenTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -218,7 +218,7 @@ export class LLMenuScreenTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 
@@ -283,11 +283,7 @@ export class LLMenuScreenTranslator extends BasePluginTranslator {
             }
 
             const cacheKey = runtime.getCacheKey(originalText, CACHE_TYPE);
-            runtime.markCacheKeySeen(cacheKey);
-
-            if (!(runtime.translationCache instanceof Map)) {
-                return originalText;
-            }
+            runtime.trackCacheKeyUsage(cacheKey);
 
             if (!runtime.hasUsableCacheValue(cacheKey)) {
                 return originalText;
@@ -319,19 +315,17 @@ export class LLMenuScreenTranslator extends BasePluginTranslator {
             }
 
             // Strategy 2: reverse-lookup through the command translation cache.
-            if (runtime.translationCache instanceof Map) {
-                for (const [originalSymbol, originalHelpText] of symbolToOriginalHelpText) {
-                    const canonicalSymbol =
-                        typeof runtime.getCanonicalSystemCommandName === 'function'
-                            ? runtime.getCanonicalSystemCommandName(originalSymbol)
-                            : originalSymbol;
+            for (const [originalSymbol, originalHelpText] of symbolToOriginalHelpText) {
+                const canonicalSymbol =
+                    typeof runtime.getCanonicalSystemCommandName === 'function'
+                        ? runtime.getCanonicalSystemCommandName(originalSymbol)
+                        : originalSymbol;
 
-                    const commandCacheKey = runtime.getCacheKey(canonicalSymbol, 'command');
-                    const translatedSymbol = runtime.translationCache.get(commandCacheKey);
+                const commandCacheKey = runtime.getCacheKey(canonicalSymbol, 'command');
+                const translatedSymbol = runtime.translationCache.get(commandCacheKey);
 
-                    if (translatedSymbol === currentName) {
-                        return resolveFromCache(originalHelpText, runtime);
-                    }
+                if (translatedSymbol === currentName) {
+                    return resolveFromCache(originalHelpText, runtime);
                 }
             }
 

@@ -21,14 +21,6 @@ const PARAM_FIELDS = [
     'param_name_10',
 ];
 
-function isUsableText(value) {
-    return typeof value === 'string' && value.trim() !== '';
-}
-
-function getRuntime() {
-    return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
-}
-
 function parseParamFieldCsv(rawValue) {
     const parts = String(rawValue || '').split(',');
     return {
@@ -57,7 +49,7 @@ function parseOriginSetParamCommandLine(commandLine) {
         return null;
     }
 
-    if (!isUsableText(value)) {
+    if (!(typeof value === 'string' && value.trim() !== '')) {
         return null;
     }
 
@@ -119,7 +111,7 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
 
         for (const field of PARAM_FIELDS) {
             const raw = typeof parameters[field] === 'string' ? parameters[field] : '';
-            if (!isUsableText(raw)) {
+            if (!this.isUsableText(raw)) {
                 continue;
             }
 
@@ -136,7 +128,7 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
             }
 
             const parsed = parseParamFieldCsv(raw);
-            if (isUsableText(parsed.name)) {
+            if (this.isUsableText(parsed.name)) {
                 output.push({
                     text: parsed.name,
                     source: {
@@ -147,7 +139,7 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
                 });
             }
 
-            if (isUsableText(parsed.value)) {
+            if (this.isUsableText(parsed.value)) {
                 output.push({
                     text: parsed.value,
                     source: {
@@ -158,7 +150,7 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
                 });
             }
 
-            if (isUsableText(parsed.afterName)) {
+            if (this.isUsableText(parsed.afterName)) {
                 output.push({
                     text: parsed.afterName,
                     source: {
@@ -172,28 +164,25 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
     }
 
     resolveRuntimeTranslation(text, runtime) {
-        if (!isUsableText(text)) {
+        if (!this.isUsableText(text)) {
             return text;
         }
 
         if (
-            !runtime ||
-            typeof runtime.getCacheKey !== 'function' ||
-            typeof runtime.hasUsableCacheValue !== 'function' ||
-            !(runtime.translationCache instanceof Map)
+            !runtime
         ) {
             return text;
         }
 
         const cacheKey = runtime.getCacheKey(text, this.getCacheType());
-        runtime.markCacheKeySeen?.(cacheKey);
+        runtime.trackCacheKeyUsage(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             return text;
         }
 
         const cached = runtime.translationCache.get(cacheKey);
-        return isUsableText(cached) ? cached : text;
+        return this.isUsableText(cached) ? cached : text;
     }
 
     patchOriginBaseWindowInstance(windowInstance) {
@@ -219,7 +208,7 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
 
         windowInstance.DrawParameterName = function (message, x, y, length, align) {
             try {
-                const runtime = getRuntime();
+                const runtime = translator.getRuntime();
                 arguments[0] = translator.resolveRuntimeTranslation(message, runtime);
             } catch (error) {
                 console.warn(
@@ -233,7 +222,7 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
 
         windowInstance.DrawParameterValue = function (message, x, y, length, afterName) {
             try {
-                const runtime = getRuntime();
+                const runtime = translator.getRuntime();
                 arguments[0] = translator.resolveRuntimeTranslation(message, runtime);
                 arguments[4] = translator.resolveRuntimeTranslation(afterName, runtime);
             } catch (error) {
@@ -274,9 +263,9 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
                         String(command || '').trim() === ORIGIN_PLUGIN_NAME &&
                         Array.isArray(args) &&
                         String(args[0] || '').trim() === SET_PARAM_COMMAND &&
-                        isUsableText(args[2])
+                        translator.isUsableText(args[2])
                     ) {
-                        const runtime = getRuntime();
+                        const runtime = translator.getRuntime();
                         if (runtime) {
                             const translatedValue = translator.resolveRuntimeTranslation(
                                 args[2],
@@ -312,7 +301,7 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
 
                 try {
                     if (Array.isArray(this._list)) {
-                        const runtime = getRuntime();
+                        const runtime = translator.getRuntime();
 
                         for (const command of this._list) {
                             if (!command || command.symbol !== ORIGIN_MENU_SYMBOL) {
@@ -492,7 +481,7 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
                     : '';
 
             const parsed = parseOriginSetParamCommandLine(commandLine);
-            if (!parsed || !isUsableText(parsed.value)) {
+            if (!parsed || !this.isUsableText(parsed.value)) {
                 continue;
             }
 
@@ -514,7 +503,7 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
@@ -533,7 +522,7 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -542,7 +531,7 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

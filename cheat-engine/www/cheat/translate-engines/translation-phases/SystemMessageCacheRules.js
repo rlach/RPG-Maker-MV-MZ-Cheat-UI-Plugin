@@ -33,7 +33,7 @@ export function getSystemMessagesSource() {
 }
 
 export function getSystemMessageCacheKey(panel, messageKey, messageValue) {
-    if (!panel || typeof panel.getCacheKey !== 'function') {
+    if (!panel) {
         return null;
     }
 

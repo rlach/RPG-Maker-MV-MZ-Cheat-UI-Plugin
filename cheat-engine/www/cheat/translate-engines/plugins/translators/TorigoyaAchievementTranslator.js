@@ -32,10 +32,6 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
         return 'plugin_torigoya_achievement_mv';
     }
 
-    getRuntime() {
-        return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
-    }
-
     findPluginEntry() {
         if (!Array.isArray(window.$plugins)) {
             return null;
@@ -368,7 +364,7 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
     }
 
     translateRuntimeText(text, runtime) {
-        if (!runtime || typeof runtime.getCacheKey !== 'function') {
+        if (!runtime) {
             return text;
         }
 
@@ -378,11 +374,9 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
 
         const cacheKey = runtime.getCacheKey(text, this.getCacheType());
 
-        runtime.markCacheKeySeen?.(cacheKey);
+        runtime.trackCacheKeyUsage(cacheKey);
 
         if (
-            !(runtime.translationCache instanceof Map) ||
-            typeof runtime.hasUsableCacheValue !== 'function' ||
             !runtime.hasUsableCacheValue(cacheKey)
         ) {
             return text;
@@ -648,7 +642,7 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -659,7 +653,7 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

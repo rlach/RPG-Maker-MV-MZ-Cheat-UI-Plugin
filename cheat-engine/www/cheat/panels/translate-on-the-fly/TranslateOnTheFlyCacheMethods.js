@@ -1,5 +1,18 @@
 import { notifyTranslateCacheRuntimeChanged } from '../../js/TranslateCacheRuntime.js';
 
+function markCacheKeySeenInternal(runtime, cacheKey) {
+    if (!runtime.shouldTrackRealtimeCacheUsage() || !runtime.lastSeenByCacheKey) {
+        return;
+    }
+
+    if (typeof cacheKey !== 'string' || cacheKey.length === 0) {
+        return;
+    }
+
+    runtime.lastSeenByCacheKey.set(cacheKey, Date.now());
+    runtime.notifyCacheRuntime('seen-updated', cacheKey);
+}
+
 export const translateOnTheFlyCacheMethods = {
     clearCache() {
         const count = this.translationCache.size;
@@ -85,20 +98,7 @@ export const translateOnTheFlyCacheMethods = {
             this.setCacheValue(cacheKey, '');
         }
 
-        this.markCacheKeySeen(cacheKey);
-    },
-
-    markCacheKeySeen(cacheKey) {
-        if (!this.shouldTrackRealtimeCacheUsage() || !this.lastSeenByCacheKey) {
-            return;
-        }
-
-        if (typeof cacheKey !== 'string' || cacheKey.length === 0) {
-            return;
-        }
-
-        this.lastSeenByCacheKey.set(cacheKey, Date.now());
-        this.notifyCacheRuntime('seen-updated', cacheKey);
+        markCacheKeySeenInternal(this, cacheKey);
     },
 
     deleteCacheValue(cacheKey, options = {}) {

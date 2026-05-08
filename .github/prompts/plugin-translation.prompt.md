@@ -55,14 +55,29 @@ Implementation workflow:
 - Scan common events when plugin can use them.
 - Parse only the text payload; preserve non-text command structure.
 - Deduplicate by cacheKey.
+- Before creating any new helper function, check `cheat-engine/www/cheat/translate-engines/plugins/translators/TranslatorHelpers.js` and reuse helpers from there.
+- For JSON parsing in translators, always import and use `parseJsonSafely` from `TranslatorHelpers.js`.
+- Do not re-implement local `parseJsonSafely`/`safeParseJSON` variants in translator files.
+
+4. Base class method inheritance (CRITICAL - NO EXCEPTIONS):
+
+**ABSOLUTE PROHIBITION:**
+- **NEVER override `getRuntime()` from BasePluginTranslator.** The base implementation is canonical, handles all edge cases, and ensures runtime contracts are normalized. Overriding it breaks this guarantee and causes inconsistencies across the plugin ecosystem.
+- **NEVER implement helper functions that duplicate base class methods** (`isUsableText()`, `getRuntime()`, or any other method from BasePluginTranslator). This violates DRY principle and creates fragmented code.
+- **NEVER add local runtime typeguards or wrapper helpers** (`resolveRuntime`, `isRuntimeTranslationActive`, `typeof runtime.method === 'function'` checks). BasePluginTranslator provides all required contract enforcement.
+
+**Required pattern:**
+- Always use `this.getRuntime()` from base class. Guaranteed to be normalized and contract-complete.
+- Always use `this.isUsableText(value)` for text validation. Canonical implementation in BasePluginTranslator.
+- Always use `this.isRuntimeTranslationActive(runtime)` for translation state checks. Never implement locally.
+- If you need a helper function, keep it focused on plugin-domain logic, NOT duplicating base infrastructure.
 
 4. Runtime hook rules:
 
 - Hook the narrowest stable method that observes displayed text for this plugin.
 - Do not break original plugin behavior.
 - Only replace text payload, never required command keywords/prefixes.
-- Do not add translator-local helpers like `resolveRuntime`, `isRuntimeTranslationActive`, or repetitive `typeof runtime.method === 'function'` checks.
-- Use base APIs directly (`this.getRuntime()`, `this.isRuntimeTranslationActive(runtime)`) and keep translator code focused on plugin-specific behavior.
+- Use base APIs directly (`this.getRuntime()`, `this.isRuntimeTranslationActive(runtime)`, `this.isUsableText(value)`) and keep translator code focused on plugin-specific behavior.
 - All real-time hooks are gated by runtime translation settings: hooks only execute when **either**:
     - `runtime.isTranslationEnabled()` returns true (user enabled "Enable Real-time Translation"), **OR**
     - `runtime.translateCacheWhenDisabled` is true (user enabled "Translate cached keys even when Real-time translation is disabled")

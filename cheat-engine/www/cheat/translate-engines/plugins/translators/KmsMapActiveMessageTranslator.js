@@ -102,20 +102,14 @@ export class KmsMapActiveMessageTranslator extends BasePluginTranslator {
 
             const runtime = resolveRuntime();
             if (
-                !runtime ||
-                typeof runtime.getCacheKey !== 'function' ||
-                typeof runtime.hasUsableCacheValue !== 'function'
+                !runtime
             ) {
                 return text;
             }
 
             const cacheKey = runtime.getCacheKey(text, cacheType);
 
-            runtime.markCacheKeySeen?.(cacheKey);
-
-            if (!(runtime.translationCache instanceof Map)) {
-                return text;
-            }
+            runtime.trackCacheKeyUsage(cacheKey);
 
             if (!runtime.hasUsableCacheValue(cacheKey)) {
                 return text;
@@ -291,7 +285,7 @@ export class KmsMapActiveMessageTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -300,7 +294,7 @@ export class KmsMapActiveMessageTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

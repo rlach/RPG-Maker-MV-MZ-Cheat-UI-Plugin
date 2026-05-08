@@ -63,7 +63,7 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
                     data.ParamName.trim()
                 ) {
                     const cacheKey = runtime.getCacheKey(data.ParamName, cacheType);
-                    runtime.markCacheKeySeen?.(cacheKey);
+                    runtime.trackCacheKeyUsage(cacheKey);
                     if (runtime.hasUsableCacheValue(cacheKey)) {
                         const cached = runtime.translationCache.get(cacheKey);
                         if (typeof cached === 'string' && cached.trim()) {
@@ -111,7 +111,7 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
                     info.AnyName.trim()
                 ) {
                     const cacheKey = runtime.getCacheKey(info.AnyName, cacheType);
-                    runtime.markCacheKeySeen?.(cacheKey);
+                    runtime.trackCacheKeyUsage(cacheKey);
                     if (runtime.hasUsableCacheValue(cacheKey)) {
                         const cached = runtime.translationCache.get(cacheKey);
                         if (typeof cached === 'string' && cached.trim()) {
@@ -360,7 +360,7 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -369,7 +369,7 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

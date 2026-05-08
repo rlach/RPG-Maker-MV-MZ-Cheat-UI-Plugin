@@ -3,14 +3,6 @@ import { DATA_CONTAINER_TRANSLATION_DEFINITIONS } from '../../translation-phases
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_DYNAMIC_DATABASE_TRANSLATOR_HOOKED__';
 
-function getRuntime() {
-    return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
-}
-
-function isUsableText(value) {
-    return typeof value === 'string' && value.trim() !== '';
-}
-
 export class DynamicDatabaseTranslator extends BasePluginTranslator {
     constructor() {
         super();
@@ -80,26 +72,23 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
                 ? dataObject._translateOriginal
                 : null;
 
-        if (originalMap && isUsableText(originalMap[field])) {
+        if (originalMap && this.isUsableText(originalMap[field])) {
             return originalMap[field];
         }
 
         const raw = dataObject[field];
-        return isUsableText(raw) ? raw : '';
+        return this.isUsableText(raw) ? raw : '';
     }
 
     resolveRuntimeTranslation(runtime, dataObject, field) {
         if (
-            !runtime ||
-            typeof runtime.getCacheKey !== 'function' ||
-            typeof runtime.hasUsableCacheValue !== 'function' ||
-            !(runtime.translationCache instanceof Map)
+            !runtime
         ) {
             return null;
         }
 
         const originalText = this.getOriginalFieldValue(dataObject, field);
-        if (!isUsableText(originalText)) {
+        if (!this.isUsableText(originalText)) {
             return null;
         }
 
@@ -108,11 +97,11 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
             const dataCacheType = `${dataType}_${field}`;
             const dataCacheKey = runtime.getCacheKey(originalText, dataCacheType);
 
-            runtime.markCacheKeySeen?.(dataCacheKey);
+            runtime.trackCacheKeyUsage(dataCacheKey);
 
             if (runtime.hasUsableCacheValue(dataCacheKey)) {
                 const directCached = runtime.translationCache.get(dataCacheKey);
-                if (isUsableText(directCached)) {
+                if (this.isUsableText(directCached)) {
                     return directCached;
                 }
             }
@@ -120,14 +109,14 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
 
         const pluginCacheKey = runtime.getCacheKey(originalText, this.getCacheType());
 
-        runtime.markCacheKeySeen?.(pluginCacheKey);
+        runtime.trackCacheKeyUsage(pluginCacheKey);
 
         if (!runtime.hasUsableCacheValue(pluginCacheKey)) {
             return null;
         }
 
         const pluginCached = runtime.translationCache.get(pluginCacheKey);
-        return isUsableText(pluginCached) ? pluginCached : null;
+        return this.isUsableText(pluginCached) ? pluginCached : null;
     }
 
     enablePluginTranslation() {
@@ -147,10 +136,10 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
         const originalDrawItemName = Window_Base.prototype.drawItemName;
         Window_Base.prototype.drawItemName = function (item) {
             try {
-                const runtime = getRuntime();
+                const runtime = translator.getRuntime();
                 const translatedName = translator.resolveRuntimeTranslation(runtime, item, 'name');
 
-                if (isUsableText(translatedName) && item && typeof item === 'object') {
+                if (translator.isUsableText(translatedName) && item && typeof item === 'object') {
                     arguments[0] = {
                         ...item,
                         name: translatedName,
@@ -174,14 +163,14 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
             const originalHelpSetItem = Window_Help.prototype.setItem;
             Window_Help.prototype.setItem = function (item) {
                 try {
-                    const runtime = getRuntime();
+                    const runtime = translator.getRuntime();
                     const translatedDescription = translator.resolveRuntimeTranslation(
                         runtime,
                         item,
                         'description'
                     );
 
-                    if (isUsableText(translatedDescription) && item && typeof item === 'object') {
+                    if (translator.isUsableText(translatedDescription) && item && typeof item === 'object') {
                         arguments[0] = {
                             ...item,
                             description: translatedDescription,
@@ -252,7 +241,7 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
 
                 for (const field of fields) {
                     const text = this.getOriginalFieldValue(dataObject, field);
-                    if (!isUsableText(text)) {
+                    if (!this.isUsableText(text)) {
                         continue;
                     }
 
@@ -278,7 +267,7 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
@@ -321,7 +310,7 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -330,7 +319,7 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

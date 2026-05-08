@@ -50,19 +50,6 @@ const GET_INFORMATION_PLUGIN_TAGS = [
     },
 ];
 
-function isUsableText(value) {
-    return typeof value === 'string' && value.trim() !== '';
-}
-
-function getRuntime() {
-    const ensureRuntime = window.__ensureTranslationRuntime;
-    if (typeof ensureRuntime === 'function') {
-        return ensureRuntime();
-    }
-
-    return window.__TranslationRuntime || null;
-}
-
 function splitCommandLine(commandLine) {
     const line = String(commandLine || '').trim();
     if (!line) {
@@ -150,7 +137,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
         if (runtimeParameters) {
             for (const field of PARAM_TEXT_FIELDS) {
                 const value = runtimeParameters[field];
-                if (!result.has(field) && isUsableText(value)) {
+                if (!result.has(field) && this.isUsableText(value)) {
                     result.set(field, value);
                 }
             }
@@ -163,7 +150,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
         const byField = this.getSourceTextByField();
         for (const field of PARAM_TEXT_FIELDS) {
             const text = byField.get(field);
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
@@ -353,17 +340,14 @@ export class GetInformationTranslator extends BasePluginTranslator {
     tryResolveCachedText(sourceText, cacheType, runtime) {
         if (
             !isUsableText(sourceText) ||
-            !runtime ||
-            typeof runtime.getCacheKey !== 'function' ||
-            typeof runtime.hasUsableCacheValue !== 'function' ||
-            !(runtime.translationCache instanceof Map)
+            !runtime
         ) {
             return { cacheKey: '', translatedText: sourceText };
         }
 
         const cacheKey = runtime.getCacheKey(sourceText, cacheType);
 
-        runtime.markCacheKeySeen?.(cacheKey);
+        runtime.trackCacheKeyUsage(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             return { cacheKey, translatedText: sourceText };
@@ -407,10 +391,10 @@ export class GetInformationTranslator extends BasePluginTranslator {
 
         if (typeof object.description === 'string') {
             const descs = object.description.split(/\n/);
-            if (descs[0] && isUsableText(descs[0])) {
+            if (descs[0] && this.isUsableText(descs[0])) {
                 result = result.replaceAll('_desc1', descs[0]);
             }
-            if (descs[1] && isUsableText(descs[1])) {
+            if (descs[1] && this.isUsableText(descs[1])) {
                 result = result.replaceAll('_desc2', descs[1]);
             }
         }
@@ -419,7 +403,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
     }
 
     applyPlaceholderSubstitutions(template, object, value, actor, classParam) {
-        if (!isUsableText(template)) {
+        if (!this.isUsableText(template)) {
             return template;
         }
 
@@ -588,7 +572,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
@@ -608,7 +592,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -617,7 +601,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

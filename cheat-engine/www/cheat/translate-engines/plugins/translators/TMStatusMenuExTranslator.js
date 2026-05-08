@@ -192,7 +192,7 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -201,7 +201,7 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 
@@ -235,7 +235,7 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
             let displayText = text;
             if (typeof text === 'string' && text.trim()) {
                 const cacheKey = runtime.getCacheKey(text, cacheType);
-                runtime.markCacheKeySeen?.(cacheKey);
+                runtime.trackCacheKeyUsage(cacheKey);
                 if (runtime.hasUsableCacheValue(cacheKey)) {
                     const cached = runtime.translationCache.get(cacheKey);
                     if (typeof cached === 'string' && cached.trim()) {

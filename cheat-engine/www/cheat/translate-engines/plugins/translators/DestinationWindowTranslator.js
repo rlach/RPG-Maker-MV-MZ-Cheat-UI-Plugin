@@ -99,15 +99,7 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
     }
 
     buildTranslatedArgs(command, args, runtime) {
-        if (!runtime || typeof runtime.getCacheKey !== 'function') {
-            return null;
-        }
-
-        if (typeof runtime.hasUsableCacheValue !== 'function') {
-            return null;
-        }
-
-        if (!(runtime.translationCache instanceof Map)) {
+        if (!runtime) {
             return null;
         }
 
@@ -120,7 +112,7 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
 
         const cacheKey = runtime.getCacheKey(parsed.text, this.getCacheType());
 
-        runtime.markCacheKeySeen?.(cacheKey);
+        runtime.trackCacheKeyUsage(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             return null;
@@ -323,7 +315,7 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -332,7 +324,7 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

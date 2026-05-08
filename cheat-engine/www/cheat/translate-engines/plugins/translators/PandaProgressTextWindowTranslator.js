@@ -1,26 +1,7 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
+import { parseJsonSafely } from './TranslatorHelpers.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_PANDA_PROGRESS_TEXT_WINDOW_TRANSLATOR_HOOKED__';
-
-function parseJsonSafely(value, fallback) {
-    if (typeof value !== 'string') {
-        return value ?? fallback;
-    }
-
-    try {
-        return JSON.parse(value);
-    } catch (_error) {
-        return fallback;
-    }
-}
-
-function isUsableText(value) {
-    return typeof value === 'string' && value.trim() !== '';
-}
-
-function getRuntime() {
-    return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
-}
 
 export class PandaProgressTextWindowTranslator extends BasePluginTranslator {
     constructor() {
@@ -87,7 +68,7 @@ export class PandaProgressTextWindowTranslator extends BasePluginTranslator {
             }
 
             const decoded = parseJsonSafely(item, item);
-            if (isUsableText(decoded)) {
+            if (this.isUsableText(decoded)) {
                 result.push(decoded);
             }
         }
@@ -126,29 +107,26 @@ export class PandaProgressTextWindowTranslator extends BasePluginTranslator {
     }
 
     translateRuntimeText(text, runtime) {
-        if (!isUsableText(text)) {
+        if (!this.isUsableText(text)) {
             return text;
         }
 
         if (
-            !runtime ||
-            typeof runtime.getCacheKey !== 'function' ||
-            typeof runtime.hasUsableCacheValue !== 'function' ||
-            !(runtime.translationCache instanceof Map)
+            !runtime
         ) {
             return text;
         }
 
         const cacheKey = runtime.getCacheKey(text, this.getCacheType());
 
-        runtime.markCacheKeySeen?.(cacheKey);
+        runtime.trackCacheKeyUsage(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             return text;
         }
 
         const cached = runtime.translationCache.get(cacheKey);
-        return isUsableText(cached) ? cached : text;
+        return this.isUsableText(cached) ? cached : text;
     }
 
     enablePluginTranslation() {
@@ -170,7 +148,7 @@ export class PandaProgressTextWindowTranslator extends BasePluginTranslator {
         Window_Help.prototype.setText = function (text) {
             try {
                 if (translator.isProgressWindowInstance(this)) {
-                    const runtime = getRuntime();
+                    const runtime = translator.getRuntime();
                     const translated = translator.translateRuntimeText(text, runtime);
                     if (translated !== text) {
                         arguments[0] = translated;
@@ -246,7 +224,7 @@ export class PandaProgressTextWindowTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
@@ -265,7 +243,7 @@ export class PandaProgressTextWindowTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -274,7 +252,7 @@ export class PandaProgressTextWindowTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

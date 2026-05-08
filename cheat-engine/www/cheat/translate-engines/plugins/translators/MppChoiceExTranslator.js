@@ -14,16 +14,6 @@ const MPP_CHOICE_EX_OP1_ADD_CHOICE_COMMANDS = new Set(['addcustomchoice', 'ÈÅ∏Êä
 
 const runtimeGlobal = /** @type {any} */ (globalThis);
 
-function isUsableText(value) {
-    return typeof value === 'string' && value.trim() !== '';
-}
-
-function getRuntime() {
-    return (
-        runtimeGlobal.__ensureTranslationRuntime?.() || runtimeGlobal.__TranslationRuntime || null
-    );
-}
-
 function normalizeChoiceDisplayText(choiceText) {
     const original = String(choiceText || '');
     return original.replace(/\s?if\((.+?)\)/i, '').replace(/\s?en\((.+?)\)/i, '');
@@ -143,12 +133,9 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
             return;
         }
 
-        const runtime = getRuntime();
+        const runtime = this.getRuntime();
         if (
-            !runtime ||
-            typeof runtime.getCacheKey !== 'function' ||
-            typeof runtime.hasUsableCacheValue !== 'function' ||
-            !(runtime.translationCache instanceof Map)
+            !runtime
         ) {
             return;
         }
@@ -170,19 +157,19 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
             const originalText = String(
                 data.choices._translateOriginalChoices[i] || data.choices[i] || ''
             );
-            if (!isUsableText(originalText)) {
+            if (!this.isUsableText(originalText)) {
                 continue;
             }
 
             const cacheKey = runtime.getCacheKey(originalText, this.getChoiceCacheType());
-            runtime.markCacheKeySeen?.(cacheKey);
+            runtime.trackCacheKeyUsage(cacheKey);
 
             if (!runtime.hasUsableCacheValue(cacheKey)) {
                 continue;
             }
 
             const cached = runtime.translationCache.get(cacheKey);
-            if (!isUsableText(cached)) {
+            if (!this.isUsableText(cached)) {
                 continue;
             }
 
@@ -191,13 +178,10 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
     }
 
     applyRuntimeChoiceHelpTranslations() {
-        const runtime = getRuntime();
+        const runtime = this.getRuntime();
         const gameMessage = runtimeGlobal.$gameMessage;
         if (
             !runtime ||
-            typeof runtime.getCacheKey !== 'function' ||
-            typeof runtime.hasUsableCacheValue !== 'function' ||
-            !(runtime.translationCache instanceof Map) ||
             !gameMessage ||
             typeof gameMessage.helpTexts !== 'function' ||
             typeof gameMessage.setChoiceHelpTexts !== 'function'
@@ -217,19 +201,19 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
             }
 
             const originalBlock = joinHelpTextLines(entry);
-            if (!isUsableText(originalBlock)) {
+            if (!this.isUsableText(originalBlock)) {
                 return entry;
             }
 
             const cacheKey = runtime.getCacheKey(originalBlock, this.getChoiceHelpCacheType());
-            runtime.markCacheKeySeen?.(cacheKey);
+            runtime.trackCacheKeyUsage(cacheKey);
 
             if (!runtime.hasUsableCacheValue(cacheKey)) {
                 return entry;
             }
 
             const cached = runtime.translationCache.get(cacheKey);
-            if (!isUsableText(cached)) {
+            if (!this.isUsableText(cached)) {
                 return entry;
             }
 
@@ -306,7 +290,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
         }
 
         const block = joinHelpTextLines(lines);
-        if (!isUsableText(block)) {
+        if (!this.isUsableText(block)) {
             return null;
         }
 
@@ -469,7 +453,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
 
         const args = parameters[3] && typeof parameters[3] === 'object' ? parameters[3] : null;
         const choiceText = normalizeChoiceDisplayText(args?.choiceText);
-        if (!isUsableText(choiceText)) {
+        if (!this.isUsableText(choiceText)) {
             return;
         }
 
@@ -505,7 +489,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
         }
 
         const choiceText = normalizeChoiceDisplayText(parts.slice(1, -1).join(' ').trim());
-        if (!isUsableText(choiceText)) {
+        if (!this.isUsableText(choiceText)) {
             return;
         }
 
@@ -528,7 +512,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
                 : [];
         for (let choiceIdx = 0; choiceIdx < choices.length; choiceIdx++) {
             const choiceText = normalizeChoiceDisplayText(choices[choiceIdx]);
-            if (!isUsableText(choiceText)) {
+            if (!this.isUsableText(choiceText)) {
                 continue;
             }
 
@@ -551,7 +535,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
                 ? cmd.parameters[1]
                 : '';
         const choiceText = normalizeChoiceDisplayText(choiceBranchText);
-        if (!isUsableText(choiceText)) {
+        if (!this.isUsableText(choiceText)) {
             return;
         }
 
@@ -597,7 +581,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
@@ -620,7 +604,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -629,7 +613,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

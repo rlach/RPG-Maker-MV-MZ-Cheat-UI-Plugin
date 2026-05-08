@@ -1,4 +1,5 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
+import { parseJsonSafely } from './TranslatorHelpers.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_QUEST_SYSTEM_TRANSLATOR_HOOKED__';
 
@@ -36,39 +37,14 @@ const TEXT_COMMAND_FIELDS = new Set([
     'HiddenQuestCommandText',
 ]);
 
-function isUsableText(value) {
-    return typeof value === 'string' && value.trim() !== '';
-}
-
-function parseJsonSafely(value, fallback) {
-    if (typeof value !== 'string') {
-        return value ?? fallback;
-    }
-
-    const normalized = value.trim();
-    if (!normalized) {
-        return fallback;
-    }
-
-    try {
-        return JSON.parse(normalized);
-    } catch {
-        return fallback;
-    }
-}
-
-function getRuntime() {
-    return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
-}
-
 function resolveQuestDetailText(noteValue, legacyValue) {
     const noteText = parseJsonSafely(noteValue, noteValue);
-    if (isUsableText(noteText)) {
+    if (typeof noteText === 'string' && noteText.trim() !== '') {
         return noteText;
     }
 
     const legacyText = parseJsonSafely(legacyValue, legacyValue);
-    if (isUsableText(legacyText)) {
+    if (typeof legacyText === 'string' && legacyText.trim() !== '') {
         return legacyText;
     }
 
@@ -192,7 +168,7 @@ export class QuestSystemTranslator extends BasePluginTranslator {
         }
 
         for (const [field, value] of Object.entries(parsed)) {
-            if (!isUsableText(value)) {
+            if (!this.isUsableText(value)) {
                 continue;
             }
 
@@ -238,7 +214,7 @@ export class QuestSystemTranslator extends BasePluginTranslator {
             }
 
             const rewardText = reward.Text;
-            if (!isUsableText(rewardText)) {
+            if (!this.isUsableText(rewardText)) {
                 continue;
             }
 
@@ -260,7 +236,7 @@ export class QuestSystemTranslator extends BasePluginTranslator {
                 quest[detailField.noteField],
                 quest[detailField.legacyField]
             );
-            if (!isUsableText(detailText)) {
+            if (!this.isUsableText(detailText)) {
                 continue;
             }
 
@@ -295,7 +271,7 @@ export class QuestSystemTranslator extends BasePluginTranslator {
 
             for (const field of QUEST_DATA_TEXT_FIELDS) {
                 const value = quest[field];
-                if (!isUsableText(value)) {
+                if (!this.isUsableText(value)) {
                     continue;
                 }
 
@@ -341,13 +317,13 @@ export class QuestSystemTranslator extends BasePluginTranslator {
 
     normalizeCacheTypes(cacheTypes) {
         const list = Array.isArray(cacheTypes) ? cacheTypes : [this.getCacheType()];
-        return list.filter((cacheType) => isUsableText(cacheType));
+        return list.filter((cacheType) => this.isUsableText(cacheType));
     }
 
     tryGetCachedTextForType(text, runtime, cacheType) {
         const cacheKey = runtime.getCacheKey(text, cacheType);
 
-        runtime.markCacheKeySeen?.(cacheKey);
+        runtime.trackCacheKeyUsage(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             if (!this._debugSeenMissKeys.has(cacheKey)) {
@@ -374,25 +350,17 @@ export class QuestSystemTranslator extends BasePluginTranslator {
             });
         }
 
-        return isUsableText(cached) ? cached : text;
+        return this.isUsableText(cached) ? cached : text;
     }
 
     translateRuntimeText(text, runtime, cacheTypes = [this.getCacheType()]) {
-        if (!isUsableText(text)) {
+        if (!this.isUsableText(text)) {
             return text;
         }
 
-        if (
-            !runtime ||
-            typeof runtime.getCacheKey !== 'function' ||
-            typeof runtime.hasUsableCacheValue !== 'function' ||
-            !(runtime.translationCache instanceof Map)
-        ) {
-            this.debugLog('runtime unavailable or incompatible', {
-                hasRuntime: !!runtime,
-                hasGetCacheKey: !!runtime && typeof runtime.getCacheKey === 'function',
-                hasHasUsable: !!runtime && typeof runtime.hasUsableCacheValue === 'function',
-                hasCacheMap: !!runtime && runtime.translationCache instanceof Map,
+        if (!runtime) {
+            this.debugLog('runtime unavailable', {
+                hasRuntime: false,
                 text: this.formatPreview(text),
             });
             return text;
@@ -434,6 +402,7 @@ export class QuestSystemTranslator extends BasePluginTranslator {
         const getCtorName = (instance) => this.getCtorName(instance);
         const shouldTranslateWindow = (instance) => this.shouldTranslateWindow(instance);
         const formatPreview = (text) => this.formatPreview(text);
+        const getRuntime = () => this.getRuntime();
         const logDrawTextCtor = (instance) => {
             const ctorName = getCtorName(instance);
             if (this._debugSeenDrawTextCtors.has(ctorName)) {
@@ -911,11 +880,11 @@ export class QuestSystemTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
-            const cacheType = isUsableText(entry.cacheType) ? entry.cacheType : this.getCacheType();
+            const cacheType = this.isUsableText(entry.cacheType) ? entry.cacheType : this.getCacheType();
             const cacheKey = panel.getCacheKey(text, cacheType);
             if (!byCacheKey.has(cacheKey)) {
                 byCacheKey.set(cacheKey, {
@@ -931,7 +900,7 @@ export class QuestSystemTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -940,7 +909,7 @@ export class QuestSystemTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

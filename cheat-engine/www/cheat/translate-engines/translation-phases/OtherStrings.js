@@ -101,7 +101,7 @@ export class OtherStrings extends BasePhase {
     }
 
     getFieldCacheKey(panel, source) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return null;
         }
 

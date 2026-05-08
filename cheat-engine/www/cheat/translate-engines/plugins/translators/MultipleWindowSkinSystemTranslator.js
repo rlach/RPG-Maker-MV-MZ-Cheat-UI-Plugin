@@ -48,7 +48,7 @@ function applyCachedCurrentMessageTranslation(runtime) {
     if (typeof originalSpeaker === 'string' && originalSpeaker.trim()) {
         const speakerCacheKey = runtime.getCacheKey(originalSpeaker, 'speaker');
 
-        runtime.markCacheKeySeen?.(speakerCacheKey);
+        runtime.trackCacheKeyUsage(speakerCacheKey);
 
         if (runtime.hasUsableCacheValue(speakerCacheKey)) {
             const cachedSpeaker = runtime.translationCache.get(speakerCacheKey);
@@ -116,7 +116,7 @@ function applyCachedActorNameTranslation(actorNameWindow, runtime) {
     );
 
     for (const cacheKey of keys) {
-        runtime.markCacheKeySeen?.(cacheKey);
+        runtime.trackCacheKeyUsage(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             continue;
@@ -355,7 +355,7 @@ export class MultipleWindowSkinSystemTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -364,7 +364,7 @@ export class MultipleWindowSkinSystemTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

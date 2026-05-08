@@ -1,4 +1,5 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
+import { parseJsonSafely } from './TranslatorHelpers.js';
 
 const CACHE_TYPE = 'plugin_nrp_map_travel';
 const DEFAULT_MENU_SYMBOL = 'maptravel';
@@ -27,27 +28,6 @@ function previewText(value, max = 80) {
     return String(value || '')
         .replaceAll('\n', String.raw`\n`)
         .slice(0, max);
-}
-
-function isUsableText(value) {
-    return typeof value === 'string' && value.trim() !== '';
-}
-
-function parseJsonSafely(value, fallback) {
-    if (typeof value !== 'string') {
-        return value ?? fallback;
-    }
-
-    const normalized = value.trim();
-    if (!normalized) {
-        return fallback;
-    }
-
-    try {
-        return JSON.parse(normalized);
-    } catch {
-        return fallback;
-    }
 }
 
 function parseStructArray(rawValue) {
@@ -155,7 +135,7 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
             return;
         }
 
-        if (isUsableText(parameters.TravelName)) {
+        if (this.isUsableText(parameters.TravelName)) {
             output.push({
                 text: parameters.TravelName,
                 cacheType: 'command',
@@ -171,7 +151,7 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
         for (let spotIndex = 0; spotIndex < spots.length; spotIndex++) {
             const spot = spots[spotIndex];
 
-            if (isUsableText(spot.SpotName)) {
+            if (this.isUsableText(spot.SpotName)) {
                 output.push({
                     text: spot.SpotName,
                     cacheType: this.getCacheType(),
@@ -184,7 +164,7 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
                 });
             }
 
-            if (isUsableText(spot.Description)) {
+            if (this.isUsableText(spot.Description)) {
                 output.push({
                     text: spot.Description,
                     cacheType: this.getCacheType(),
@@ -200,15 +180,12 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
     }
 
     resolveRuntimeTranslation(text, runtime, cacheType) {
-        if (!isUsableText(text)) {
+        if (!this.isUsableText(text)) {
             return text;
         }
 
         if (
-            !runtime ||
-            typeof runtime.getCacheKey !== 'function' ||
-            typeof runtime.hasUsableCacheValue !== 'function' ||
-            !(runtime.translationCache instanceof Map)
+            !runtime
         ) {
             debugLog('resolveRuntimeTranslation skipped (runtime unavailable)', {
                 cacheType,
@@ -225,8 +202,8 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
             text: previewText(text),
         });
 
-        runtime.markCacheKeySeen?.(cacheKey);
-        debugLog('markCacheKeySeen', { cacheKey, cacheType });
+        runtime.trackCacheKeyUsage(cacheKey);
+        debugLog('trackCacheKeyUsage', { cacheKey, cacheType });
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             debugLog('cache miss', { cacheKey, cacheType, text: previewText(text) });
@@ -240,7 +217,7 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
             original: previewText(text),
             translated: previewText(cached),
         });
-        return isUsableText(cached) ? cached : text;
+        return this.isUsableText(cached) ? cached : text;
     }
 
     patchSpotListItems(windowInstance, runtime) {
@@ -551,7 +528,7 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
                             continue;
                         }
 
-                        if (!isUsableText(command.name)) {
+                        if (!translator.isUsableText(command.name)) {
                             continue;
                         }
 
@@ -689,11 +666,11 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
-            const cacheType = isUsableText(entry.cacheType) ? entry.cacheType : this.getCacheType();
+            const cacheType = this.isUsableText(entry.cacheType) ? entry.cacheType : this.getCacheType();
             const cacheKey = panel.getCacheKey(text, cacheType);
             if (!byCacheKey.has(cacheKey)) {
                 byCacheKey.set(cacheKey, {
@@ -709,7 +686,7 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -718,7 +695,7 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

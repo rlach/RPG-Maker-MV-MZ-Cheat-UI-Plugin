@@ -3,14 +3,6 @@ import { BasePluginTranslator } from '../BasePluginTranslator.js';
 const RUNTIME_HOOK_GUARD = '__CHEAT_CBR_ERO_STATUS_MV_TRANSLATOR_HOOKED__';
 const PAGE_PLUGIN_NAME_RE = /^CBR_eroStatus_(\d+)$/i;
 
-function getRuntime() {
-    return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
-}
-
-function isUsableText(value) {
-    return typeof value === 'string' && value.trim() !== '';
-}
-
 function toSafeArray(value) {
     return Array.isArray(value) ? value : [];
 }
@@ -88,7 +80,7 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
         }
 
         const pushEntry = (text, rowNo, sourceKey) => {
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 return;
             }
 
@@ -116,7 +108,7 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
             }
 
             const value = typeof parameters[key] === 'string' ? parameters[key] : '';
-            if (!isUsableText(value)) {
+            if (!this.isUsableText(value)) {
                 continue;
             }
 
@@ -141,7 +133,7 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
             for (let rowIdx = 0; rowIdx < page.t.length; rowIdx++) {
                 const row = page.t[rowIdx];
                 const text = row && typeof row.subject === 'string' ? row.subject : '';
-                if (!isUsableText(text)) {
+                if (!this.isUsableText(text)) {
                     continue;
                 }
 
@@ -220,33 +212,30 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
     }
 
     translateSubjectValue(subject, runtime) {
-        if (!isUsableText(subject)) {
+        if (!this.isUsableText(subject)) {
             return subject;
         }
 
         if (
-            !runtime ||
-            typeof runtime.getCacheKey !== 'function' ||
-            typeof runtime.hasUsableCacheValue !== 'function' ||
-            !(runtime.translationCache instanceof Map)
+            !runtime
         ) {
             return subject;
         }
 
         const cacheKey = runtime.getCacheKey(subject, this.getCacheType());
-        runtime.markCacheKeySeen?.(cacheKey);
+        runtime.trackCacheKeyUsage(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             return subject;
         }
 
         const cached = runtime.translationCache.get(cacheKey);
-        return isUsableText(cached) ? cached : subject;
+        return this.isUsableText(cached) ? cached : subject;
     }
 
     applyRuntimeSubjectTranslations() {
         const pages = toSafeArray(window.CBR_eroStatus);
-        const runtime = getRuntime();
+        const runtime = this.getRuntime();
         if (!runtime) {
             return;
         }
@@ -262,7 +251,7 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
                 }
 
                 const currentSubject = typeof item.subject === 'string' ? item.subject : '';
-                if (!isUsableText(currentSubject)) {
+                if (!this.isUsableText(currentSubject)) {
                     continue;
                 }
 
@@ -370,7 +359,7 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -382,7 +371,7 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

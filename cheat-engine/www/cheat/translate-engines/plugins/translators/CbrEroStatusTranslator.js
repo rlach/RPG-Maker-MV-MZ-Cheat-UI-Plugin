@@ -5,14 +5,6 @@ const RUNTIME_HOOK_GUARD = '__CHEAT_CBR_ERO_STATUS_TRANSLATOR_HOOKED__';
 const PLUGIN_SCRIPT_HEADER = 'CBR-エロステータス';
 const TEXT_LINE_PREFIX = 'テキスト-';
 
-function getRuntime() {
-    return window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
-}
-
-function isUsableText(value) {
-    return typeof value === 'string' && value.trim() !== '';
-}
-
 function readCommandLine(cmd) {
     return Array.isArray(cmd && cmd.parameters) && typeof cmd.parameters[0] === 'string'
         ? cmd.parameters[0]
@@ -32,33 +24,27 @@ function extractTextPayloadFromDataLine(line) {
     return safeLine.slice(TEXT_LINE_PREFIX.length);
 }
 
-function buildTranslatedDataLine(line, runtime, cacheType) {
+function buildTranslatedDataLine(line, translator, runtime, cacheType) {
     const payload = extractTextPayloadFromDataLine(line);
-    if (!isUsableText(payload)) {
+    if (!translator.isUsableText(payload)) {
         return line;
     }
 
     if (
-        !runtime ||
-        typeof runtime.getCacheKey !== 'function' ||
-        typeof runtime.hasUsableCacheValue !== 'function'
+        !runtime
     ) {
         return line;
     }
 
     const cacheKey = runtime.getCacheKey(payload, cacheType);
-    runtime.markCacheKeySeen?.(cacheKey);
-
-    if (!(runtime.translationCache instanceof Map)) {
-        return line;
-    }
+    runtime.trackCacheKeyUsage(cacheKey);
 
     if (!runtime.hasUsableCacheValue(cacheKey)) {
         return line;
     }
 
     const cached = runtime.translationCache.get(cacheKey);
-    if (!isUsableText(cached)) {
+    if (!translator.isUsableText(cached)) {
         return line;
     }
 
@@ -100,13 +86,14 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
 
         const original = window.CBR['エロステータス'];
         const cacheType = this.getCacheType();
+        const translator = this;
 
         window.CBR['エロステータス'] = function (ary) {
             try {
-                const runtime = getRuntime();
+                const runtime = translator.getRuntime();
                 if (Array.isArray(ary) && runtime) {
                     arguments[0] = ary.map((line) =>
-                        buildTranslatedDataLine(line, runtime, cacheType)
+                        buildTranslatedDataLine(line, translator, runtime, cacheType)
                     );
                 }
             } catch (error) {
@@ -266,7 +253,7 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
             ) {
                 const dataLine = readCommandLine(list[continuationIdx]);
                 const payload = extractTextPayloadFromDataLine(dataLine);
-                if (isUsableText(payload)) {
+                if (this.isUsableText(payload)) {
                     output.push({
                         text: payload,
                         source: {
@@ -289,7 +276,7 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
@@ -308,7 +295,7 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -317,7 +304,7 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

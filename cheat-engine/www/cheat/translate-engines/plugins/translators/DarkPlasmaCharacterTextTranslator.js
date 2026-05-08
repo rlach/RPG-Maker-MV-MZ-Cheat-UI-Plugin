@@ -50,7 +50,7 @@ export class DarkPlasmaCharacterTextTranslator extends BasePluginTranslator {
                 }
 
                 const cacheKey = runtime.getCacheKey(text, cacheType);
-                runtime.markCacheKeySeen(cacheKey);
+                runtime.trackCacheKeyUsage(cacheKey);
 
                 if (runtime.hasUsableCacheValue(cacheKey)) {
                     const cached = runtime.translationCache.get(cacheKey);
@@ -234,7 +234,7 @@ export class DarkPlasmaCharacterTextTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -243,7 +243,7 @@ export class DarkPlasmaCharacterTextTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

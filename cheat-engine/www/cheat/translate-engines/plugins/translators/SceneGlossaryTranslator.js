@@ -1,5 +1,6 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { mergeKnowledgeEntries } from '../../../js/KnowledgeBaseRuntime.js';
+import { parseJsonSafely } from './TranslatorHelpers.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_SCENE_GLOSSARY_TRANSLATOR_HOOKED__';
 const NOTE_CACHE_TYPE = 'item_note';
@@ -73,10 +74,6 @@ const SCENE_GLOSSARY_PLUGIN_TAGS = (() => {
     return tags;
 })();
 
-function isUsableText(value) {
-    return typeof value === 'string' && value.trim() !== '';
-}
-
 function hasOwn(object, key) {
     if (!object || (typeof object !== 'object' && typeof object !== 'function')) {
         return false;
@@ -85,23 +82,6 @@ function hasOwn(object, key) {
     return typeof Object.hasOwn === 'function'
         ? Object.hasOwn(object, key)
         : HAS_OWN_PROPERTY.call(object, key);
-}
-
-function parseJsonSafely(value, fallback) {
-    if (typeof value !== 'string') {
-        return value ?? fallback;
-    }
-
-    const normalized = value.trim();
-    if (!normalized) {
-        return fallback;
-    }
-
-    try {
-        return JSON.parse(normalized);
-    } catch {
-        return fallback;
-    }
 }
 
 function parseStructArray(rawValue) {
@@ -150,7 +130,7 @@ function parseNoteTagEntries(noteText) {
     while ((match = regex.exec(text)) !== null) {
         const tag = String(match[1] || '').trim();
         const value = String(match[2] || '').trim();
-        if (!tag || !isUsableText(value)) {
+        if (!tag || !(typeof value === 'string' && value.trim() !== '')) {
             continue;
         }
 
@@ -253,11 +233,11 @@ function getOriginalItemNote(item) {
             ? item._translateOriginal
             : null;
 
-    if (originalMap && isUsableText(originalMap.note)) {
+    if (originalMap && typeof originalMap.note === 'string' && originalMap.note.trim() !== '') {
         return originalMap.note;
     }
 
-    return isUsableText(item.note) ? item.note : '';
+    return (typeof item.note === 'string' && item.note.trim() !== '') ? item.note : '';
 }
 
 function getOriginalItemMeta(item) {
@@ -283,7 +263,7 @@ function buildMetaPatchFromNoteText(noteText) {
 
     for (const tagEntry of tagEntries) {
         const tagName = String(tagEntry.tag || '').trim();
-        if (!tagName.startsWith('SG') || !isUsableText(tagEntry.value)) {
+        if (!tagName.startsWith('SG') || !(typeof tagEntry.value === 'string' && tagEntry.value.trim() !== '')) {
             continue;
         }
 
@@ -313,13 +293,13 @@ function applyTranslatedGlossaryMeta(translator, item) {
     }
 
     const originalNote = getOriginalItemNote(item);
-    if (!isUsableText(originalNote)) {
+    if (!translator.isUsableText(originalNote)) {
         item.meta = { ...originalMeta };
         return;
     }
 
     const cacheKey = runtime.getCacheKey(originalNote, NOTE_CACHE_TYPE);
-    runtime.markCacheKeySeen(cacheKey);
+    runtime.trackCacheKeyUsage(cacheKey);
 
     if (!runtime.hasUsableCacheValue(cacheKey)) {
         item.meta = { ...originalMeta };
@@ -327,7 +307,7 @@ function applyTranslatedGlossaryMeta(translator, item) {
     }
 
     const translatedNote = runtime.translationCache.get(cacheKey);
-    if (!isUsableText(translatedNote)) {
+    if (!translator.isUsableText(translatedNote)) {
         item.meta = { ...originalMeta };
         return;
     }
@@ -337,7 +317,7 @@ function applyTranslatedGlossaryMeta(translator, item) {
 }
 
 function pushScanEntry(output, text, source, cacheType) {
-    if (!Array.isArray(output) || !isUsableText(text)) {
+    if (!Array.isArray(output) || !(typeof text === 'string' && text.trim() !== '')) {
         return;
     }
 
@@ -355,7 +335,7 @@ function getGlossaryDescriptionTagCandidates(pageIndex) {
 }
 
 function extractDescriptionFromNoteText(noteText, pageIndex) {
-    if (!isUsableText(noteText)) {
+    if (!(typeof noteText === 'string' && noteText.trim() !== '')) {
         return '';
     }
 
@@ -391,7 +371,7 @@ function appendEntriesFromGlossaryInfo(glossaryInfoList, scope, output) {
 
         for (const field of GLOSSARY_TEXT_FIELDS) {
             const text = typeof glossaryInfo[field] === 'string' ? glossaryInfo[field] : '';
-            if (!isUsableText(text)) {
+            if (!(typeof text === 'string' && text.trim() !== '')) {
                 continue;
             }
 
@@ -434,25 +414,25 @@ function appendEntriesFromParameters(parameters, scope, output) {
 }
 
 function applyRuntimeTranslation(runtime, text, cacheTypes) {
-    if (!isUsableText(text)) {
+    if (!(typeof text === 'string' && text.trim() !== '')) {
         return text;
     }
 
     const list = Array.isArray(cacheTypes) ? cacheTypes : [];
     for (const cacheType of list) {
-        if (!isUsableText(cacheType)) {
+        if (!(typeof cacheType === 'string' && cacheType.trim() !== '')) {
             continue;
         }
 
         const cacheKey = runtime.getCacheKey(text, cacheType);
-        runtime.markCacheKeySeen(cacheKey);
+        runtime.trackCacheKeyUsage(cacheKey);
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             continue;
         }
 
         const cached = runtime.translationCache.get(cacheKey);
-        if (isUsableText(cached)) {
+        if (typeof cached === 'string' && cached.trim() !== '') {
             return cached;
         }
     }
@@ -465,8 +445,7 @@ function resolveRuntimeTranslation(translator, text, cacheTypes) {
     if (
         !runtime ||
         !translator.isRuntimeTranslationActive(runtime) ||
-        !isUsableText(text) ||
-        !(runtime.translationCache instanceof Map)
+        !translator.isUsableText(text)
     ) {
         return text;
     }
@@ -489,7 +468,7 @@ function patchGlossaryDescription(translator) {
         const description = originalGetDescription.apply(this, arguments);
 
         try {
-            return isUsableText(description)
+            return translator.isUsableText(description)
                 ? resolveRuntimeTranslation(translator, description, [translator.getCacheType()])
                 : extractDescriptionFromNoteText(getOriginalItemNote(this._itemData), index);
         } catch (error) {
@@ -525,7 +504,7 @@ function patchGlossaryCategoryWindow(translator) {
         const originalText = hasData && typeof this._data[index] === 'string' ? this._data[index] : '';
 
         try {
-            if (hasData && isUsableText(originalText)) {
+            if (hasData && translator.isUsableText(originalText)) {
                 const translated = resolveRuntimeTranslation(translator, originalText, [
                     translator.getCacheType(),
                 ]);
@@ -653,7 +632,7 @@ function patchGlossaryMenuCommand(translator) {
         try {
             const list = Array.isArray(this._list) ? this._list : [];
             for (const command of list) {
-                if (!command || !isUsableText(command.symbol) || !isUsableText(command.name)) {
+                if (!command || !translator.isUsableText(command.symbol) || !translator.isUsableText(command.name)) {
                     continue;
                 }
 
@@ -763,11 +742,11 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
-            const cacheType = isUsableText(entry.cacheType) ? entry.cacheType : this.getCacheType();
+            const cacheType = this.isUsableText(entry.cacheType) ? entry.cacheType : this.getCacheType();
             const cacheKey = panel.getCacheKey(text, cacheType);
             if (!byCacheKey.has(cacheKey)) {
                 byCacheKey.set(cacheKey, {
@@ -783,7 +762,7 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -792,7 +771,7 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

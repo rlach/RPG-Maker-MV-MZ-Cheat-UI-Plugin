@@ -25,7 +25,7 @@ function applyNamePopTranslation(namePop, runtime) {
 
     const cacheKey = runtime.getCacheKey(namePop, CACHE_TYPE);
 
-    runtime.markCacheKeySeen?.(cacheKey);
+    runtime.trackCacheKeyUsage(cacheKey);
 
     if (!runtime.hasUsableCacheValue(cacheKey)) {
         return namePop;
@@ -285,7 +285,7 @@ export class TMNamePopTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -294,7 +294,7 @@ export class TMNamePopTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

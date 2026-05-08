@@ -8,10 +8,6 @@ const LB_EXPLICIT_REGEX = /<LB\s*:\s*([^>]+)>/i;
 const LB_PLAIN_REGEX = /<LB>/i;
 const LB_NO_REGEX = /<LB_No>/i;
 
-function isUsableText(value) {
-    return typeof value === 'string' && value.trim() !== '';
-}
-
 function toBoolean(value, fallback = false) {
     if (typeof value === 'boolean') {
         return value;
@@ -122,7 +118,7 @@ export class EventLabelTranslator extends BasePluginTranslator {
     extractExplicitLabelFromNote(note) {
         const text = String(note || '');
         const match = LB_EXPLICIT_REGEX.exec(text);
-        if (!match || !isUsableText(match[1])) {
+        if (!match || !this.isUsableText(match[1])) {
             return null;
         }
 
@@ -158,7 +154,7 @@ export class EventLabelTranslator extends BasePluginTranslator {
 
         const note = typeof event.note === 'string' ? event.note : '';
         const explicitLabel = this.extractExplicitLabelFromNote(note);
-        if (isUsableText(explicitLabel)) {
+        if (this.isUsableText(explicitLabel)) {
             output.push({
                 text: explicitLabel,
                 source: {
@@ -176,7 +172,7 @@ export class EventLabelTranslator extends BasePluginTranslator {
         }
 
         const eventName = typeof event.name === 'string' ? event.name : '';
-        if (!isUsableText(eventName) || this.isNameHiddenByEvPrefix(eventName)) {
+        if (!this.isUsableText(eventName) || this.isNameHiddenByEvPrefix(eventName)) {
             return;
         }
 
@@ -209,7 +205,7 @@ export class EventLabelTranslator extends BasePluginTranslator {
 
         const args = parameters[3] && typeof parameters[3] === 'object' ? parameters[3] : null;
         const text = args && typeof args.text === 'string' ? args.text : '';
-        if (!isUsableText(text)) {
+        if (!this.isUsableText(text)) {
             return null;
         }
 
@@ -391,7 +387,7 @@ export class EventLabelTranslator extends BasePluginTranslator {
             }
 
             const originalText = typeof label.text === 'string' ? label.text : '';
-            if (!isUsableText(originalText)) {
+            if (!translator.isUsableText(originalText)) {
                 return label;
             }
 
@@ -403,14 +399,14 @@ export class EventLabelTranslator extends BasePluginTranslator {
 
                 const cacheKey = runtime.getCacheKey(originalText, translator.getCacheType());
 
-                runtime.markCacheKeySeen?.(cacheKey);
+                runtime.trackCacheKeyUsage(cacheKey);
 
                 if (!runtime.hasUsableCacheValue(cacheKey)) {
                     return label;
                 }
 
                 const cached = runtime.translationCache.get(cacheKey);
-                if (!isUsableText(cached)) {
+                if (!translator.isUsableText(cached)) {
                     return label;
                 }
 
@@ -435,7 +431,7 @@ export class EventLabelTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
@@ -454,7 +450,7 @@ export class EventLabelTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -463,7 +459,7 @@ export class EventLabelTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

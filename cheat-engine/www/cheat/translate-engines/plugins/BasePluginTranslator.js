@@ -224,8 +224,8 @@ export class BasePluginTranslator extends BasePhase {
             };
         }
 
-        if (typeof runtime.markCacheKeySeen !== 'function') {
-            runtime.markCacheKeySeen = function () {};
+        if (typeof runtime.trackCacheKeyUsage !== 'function') {
+            runtime.trackCacheKeyUsage = function () {};
         }
 
         if (typeof runtime.hasUsableCacheValue !== 'function') {
@@ -265,6 +265,15 @@ export class BasePluginTranslator extends BasePhase {
         });
 
         return runtime;
+    }
+
+    /**
+     * Canonical helper to validate if a value is usable text for translation.
+     * @param {*} value - Value to check
+     * @returns {boolean} True if value is a non-empty string
+     */
+    isUsableText(value) {
+        return typeof value === 'string' && value.trim() !== '';
     }
 
     getRuntime() {

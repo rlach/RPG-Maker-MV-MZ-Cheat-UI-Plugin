@@ -6,19 +6,6 @@ const CACHE_TYPE = 'plugin_mano_input_config';
 
 const STATIC_PLUGIN_TEXTS = ['ボタン表記変更'];
 
-function isUsableText(value) {
-    return typeof value === 'string' && value.trim() !== '';
-}
-
-function getRuntime() {
-    const ensureRuntime = window['__ensureTranslationRuntime'];
-    if (typeof ensureRuntime === 'function') {
-        return ensureRuntime();
-    }
-
-    return window['__TranslationRuntime'] || null;
-}
-
 /**
  * Strip outer double-quotes from an RPG Maker note-style string, identical to the
  * plugin's own noteOrString() helper.
@@ -142,17 +129,14 @@ function resolveFromCache(text, runtime) {
     }
 
     if (
-        !runtime ||
-        typeof runtime.getCacheKey !== 'function' ||
-        typeof runtime.hasUsableCacheValue !== 'function' ||
-        !(runtime.translationCache instanceof Map)
+        !runtime
     ) {
         return text;
     }
 
     const cacheKey = runtime.getCacheKey(text, CACHE_TYPE);
 
-    runtime.markCacheKeySeen?.(cacheKey);
+    runtime.trackCacheKeyUsage(cacheKey);
 
     if (!runtime.hasUsableCacheValue(cacheKey)) {
         return text;
@@ -1028,7 +1012,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -1037,7 +1021,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

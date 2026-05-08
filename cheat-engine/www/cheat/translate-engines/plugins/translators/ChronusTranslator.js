@@ -110,7 +110,7 @@ export class ChronusTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -119,7 +119,7 @@ export class ChronusTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 
@@ -160,7 +160,7 @@ export class ChronusTranslator extends BasePluginTranslator {
                 return null;
             }
             const formatKey = runtime.getCacheKey(rawFormat, 'plugin_chronus');
-            runtime.markCacheKeySeen(formatKey);
+            runtime.trackCacheKeyUsage(formatKey);
             if (!runtime.hasUsableCacheValue(formatKey)) {
                 return null;
             }
@@ -219,7 +219,7 @@ export class ChronusTranslator extends BasePluginTranslator {
             return name;
         }
         const cacheKey = runtime.getCacheKey(name, 'plugin_chronus');
-        runtime.markCacheKeySeen(cacheKey);
+        runtime.trackCacheKeyUsage(cacheKey);
         if (!runtime.hasUsableCacheValue(cacheKey)) {
             return name;
         }
@@ -282,7 +282,7 @@ export class ChronusTranslator extends BasePluginTranslator {
                 continue;
             }
             const cacheKey = runtime.getCacheKey(ampm, 'plugin_chronus');
-            runtime.markCacheKeySeen(cacheKey);
+            runtime.trackCacheKeyUsage(cacheKey);
             if (runtime.hasUsableCacheValue(cacheKey)) {
                 const cached = runtime.translationCache.get(cacheKey);
                 if (typeof cached === 'string' && cached.trim()) {

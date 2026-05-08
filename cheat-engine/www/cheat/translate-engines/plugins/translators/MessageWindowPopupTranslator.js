@@ -12,8 +12,7 @@ function getTranslatedMessageTextForPopupSizing(runtime, originalText, options =
 
     if (
         !runtime ||
-        typeof runtime.getPreferredMessageCacheEntry !== 'function' ||
-        !(runtime.translationCache instanceof Map)
+        typeof runtime.getPreferredMessageCacheEntry !== 'function'
     ) {
         return null;
     }

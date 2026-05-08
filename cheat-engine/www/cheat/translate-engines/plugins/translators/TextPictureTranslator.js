@@ -41,10 +41,7 @@ export class TextPictureTranslator extends BasePluginTranslator {
                     window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
 
                 if (
-                    !runtime ||
-                    typeof runtime.getCacheKey !== 'function' ||
-                    typeof runtime.hasUsableCacheValue !== 'function' ||
-                    !(runtime.translationCache instanceof Map)
+                    !runtime
                 ) {
                     return result;
                 }
@@ -56,7 +53,7 @@ export class TextPictureTranslator extends BasePluginTranslator {
 
                 const cacheKey = runtime.getCacheKey(text, translator.getCacheType());
 
-                runtime.markCacheKeySeen?.(cacheKey);
+                runtime.trackCacheKeyUsage(cacheKey);
 
                 if (!runtime.hasUsableCacheValue(cacheKey)) {
                     return result;
@@ -346,7 +343,7 @@ export class TextPictureTranslator extends BasePluginTranslator {
     collectUntranslated({ panel }) {
         this.scheduleScanRefreshIfNeeded();
 
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -357,7 +354,7 @@ export class TextPictureTranslator extends BasePluginTranslator {
     countPluginAmountSync({ panel }) {
         this.scheduleScanRefreshIfNeeded();
 
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 

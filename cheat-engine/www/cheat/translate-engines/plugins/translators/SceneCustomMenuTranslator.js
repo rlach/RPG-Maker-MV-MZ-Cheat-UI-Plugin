@@ -1,20 +1,5 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
-
-/**
- * Safely parse a JSON string, returning null on failure.
- * @param {unknown} value
- * @returns {unknown}
- */
-function safeParseJSON(value) {
-    if (typeof value !== 'string' || !value.trim()) {
-        return null;
-    }
-    try {
-        return JSON.parse(value);
-    } catch {
-        return null;
-    }
-}
+import { parseJsonSafely } from './TranslatorHelpers.js';
 
 function normalizeCacheSourceText(value) {
     return typeof value === 'string' ? value.trim() : '';
@@ -27,7 +12,7 @@ function resolveCachedText(runtime, text, cacheType) {
     }
 
     const cacheKey = runtime.getCacheKey(normalizedText, cacheType);
-    runtime.markCacheKeySeen(cacheKey);
+    runtime.trackCacheKeyUsage(cacheKey);
 
     if (!runtime.hasUsableCacheValue(cacheKey)) {
         return null;
@@ -73,13 +58,13 @@ function extractWindowEntries(win, sceneId, winIdx) {
         entries.push({ text: commonHelpText, kind: 'commonHelpText', source });
     }
 
-    const commandList = safeParseJSON(win.CommandList);
+    const commandList = parseJsonSafely(win.CommandList, null);
     if (!Array.isArray(commandList)) {
         return entries;
     }
 
     for (let cmdIdx = 0; cmdIdx < commandList.length; cmdIdx++) {
-        const cmd = safeParseJSON(commandList[cmdIdx]);
+        const cmd = parseJsonSafely(commandList[cmdIdx], null);
         if (cmd) {
             entries.push(...extractCommandEntries(cmd, source, cmdIdx));
         }
@@ -96,7 +81,7 @@ function extractWindowEntries(win, sceneId, winIdx) {
 function extractSceneEntries(scene) {
     const entries = [];
     const sceneId = scene.Id.trim();
-    const windowList = safeParseJSON(scene.WindowList);
+    const windowList = parseJsonSafely(scene.WindowList, null);
     if (!Array.isArray(windowList)) {
         return entries;
     }
@@ -238,7 +223,7 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
         const entries = [];
 
         for (let sceneIdx = 1; sceneIdx <= 20; sceneIdx++) {
-            const scene = /** @type {any} */ (safeParseJSON(params[`Scene${sceneIdx}`]));
+            const scene = /** @type {any} */ (parseJsonSafely(params[`Scene${sceneIdx}`], null));
             if (scene && typeof scene.Id === 'string' && scene.Id.trim()) {
                 entries.push(...extractSceneEntries(scene));
             }
@@ -271,7 +256,7 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
     }
 
     collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return [];
         }
 
@@ -280,7 +265,7 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
     }
 
     countPluginAmountSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+        if (!panel) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 
