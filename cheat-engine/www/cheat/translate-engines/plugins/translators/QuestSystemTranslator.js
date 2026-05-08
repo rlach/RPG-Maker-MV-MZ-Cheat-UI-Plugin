@@ -366,6 +366,10 @@ export class QuestSystemTranslator extends BasePluginTranslator {
             return text;
         }
 
+        if (!this.isRuntimeTranslationActive(runtime)) {
+            return text;
+        }
+
         const normalizedTypes = this.normalizeCacheTypes(cacheTypes);
         for (const cacheType of normalizedTypes) {
             const cachedText = this.tryGetCachedTextForType(text, runtime, cacheType);

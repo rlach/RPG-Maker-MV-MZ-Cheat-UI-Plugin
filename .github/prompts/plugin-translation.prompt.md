@@ -78,11 +78,12 @@ Implementation workflow:
 - Do not break original plugin behavior.
 - Only replace text payload, never required command keywords/prefixes.
 - Use base APIs directly (`this.getRuntime()`, `this.isRuntimeTranslationActive(runtime)`, `this.isUsableText(value)`) and keep translator code focused on plugin-specific behavior.
+- Runtime translation is allowed only when `this.isRuntimeTranslationActive(runtime)` is true; otherwise hooks must return original text/behavior unchanged.
 - All real-time hooks are gated by runtime translation settings: hooks only execute when **either**:
     - `runtime.isTranslationEnabled()` returns true (user enabled "Enable Real-time Translation"), **OR**
     - `runtime.translateCacheWhenDisabled` is true (user enabled "Translate cached keys even when Real-time translation is disabled")
 - If both flags are false/disabled, plugin-specific runtime patches must early-return without applying any hook logic (preserve original behavior).
-- To check at hook time: use `isTranslationEnabled() || translateCacheWhenDisabled` on the resolved runtime object, or call helper if available.
+- To check at hook time, call `this.isRuntimeTranslationActive(runtime)` (preferred canonical helper from `BasePluginTranslator`).
 
 5. Seen tracking rules:
 

@@ -51,6 +51,10 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
             return text;
         }
 
+        if (!this.isRuntimeTranslationActive(runtime)) {
+            return text;
+        }
+
         if (typeof text !== 'string' || !text.trim()) {
             return text;
         }
@@ -99,7 +103,7 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
             return text;
         }
 
-        if (!runtime) {
+        if (!runtime || !this.isRuntimeTranslationActive(runtime)) {
             return text;
         }
 
