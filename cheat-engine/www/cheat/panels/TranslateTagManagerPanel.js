@@ -108,7 +108,13 @@ export default {
     <v-dialog v-model="customTagDialogVisible" max-width="560" @keydown.stop>
         <v-card dark class="pt-2">
             <v-card-title class="subtitle-1 font-weight-bold">
-                {{ customTagEditIndex >= 0 ? 'Edit Custom Tag' : 'Add Custom Tag' }}
+                {{
+                    customTagReadOnlyMode
+                        ? 'Edit Reserved Width'
+                        : customTagEditIndex >= 0
+                            ? 'Edit Custom Tag'
+                            : 'Add Custom Tag'
+                }}
             </v-card-title>
             <v-card-text>
                 <v-text-field
@@ -117,6 +123,7 @@ export default {
                     outlined
                     dense
                     hide-details
+                    :readonly="customTagReadOnlyMode"
                     @keydown.stop
                     class="mb-2"
                 ></v-text-field>
@@ -127,6 +134,7 @@ export default {
                     outlined
                     dense
                     hide-details
+                    :readonly="customTagReadOnlyMode"
                     @keydown.stop
                     class="mb-2"
                 ></v-text-field>
@@ -138,6 +146,7 @@ export default {
                     outlined
                     dense
                     hide-details
+                    :readonly="customTagReadOnlyMode"
                     @keydown.stop
                     class="mb-2"
                 ></v-select>
@@ -149,6 +158,7 @@ export default {
                     outlined
                     dense
                     hide-details
+                    :readonly="customTagReadOnlyMode"
                     @keydown.stop
                     class="mb-2"
                 ></v-select>
@@ -157,6 +167,7 @@ export default {
                     v-model="customTagForm.requiredConsistency"
                     label="Required consistency"
                     hide-details
+                    :disabled="customTagReadOnlyMode"
                     class="mt-0 mb-2"
                 ></v-checkbox>
 
@@ -181,6 +192,7 @@ export default {
                         outlined
                         dense
                         hide-details
+                        :readonly="customTagReadOnlyMode"
                         @keydown.stop
                         class="mb-2"
                     ></v-select>
@@ -189,12 +201,13 @@ export default {
                         v-model="customTagForm.maskValue"
                         label="Mask value (preserve exact value, LLM cannot change it)"
                         hide-details
+                        :disabled="customTagReadOnlyMode"
                         class="mt-0 mb-2"
                     ></v-checkbox>
 
                     <v-checkbox
                         v-model="customTagForm.alwaysTranslate"
-                        :disabled="customTagForm.maskValue"
+                        :disabled="customTagForm.maskValue || customTagReadOnlyMode"
                         label="Prompt LLM to always translate"
                         hide-details
                         class="mt-0 mb-2"
@@ -202,7 +215,7 @@ export default {
 
                     <v-checkbox
                         v-model="customTagForm.alwaysAddToKnowledgeBase"
-                        :disabled="customTagForm.maskValue"
+                        :disabled="customTagForm.maskValue || customTagReadOnlyMode"
                         label="Ask LLM to always add translations to knowledge base"
                         hide-details
                         class="mt-0 mb-2"
@@ -212,34 +225,7 @@ export default {
             <v-card-actions>
                 <v-spacer></v-spacer>
                 <v-btn text color="grey" @click="closeCustomTagDialog">Cancel</v-btn>
-                <v-btn text color="primary" @click="saveCustomTag">Save</v-btn>
-            </v-card-actions>
-        </v-card>
-    </v-dialog>
-
-    <v-dialog v-model="reservedWidthDialogVisible" max-width="420" @keydown.stop>
-        <v-card dark class="pt-2">
-            <v-card-title class="subtitle-1 font-weight-bold">
-                Edit Reserved Width
-            </v-card-title>
-            <v-card-text>
-                <div class="caption mb-2">{{ reservedWidthDialogTagDisplay }}</div>
-                <v-text-field
-                    v-model.number="reservedWidthForm.reservedWidth"
-                    type="number"
-                    min="0"
-                    step="1"
-                    label="Reserved width"
-                    outlined
-                    dense
-                    hide-details
-                    @keydown.stop
-                ></v-text-field>
-            </v-card-text>
-            <v-card-actions>
-                <v-spacer></v-spacer>
-                <v-btn text color="grey" @click="closeReservedWidthDialog">Cancel</v-btn>
-                <v-btn text color="primary" @click="saveReservedWidth">Save</v-btn>
+                <v-btn text color="primary" @click="saveTagDialog">Save</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
@@ -330,6 +316,12 @@ export default {
             // Custom tag dialog
             customTagDialogVisible: false,
             customTagEditIndex: -1,
+            customTagReadOnlyMode: false,
+            fixedTagEditContext: {
+                tagSource: 'default',
+                pluginName: '',
+                tagConfig: null,
+            },
             customTagForm: {
                 description: '',
                 tagSymbol: '',
@@ -341,15 +333,6 @@ export default {
                 reservedWidth: 0,
                 alwaysTranslate: false,
                 alwaysAddToKnowledgeBase: false,
-            },
-
-            reservedWidthDialogVisible: false,
-            reservedWidthDialogTagDisplay: '',
-            reservedWidthForm: {
-                tagSource: 'default',
-                pluginName: '',
-                tagConfig: null,
-                reservedWidth: 0,
             },
 
             // Static options (populated from runtime engine or fallback defaults)
@@ -628,11 +611,17 @@ export default {
                 return;
             }
 
-            this.openReservedWidthDialog(item);
+            this.openEditFixedTagDialog(item);
         },
 
         openAddCustomTagDialog() {
             this.customTagEditIndex = -1;
+            this.customTagReadOnlyMode = false;
+            this.fixedTagEditContext = {
+                tagSource: 'default',
+                pluginName: '',
+                tagConfig: null,
+            };
             this.customTagForm = {
                 description: '',
                 tagSymbol: '',
@@ -650,6 +639,12 @@ export default {
 
         openEditCustomTagDialog(tag, index) {
             this.customTagEditIndex = index;
+            this.customTagReadOnlyMode = false;
+            this.fixedTagEditContext = {
+                tagSource: 'default',
+                pluginName: '',
+                tagConfig: null,
+            };
             this.customTagForm = {
                 description: String(tag.description || ''),
                 tagSymbol: String(tag.tagSymbol || ''),
@@ -665,19 +660,28 @@ export default {
             this.customTagDialogVisible = true;
         },
 
-        openReservedWidthDialog(item) {
-            this.reservedWidthDialogTagDisplay = item.tagDisplay;
-            this.reservedWidthForm = {
+        openEditFixedTagDialog(item) {
+            const tag = item.tag || {};
+            this.customTagEditIndex = -1;
+            this.customTagReadOnlyMode = true;
+            this.fixedTagEditContext = {
                 tagSource: item.tagSource,
                 pluginName: item.pluginName || '',
-                tagConfig: item.tag,
-                reservedWidth: this.normalizeReservedWidthInput(item.tag.reservedWidth),
+                tagConfig: tag,
             };
-            this.reservedWidthDialogVisible = true;
-        },
-
-        closeReservedWidthDialog() {
-            this.reservedWidthDialogVisible = false;
+            this.customTagForm = {
+                description: String(tag.description || ''),
+                tagSymbol: String(tag.tagSymbol || ''),
+                type: String(tag.type || 'withNumericParameter'),
+                requiredConsistency: !!tag.requiredConsistency,
+                style: String(tag.style || 'escape'),
+                bracket: String(tag.bracket || (tag.style === 'xml' ? 'none' : '<')),
+                maskValue: !!tag.maskValue,
+                alwaysTranslate: !!tag.alwaysTranslate,
+                alwaysAddToKnowledgeBase: !!tag.alwaysAddToKnowledgeBase,
+                reservedWidth: this.normalizeReservedWidthInput(tag.reservedWidth),
+            };
+            this.customTagDialogVisible = true;
         },
 
         normalizeReservedWidthInput(value) {
@@ -685,21 +689,35 @@ export default {
             return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
         },
 
-        saveReservedWidth() {
-            const { tagSource, pluginName, tagConfig } = this.reservedWidthForm;
+        saveTagDialog() {
+            if (this.customTagReadOnlyMode) {
+                this.saveFixedTagReservedWidth();
+                return;
+            }
+            this.saveCustomTag();
+        },
+
+        saveFixedTagReservedWidth() {
+            const { tagSource, pluginName, tagConfig } = this.fixedTagEditContext;
             this.callRuntime(
                 'updateAiTagReservedWidth',
                 tagSource,
                 tagConfig,
-                this.normalizeReservedWidthInput(this.reservedWidthForm.reservedWidth),
+                this.normalizeReservedWidthInput(this.customTagForm.reservedWidth),
                 pluginName || ''
             );
             this.callRuntime('bindEngineConfigTo', this.runtime);
-            this.closeReservedWidthDialog();
+            this.closeCustomTagDialog();
         },
 
         closeCustomTagDialog() {
             this.customTagDialogVisible = false;
+            this.customTagReadOnlyMode = false;
+            this.fixedTagEditContext = {
+                tagSource: 'default',
+                pluginName: '',
+                tagConfig: null,
+            };
         },
 
         saveCustomTag() {
