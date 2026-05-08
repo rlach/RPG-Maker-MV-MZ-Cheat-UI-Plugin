@@ -123,7 +123,7 @@ export default {
                     outlined
                     dense
                     hide-details
-                    :readonly="customTagReadOnlyMode"
+                    :disabled="customTagReadOnlyMode"
                     @keydown.stop
                     class="mb-2"
                 ></v-text-field>
@@ -134,7 +134,7 @@ export default {
                     outlined
                     dense
                     hide-details
-                    :readonly="customTagReadOnlyMode"
+                    :disabled="customTagReadOnlyMode"
                     @keydown.stop
                     class="mb-2"
                 ></v-text-field>
@@ -146,7 +146,7 @@ export default {
                     outlined
                     dense
                     hide-details
-                    :readonly="customTagReadOnlyMode"
+                    :disabled="customTagReadOnlyMode"
                     @keydown.stop
                     class="mb-2"
                 ></v-select>
@@ -158,7 +158,7 @@ export default {
                     outlined
                     dense
                     hide-details
-                    :readonly="customTagReadOnlyMode"
+                    :disabled="customTagReadOnlyMode"
                     @keydown.stop
                     class="mb-2"
                 ></v-select>
@@ -192,7 +192,7 @@ export default {
                         outlined
                         dense
                         hide-details
-                        :readonly="customTagReadOnlyMode"
+                        :disabled="customTagReadOnlyMode"
                         @keydown.stop
                         class="mb-2"
                     ></v-select>
