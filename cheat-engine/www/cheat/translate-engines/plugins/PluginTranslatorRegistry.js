@@ -11,6 +11,7 @@ import { DynamicDatabaseTranslator } from './translators/DynamicDatabaseTranslat
 import { EventLabelTranslator } from './translators/EventLabelTranslator.js';
 import { ExtraWindowTranslator } from './translators/ExtraWindowTranslator.js';
 import { GetInformationTranslator } from './translators/GetInformationTranslator.js';
+import { HelpWindowPluginTranslator } from './translators/HelpWindowPluginTranslator.js';
 import { DestinationWindowTranslator } from './translators/DestinationWindowTranslator.js';
 import { KmsMapActiveMessageTranslator } from './translators/KmsMapActiveMessageTranslator.js';
 import { KekeVariableActorCommandTranslator } from './translators/KekeVariableActorCommandTranslator.js';
@@ -63,6 +64,7 @@ class PluginTranslatorRegistry {
             EventLabelTranslator,
             ExtraWindowTranslator,
             GetInformationTranslator,
+            HelpWindowPluginTranslator,
             DestinationWindowTranslator,
             KmsMapActiveMessageTranslator,
             KekeVariableActorCommandTranslator,
