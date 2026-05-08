@@ -7,7 +7,9 @@
  *   ./www/cheat-settings/translate-cache/cache-settings.json
  *
  * Versioning:
- *   - No file / version 0 → run all migrations up to CURRENT_CACHE_VERSION
+ *   - No file + no cache files/data → initialize settings at CURRENT_CACHE_VERSION
+ *   - No file + existing cache files/data → treat as version 0 and run all migrations
+ *   - version 0 → run all migrations up to CURRENT_CACHE_VERSION
  *   - version >= CURRENT_CACHE_VERSION → nothing to do
  *
  * Migration history:
@@ -92,6 +94,15 @@ export function runCacheMigrationsIfNeeded(panel) {
     }
 
     const settings = readCacheSettings(panel);
+
+    if (!settings) {
+        const hasAnyCacheContent = _hasAnyCacheContent(panel);
+        if (!hasAnyCacheContent) {
+            writeCacheSettings(panel, { version: CURRENT_CACHE_VERSION });
+            return;
+        }
+    }
+
     const storedVersion = settings && typeof settings.version === 'number' ? settings.version : 0;
 
     if (storedVersion >= CURRENT_CACHE_VERSION) {
@@ -117,6 +128,14 @@ export function runCacheMigrationsIfNeeded(panel) {
     console.log(
         `[TranslateOnTheFly] Cache migrated from v${storedVersion} to v${CURRENT_CACHE_VERSION}`
     );
+}
+
+function _hasAnyCacheContent(panel) {
+    if (panel.translationCache.size > 0) {
+        return true;
+    }
+
+    return panel.getAllSplitCacheBucketsFromDiskSync().length > 0;
 }
 
 // ---------------------------------------------------------------------------

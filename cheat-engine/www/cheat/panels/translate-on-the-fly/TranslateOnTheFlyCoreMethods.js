@@ -10,8 +10,6 @@ import { createTranslationBatchManager } from '../../translate-engines/batch-man
 import { DATA_CONTAINER_TRANSLATION_DEFINITIONS } from '../../translate-engines/translation-phases/DataContainerDefinitions.js';
 import {
     runCacheMigrationsIfNeeded,
-    writeCacheSettings,
-    CURRENT_CACHE_VERSION,
 } from './TranslateCacheMigrations.js';
 
 export const translateOnTheFlyCoreMethods = {
@@ -290,8 +288,6 @@ export const translateOnTheFlyCoreMethods = {
         const directoryPath = this.getSplitCacheDirectoryPath();
         if (!fs.existsSync(directoryPath)) {
             fs.mkdirSync(directoryPath, { recursive: true });
-            // Brand-new cache directory – write settings so version is known from the start.
-            writeCacheSettings(this, { version: CURRENT_CACHE_VERSION });
         }
     },
 
