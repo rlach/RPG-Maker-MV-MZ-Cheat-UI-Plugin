@@ -52,18 +52,30 @@ export function loadMapDataById(mapId) {
         return Promise.resolve(cached);
     }
 
-    const promise = (() => {
-        const dataManager = globalThis.DataManager;
-        if (dataManager && typeof dataManager.loadDataFile === 'function') {
-            return loadMapDataViaDataManager(dataManager, safeMapId);
-        }
-        return loadMapDataViaXhr(safeMapId);
-    })();
+    const promise = loadMapDataViaXhr(safeMapId)
+        .then((mapData) => validateXhrMapDataOrThrow(mapData))
+        .catch(() => loadMapDataViaDataManager(DataManager, safeMapId));
 
     return promise.then((mapData) => {
         cache.set(safeMapId, mapData);
         return mapData;
     });
+}
+
+function validateXhrMapDataOrThrow(mapData) {
+    if (Array.isArray(mapData?.data)) {
+        return mapData;
+    }
+
+    if (typeof mapData?.data === 'string') {
+        const parsed = JSON.parse(mapData.data);
+        if (Array.isArray(parsed)) {
+            mapData.data = parsed;
+            return mapData;
+        }
+    }
+
+    throw new Error('Map data is encrypted or not JSON');
 }
 
 function loadMapDataViaDataManager(dataManager, mapId) {

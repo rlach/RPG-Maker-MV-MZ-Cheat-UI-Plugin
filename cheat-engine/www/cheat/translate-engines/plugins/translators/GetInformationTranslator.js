@@ -127,7 +127,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
         if (pluginEntry?.parameters && typeof pluginEntry.parameters === 'object') {
             for (const field of PARAM_TEXT_FIELDS) {
                 const value = pluginEntry.parameters[field];
-                if (!result.has(field) && isUsableText(value)) {
+                if (!result.has(field) && this.isUsableText(value)) {
                     result.set(field, value);
                 }
             }
@@ -171,7 +171,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
             return null;
         }
 
-        if (!isUsableText(parsed.payload)) {
+        if (!this.isUsableText(parsed.payload)) {
             return null;
         }
 
@@ -339,7 +339,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
 
     tryResolveCachedText(sourceText, cacheType, runtime) {
         if (
-            !isUsableText(sourceText) ||
+            !this.isUsableText(sourceText) ||
             !runtime
         ) {
             return { cacheKey: '', translatedText: sourceText };
@@ -354,7 +354,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
         }
 
         const cached = runtime.translationCache.get(cacheKey);
-        if (!isUsableText(cached)) {
+        if (!this.isUsableText(cached)) {
             return { cacheKey, translatedText: sourceText };
         }
 
@@ -442,7 +442,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
         if (field) {
             const byField = this.getSourceTextByField();
             const sourceTemplate = byField.get(field);
-            if (!isUsableText(sourceTemplate)) {
+            if (!this.isUsableText(sourceTemplate)) {
                 return null;
             }
 
@@ -470,7 +470,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
             };
         }
 
-        if (typeof value === 'string' && isUsableText(value)) {
+        if (typeof value === 'string' && this.isUsableText(value)) {
             const { translatedText } = this.tryResolveCachedText(
                 value,
                 COMMAND_CACHE_TYPE,
@@ -504,15 +504,16 @@ export class GetInformationTranslator extends BasePluginTranslator {
         }
 
         const originalShowInfo = commonPopupManager.showInfo;
+        const isUsableTranslatedTemplate = (text) => this.isUsableText(text);
         const resolveRuntimeTranslation = (...args) =>
-            this.resolveShowInfoRuntimeTranslation(args, getRuntime());
+            this.resolveShowInfoRuntimeTranslation(args, this.getRuntime());
 
         commonPopupManager.showInfo = function (object, value, type, actor, c) {
             try {
                 const result = resolveRuntimeTranslation(...arguments);
                 if (
                     result?.shouldOverrideTemplate &&
-                    isUsableText(result.template) &&
+                    isUsableTranslatedTemplate(result.template) &&
                     result.preSubstituted
                 ) {
                     arguments[1] = result.template;

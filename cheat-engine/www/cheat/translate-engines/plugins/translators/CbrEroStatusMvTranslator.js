@@ -193,7 +193,7 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!isUsableText(text)) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
@@ -216,9 +216,7 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
             return subject;
         }
 
-        if (
-            !runtime
-        ) {
+        if (!runtime) {
             return subject;
         }
 
