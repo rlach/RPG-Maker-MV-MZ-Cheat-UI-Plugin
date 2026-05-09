@@ -68,6 +68,14 @@ declare const Window_TitleCommand: any;
 declare const Window_Options: any;
 declare const Window_Help: any;
 declare const Window_ActorCommand: any;
+declare const Window_ChoiceList: any;
+declare const Window_EquipStatus: any;
+declare const Window_EquipCommand: any;
+declare const Window_EquipSlot: any;
+declare const Window_EquipItem: any;
+declare const Window_ShopCommand: any;
+declare const Window_ShopBuy: any;
+declare const Window_ShopSell: any;
 
 declare const Game_Picture: any;
 declare const Spriteset_Map: any;
@@ -133,6 +141,7 @@ declare interface Window {
     Window_TitleCommand?: any;
     Window_Help?: any;
     Window_CustomMenuCommand?: any;
+    Window_ChoiceList?: any;
     PluginManager?: any;
     Torigoya?: any;
     TRP_CORE?: {
