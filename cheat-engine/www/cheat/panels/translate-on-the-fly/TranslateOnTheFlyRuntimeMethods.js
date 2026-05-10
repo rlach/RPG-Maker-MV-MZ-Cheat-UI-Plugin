@@ -5,92 +5,6 @@ import {
 } from '../../js/CommandTranslationManager.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../../translate-engines/plugins/PluginTranslatorRegistry.js';
 
-const PERF_LOG_INTERVAL_MS = 2000;
-const PERF_WARN_AVG_MS = 0.35;
-const PERF_WARN_MAX_MS = 4;
-const PERF_WARN_MIN_COUNT = 100;
-
-function nowMs() {
-    if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
-        return performance.now();
-    }
-
-    return Date.now();
-}
-
-function getPerfCounters(runtime) {
-    if (!runtime.__translationHookPerfCounters) {
-        runtime.__translationHookPerfCounters = {
-            lastLogAt: 0,
-            counters: Object.create(null),
-        };
-    }
-
-    return runtime.__translationHookPerfCounters;
-}
-
-function recordHookPerf(runtime, key, durationMs) {
-    const store = getPerfCounters(runtime);
-    if (!store.counters[key]) {
-        store.counters[key] = {
-            calls: 0,
-            totalMs: 0,
-            maxMs: 0,
-        };
-    }
-
-    const bucket = store.counters[key];
-    bucket.calls += 1;
-    bucket.totalMs += durationMs;
-    if (durationMs > bucket.maxMs) {
-        bucket.maxMs = durationMs;
-    }
-
-    const elapsedSinceLastLog = Date.now() - store.lastLogAt;
-    if (elapsedSinceLastLog < PERF_LOG_INTERVAL_MS) {
-        return;
-    }
-
-    store.lastLogAt = Date.now();
-
-    const rows = [];
-    for (const [name, metrics] of Object.entries(store.counters)) {
-        if (!metrics.calls) {
-            continue;
-        }
-
-        const avgMs = metrics.totalMs / metrics.calls;
-        const suspicious =
-            (metrics.calls >= PERF_WARN_MIN_COUNT && avgMs >= PERF_WARN_AVG_MS) ||
-            metrics.maxMs >= PERF_WARN_MAX_MS;
-
-        if (!suspicious) {
-            continue;
-        }
-
-        rows.push({
-            name,
-            calls: metrics.calls,
-            avgMs: Number(avgMs.toFixed(4)),
-            maxMs: Number(metrics.maxMs.toFixed(4)),
-        });
-    }
-
-    if (rows.length === 0) {
-        return;
-    }
-
-    console.warn('[TranslateOnTheFly][Perf][Hooks] Suspicious hot-path timings', {
-        translationEnabled: runtime.isTranslationEnabled(),
-        translateCacheWhenDisabled: !!runtime.translateCacheWhenDisabled,
-        nonOtfActive:
-            typeof runtime.isNonOtfTranslationProcessActive === 'function'
-                ? runtime.isNonOtfTranslationProcessActive()
-                : false,
-        rows,
-    });
-}
-
 export const translateOnTheFlyRuntimeMethods = {
     setupTranslationHook() {
         const self = this;
@@ -402,8 +316,6 @@ export const translateOnTheFlyRuntimeMethods = {
         }
 
         Game_Variables.prototype.value = function (variableId) {
-            const perfStartedAt = nowMs();
-            try {
                 const originalValue = Game_Variables.prototype._translateOriginalValue.call(
                     this,
                     variableId
@@ -433,9 +345,6 @@ export const translateOnTheFlyRuntimeMethods = {
                 }
 
                 return originalValue;
-            } finally {
-                recordHookPerf(self, 'Game_Variables.value', nowMs() - perfStartedAt);
-            }
         };
 
         if (shouldHookInterpreterCommands) {
@@ -485,8 +394,6 @@ export const translateOnTheFlyRuntimeMethods = {
 
         // Override canStart to block until translation is ready
         Window_Message.prototype.canStart = function () {
-            const perfStartedAt = nowMs();
-            try {
                 // Store reference to this message window and $gameMessage for Alt+R refresh
                 self.currentMessageWindow = this;
                 self.currentGameMessage = $gameMessage;
@@ -834,9 +741,6 @@ export const translateOnTheFlyRuntimeMethods = {
 
                 // Translation already applied, allow start
                 return originalCanStart;
-            } finally {
-                recordHookPerf(self, 'Window_Message.canStart', nowMs() - perfStartedAt);
-            }
         };
 
         // Reset translation flag when message terminates
@@ -1101,8 +1005,6 @@ export const translateOnTheFlyRuntimeMethods = {
         }
 
         Window_Message.prototype.startInput = function () {
-            const perfStartedAt = nowMs();
-            try {
                 const translationEnabled = self.isTranslationEnabled();
                 const skipping = self.isSkippingMessages();
                 const allowTranslation = translationEnabled && !skipping;
@@ -1245,9 +1147,6 @@ export const translateOnTheFlyRuntimeMethods = {
                 }
 
                 return Window_Message.prototype._originalStartInput.call(this);
-            } finally {
-                recordHookPerf(self, 'Window_Message.startInput', nowMs() - perfStartedAt);
-            }
         };
 
         if (!DataManager._extractSaveContents) {
@@ -1322,14 +1221,9 @@ export const translateOnTheFlyRuntimeMethods = {
             }
 
             Scene_Map.prototype.onMapLoaded = function () {
-                const perfStartedAt = nowMs();
-                try {
                     applyLifecycleTranslations('sceneMapOnMapLoaded');
                     applyCurrentMapDisplayNameFromCache();
                     return Scene_Map.prototype._translateOriginalOnMapLoaded.call(this);
-                } finally {
-                    recordHookPerf(self, 'Scene_Map.onMapLoaded', nowMs() - perfStartedAt);
-                }
             };
         }
 

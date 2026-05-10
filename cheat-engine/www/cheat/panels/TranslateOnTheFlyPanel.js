@@ -6,11 +6,13 @@ import { TRANSLATION_RUNTIME_STATE_KEYS } from './translate-on-the-fly/Translati
 const runtimeStateProxyComputed = TRANSLATION_RUNTIME_STATE_KEYS.reduce((acc, key) => {
     acc[key] = {
         get() {
-            return this.runtime ? this.runtime[key] : undefined;
+            void this._stateVersion;
+            return this._runtime ? this._runtime[key] : undefined;
         },
         set(value) {
-            if (this.runtime) {
-                this.runtime[key] = value;
+            if (this._runtime) {
+                this._runtime[key] = value;
+                this._stateVersion++;
             }
         },
     };
@@ -300,22 +302,17 @@ export default {
 
     data() {
         return {
-            runtime: null,
-            translationCache: null,
-            lastSeenByCacheKey: null,
-            pendingTranslations: null,
-            failedTranslations: null,
-            batchManager: null,
+            _stateVersion: 0,
         };
     },
 
     created() {
-        this.runtime = ensureTranslationRuntime();
+        this._runtime = ensureTranslationRuntime();
         this.syncRuntimeRefs();
 
         this.stateUnsubscribe = TranslateOnTheFlyState.subscribe((enabled) => {
-            if (this.runtime) {
-                this.runtime.enabled = enabled;
+            if (this._runtime) {
+                this._runtime.enabled = enabled;
             }
             this.syncRuntimeRefs();
         });
@@ -342,7 +339,8 @@ export default {
         ...runtimeStateProxyComputed,
 
         cachedCount() {
-            return this.translationCache ? this.translationCache.size : 0;
+            void this._stateVersion;
+            return this._translationCache ? this._translationCache.size : 0;
         },
 
         normalizedTextWrapFontScaleMultiplier() {
@@ -378,27 +376,28 @@ export default {
 
     methods: {
         syncRuntimeRefs() {
-            if (!this.runtime) {
+            if (!this._runtime) {
                 return;
             }
 
-            this.translationCache = this.runtime.translationCache;
-            this.lastSeenByCacheKey = this.runtime.lastSeenByCacheKey;
-            this.pendingTranslations = this.runtime.pendingTranslations;
-            this.failedTranslations = this.runtime.failedTranslations;
-            this.batchManager = this.runtime.batchManager;
-            this.engine = this.runtime.engine;
+            this._translationCache = this._runtime.translationCache;
+            this._lastSeenByCacheKey = this._runtime.lastSeenByCacheKey;
+            this._pendingTranslations = this._runtime.pendingTranslations;
+            this._failedTranslations = this._runtime.failedTranslations;
+            this._batchManager = this._runtime.batchManager;
+            this._engine = this._runtime.engine;
+            this._stateVersion++;
         },
 
         callRuntime(methodName, ...args) {
-            if (!this.runtime) {
-                this.runtime = ensureTranslationRuntime();
+            if (!this._runtime) {
+                this._runtime = ensureTranslationRuntime();
             }
 
-            if (!this.runtime || typeof this.runtime[methodName] !== 'function') {
+            if (!this._runtime || typeof this._runtime[methodName] !== 'function') {
                 throw new Error(`Translation runtime method is missing: ${methodName}`);
             }
-            const result = this.runtime[methodName](...args);
+            const result = this._runtime[methodName](...args);
 
             if (result && typeof result.then === 'function') {
                 return result.finally(() => {
