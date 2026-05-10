@@ -6,13 +6,13 @@ import { TRANSLATION_RUNTIME_STATE_KEYS } from './translate-on-the-fly/Translati
 const runtimeStateProxyComputed = TRANSLATION_RUNTIME_STATE_KEYS.reduce((acc, key) => {
     acc[key] = {
         get() {
-            void this._stateVersion;
+            void this.stateVersion;
             return this._runtime ? this._runtime[key] : undefined;
         },
         set(value) {
             if (this._runtime) {
                 this._runtime[key] = value;
-                this._stateVersion++;
+                this.stateVersion++;
             }
         },
     };
@@ -173,35 +173,85 @@ export default {
     </v-card-text>
 
     <v-card-text class="py-0">
-        <v-text-field
-            v-model.number="maxLineWidth"
-            label="Maximum line width for dialogue"
-            outlined
-            dense
-            type="number"
-            min="20"
-            max="200"
-            hide-details
-            :disabled="!enableTextWrapping"
-            @keydown.self.stop
-            @change="onChangeMaxWidth"
-            @focus="$event.target.select()">
-        </v-text-field>
+        <div class="d-flex align-center" style="gap: 8px;">
+            <v-text-field
+                v-model.number="maxLineWidth"
+                label="Maximum line width for dialogue"
+                outlined
+                dense
+                type="number"
+                min="20"
+                max="200"
+                hide-details
+                :disabled="!enableTextWrapping"
+                @keydown.self.stop
+                @change="onChangeMaxWidth"
+                @focus="$event.target.select()"
+                style="flex: 1 1 auto;">
+            </v-text-field>
+            <v-text-field
+                :value="textWrapLevel1RegularWidth"
+                label="size +1 \\{"
+                outlined
+                dense
+                type="number"
+                hide-details
+                disabled
+                readonly
+                style="flex: 0 0 100px; max-width: 100px;">
+            </v-text-field>
+            <v-text-field
+                :value="textWrapLevel2RegularWidth"
+                label="size +2 \\{\\{"
+                outlined
+                dense
+                type="number"
+                hide-details
+                disabled
+                readonly
+                style="flex: 0 0 110px; max-width: 110px;">
+            </v-text-field>
+        </div>
 
-        <v-text-field
-            v-model.number="maxLineWidthWithPortrait"
-            label="Maximum line width for dialogue with portrait"
-            outlined
-            dense
-            type="number"
-            min="20"
-            max="200"
-            hide-details
-            :disabled="!enableTextWrapping"
-            @keydown.self.stop
-            @change="onChangeMaxWidthWithPortrait"
-            @focus="$event.target.select()">
-        </v-text-field>
+        <div class="d-flex align-center" style="gap: 8px;">
+            <v-text-field
+                v-model.number="maxLineWidthWithPortrait"
+                label="Maximum line width for dialogue with portrait"
+                outlined
+                dense
+                type="number"
+                min="20"
+                max="200"
+                hide-details
+                :disabled="!enableTextWrapping"
+                @keydown.self.stop
+                @change="onChangeMaxWidthWithPortrait"
+                @focus="$event.target.select()"
+                style="flex: 1 1 auto;">
+            </v-text-field>
+            <v-text-field
+                :value="textWrapLevel1PortraitWidth"
+                label="size +1 \\{"
+                outlined
+                dense
+                type="number"
+                hide-details
+                disabled
+                readonly
+                style="flex: 0 0 100px; max-width: 100px;">
+            </v-text-field>
+            <v-text-field
+                :value="textWrapLevel2PortraitWidth"
+                label="size +2 \\{\\{"
+                outlined
+                dense
+                type="number"
+                hide-details
+                disabled
+                readonly
+                style="flex: 0 0 110px; max-width: 110px;">
+            </v-text-field>
+        </div>
 
         <v-text-field
             v-model.number="descriptionMaxLineWidth"
@@ -232,10 +282,6 @@ export default {
             @change="onChangeTextWrapFontScaleMultiplier"
             @focus="$event.target.select()">
         </v-text-field>
-
-        <div class="caption mt-1" :class="{ 'text--disabled': !enableTextWrapping }">
-            1 level of \\{ increase: {{ textWrapLevel1RegularWidth }} (regular), {{ textWrapLevel1PortraitWidth }} (portrait). 2 levels: {{ textWrapLevel2RegularWidth }} (regular), {{ textWrapLevel2PortraitWidth }} (portrait)
-        </div>
     </v-card-text>
 
     <v-card-subtitle class="pb-0 mt-4 font-weight-bold">Batching</v-card-subtitle>
@@ -302,7 +348,7 @@ export default {
 
     data() {
         return {
-            _stateVersion: 0,
+            stateVersion: 0,
         };
     },
 
@@ -339,7 +385,7 @@ export default {
         ...runtimeStateProxyComputed,
 
         cachedCount() {
-            void this._stateVersion;
+            void this.stateVersion;
             return this._translationCache ? this._translationCache.size : 0;
         },
 
@@ -386,7 +432,7 @@ export default {
             this._failedTranslations = this._runtime.failedTranslations;
             this._batchManager = this._runtime.batchManager;
             this._engine = this._runtime.engine;
-            this._stateVersion++;
+            this.stateVersion++;
         },
 
         callRuntime(methodName, ...args) {
