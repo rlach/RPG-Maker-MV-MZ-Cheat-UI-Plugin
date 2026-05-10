@@ -1,5 +1,15 @@
 import { notifyTranslateCacheRuntimeChanged } from '../../js/TranslateCacheRuntime.js';
 
+const SEEN_UPDATED_NOTIFY_INTERVAL_MS = 1000;
+
+function ensureSeenNotifyTimestamps(runtime) {
+    if (!runtime.__lastSeenNotifyByCacheKey) {
+        runtime.__lastSeenNotifyByCacheKey = new Map();
+    }
+
+    return runtime.__lastSeenNotifyByCacheKey;
+}
+
 function markCacheKeySeenInternal(runtime, cacheKey) {
     if (!runtime.shouldTrackRealtimeCacheUsage() || !runtime.lastSeenByCacheKey) {
         return;
@@ -9,7 +19,16 @@ function markCacheKeySeenInternal(runtime, cacheKey) {
         return;
     }
 
-    runtime.lastSeenByCacheKey.set(cacheKey, Date.now());
+    const now = Date.now();
+    runtime.lastSeenByCacheKey.set(cacheKey, now);
+
+    const notifyTimestamps = ensureSeenNotifyTimestamps(runtime);
+    const lastNotifiedAt = notifyTimestamps.get(cacheKey) || 0;
+    if (now - lastNotifiedAt < SEEN_UPDATED_NOTIFY_INTERVAL_MS) {
+        return;
+    }
+
+    notifyTimestamps.set(cacheKey, now);
     runtime.notifyCacheRuntime('seen-updated', cacheKey);
 }
 
@@ -20,6 +39,9 @@ export const translateOnTheFlyCacheMethods = {
         this.translationCache.clear();
         if (this.lastSeenByCacheKey) {
             this.lastSeenByCacheKey.clear();
+        }
+        if (this.__lastSeenNotifyByCacheKey) {
+            this.__lastSeenNotifyByCacheKey.clear();
         }
         if (this.cacheBucketByCompositeKey) {
             this.cacheBucketByCompositeKey.clear();
@@ -109,6 +131,9 @@ export const translateOnTheFlyCacheMethods = {
         this.translationCache.delete(cacheKey);
         if (options.deleteSeen !== false && this.lastSeenByCacheKey) {
             this.lastSeenByCacheKey.delete(cacheKey);
+        }
+        if (options.deleteSeen !== false && this.__lastSeenNotifyByCacheKey) {
+            this.__lastSeenNotifyByCacheKey.delete(cacheKey);
         }
         if (options.persist !== false) {
             this.persistCache([cacheKey]);
