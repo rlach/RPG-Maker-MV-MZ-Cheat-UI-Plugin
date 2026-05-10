@@ -164,7 +164,7 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
             }
 
             if (config.array) {
-                const values = parseNoteArray(fieldValue);
+                const values = parseNoteArray(fieldValue, this);
                 for (let i = 0; i < values.length; i++) {
                     this.addEntry(
                         output,
@@ -241,7 +241,7 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
             }
 
             if (fieldConfig.array) {
-                const values = parseNoteArray(fieldValue);
+                const values = parseNoteArray(fieldValue, this);
                 for (let i = 0; i < values.length; i++) {
                     this.addEntry(
                         output,
