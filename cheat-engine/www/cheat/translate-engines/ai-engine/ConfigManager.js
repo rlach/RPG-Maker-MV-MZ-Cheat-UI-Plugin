@@ -246,6 +246,7 @@ export class ConfigManager {
                @change="onChangeAiSystemPrompt"
                class="mb-2"
              ></v-textarea>
+             </div>
     `;
     }
 
