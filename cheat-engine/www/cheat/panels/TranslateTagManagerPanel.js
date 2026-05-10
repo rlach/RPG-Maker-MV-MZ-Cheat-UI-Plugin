@@ -287,7 +287,6 @@ export default {
 
     data() {
         return {
-            runtime: null,
             entries: [],
 
             searchInput: '',
@@ -366,14 +365,14 @@ export default {
     },
 
     created() {
-        this.runtime = ensureTranslationRuntime();
+        this._runtime = ensureTranslationRuntime();
         this.loadTableState();
         this.refreshEntries();
         this.unknownTagsList = this.loadUnknownTagsFromStorage();
     },
 
     activated() {
-        if (this.runtime) {
+        if (this._runtime) {
             this.refreshEntries();
         }
     },
@@ -415,8 +414,8 @@ export default {
 
     computed: {
         isAiEngine() {
-            if (!this.runtime) return false;
-            const e = this.runtime.translationEngine;
+            if (!this._runtime) return false;
+            const e = this._runtime.translationEngine;
             return e === 'openApi' || e === 'gpt4all';
         },
 
@@ -463,7 +462,7 @@ export default {
             }
 
             // 2. Plugin tags (only exist on AI engine)
-            const engine = this.runtime && this.runtime.engine;
+            const engine = this._runtime && this._runtime.engine;
             if (engine && Array.isArray(engine.pluginTags)) {
                 for (const tag of engine.pluginTags) {
                     const pluginName = tag._pluginName || 'unknown';
@@ -487,8 +486,8 @@ export default {
 
             // 3. Custom tags (bound via runtime proxy aiCustomTags)
             const customTags =
-                this.runtime && Array.isArray(this.runtime.aiCustomTags)
-                    ? this.runtime.aiCustomTags
+                this._runtime && Array.isArray(this._runtime.aiCustomTags)
+                    ? this._runtime.aiCustomTags
                     : [];
             customTags.forEach((tag, idx) => {
                 entries.push({
@@ -540,7 +539,7 @@ export default {
         },
 
         resolveEffectiveReservedWidth(tag, source, pluginName) {
-            const engine = this.runtime && this.runtime.engine;
+            const engine = this._runtime && this._runtime.engine;
             if (engine && typeof engine.resolveTagReservedWidth === 'function') {
                 return engine.resolveTagReservedWidth(tag, source, pluginName || '');
             }
@@ -549,13 +548,13 @@ export default {
         },
 
         callRuntime(methodName, ...args) {
-            if (!this.runtime) {
-                this.runtime = ensureTranslationRuntime();
+            if (!this._runtime) {
+                this._runtime = ensureTranslationRuntime();
             }
-            if (!this.runtime || typeof this.runtime[methodName] !== 'function') {
+            if (!this._runtime || typeof this._runtime[methodName] !== 'function') {
                 throw new Error(`Translation runtime method is missing: ${methodName}`);
             }
-            const result = this.runtime[methodName](...args);
+            const result = this._runtime[methodName](...args);
             if (result && typeof result.then === 'function') {
                 return result.finally(() => this.refreshEntries());
             }
@@ -706,7 +705,7 @@ export default {
                 this.normalizeReservedWidthInput(this.customTagForm.reservedWidth),
                 pluginName || ''
             );
-            this.callRuntime('bindEngineConfigTo', this.runtime);
+            this.callRuntime('bindEngineConfigTo', this._runtime);
             this.closeCustomTagDialog();
         },
 
@@ -750,7 +749,7 @@ export default {
             } else {
                 this.callRuntime('addAiCustomTag', payload);
             }
-            this.callRuntime('bindEngineConfigTo', this.runtime);
+            this.callRuntime('bindEngineConfigTo', this._runtime);
 
             // If this save was triggered from unknown-tag flow, remove matched pattern
             if (this._pendingUnknownTagPattern !== null) {
@@ -766,7 +765,7 @@ export default {
 
         removeCustomTag(index) {
             this.callRuntime('removeAiCustomTag', index);
-            this.callRuntime('bindEngineConfigTo', this.runtime);
+            this.callRuntime('bindEngineConfigTo', this._runtime);
         },
 
         // ---- Find Unknown Tags ----
@@ -786,8 +785,8 @@ export default {
         },
 
         scanCacheForUnknownTags() {
-            if (!this.runtime) return;
-            const engine = this.runtime.engine;
+            if (!this._runtime) return;
+            const engine = this._runtime.engine;
             if (!engine || typeof engine.scanForUnknownTags !== 'function') return;
 
             this.isScanning = true;
@@ -796,7 +795,7 @@ export default {
             // Use setTimeout to allow UI to update (show loading) before potentially heavy scan
             setTimeout(() => {
                 try {
-                    const cache = this.runtime.translationCache;
+                    const cache = this._runtime.translationCache;
                     const results = engine.scanForUnknownTags(cache || new Map());
                     this.unknownTagsList = results;
                     this.saveUnknownTagsToStorage(results);

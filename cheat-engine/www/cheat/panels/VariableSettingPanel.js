@@ -116,7 +116,6 @@ export default {
             rowsPerPage: getRowsPerPage(),
 
             variableNames: [],
-            translationRuntime: null,
 
             tableHeaders: [
                 {
@@ -147,7 +146,7 @@ export default {
     },
 
     created() {
-        this.translationRuntime = ensureTranslationRuntime();
+        this._translationRuntime = ensureTranslationRuntime();
         this.initializeVariables();
     },
 
@@ -219,8 +218,8 @@ export default {
         },
 
         getRawVariableValue(variableId) {
-            if (this.translationRuntime) {
-                return this.translationRuntime.getRawGameVariableValue(variableId);
+            if (this._translationRuntime) {
+                return this._translationRuntime.getRawGameVariableValue(variableId);
             }
 
             if (!window.$gameVariables || !Array.isArray($gameVariables._data)) {
@@ -231,16 +230,16 @@ export default {
         },
 
         isSafeForTranslate(variableId) {
-            return !!this.translationRuntime?.isVariableSafeForTranslation?.(variableId);
+            return !!this._translationRuntime?.isVariableSafeForTranslation?.(variableId);
         },
 
         toggleSafeForTranslate(item) {
-            if (!item || !this.translationRuntime) {
+            if (!item || !this._translationRuntime) {
                 return;
             }
 
             const nextValue = !item.safeForTranslate;
-            this.translationRuntime.setVariableSafeForTranslation(item.id, nextValue);
+            this._translationRuntime.setVariableSafeForTranslation(item.id, nextValue);
             item.safeForTranslate = nextValue;
         },
 
