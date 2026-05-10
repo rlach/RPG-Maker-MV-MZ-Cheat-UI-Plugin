@@ -48,6 +48,7 @@ Implementation workflow:
 - collectUntranslated({ panel })
 - countPluginAmountSync({ panel })
 - runtime integration in enablePluginTranslation() when applicable
+- at the top of the file, add a comment block with a brief description of the plugin and any important notes about its translation (e.g. if it has special parsing requirements, where text is stored, etc.). Also include plugin version, whenever it was target for MV or MZ (if no MZ/target is mentioned it means MV). When updating existing translator to support new plugin version or another engine (For example adding MZ support to an existing MV translator), add a version note in the comment block with the new version and any important differences in translation approach for that version. We want all supported versions listed.
 
 3. Scanning rules:
 
@@ -62,11 +63,13 @@ Implementation workflow:
 4. Base class method inheritance (CRITICAL - NO EXCEPTIONS):
 
 **ABSOLUTE PROHIBITION:**
+
 - **NEVER override `getRuntime()` from BasePluginTranslator.** The base implementation is canonical, handles all edge cases, and ensures runtime contracts are normalized. Overriding it breaks this guarantee and causes inconsistencies across the plugin ecosystem.
 - **NEVER implement helper functions that duplicate base class methods** (`isUsableText()`, `getRuntime()`, or any other method from BasePluginTranslator). This violates DRY principle and creates fragmented code.
 - **NEVER add local runtime typeguards or wrapper helpers** (`resolveRuntime`, `isRuntimeTranslationActive`, `typeof runtime.method === 'function'` checks). BasePluginTranslator provides all required contract enforcement.
 
 **Required pattern:**
+
 - Always use `this.getRuntime()` from base class. Guaranteed to be normalized and contract-complete.
 - Always use `this.isUsableText(value)` for text validation. Canonical implementation in BasePluginTranslator.
 - Always use `this.isRuntimeTranslationActive(runtime)` for translation state checks. Never implement locally.
