@@ -83,6 +83,7 @@ export const translateOnTheFlyCoreMethods = {
             label,
             startedAt: Date.now(),
         };
+        this.ensureHookInitialized('non-otf-process');
         this.clearBatchQueueAbortRequest();
         return true;
     },
@@ -99,6 +100,9 @@ export const translateOnTheFlyCoreMethods = {
     applyExternalToggle(enabled, notify = false) {
         TranslateOnTheFlyState.setEnabled(enabled);
         this.enabled = enabled;
+        if (enabled) {
+            this.ensureHookInitialized('external-toggle');
+        }
         this.saveSettings();
         this.notifyCacheRuntime('settings-enabled');
 

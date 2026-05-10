@@ -6,3 +6,7 @@ deploy/output/
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
+
+# macOS Finder metadata
+.DS_Store
+**/.DS_Store

@@ -92,6 +92,9 @@ class TranslationRuntime {
 
         this.stateUnsubscribe = TranslateOnTheFlyState.subscribe((enabled) => {
             this.enabled = enabled;
+            if (enabled) {
+                this.ensureHookInitialized('state-enabled');
+            }
         });
 
         this._initialized = true;
@@ -130,22 +133,47 @@ class TranslationRuntime {
             return;
         }
 
+        if (!this.shouldInitializeHooks()) {
+            return;
+        }
+
+        this.ensureHookInitialized('deferred');
+    }
+
+    shouldInitializeHooks() {
+        return (
+            this.isTranslationEnabled() ||
+            !!this.translateCacheWhenDisabled ||
+            this.isNonOtfTranslationProcessActive()
+        );
+    }
+
+    ensureHookInitialized(reason = 'manual') {
+        if (this._hookInitialized) {
+            return;
+        }
+
         try {
             this.setupTranslationHook();
             this._hookInitialized = true;
-            console.log('[TranslateOnTheFly] Hook initialized (immediate)');
+            console.log(`[TranslateOnTheFly] Hook initialized (${reason})`);
             return;
         } catch (error) {
-            console.warn('[TranslateOnTheFly] Immediate hook init failed, retrying delayed', error);
+            console.warn('[TranslateOnTheFly] Hook init failed, retrying delayed', error);
         }
 
         setTimeout(() => {
             if (this._hookInitialized) {
                 return;
             }
+
+            if (!this.shouldInitializeHooks()) {
+                return;
+            }
+
             this.setupTranslationHook();
             this._hookInitialized = true;
-            console.log('[TranslateOnTheFly] Hook initialized (delayed)');
+            console.log(`[TranslateOnTheFly] Hook initialized (delayed:${reason})`);
         }, 1000);
     }
 

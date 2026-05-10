@@ -114,6 +114,9 @@ export const translateOnTheFlySettingsMethods = {
 
     onChangeCacheOnly() {
         // When real-time is enabled, this flag is ignored; still persist for when disabled later
+        if (this.translateCacheWhenDisabled) {
+            this.ensureHookInitialized('cache-only-enabled');
+        }
         this.saveSettings();
         this.notifyCacheRuntime('settings-cache-only');
     },
@@ -143,6 +146,9 @@ export const translateOnTheFlySettingsMethods = {
 
     onChangeEnabled() {
         TranslateOnTheFlyState.setEnabled(this.enabled);
+        if (this.enabled) {
+            this.ensureHookInitialized('enabled-toggle');
+        }
         this.saveSettings();
         this.notifyCacheRuntime('settings-enabled');
         if (this.enabled) {
