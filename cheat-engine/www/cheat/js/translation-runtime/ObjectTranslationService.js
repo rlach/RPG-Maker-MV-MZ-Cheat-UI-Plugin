@@ -1,4 +1,4 @@
-import { Alert } from '../AlertHelper.js';
+
 import { ensureTranslationRuntime } from './TranslationRuntime.js';
 
 const makeObservable = (value) => {
@@ -42,23 +42,23 @@ class ObjectTranslationService {
     async openModal() {
         const runtime = this.ensureRuntime();
         if (!runtime) {
-            Alert.error('Translation runtime not initialized');
+            console.error('[ObjectTranslationService] Translation runtime not initialized');
             return;
         }
 
         if (runtime.objectTranslationJob && runtime.objectTranslationJob.active) {
-            Alert.warn('Object translation is already in progress');
+            runtime.notify('warn', 'Object translation is already in progress');
             return;
         }
 
         if (runtime.isNonOtfTranslationProcessActive()) {
             const activeLabel = runtime.getActiveNonOtfTranslationProcessLabel();
-            Alert.warn(`Another translation is already in progress (${activeLabel}).`);
+            runtime.notify('warn', `Another translation is already in progress (${activeLabel}).`);
             return;
         }
 
         if (runtime.checkIfDataIsLoaded()) {
-            Alert.warn('Game data is not fully loaded yet');
+            runtime.notify('warn', 'Game data is not fully loaded yet');
             return;
         }
 
@@ -163,7 +163,7 @@ class ObjectTranslationService {
     async openMapSelection() {
         const runtime = this.ensureRuntime();
         if (!runtime) {
-            Alert.error('Translation runtime not initialized');
+            console.error('[ObjectTranslationService] Translation runtime not initialized');
             return;
         }
 
@@ -188,7 +188,7 @@ class ObjectTranslationService {
     async openPluginSelection() {
         const runtime = this.ensureRuntime();
         if (!runtime) {
-            Alert.error('Translation runtime not initialized');
+            console.error('[ObjectTranslationService] Translation runtime not initialized');
             return;
         }
 
@@ -233,7 +233,7 @@ class ObjectTranslationService {
     savePluginSelection() {
         const runtime = this.ensureRuntime();
         if (!runtime) {
-            Alert.error('Translation runtime not initialized');
+            console.error('[ObjectTranslationService] Translation runtime not initialized');
             return;
         }
 
@@ -288,7 +288,7 @@ class ObjectTranslationService {
     saveMapSelection() {
         const runtime = this.ensureRuntime();
         if (!runtime) {
-            Alert.error('Translation runtime not initialized');
+            console.error('[ObjectTranslationService] Translation runtime not initialized');
             return;
         }
 
@@ -313,13 +313,13 @@ class ObjectTranslationService {
     async startTranslation(dryRun = false) {
         const runtime = this.ensureRuntime();
         if (!runtime) {
-            Alert.error('Translation runtime not initialized');
+            console.error('[ObjectTranslationService] Translation runtime not initialized');
             return;
         }
 
         if (runtime.isNonOtfTranslationProcessActive()) {
             const activeLabel = runtime.getActiveNonOtfTranslationProcessLabel();
-            Alert.warn(`Another translation is already in progress (${activeLabel}).`);
+            runtime.notify('warn', `Another translation is already in progress (${activeLabel}).`);
             return;
         }
 
@@ -337,7 +337,7 @@ class ObjectTranslationService {
         }
 
         if (!selected.length) {
-            Alert.warn('Select at least one type to translate');
+            runtime.notify('warn', 'Select at least one type to translate');
             return;
         }
 

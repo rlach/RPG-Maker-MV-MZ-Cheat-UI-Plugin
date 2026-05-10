@@ -99,6 +99,27 @@ export default [
         rules: sharedRules,
     },
     {
+        files: [
+            'cheat-engine/www/cheat/js/**/*.js',
+            'cheat-engine/www/cheat/init/**/*.js',
+            'cheat-engine/www/cheat/translate-engines/**/*.js',
+        ],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            group: ['**/panels/*', '**/panels/**'],
+                            message:
+                                'Runtime/engine/init layers must not import from panels/. Move shared code to js/ or translate-engines/.',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    {
         files: ['cheat-engine/www/**/*.vue'],
         languageOptions: {
             ...sharedLanguageOptions,

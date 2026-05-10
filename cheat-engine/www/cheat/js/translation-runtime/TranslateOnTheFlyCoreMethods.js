@@ -1,5 +1,4 @@
-import { Alert } from '../AlertHelper.js';
-import { MessageCheat } from '../CheatHelper.js';
+
 import { TranslateOnTheFlyState } from '../TranslateOnTheFlyState.js';
 import { ensureTranslateCacheRuntime } from '../TranslateCacheRuntime.js';
 import {
@@ -52,7 +51,7 @@ export const translateOnTheFlyCoreMethods = {
     },
 
     isSkippingMessages() {
-        return !!(MessageCheat && MessageCheat.skip);
+        return this._isMessageSkipActive();
     },
 
     isNonOtfTranslationProcessActive() {
@@ -70,7 +69,8 @@ export const translateOnTheFlyCoreMethods = {
     beginNonOtfTranslationProcess(label = 'translation') {
         if (this.isNonOtfTranslationProcessActive()) {
             const activeLabel = this.getActiveNonOtfTranslationProcessLabel();
-            Alert.warn(
+            this.notify(
+                'warn',
                 `Another translation is already in progress (${activeLabel}). Only On-The-Fly translation can run in parallel.`
             );
             return false;
@@ -105,7 +105,7 @@ export const translateOnTheFlyCoreMethods = {
         this.notifyCacheRuntime('settings-enabled');
 
         if (notify) {
-            Alert.success(`Real-time translation: ${enabled ? 'enabled' : 'disabled'}`);
+            this.notify('success', `Real-time translation: ${enabled ? 'enabled' : 'disabled'}`);
         }
     },
 

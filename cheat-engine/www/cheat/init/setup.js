@@ -5,6 +5,8 @@ import '../libs/vuetify.js';
 
 import MainComponent from '../MainComponent.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
+import { Alert } from '../js/AlertHelper.js';
+import { MessageCheat } from '../js/CheatHelper.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../translate-engines/plugins/PluginTranslatorRegistry.js';
 import { ensureHacksRuntime } from '../js/HacksRuntime.js';
 import { getRpgMakerName } from '../js/RpgMakerRuntime.js';
@@ -72,9 +74,23 @@ function ensureEveryDependencyReadyWithRetry(options = {}) {
 
 window.__ensureEveryDependencyReadyWithRetry = ensureEveryDependencyReadyWithRetry;
 
+let _runtimeWired = false;
+
 function ensureTranslateOnTheFlyRuntime() {
     try {
-        return ensureTranslationRuntime();
+        const runtime = ensureTranslationRuntime();
+
+        if (runtime && !_runtimeWired) {
+            _runtimeWired = true;
+            runtime.setMessageSkipProvider(() => !!(MessageCheat && MessageCheat.skip));
+            runtime.onNotify((level, msg) => {
+                if (typeof Alert[level] === 'function') {
+                    Alert[level](msg);
+                }
+            });
+        }
+
+        return runtime;
     } catch (err) {
         console.warn('[TranslateOnTheFly] Failed to ensure runtime translator', err);
         return null;
