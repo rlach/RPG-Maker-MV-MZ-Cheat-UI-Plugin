@@ -76,7 +76,6 @@ export default {
 
     data() {
         return {
-            runtime: null,
             languageOptions: [],
             selectedTargetLang: 'en',
             sourceImageRootDisplay: '',
@@ -87,19 +86,19 @@ export default {
     },
 
     created() {
-        this.runtime = ensureTranslationRuntime();
+        this._runtime = ensureTranslationRuntime();
 
-        const runtimeOptions = Array.isArray(this.runtime?.languageOptions)
-            ? this.runtime.languageOptions
+        const runtimeOptions = Array.isArray(this._runtime?.languageOptions)
+            ? this._runtime.languageOptions
             : [];
         this.languageOptions = runtimeOptions.map((item) => ({ ...item }));
 
         if (
-            this.runtime &&
-            typeof this.runtime.targetLang === 'string' &&
-            this.runtime.targetLang
+            this._runtime &&
+            typeof this._runtime.targetLang === 'string' &&
+            this._runtime.targetLang
         ) {
-            this.selectedTargetLang = this.runtime.targetLang;
+            this.selectedTargetLang = this._runtime.targetLang;
         }
 
         if (!this.languageOptions.some((item) => item.value === this.selectedTargetLang)) {
@@ -384,7 +383,7 @@ export default {
                 return;
             }
 
-            const runtime = this.runtime || ensureTranslationRuntime();
+            const runtime = this._runtime || ensureTranslationRuntime();
             if (!runtime || typeof runtime.getSplitCacheDirectoryPath !== 'function') {
                 Alert.error('Translation runtime is unavailable');
                 return;
