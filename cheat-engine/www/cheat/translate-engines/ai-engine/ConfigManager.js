@@ -10,20 +10,20 @@ export class ConfigManager {
     }
 
     _syncPanelEngineConfig() {
-        const panel = this.aiEngine && this.aiEngine.panel;
-        if (!panel) {
+        const runtime = this.aiEngine && this.aiEngine.runtime;
+        if (!runtime) {
             return;
         }
 
-        if (typeof panel.bindEngineConfigTo === 'function') {
-            panel.bindEngineConfigTo(panel);
+        if (typeof runtime.bindEngineConfigTo === 'function') {
+            runtime.bindEngineConfigTo(runtime);
         }
     }
 
     _savePanelSettings() {
-        const panel = this.aiEngine && this.aiEngine.panel;
-        if (panel && typeof panel.saveSettings === 'function') {
-            panel.saveSettings();
+        const runtime = this.aiEngine && this.aiEngine.runtime;
+        if (runtime && typeof runtime.saveSettings === 'function') {
+            runtime.saveSettings();
         }
     }
 
@@ -259,7 +259,7 @@ export class ConfigManager {
     }
 
     /**
-     * Get configuration data object for panel binding
+     * Get configuration data object for runtime binding
      * @returns {Object}
      */
     getData() {
@@ -315,9 +315,9 @@ export class ConfigManager {
             }),
             onChangeAiApiKey: this._createPersistedHandler(async (v) => {
                 this.aiEngine.apiKey = v;
-                const panel = this.aiEngine.panel;
-                if (panel && typeof panel.saveAiApiKeyToSecureStore === 'function') {
-                    await panel.saveAiApiKeyToSecureStore(v, this.aiEngine.provider);
+                const runtime = this.aiEngine.runtime;
+                if (runtime && typeof runtime.saveAiApiKeyToSecureStore === 'function') {
+                    await runtime.saveAiApiKeyToSecureStore(v, this.aiEngine.provider);
                 }
             }),
             onChangeAiModel: this._createPersistedHandler((v) => {
@@ -437,7 +437,7 @@ export class ConfigManager {
         } finally {
             this.aiEngine.loadingModels = false;
             this._syncPanelEngineConfig();
-            this.aiEngine.panel?.saveSettings?.();
+            this.aiEngine.runtime?.saveSettings?.();
         }
     }
 
@@ -459,9 +459,9 @@ export class ConfigManager {
             this.aiEngine.host = 'http://localhost:4891';
         }
 
-        const panel = this.aiEngine.panel;
-        if (panel && typeof panel.loadAiApiKeyFromSecureStore === 'function') {
-            await panel.loadAiApiKeyFromSecureStore(this.aiEngine.provider);
+        const runtime = this.aiEngine.runtime;
+        if (runtime && typeof runtime.loadAiApiKeyFromSecureStore === 'function') {
+            await runtime.loadAiApiKeyFromSecureStore(this.aiEngine.provider);
         }
     }
 

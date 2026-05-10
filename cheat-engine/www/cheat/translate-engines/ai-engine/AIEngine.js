@@ -39,8 +39,8 @@ import {
 } from '../../js/KnowledgeBaseRuntime.js';
 
 class AIEngine extends BaseTranslationEngine {
-    constructor(panel) {
-        super(panel);
+    constructor(runtime) {
+        super(runtime);
 
         // Configuration properties
         this.provider = 'openApi';
@@ -73,7 +73,7 @@ class AIEngine extends BaseTranslationEngine {
         this._requestQueueTail = Promise.resolve();
 
         // Initialize services
-        this.tagManager = new TagManager(panel);
+        this.tagManager = new TagManager(runtime);
         this.validationService = new ValidationService(this);
         this.retryHandler = new RetryHandler(this);
         this.apiClient = new ApiClient({
@@ -83,7 +83,7 @@ class AIEngine extends BaseTranslationEngine {
         });
         this.configManager = new ConfigManager(this);
 
-        // Property descriptors for panel state sync
+        // Property descriptors for runtime state sync
         Object.defineProperties(this, {
             aiProvider: {
                 get: () => this.provider,
@@ -677,12 +677,12 @@ class AIEngine extends BaseTranslationEngine {
     }
 
     getOfficialNameEnforcementMode() {
-        const mode = this.panel?.officialNameEnforcementMode;
+        const mode = this.runtime?.officialNameEnforcementMode;
         return typeof mode === 'string' ? mode : 'none';
     }
 
     getOfficialNameEnforcementPattern() {
-        const pattern = this.panel?.namePatternForEnforcing;
+        const pattern = this.runtime?.namePatternForEnforcing;
         return typeof pattern === 'string' && pattern.trim() ? pattern : null;
     }
 
@@ -704,15 +704,15 @@ class AIEngine extends BaseTranslationEngine {
     }
 
     getOfficialNameMap() {
-        const sourceLang = this.panel?.sourceLang || 'ja';
-        const targetLang = this.panel?.targetLang || 'en';
+        const sourceLang = this.runtime?.sourceLang || 'ja';
+        const targetLang = this.runtime?.targetLang || 'en';
         const pairKey = `${sourceLang}-${targetLang}`;
         const officialNameMap = new Map();
 
         const pairProfiles =
-            this.panel?.nameProfilesByLangPair &&
-            typeof this.panel.nameProfilesByLangPair[pairKey] === 'object'
-                ? this.panel.nameProfilesByLangPair[pairKey]
+            this.runtime?.nameProfilesByLangPair &&
+            typeof this.runtime.nameProfilesByLangPair[pairKey] === 'object'
+                ? this.runtime.nameProfilesByLangPair[pairKey]
                 : {};
 
         Object.keys(pairProfiles).forEach((originalName) => {
@@ -726,8 +726,8 @@ class AIEngine extends BaseTranslationEngine {
             }
         });
 
-        if (this.panel?.translationCache instanceof Map) {
-            for (const [cacheKey, value] of this.panel.translationCache.entries()) {
+        if (this.runtime?.translationCache instanceof Map) {
+            for (const [cacheKey, value] of this.runtime.translationCache.entries()) {
                 const prefix = `actor_name:${sourceLang}-${targetLang}-`;
                 if (!cacheKey.startsWith(prefix)) {
                     continue;
@@ -781,7 +781,7 @@ class AIEngine extends BaseTranslationEngine {
 
             let nextValue = this.replaceFirstMatchedCapture(value, pattern, officialTranslation);
 
-            if (this.panel?.officialNameEnforcementIncludeAllText) {
+            if (this.runtime?.officialNameEnforcementIncludeAllText) {
                 const replacementPairs = Array.from(officialNameMap.entries()).sort(
                     (left, right) => right[0].length - left[0].length
                 );
@@ -848,8 +848,8 @@ class AIEngine extends BaseTranslationEngine {
             });
 
             const nameHints = this.tagManager.buildNameHints();
-            const sourceName = this.getLanguageName(this.panel.sourceLang);
-            const targetName = this.getLanguageName(this.panel.targetLang);
+            const sourceName = this.getLanguageName(this.runtime.sourceLang);
+            const targetName = this.getLanguageName(this.runtime.targetLang);
             const content = JSON.stringify(jsonMap);
             const expectedKeys = Object.keys(jsonMap);
             const expectedValueLengthsByKey = {};
@@ -869,8 +869,8 @@ class AIEngine extends BaseTranslationEngine {
             // Build knowledge hints from matching knowledge base entries
             const preprocessedTexts = itemData.map((item) => item.preprocessed);
             ensureKnowledgeForLangPair(
-                this.panel.sourceLang || 'ja',
-                this.panel.targetLang || 'en'
+                this.runtime.sourceLang || 'ja',
+                this.runtime.targetLang || 'en'
             );
             const knowledgeEntries = getKnowledgeEntries();
             const relevantKnowledge = findRelevantEntries(knowledgeEntries, preprocessedTexts);
@@ -881,7 +881,7 @@ class AIEngine extends BaseTranslationEngine {
                 knowledgePromptPart = ` Knowledge base of proper names and terms that MUST be used for consistency: ${knowledgeHints}.`;
             }
 
-            const askLlmForKbase = !!(this.panel && this.panel.askLlmToAddToKnowledge);
+            const askLlmForKbase = !!(this.runtime && this.runtime.askLlmToAddToKnowledge);
             let kbaseInstructionPart = '';
             if (askLlmForKbase) {
                 kbaseInstructionPart = ' ' + buildKbaseInstruction();

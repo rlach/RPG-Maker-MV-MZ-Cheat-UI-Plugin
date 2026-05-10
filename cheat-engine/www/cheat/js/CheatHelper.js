@@ -2,8 +2,8 @@ import { Alert } from './AlertHelper.js';
 import { KeyValueStorage } from './KeyValueStorage.js';
 import { TranslateOnTheFlyState } from './TranslateOnTheFlyState.js';
 import { MESSAGE_LOG } from './MessageLogStore.js';
-import { OBJECT_TRANSLATION_SERVICE } from '../panels/translate-on-the-fly/ObjectTranslationService.js';
-import { ensureTranslationRuntime } from '../panels/translate-on-the-fly/TranslationRuntime.js';
+import { OBJECT_TRANSLATION_SERVICE } from './translation-runtime/ObjectTranslationService.js';
+import { ensureTranslationRuntime } from './translation-runtime/TranslationRuntime.js';
 import {
     ensureSettingsMigration,
     getUnifiedSetting,

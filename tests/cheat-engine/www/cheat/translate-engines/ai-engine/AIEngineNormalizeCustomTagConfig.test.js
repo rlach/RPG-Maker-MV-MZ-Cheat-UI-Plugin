@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 import AIEngine from '../../../../../../cheat-engine/www/cheat/translate-engines/ai-engine/AIEngine.js';
 
-// Minimal panel stub — AIEngine only reads properties from panel during
+// Minimal runtime stub — AIEngine only reads properties from runtime during
 // translation calls, not during construction / normalizeCustomTagConfig.
 const PANEL_STUB = { sourceLang: 'ja', targetLang: 'en' };
 

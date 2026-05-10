@@ -618,7 +618,7 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
         return this.mergeEntriesByText(entries);
     }
 
-    buildUniquePendingItems(panel) {
+    buildUniquePendingItems(runtime) {
         const byCacheKey = new Map();
 
         for (const entry of this._scanEntries) {
@@ -627,7 +627,7 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            const cacheKey = panel.getCacheKey(text, this.getCacheType());
+            const cacheKey = runtime.getCacheKey(text, this.getCacheType());
             if (!byCacheKey.has(cacheKey)) {
                 byCacheKey.set(cacheKey, {
                     type: this.getCacheType(),
@@ -641,28 +641,28 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
         return Array.from(byCacheKey.values());
     }
 
-    collectUntranslated({ panel }) {
-        if (!panel) {
+    collectUntranslated({ runtime }) {
+        if (!runtime) {
             return [];
         }
 
         this.refreshRuntimeEntriesIfNeeded();
 
-        const items = this.buildUniquePendingItems(panel);
-        return items.filter((item) => !panel.hasUsableCacheValue(item.cacheKey));
+        const items = this.buildUniquePendingItems(runtime);
+        return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ panel }) {
-        if (!panel) {
+    countPluginAmountSync({ runtime }) {
+        if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 
         this.refreshRuntimeEntriesIfNeeded();
 
-        const items = this.buildUniquePendingItems(panel);
+        const items = this.buildUniquePendingItems(runtime);
         const totalStrings = items.length;
         const leftStrings = items.filter(
-            (item) => !panel.hasUsableCacheValue(item.cacheKey)
+            (item) => !runtime.hasUsableCacheValue(item.cacheKey)
         ).length;
 
         return {

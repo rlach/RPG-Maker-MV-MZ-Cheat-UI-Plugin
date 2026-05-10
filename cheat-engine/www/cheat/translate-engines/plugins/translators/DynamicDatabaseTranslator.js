@@ -262,7 +262,7 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
         return entries;
     }
 
-    buildUniquePendingItems(panel) {
+    buildUniquePendingItems(runtime) {
         const byCacheKey = new Map();
 
         for (const entry of this._scanEntries) {
@@ -276,8 +276,8 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            const cacheKey = panel.getCacheKey(text, mappedType);
-            const legacyCacheKey = panel.getCacheKey(text, this.getCacheType());
+            const cacheKey = runtime.getCacheKey(text, mappedType);
+            const legacyCacheKey = runtime.getCacheKey(text, this.getCacheType());
 
             if (!byCacheKey.has(cacheKey)) {
                 byCacheKey.set(cacheKey, {
@@ -293,39 +293,39 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
         return Array.from(byCacheKey.values());
     }
 
-    isEntryTranslated(panel, item) {
-        if (!panel || !item) {
+    isEntryTranslated(runtime, item) {
+        if (!runtime || !item) {
             return false;
         }
 
-        if (panel.hasUsableCacheValue(item.cacheKey)) {
+        if (runtime.hasUsableCacheValue(item.cacheKey)) {
             return true;
         }
 
-        if (item.legacyCacheKey && panel.hasUsableCacheValue(item.legacyCacheKey)) {
+        if (item.legacyCacheKey && runtime.hasUsableCacheValue(item.legacyCacheKey)) {
             return true;
         }
 
         return false;
     }
 
-    collectUntranslated({ panel }) {
-        if (!panel) {
+    collectUntranslated({ runtime }) {
+        if (!runtime) {
             return [];
         }
 
-        const items = this.buildUniquePendingItems(panel);
-        return items.filter((item) => !this.isEntryTranslated(panel, item));
+        const items = this.buildUniquePendingItems(runtime);
+        return items.filter((item) => !this.isEntryTranslated(runtime, item));
     }
 
-    countPluginAmountSync({ panel }) {
-        if (!panel) {
+    countPluginAmountSync({ runtime }) {
+        if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 
-        const items = this.buildUniquePendingItems(panel);
+        const items = this.buildUniquePendingItems(runtime);
         const totalStrings = items.length;
-        const leftStrings = items.filter((item) => !this.isEntryTranslated(panel, item)).length;
+        const leftStrings = items.filter((item) => !this.isEntryTranslated(runtime, item)).length;
 
         return {
             total: totalStrings,

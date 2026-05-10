@@ -1,5 +1,5 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
-import { loadMapDataById } from '../../../panels/translate-on-the-fly/ObjectTranslationModalMethods.js';
+import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_GET_INFORMATION_TRANSLATOR_HOOKED__';
 const CACHE_TYPE = 'plugin_get_information';
@@ -568,7 +568,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
         return entries;
     }
 
-    buildUniquePendingItems(panel) {
+    buildUniquePendingItems(runtime) {
         const byCacheKey = new Map();
 
         for (const entry of this._scanEntries) {
@@ -578,7 +578,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
             }
 
             const cacheType = entry.cacheType || this.getCacheType();
-            const cacheKey = panel.getCacheKey(text, cacheType);
+            const cacheKey = runtime.getCacheKey(text, cacheType);
             if (!byCacheKey.has(cacheKey)) {
                 byCacheKey.set(cacheKey, {
                     type: cacheType,
@@ -592,24 +592,24 @@ export class GetInformationTranslator extends BasePluginTranslator {
         return Array.from(byCacheKey.values());
     }
 
-    collectUntranslated({ panel }) {
-        if (!panel) {
+    collectUntranslated({ runtime }) {
+        if (!runtime) {
             return [];
         }
 
-        const items = this.buildUniquePendingItems(panel);
-        return items.filter((item) => !panel.hasUsableCacheValue(item.cacheKey));
+        const items = this.buildUniquePendingItems(runtime);
+        return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ panel }) {
-        if (!panel) {
+    countPluginAmountSync({ runtime }) {
+        if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 
-        const items = this.buildUniquePendingItems(panel);
+        const items = this.buildUniquePendingItems(runtime);
         const totalStrings = items.length;
         const leftStrings = items.filter(
-            (item) => !panel.hasUsableCacheValue(item.cacheKey)
+            (item) => !runtime.hasUsableCacheValue(item.cacheKey)
         ).length;
 
         return {

@@ -35,7 +35,7 @@ vi.mock('../../../../../../cheat-engine/www/cheat/js/HookGuardHelper.js', () => 
     getAppliedHooks: vi.fn(() => []),
 }));
 
-import { translateOnTheFlyRuntimeMethods } from '../../../../../../cheat-engine/www/cheat/panels/translate-on-the-fly/TranslateOnTheFlyRuntimeMethods.js';
+import { translateOnTheFlyRuntimeMethods } from '../../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslateOnTheFlyRuntimeMethods.js';
 
 function getCanonicalSystemCommandName(commandName) {
     let normalizedName = '';

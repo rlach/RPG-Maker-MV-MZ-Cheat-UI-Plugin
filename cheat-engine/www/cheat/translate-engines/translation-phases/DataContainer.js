@@ -29,7 +29,7 @@ export class DataContainer extends DataObjects {
         return `translating ${this.kind}`;
     }
 
-    async createEntries({ request, panel }) {
+    async createEntries({ request, runtime }) {
         const container = this.getContainer && this.getContainer();
         if (!Array.isArray(container)) {
             return [];
@@ -42,7 +42,7 @@ export class DataContainer extends DataObjects {
                 continue;
             }
 
-            if (panel.hasUntranslatedFields(item, this.fields, this.cachePrefix)) {
+            if (runtime.hasUntranslatedFields(item, this.fields, this.cachePrefix)) {
                 pendingObjects.push(item);
             }
         }
@@ -59,18 +59,18 @@ export class DataContainer extends DataObjects {
         ];
     }
 
-    countAmountSync({ panel }) {
+    countAmountSync({ runtime }) {
         const container = this.getContainer && this.getContainer();
         return this.constructor.countAmountFromContainer(
-            panel,
+            runtime,
             container,
             this.fields,
             this.cachePrefix
         );
     }
 
-    applyCachedData(panel) {
-        if (!panel || typeof panel.applyCachedTranslations !== 'function') {
+    applyCachedData(runtime) {
+        if (!runtime || typeof runtime.applyCachedTranslations !== 'function') {
             return true;
         }
 
@@ -81,7 +81,7 @@ export class DataContainer extends DataObjects {
 
         const instanceContainer = this.getInstanceContainer && this.getInstanceContainer();
 
-        panel.applyCachedTranslations(
+        runtime.applyCachedTranslations(
             container,
             this.fields,
             this.cachePrefix,
@@ -92,12 +92,12 @@ export class DataContainer extends DataObjects {
         return true;
     }
 
-    applyDataOnLifecycle({ panel, trigger } = {}) {
+    applyDataOnLifecycle({ runtime, trigger } = {}) {
         const isRestart = trigger === 'createGameObjects';
         if (!isRestart && !this.requiresReapplyOnLoad) {
             return true;
         }
 
-        return this.applyCachedData(panel);
+        return this.applyCachedData(runtime);
     }
 }

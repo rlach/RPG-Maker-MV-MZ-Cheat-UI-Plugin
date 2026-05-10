@@ -8,25 +8,25 @@ import DummyEngine from './DummyEngine.js';
 export { MyMemoryEngine, DatpmtEngine, LibreTranslateEngine, AIEngine, DummyEngine };
 
 // Factory function to create engine instances
-export function createEngine(engineId, panel) {
+export function createEngine(engineId, runtime) {
     switch (engineId) {
         case 'mymemory':
-            return new MyMemoryEngine(panel);
+            return new MyMemoryEngine(runtime);
         case 'datpmt':
-            return new DatpmtEngine(panel);
+            return new DatpmtEngine(runtime);
         case 'libretranslate':
-            return new LibreTranslateEngine(panel);
+            return new LibreTranslateEngine(runtime);
         case 'openApi':
         case 'gpt4all':
         case 'ai':
-            return new AIEngine(panel);
+            return new AIEngine(runtime);
         case 'dummy':
-            return new DummyEngine(panel);
+            return new DummyEngine(runtime);
         default:
             console.warn(
                 `[TranslationEngines] Unknown engine: ${engineId}, falling back to MyMemory`
             );
-            return new MyMemoryEngine(panel);
+            return new MyMemoryEngine(runtime);
     }
 }
 

@@ -39,8 +39,8 @@ const makeTagIdSeed = (value) =>
 const cloneTagConfig = (config) => ({ ...config });
 
 export class TagManager {
-    constructor(panel) {
-        this.panel = panel;
+    constructor(runtime) {
+        this.runtime = runtime;
         this.allowNewlineMismatch = false;
         this.tagEntries = [];
         this.customParameterEntries = [];
@@ -931,16 +931,16 @@ export class TagManager {
      * @returns {string}
      */
     buildNameHints() {
-        if (!this.panel) {
+        if (!this.runtime) {
             return '';
         }
 
-        const sourceLang = this.panel.sourceLang || 'ja';
-        const targetLang = this.panel.targetLang || 'en';
+        const sourceLang = this.runtime.sourceLang || 'ja';
+        const targetLang = this.runtime.targetLang || 'en';
         const pairKey = `${sourceLang}-${targetLang}`;
         const prefix = `actor_name:${sourceLang}-${targetLang}-`;
         const pairProfiles =
-            (this.panel.nameProfilesByLangPair && this.panel.nameProfilesByLangPair[pairKey]) || {};
+            (this.runtime.nameProfilesByLangPair && this.runtime.nameProfilesByLangPair[pairKey]) || {};
 
         const { cache } = ensureTranslateCacheRuntime();
         if (!(cache instanceof Map)) {

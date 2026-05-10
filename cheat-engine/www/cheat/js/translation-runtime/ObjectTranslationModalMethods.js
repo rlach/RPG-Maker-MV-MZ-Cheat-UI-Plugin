@@ -1,5 +1,5 @@
-import { TRANSLATE_SETTINGS, TRANSLATOR } from '../../js/TranslateHelper.js';
-import { countEventCommandEntries } from '../../js/EventCommandTraversal.js';
+import { TRANSLATE_SETTINGS, TRANSLATOR } from '../TranslateHelper.js';
+import { countEventCommandEntries } from '../EventCommandTraversal.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../../translate-engines/plugins/PluginTranslatorRegistry.js';
 import { normalizeMessageEntryForPlugins } from '../../translate-engines/plugins/PluginMessageEntryNormalizer.js';
@@ -7,7 +7,7 @@ import {
     getSystemMessageCacheKey,
     getSystemMessagesSource,
 } from '../../translate-engines/translation-phases/SystemMessageCacheRules.js';
-import { ensureRootWindowStateValue } from '../../js/RootWindowState.js';
+import { ensureRootWindowStateValue } from '../RootWindowState.js';
 
 const MAP_DATA_CACHE_KEY = '__CHEAT_MAP_DATA_CACHE__';
 
@@ -18,7 +18,7 @@ function getMapDataCache() {
 const DEFAULT_OBJECT_TRANSLATION_TYPE_DEFS = Object.freeze([
     { id: 'mapEvents', label: 'Map events' },
     { id: 'commonEvents', label: 'CommonEvents' },
-    { id: 'variables', label: 'Variables (setup in variables panel)' },
+    { id: 'variables', label: 'Variables (setup in variables runtime)' },
     { id: 'items', label: 'items' },
     { id: 'skills', label: 'skills' },
     { id: 'classes', label: 'classes' },

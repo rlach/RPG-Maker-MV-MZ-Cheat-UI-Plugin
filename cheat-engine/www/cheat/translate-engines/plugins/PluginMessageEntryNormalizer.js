@@ -4,13 +4,13 @@ function isMessageTextType(type) {
     return type === 'message' || type === 'message_portrait';
 }
 
-export function normalizeMessageEntryForPlugins(panel, entry) {
+export function normalizeMessageEntryForPlugins(runtime, entry) {
     if (!entry || !isMessageTextType(entry.type)) {
         return entry;
     }
 
     const normalized = PLUGIN_TRANSLATOR_REGISTRY.resolveMessageCacheSourceText({
-        runtime: panel,
+        runtime: runtime,
         text: entry.value,
         hasPortrait: entry.type === 'message_portrait',
         mode: 'collection',

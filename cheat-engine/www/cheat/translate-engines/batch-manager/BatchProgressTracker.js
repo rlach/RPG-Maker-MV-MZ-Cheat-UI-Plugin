@@ -1,8 +1,8 @@
 import { BatchSummaryReporter } from './BatchSummaryReporter.js';
 
 export class BatchProgressTracker {
-    constructor(panel) {
-        this.panel = panel;
+    constructor(runtime) {
+        this.runtime = runtime;
         this.currentStepLabel = '';
         this.currentProcessed = 0;
         this.currentTotal = 0;
@@ -33,7 +33,7 @@ export class BatchProgressTracker {
         this.queueTotal = 0;
         this.phaseStartQueueProcessed = 0;
         this.paused = false;
-        this.panel.showSpinner();
+        this.runtime.showSpinner();
         this._render();
     }
 
@@ -57,8 +57,8 @@ export class BatchProgressTracker {
      * End the queue: hide spinner and progress box.
      */
     endQueue() {
-        this.panel.hideSpinner();
-        this.panel.hideProgressBox();
+        this.runtime.hideSpinner();
+        this.runtime.hideProgressBox();
     }
 
     updateStep(stepLabel, currentProcessed, currentTotal) {
@@ -132,7 +132,7 @@ export class BatchProgressTracker {
         const title = this.paused
             ? `batch paused by OTF - ${this.pauseReason || 'translating event'}`
             : this.currentStepLabel;
-        const totalCompletionLine = this.panel?.getOverallTranslationCompletionLine?.() || null;
+        const totalCompletionLine = this.runtime?.getOverallTranslationCompletionLine?.() || null;
         const progress = BatchSummaryReporter.buildProgress({
             title,
             processed: this.currentProcessed,
@@ -144,7 +144,7 @@ export class BatchProgressTracker {
             totalCompletionLine,
         });
 
-        this.panel.updateProgressBox(
+        this.runtime.updateProgressBox(
             progress.title,
             progress.message,
             progress.totalCompletionLine,

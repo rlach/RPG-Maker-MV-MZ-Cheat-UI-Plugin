@@ -1,4 +1,4 @@
-import { notifyTranslateCacheRuntimeChanged } from '../../js/TranslateCacheRuntime.js';
+import { notifyTranslateCacheRuntimeChanged } from '../TranslateCacheRuntime.js';
 
 const SEEN_UPDATED_NOTIFY_INTERVAL_MS = 1000;
 

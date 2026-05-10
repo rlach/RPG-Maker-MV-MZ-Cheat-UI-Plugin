@@ -8,7 +8,7 @@ import {
 } from '../js/TranslateCacheRuntime.js';
 import { computeLangPairCompletionByKeyLength } from '../js/TranslationCompletionMetrics.js';
 import { ConfirmDialog } from '../js/DialogHelper.js';
-import { ensureTranslationRuntime } from './translate-on-the-fly/TranslationRuntime.js';
+import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
 
 const cacheManagerTableStateMemory = {
     sortBy: 'seenSort',

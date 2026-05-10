@@ -1,5 +1,5 @@
 import { Alert } from '../js/AlertHelper.js';
-import { ensureTranslationRuntime } from './translate-on-the-fly/TranslationRuntime.js';
+import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
 import { isRpgMakerMv } from '../js/RpgMakerRuntime.js';
 
 function sortByName(a, b) {

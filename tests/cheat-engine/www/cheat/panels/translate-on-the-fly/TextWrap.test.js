@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { wrapTextByVisibleWidth } from '../../../../../../cheat-engine/www/cheat/panels/translate-on-the-fly/TextWrap.js';
+import { wrapTextByVisibleWidth } from '../../../../../../cheat-engine/www/cheat/js/translation-runtime/TextWrap.js';
 
 const KNOWN_BACKSLASH_TAGS = [
     {

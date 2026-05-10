@@ -1,16 +1,13 @@
-import { Alert } from '../../js/AlertHelper.js';
-import { MessageCheat } from '../../js/CheatHelper.js';
-import { TranslateOnTheFlyState } from '../../js/TranslateOnTheFlyState.js';
-import { ensureTranslateCacheRuntime } from '../../js/TranslateCacheRuntime.js';
+
+import { TranslateOnTheFlyState } from '../TranslateOnTheFlyState.js';
+import { ensureTranslateCacheRuntime } from '../TranslateCacheRuntime.js';
 import {
     getMessageSourceTextVariants as getMessageSourceTextVariantsHelper,
     buildMessageCacheLookupKeys,
-} from '../../js/MessageCacheKeyHelper.js';
+} from '../MessageCacheKeyHelper.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { DATA_CONTAINER_TRANSLATION_DEFINITIONS } from '../../translate-engines/translation-phases/DataContainerDefinitions.js';
-import {
-    runCacheMigrationsIfNeeded,
-} from './TranslateCacheMigrations.js';
+import { runCacheMigrationsIfNeeded } from './TranslateCacheMigrations.js';
 
 export const translateOnTheFlyCoreMethods = {
     isBatchQueueAbortRequested() {
@@ -54,7 +51,7 @@ export const translateOnTheFlyCoreMethods = {
     },
 
     isSkippingMessages() {
-        return !!(MessageCheat && MessageCheat.skip);
+        return this._isMessageSkipActive();
     },
 
     isNonOtfTranslationProcessActive() {
@@ -72,7 +69,8 @@ export const translateOnTheFlyCoreMethods = {
     beginNonOtfTranslationProcess(label = 'translation') {
         if (this.isNonOtfTranslationProcessActive()) {
             const activeLabel = this.getActiveNonOtfTranslationProcessLabel();
-            Alert.warn(
+            this.notify(
+                'warn',
                 `Another translation is already in progress (${activeLabel}). Only On-The-Fly translation can run in parallel.`
             );
             return false;
@@ -107,7 +105,7 @@ export const translateOnTheFlyCoreMethods = {
         this.notifyCacheRuntime('settings-enabled');
 
         if (notify) {
-            Alert.success(`Real-time translation: ${enabled ? 'enabled' : 'disabled'}`);
+            this.notify('success', `Real-time translation: ${enabled ? 'enabled' : 'disabled'}`);
         }
     },
 

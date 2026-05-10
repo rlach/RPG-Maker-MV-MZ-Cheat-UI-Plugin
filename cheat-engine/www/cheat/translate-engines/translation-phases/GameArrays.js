@@ -6,17 +6,17 @@ export class GameArrays extends BasePhase {
     }
 
     applyDataOnLifecycle(context = {}) {
-        const panel = context?.panel;
-        if (!panel) {
+        const runtime = context?.runtime;
+        if (!runtime) {
             return true;
         }
 
-        const arrays = panel.getGameArrayDefs();
-        this.applyCachedTranslationsToArrays(panel, arrays);
+        const arrays = runtime.getGameArrayDefs();
+        this.applyCachedTranslationsToArrays(runtime, arrays);
         return true;
     }
 
-    applyCachedTranslationsToArrays(panel, arrays) {
+    applyCachedTranslationsToArrays(runtime, arrays) {
         for (const entry of arrays || []) {
             const parentObj = entry ? entry.parent() : null;
             if (!parentObj || !Array.isArray(parentObj[entry.prop])) {
@@ -43,17 +43,17 @@ export class GameArrays extends BasePhase {
                     }
 
                     const trimmed = value.trim();
-                    const primaryKey = panel.getCacheKey(trimmed, entry.type);
-                    if (panel.hasUsableCacheValue(primaryKey)) {
-                        parentObj[entry.prop][i] = panel.translationCache.get(primaryKey);
+                    const primaryKey = runtime.getCacheKey(trimmed, entry.type);
+                    if (runtime.hasUsableCacheValue(primaryKey)) {
+                        parentObj[entry.prop][i] = runtime.translationCache.get(primaryKey);
                         continue;
                     }
 
                     let applied = false;
                     for (const fallbackEntry of arrays) {
-                        const fallbackKey = panel.getCacheKey(trimmed, fallbackEntry.type);
-                        if (panel.hasUsableCacheValue(fallbackKey)) {
-                            parentObj[entry.prop][i] = panel.translationCache.get(fallbackKey);
+                        const fallbackKey = runtime.getCacheKey(trimmed, fallbackEntry.type);
+                        if (runtime.hasUsableCacheValue(fallbackKey)) {
+                            parentObj[entry.prop][i] = runtime.translationCache.get(fallbackKey);
                             applied = true;
                             break;
                         }
@@ -73,9 +73,9 @@ export class GameArrays extends BasePhase {
         }
     }
 
-    async createEntries({ panel }) {
-        const arrays = panel.getGameArrayDefs();
-        const candidates = panel.collectGameArrayCandidates();
+    async createEntries({ runtime }) {
+        const arrays = runtime.getGameArrayDefs();
+        const candidates = runtime.collectGameArrayCandidates();
         const pendingValues = Array.isArray(candidates && candidates.pendingValues)
             ? candidates.pendingValues
             : [];
@@ -91,7 +91,7 @@ export class GameArrays extends BasePhase {
                 type: pv.types && pv.types[0] ? pv.types[0] : 'text',
                 id: `sys_${idCounter++}`,
                 value: pv.value,
-                cacheKey: panel.getCacheKey(
+                cacheKey: runtime.getCacheKey(
                     pv.value,
                     pv.types && pv.types[0] ? pv.types[0] : 'text'
                 ),
@@ -102,7 +102,7 @@ export class GameArrays extends BasePhase {
             pendingValues
                 .filter((pv) => pv && typeof pv.value === 'string')
                 .map((pv) => [
-                    panel.getCacheKey(pv.value, pv.types && pv.types[0] ? pv.types[0] : 'text'),
+                    runtime.getCacheKey(pv.value, pv.types && pv.types[0] ? pv.types[0] : 'text'),
                     pv,
                 ])
         );
@@ -116,7 +116,7 @@ export class GameArrays extends BasePhase {
                     collectUntranslated() {
                         return items;
                     },
-                    async setData({ panel: panelRef, successes }) {
+                    async setData({ runtime: panelRef, successes }) {
                         for (const success of successes || []) {
                             if (!success || !success.cacheKey) {
                                 continue;
@@ -133,7 +133,7 @@ export class GameArrays extends BasePhase {
                         }
                     },
                     finalizePhase: () => {
-                        this.applyCachedTranslationsToArrays(panel, arrays);
+                        this.applyCachedTranslationsToArrays(runtime, arrays);
                     },
                 },
                 priorityMapId: 0,
@@ -141,7 +141,7 @@ export class GameArrays extends BasePhase {
         ];
     }
 
-    countAmountSync({ panel }) {
-        return panel.countGameArraysStats();
+    countAmountSync({ runtime }) {
+        return runtime.countGameArraysStats();
     }
 }

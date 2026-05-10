@@ -30,7 +30,7 @@ export class Troops extends BasePhase {
         ];
     }
 
-    countAmountSync({ panel }) {
+    countAmountSync({ runtime }) {
         if (!Array.isArray(window.$dataTroops)) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
@@ -50,10 +50,10 @@ export class Troops extends BasePhase {
 
                 const stats = countEventCommandEntries(page.list, {
                     transformEntry(entry) {
-                        return normalizeMessageEntryForPlugins(panel, entry);
+                        return normalizeMessageEntryForPlugins(runtime, entry);
                     },
                     isUntranslated(entry) {
-                        return !panel.hasUsableCacheValue(panel.getCacheKey(entry.value, 'troop'));
+                        return !runtime.hasUsableCacheValue(runtime.getCacheKey(entry.value, 'troop'));
                     },
                 });
                 totalStrings += stats.totalStrings;
@@ -69,7 +69,7 @@ export class Troops extends BasePhase {
         };
     }
 
-    collectUntranslated({ panel }) {
+    collectUntranslated({ runtime }) {
         if (!Array.isArray(window.$dataTroops)) {
             return [];
         }
@@ -82,8 +82,8 @@ export class Troops extends BasePhase {
                 return;
             }
 
-            const cacheKey = panel.getCacheKey(rawText, 'troop');
-            if (panel.hasUsableCacheValue(cacheKey)) {
+            const cacheKey = runtime.getCacheKey(rawText, 'troop');
+            if (runtime.hasUsableCacheValue(cacheKey)) {
                 return;
             }
 
@@ -121,7 +121,7 @@ export class Troops extends BasePhase {
 
                 const entries = collectEventCommandEntries(page.list, {
                     transformEntry(entry) {
-                        return normalizeMessageEntryForPlugins(panel, entry);
+                        return normalizeMessageEntryForPlugins(runtime, entry);
                     },
                 });
                 for (const entry of entries) {
@@ -133,18 +133,18 @@ export class Troops extends BasePhase {
         return Array.from(itemsByCacheKey.values());
     }
 
-    setData({ panel, pendingItems, successes, failures }) {
+    setData({ runtime, pendingItems, successes, failures }) {
         for (const success of successes || []) {
             if (!success || !success.cacheKey) {
                 continue;
             }
 
-            panel.setCacheValue(success.cacheKey, success.translated, {
+            runtime.setCacheValue(success.cacheKey, success.translated, {
                 persist: false,
             });
         }
 
-        panel.markBatchFailuresAsUntranslated(failures || [], true);
+        runtime.markBatchFailuresAsUntranslated(failures || [], true);
 
         const pendingByCacheKey = new Map(
             (pendingItems || [])
@@ -171,12 +171,12 @@ export class Troops extends BasePhase {
             }
 
             for (const originalType of originalTypes) {
-                const cacheKey = panel.getCacheKey(originalValue, originalType);
-                panel.setCacheValue(cacheKey, success.translated, { persist: false });
+                const cacheKey = runtime.getCacheKey(originalValue, originalType);
+                runtime.setCacheValue(cacheKey, success.translated, { persist: false });
                 changedKeys.push(cacheKey);
             }
         }
 
-        panel.persistCache(changedKeys);
+        runtime.persistCache(changedKeys);
     }
 }

@@ -1,6 +1,6 @@
-import { TranslateOnTheFlyState } from '../../js/TranslateOnTheFlyState.js';
+import { TranslateOnTheFlyState } from '../TranslateOnTheFlyState.js';
 import { createEngine } from '../../translate-engines/index.js';
-import { ensureKnowledgeForLangPair } from '../../js/KnowledgeBaseRuntime.js';
+import { ensureKnowledgeForLangPair } from '../KnowledgeBaseRuntime.js';
 import {
     DEFAULT_TEXT_WRAP_FONT_SCALE_MULTIPLIER,
     createPersistedTranslationSettingsDefaults,
@@ -192,13 +192,13 @@ export const translateOnTheFlySettingsMethods = {
             this.engine.setCustomTags?.(this.engine.customTags || []);
         }
 
-        // Bind new engine config data to panel
+        // Bind new engine config data to runtime
         const engineConfigData = this.engine.getConfigData();
         Object.keys(engineConfigData).forEach((key) => {
             this.$set(this, key, engineConfigData[key]);
         });
 
-        // Bind new engine config methods to panel
+        // Bind new engine config methods to runtime
         const engineConfigMethods = this.engine.getConfigMethods();
         Object.keys(engineConfigMethods).forEach((methodName) => {
             this[methodName] = engineConfigMethods[methodName].bind(this.engine);

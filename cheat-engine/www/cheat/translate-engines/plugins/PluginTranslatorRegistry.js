@@ -192,10 +192,10 @@ class PluginTranslatorRegistry {
         return result;
     }
 
-    getDetectedPluginSummaries(panel) {
+    getDetectedPluginSummaries(runtime) {
         return this.getDetectedTranslatorInstances().map((translator) => {
             const pluginName = translator.getPluginName();
-            const counts = translator.countAmountSync({ panel });
+            const counts = translator.countAmountSync({ runtime });
 
             return {
                 pluginName,
@@ -231,7 +231,7 @@ class PluginTranslatorRegistry {
                 continue;
             }
 
-            if (!translator.isActive({ panel: runtime })) {
+            if (!translator.isActive({ runtime: runtime })) {
                 continue;
             }
 

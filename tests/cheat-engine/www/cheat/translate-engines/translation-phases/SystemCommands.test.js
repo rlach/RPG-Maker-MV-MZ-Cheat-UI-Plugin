@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { SystemCommands } from '../../../../../../cheat-engine/www/cheat/translate-engines/translation-phases/SystemCommands.js';
 
-function createPanelStub() {
+function createRuntimeStub() {
     return {
         getCacheKey(value, type) {
             return `${type}:${value}`;
@@ -102,7 +102,7 @@ describe('SystemCommands', () => {
 
         const strategy = new SystemCommands();
         const values = strategy
-            .collectUntranslated({ panel: createPanelStub() })
+            .collectUntranslated({ runtime: createRuntimeStub() })
             .map((item) => item.value);
 
         expect(values).toEqual(['Item', 'Skill', 'Gallery']);
@@ -116,7 +116,7 @@ describe('SystemCommands', () => {
 
         const strategy = new SystemCommands();
         const values = strategy
-            .collectUntranslated({ panel: createPanelStub() })
+            .collectUntranslated({ runtime: createRuntimeStub() })
             .map((item) => item.value);
 
         expect(values).toEqual(['Item', 'Skill', 'Item']);
@@ -131,7 +131,7 @@ describe('SystemCommands', () => {
 
         const strategy = new SystemCommands();
         const values = strategy
-            .collectUntranslated({ panel: createPanelStub() })
+            .collectUntranslated({ runtime: createRuntimeStub() })
             .map((item) => item.value);
 
         expect(values).toEqual(['Przedmiot', 'Umiejetnosci', 'Gallery']);
@@ -146,7 +146,7 @@ describe('SystemCommands', () => {
 
         const strategy = new SystemCommands();
         const values = strategy
-            .collectUntranslated({ panel: createPanelStub() })
+            .collectUntranslated({ runtime: createRuntimeStub() })
             .map((item) => item.value);
 
         expect(values).toEqual(['ItemOriginal', 'Gallery']);
@@ -174,7 +174,7 @@ describe('SystemCommands', () => {
 
         const strategy = new SystemCommands();
         const values = strategy
-            .collectUntranslated({ panel: createPanelStub() })
+            .collectUntranslated({ runtime: createRuntimeStub() })
             .map((item) => item.value);
 
         expect(values).toContain('Item');
@@ -197,7 +197,7 @@ describe('SystemCommands', () => {
 
         const strategy = new SystemCommands();
         const values = strategy
-            .collectUntranslated({ panel: createPanelStub() })
+            .collectUntranslated({ runtime: createRuntimeStub() })
             .map((item) => item.value);
 
         expect(values).toContain('Item');

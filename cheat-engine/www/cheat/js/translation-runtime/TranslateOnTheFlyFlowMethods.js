@@ -1,9 +1,8 @@
-import { Alert } from '../../js/AlertHelper.js';
-import { findNearestMessageEntry } from '../../js/EventCommandTraversal.js';
+import { findNearestMessageEntry } from '../EventCommandTraversal.js';
 import {
     computeLangPairCompletionByKeyLength,
     computeLangPairCompletionByCacheTypes,
-} from '../../js/TranslationCompletionMetrics.js';
+} from '../TranslationCompletionMetrics.js';
 import { BatchSummaryReporter } from '../../translate-engines/batch-manager/BatchSummaryReporter.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { CurrentEvent } from '../../translate-engines/translation-phases/CurrentEvent.js';
@@ -455,17 +454,17 @@ export const translateOnTheFlyFlowMethods = {
         const dryRun = !!(options && options.dryRun);
 
         if (this.objectTranslationJob.active) {
-            Alert.warn('Object translation is already in progress');
+            this.notify('warn', 'Object translation is already in progress');
             return;
         }
 
         if (!this.engine || typeof this.engine.batchTranslate !== 'function') {
-            Alert.error('Translation engine not initialized');
+            this.notify('error', 'Translation engine not initialized');
             return;
         }
 
         if (!this.isEngineFullyConfigured()) {
-            Alert.warn('Translation engine is not fully configured');
+            this.notify('warn', 'Translation engine is not fully configured');
             return;
         }
 
@@ -530,7 +529,7 @@ export const translateOnTheFlyFlowMethods = {
             BatchSummaryReporter.logSummary(summary);
         } catch (error) {
             console.error('[TranslateOnTheFly] Object translation job failed:', error);
-            Alert.error(`Object translation failed: ${error.message || error}`);
+            this.notify('error', `Object translation failed: ${error.message || error}`);
         } finally {
             this.objectTranslationJob.active = false;
             this.endNonOtfTranslationProcess();
@@ -707,7 +706,7 @@ export const translateOnTheFlyFlowMethods = {
         } catch (error) {
             const strategy = CurrentEvent.getInstance();
             if (typeof strategy.handleFatalError === 'function') {
-                strategy.handleFatalError({ panel: this, error });
+                strategy.handleFatalError({ runtime: this, error });
             }
             return null;
         }

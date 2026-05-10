@@ -1,8 +1,8 @@
-import { KeyValueStorage } from '../../js/KeyValueStorage.js';
-import { createSecureSecretStorage } from '../../js/SecureSecretStorage.js';
-import { ensureSettingsMigration } from '../../js/UnifiedSettings.js';
-import { TranslateOnTheFlyState } from '../../js/TranslateOnTheFlyState.js';
-import { ensureTranslateCacheRuntime } from '../../js/TranslateCacheRuntime.js';
+import { KeyValueStorage } from '../KeyValueStorage.js';
+import { createSecureSecretStorage } from '../SecureSecretStorage.js';
+import { ensureSettingsMigration } from '../UnifiedSettings.js';
+import { TranslateOnTheFlyState } from '../TranslateOnTheFlyState.js';
+import { ensureTranslateCacheRuntime } from '../TranslateCacheRuntime.js';
 import { createEngine, getAvailableEngines } from '../../translate-engines/index.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { translateOnTheFlySettingsMethods } from './TranslateOnTheFlySettingsMethods.js';
@@ -13,7 +13,7 @@ import { translateOnTheFlyFlowMethods } from './TranslateOnTheFlyFlowMethods.js'
 import { translateOnTheFlyRuntimeMethods } from './TranslateOnTheFlyRuntimeMethods.js';
 import { objectTranslationRuntimeMethods } from './ObjectTranslationModalMethods.js';
 import { translateOnTheFlyCoreMethods } from './TranslateOnTheFlyCoreMethods.js';
-import { ensureKnowledgeForLangPair } from '../../js/KnowledgeBaseRuntime.js';
+import { ensureKnowledgeForLangPair } from '../KnowledgeBaseRuntime.js';
 import {
     createTranslationRuntimeStateDefaults,
     UI_SYNC_STATE_KEYS,
@@ -38,6 +38,12 @@ class TranslationRuntime {
 
         this._initialized = false;
         this._hookInitialized = false;
+
+        /** @type {Array<(level: string, msg: string) => void>} */
+        this._notifyListeners = [];
+
+        /** @type {() => boolean} */
+        this._isMessageSkipActive = () => false;
 
         Object.assign(this, createTranslationRuntimeStateDefaults(engineOptions));
     }
@@ -126,6 +132,46 @@ class TranslationRuntime {
             window.__ensureTranslationRuntime = ensureTranslationRuntime;
             window.__ensureTranslateOnTheFlyRuntime = ensureTranslationRuntime;
         }
+    }
+
+    /**
+     * Emit a notification to all subscribed listeners (UI adapters).
+     * @param {'success'|'info'|'warn'|'error'} level
+     * @param {string} msg
+     */
+    notify(level, msg) {
+        for (const listener of this._notifyListeners) {
+            listener(level, msg);
+        }
+    }
+
+    /**
+     * Subscribe a listener for runtime notifications.
+     * @param {(level: string, msg: string) => void} listener
+     * @returns {() => void} unsubscribe function
+     */
+    onNotify(listener) {
+        this._notifyListeners.push(listener);
+        return () => this.offNotify(listener);
+    }
+
+    /**
+     * Remove a notification listener.
+     * @param {(level: string, msg: string) => void} listener
+     */
+    offNotify(listener) {
+        const idx = this._notifyListeners.indexOf(listener);
+        if (idx !== -1) {
+            this._notifyListeners.splice(idx, 1);
+        }
+    }
+
+    /**
+     * Set the provider for message-skip state (replaces direct MessageCheat dependency).
+     * @param {() => boolean} provider
+     */
+    setMessageSkipProvider(provider) {
+        this._isMessageSkipActive = provider;
     }
 
     deferHookInitialization() {

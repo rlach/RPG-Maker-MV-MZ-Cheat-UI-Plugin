@@ -30,24 +30,24 @@ export const CURRENT_CACHE_VERSION = 2;
 // ---------------------------------------------------------------------------
 
 /**
- * Returns the absolute path to cache-settings.json for the given panel.
- * @param {object} panel – TranslationRuntime instance
+ * Returns the absolute path to cache-settings.json for the given runtime.
+ * @param {object} runtime – TranslationRuntime instance
  * @returns {string}
  */
-export function getCacheSettingsFilePath(panel) {
+export function getCacheSettingsFilePath(runtime) {
     const path = require('path');
-    return path.join(panel.getSplitCacheDirectoryPath(), SETTINGS_FILE_NAME);
+    return path.join(runtime.getSplitCacheDirectoryPath(), SETTINGS_FILE_NAME);
 }
 
 /**
  * Reads cache-settings.json from disk.
  * Returns null if the file does not exist or cannot be parsed.
- * @param {object} panel – TranslationRuntime instance
+ * @param {object} runtime – TranslationRuntime instance
  * @returns {{ version: number } | null}
  */
-export function readCacheSettings(panel) {
-    const fs = panel.getCacheFileSystem();
-    const filePath = getCacheSettingsFilePath(panel);
+export function readCacheSettings(runtime) {
+    const fs = runtime.getCacheFileSystem();
+    const filePath = getCacheSettingsFilePath(runtime);
     if (!fs.existsSync(filePath)) {
         return null;
     }
@@ -62,12 +62,12 @@ export function readCacheSettings(panel) {
 /**
  * Atomically writes cache-settings.json to disk.
  * Caller must ensure the directory already exists.
- * @param {object} panel – TranslationRuntime instance
+ * @param {object} runtime – TranslationRuntime instance
  * @param {{ version: number }} settings
  */
-export function writeCacheSettings(panel, settings) {
-    const fs = panel.getCacheFileSystem();
-    const filePath = getCacheSettingsFilePath(panel);
+export function writeCacheSettings(runtime, settings) {
+    const fs = runtime.getCacheFileSystem();
+    const filePath = getCacheSettingsFilePath(runtime);
     const data = `${JSON.stringify(settings, null, 2)}\n`;
     fs.writeFileSync(`${filePath}.tmp`, data, 'utf-8');
     fs.renameSync(`${filePath}.tmp`, filePath);
@@ -81,24 +81,24 @@ export function writeCacheSettings(panel, settings) {
  * Checks whether any cache migrations are needed and runs them synchronously.
  * Must be called after the in-memory cache has been fully loaded from disk.
  *
- * @param {object} panel – TranslationRuntime instance (has getCacheFileSystem,
+ * @param {object} runtime – TranslationRuntime instance (has getCacheFileSystem,
  *   getSplitCacheDirectoryPath, translationCache, etc.)
  */
-export function runCacheMigrationsIfNeeded(panel) {
-    const fs = panel.getCacheFileSystem();
-    const dirPath = panel.getSplitCacheDirectoryPath();
+export function runCacheMigrationsIfNeeded(runtime) {
+    const fs = runtime.getCacheFileSystem();
+    const dirPath = runtime.getSplitCacheDirectoryPath();
 
     // If the cache directory does not exist there is nothing to migrate.
     if (!fs.existsSync(dirPath)) {
         return;
     }
 
-    const settings = readCacheSettings(panel);
+    const settings = readCacheSettings(runtime);
 
     if (!settings) {
-        const hasAnyCacheContent = _hasAnyCacheContent(panel);
+        const hasAnyCacheContent = _hasAnyCacheContent(runtime);
         if (!hasAnyCacheContent) {
-            writeCacheSettings(panel, { version: CURRENT_CACHE_VERSION });
+            writeCacheSettings(runtime, { version: CURRENT_CACHE_VERSION });
             return;
         }
     }
@@ -112,37 +112,37 @@ export function runCacheMigrationsIfNeeded(panel) {
     let didMutateCache = false;
 
     if (storedVersion < 1) {
-        didMutateCache = _migrateV1StripTrailingNewlines(panel) || didMutateCache;
+        didMutateCache = _migrateV1StripTrailingNewlines(runtime) || didMutateCache;
     }
 
     if (storedVersion < 2) {
-        didMutateCache = _migrateV2TextBucketToMessageBucket(panel) || didMutateCache;
+        didMutateCache = _migrateV2TextBucketToMessageBucket(runtime) || didMutateCache;
     }
 
     if (didMutateCache) {
-        _persistAllBucketsSync(panel);
+        _persistAllBucketsSync(runtime);
     }
 
-    writeCacheSettings(panel, { version: CURRENT_CACHE_VERSION });
+    writeCacheSettings(runtime, { version: CURRENT_CACHE_VERSION });
 
     console.log(
         `[TranslateOnTheFly] Cache migrated from v${storedVersion} to v${CURRENT_CACHE_VERSION}`
     );
 }
 
-function _hasAnyCacheContent(panel) {
-    if (panel.translationCache.size > 0) {
+function _hasAnyCacheContent(runtime) {
+    if (runtime.translationCache.size > 0) {
         return true;
     }
 
-    return panel.getAllSplitCacheBucketsFromDiskSync().length > 0;
+    return runtime.getAllSplitCacheBucketsFromDiskSync().length > 0;
 }
 
 // ---------------------------------------------------------------------------
 // Individual migrations
 // ---------------------------------------------------------------------------
 
-import { isMapLike } from '../../js/TranslateCacheRuntime.js';
+import { isMapLike } from '../TranslateCacheRuntime.js';
 
 /**
  * v1: Remove trailing \n characters from the text portion of every cache key.
@@ -152,11 +152,11 @@ import { isMapLike } from '../../js/TranslateCacheRuntime.js';
  * differs between the harvesting pass and the seen-lookup pass, producing keys
  * that differ only in trailing newlines.
  *
- * @param {object} panel
+ * @param {object} runtime
  * @returns {boolean} true if any key was renamed
  */
-function _migrateV1StripTrailingNewlines(panel) {
-    const cache = panel.translationCache;
+function _migrateV1StripTrailingNewlines(runtime) {
+    const cache = runtime.translationCache;
     if (!isMapLike(cache)) {
         return false;
     }
@@ -203,17 +203,17 @@ function _migrateV1StripTrailingNewlines(panel) {
  *      - otherwise keep message
  *  - remove text bucket file for every affected language pair
  *
- * @param {object} panel
+ * @param {object} runtime
  * @returns {boolean} true if any migration work was applied
  */
-function _migrateV2TextBucketToMessageBucket(panel) {
-    const cache = panel.translationCache;
+function _migrateV2TextBucketToMessageBucket(runtime) {
+    const cache = runtime.translationCache;
     if (!isMapLike(cache)) {
         return false;
     }
 
-    const fs = panel.getCacheFileSystem();
-    const langPairs = _collectTextMigrationLangPairs(panel);
+    const fs = runtime.getCacheFileSystem();
+    const langPairs = _collectTextMigrationLangPairs(runtime);
     if (langPairs.size === 0) {
         console.log('[TranslateOnTheFly] Migration v2: no legacy text buckets found');
         return false;
@@ -226,10 +226,10 @@ function _migrateV2TextBucketToMessageBucket(panel) {
     let deletedFiles = 0;
 
     for (const langPair of langPairs) {
-        const textBucketId = panel.getCacheBucketId('text', langPair);
-        const messageBucketId = panel.getCacheBucketId('message', langPair);
-        const textFilePath = panel.getSplitCacheFilePathFromBucketId(textBucketId);
-        const messageFilePath = panel.getSplitCacheFilePathFromBucketId(messageBucketId);
+        const textBucketId = runtime.getCacheBucketId('text', langPair);
+        const messageBucketId = runtime.getCacheBucketId('message', langPair);
+        const textFilePath = runtime.getSplitCacheFilePathFromBucketId(textBucketId);
+        const messageFilePath = runtime.getSplitCacheFilePathFromBucketId(messageBucketId);
         const textFileExists = !!textFilePath && fs.existsSync(textFilePath);
         const messageFileExists = !!messageFilePath && fs.existsSync(messageFilePath);
 
@@ -314,9 +314,9 @@ function _migrateV2TextBucketToMessageBucket(panel) {
     }
 
     if (didMutateCache) {
-        panel.cacheBucketByCompositeKey = new Map();
+        runtime.cacheBucketByCompositeKey = new Map();
         for (const compositeKey of cache.keys()) {
-            panel.rememberCacheBucketForKey(compositeKey);
+            runtime.rememberCacheBucketForKey(compositeKey);
         }
     }
 
@@ -327,11 +327,11 @@ function _migrateV2TextBucketToMessageBucket(panel) {
     return didMutateCache || renamedFiles > 0 || deletedFiles > 0;
 }
 
-function _collectTextMigrationLangPairs(panel) {
+function _collectTextMigrationLangPairs(runtime) {
     const langPairs = new Set();
 
-    for (const bucketId of panel.getAllSplitCacheBucketsFromDiskSync()) {
-        const parsed = panel.parseCacheBucketId(bucketId);
+    for (const bucketId of runtime.getAllSplitCacheBucketsFromDiskSync()) {
+        const parsed = runtime.parseCacheBucketId(bucketId);
         if (!parsed || parsed.type !== 'text') {
             continue;
         }
@@ -339,8 +339,8 @@ function _collectTextMigrationLangPairs(panel) {
         langPairs.add(parsed.langPair);
     }
 
-    for (const compositeKey of panel.translationCache.keys()) {
-        const parsed = panel.parseCompositeCacheKey(compositeKey);
+    for (const compositeKey of runtime.translationCache.keys()) {
+        const parsed = runtime.parseCompositeCacheKey(compositeKey);
         if (!parsed || parsed.type !== 'text') {
             continue;
         }
@@ -362,22 +362,22 @@ function _hasUsableTextTranslation(value) {
 /**
  * Rewrites every cache bucket file from the current in-memory state.
  * Called synchronously after a migration has mutated the in-memory cache.
- * @param {object} panel
+ * @param {object} runtime
  */
-function _persistAllBucketsSync(panel) {
+function _persistAllBucketsSync(runtime) {
     // Rebuild the key→bucket mapping from scratch so renamed keys are tracked correctly.
-    panel.cacheBucketByCompositeKey = new Map();
+    runtime.cacheBucketByCompositeKey = new Map();
 
     const buckets = new Map();
 
-    for (const [compositeKey, value] of panel.translationCache.entries()) {
-        panel.rememberCacheBucketForKey(compositeKey);
-        const bucketId = panel.getBucketForCacheKey(compositeKey);
+    for (const [compositeKey, value] of runtime.translationCache.entries()) {
+        runtime.rememberCacheBucketForKey(compositeKey);
+        const bucketId = runtime.getBucketForCacheKey(compositeKey);
         if (!bucketId) {
             continue;
         }
 
-        const parsed = panel.parseCacheBucketId(bucketId);
+        const parsed = runtime.parseCacheBucketId(bucketId);
         if (!parsed) {
             continue;
         }
@@ -395,9 +395,9 @@ function _persistAllBucketsSync(panel) {
     }
 
     for (const [bucketId, payload] of buckets.entries()) {
-        const filePath = panel.getSplitCacheFilePathFromBucketId(bucketId);
+        const filePath = runtime.getSplitCacheFilePathFromBucketId(bucketId);
         if (filePath) {
-            panel.writeJsonFileAtomicSync(filePath, payload);
+            runtime.writeJsonFileAtomicSync(filePath, payload);
         }
     }
 }

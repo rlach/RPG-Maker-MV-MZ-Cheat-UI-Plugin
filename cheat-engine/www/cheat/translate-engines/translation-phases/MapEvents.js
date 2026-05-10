@@ -3,7 +3,7 @@ import {
     collectEventCommandEntries,
     countEventCommandEntries,
 } from '../../js/EventCommandTraversal.js';
-import { loadMapDataById } from '../../panels/translate-on-the-fly/ObjectTranslationModalMethods.js';
+import { loadMapDataById } from '../../js/translation-runtime/ObjectTranslationModalMethods.js';
 import { normalizeMessageEntryForPlugins } from '../plugins/PluginMessageEntryNormalizer.js';
 
 export class MapEvents extends BasePhase {
@@ -27,18 +27,18 @@ export class MapEvents extends BasePhase {
         return this;
     }
 
-    static countEventCommandListStats(panel, list = []) {
+    static countEventCommandListStats(runtime, list = []) {
         return countEventCommandEntries(list, {
             transformEntry(entry) {
-                return normalizeMessageEntryForPlugins(panel, entry);
+                return normalizeMessageEntryForPlugins(runtime, entry);
             },
             isUntranslated(entry) {
-                return !panel.hasUsableCacheValue(panel.getCacheKey(entry.value, entry.type));
+                return !runtime.hasUsableCacheValue(runtime.getCacheKey(entry.value, entry.type));
             },
         });
     }
 
-    static countMapEventStatsForData(panel, mapData) {
+    static countMapEventStatsForData(runtime, mapData) {
         if (!mapData || !Array.isArray(mapData.events)) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
@@ -56,7 +56,7 @@ export class MapEvents extends BasePhase {
                     continue;
                 }
 
-                const stats = MapEvents.countEventCommandListStats(panel, page.list);
+                const stats = MapEvents.countEventCommandListStats(runtime, page.list);
                 totalStrings += stats.totalStrings;
                 leftStrings += stats.leftStrings;
             }
@@ -83,7 +83,7 @@ export class MapEvents extends BasePhase {
         return 'mapEvents';
     }
 
-    async createEntries({ request, panel }) {
+    async createEntries({ request, runtime }) {
         if (request.mapData) {
             return [
                 {
@@ -98,10 +98,10 @@ export class MapEvents extends BasePhase {
             ];
         }
 
-        const validMaps = panel.getValidMapInfos();
+        const validMaps = runtime.getValidMapInfos();
         const selectedIds = Array.isArray(request.mapIds)
             ? request.mapIds.map((id) => Number(id)).filter(Boolean)
-            : panel.getSelectedObjectTranslationMapIds(validMaps);
+            : runtime.getSelectedObjectTranslationMapIds(validMaps);
         const selectedIdSet = new Set(selectedIds);
         const mapsToTranslate = validMaps.filter((mapInfo) =>
             selectedIdSet.has(Number(mapInfo.id))
@@ -125,16 +125,16 @@ export class MapEvents extends BasePhase {
         });
     }
 
-    countAmountSync({ request, panel }) {
-        const validMaps = panel.getValidMapInfos();
+    countAmountSync({ request, runtime }) {
+        const validMaps = runtime.getValidMapInfos();
         const selectedIds = Array.isArray(request.mapIds)
             ? request.mapIds.map((id) => Number(id)).filter(Boolean)
-            : panel.getSelectedObjectTranslationMapIds(validMaps);
+            : runtime.getSelectedObjectTranslationMapIds(validMaps);
         const total = selectedIds.length;
         return { total, left: total, totalStrings: 0, leftStrings: 0 };
     }
 
-    collectUntranslated({ panel }) {
+    collectUntranslated({ runtime }) {
         const dataMap = this.mapData || window.$dataMap;
         if (!dataMap || !Array.isArray(dataMap.events)) {
             return [];
@@ -157,12 +157,12 @@ export class MapEvents extends BasePhase {
 
                 const entries = collectEventCommandEntries(page.list, {
                     transformEntry(entry) {
-                        return normalizeMessageEntryForPlugins(panel, entry);
+                        return normalizeMessageEntryForPlugins(runtime, entry);
                     },
                 });
                 for (const entry of entries) {
-                    const cacheKey = panel.getCacheKey(entry.value, entry.type);
-                    if (panel.hasUsableCacheValue(cacheKey)) {
+                    const cacheKey = runtime.getCacheKey(entry.value, entry.type);
+                    if (runtime.hasUsableCacheValue(cacheKey)) {
                         continue;
                     }
 

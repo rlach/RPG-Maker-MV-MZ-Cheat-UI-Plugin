@@ -2,7 +2,7 @@ import {
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_BANNED_PHRASES_TEXT,
 } from '../../translate-engines/ai-engine/constants.js';
-import { isRpgMakerMv } from '../../js/RpgMakerRuntime.js';
+import { isRpgMakerMv } from '../RpgMakerRuntime.js';
 
 export const LANGUAGE_OPTIONS = [
     { text: 'English', value: 'en' },

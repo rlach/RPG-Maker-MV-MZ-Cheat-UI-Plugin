@@ -7,7 +7,7 @@ import {
     ensureKnowledgeForLangPair,
     getKnowledgeLangPair,
 } from '../js/KnowledgeBaseRuntime.js';
-import { ensureTranslationRuntime } from './translate-on-the-fly/TranslationRuntime.js';
+import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
 
 const knowledgePanelTableStateMemory = {
     sortBy: 'key',

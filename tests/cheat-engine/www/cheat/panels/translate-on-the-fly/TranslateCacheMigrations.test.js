@@ -3,7 +3,7 @@ import {
     CURRENT_CACHE_VERSION,
     getCacheSettingsFilePath,
     runCacheMigrationsIfNeeded,
-} from '../../../../../../cheat-engine/www/cheat/panels/translate-on-the-fly/TranslateCacheMigrations.js';
+} from '../../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslateCacheMigrations.js';
 
 class MemoryFs {
     constructor({ files = {}, directories = [] } = {}) {
@@ -52,7 +52,7 @@ function _getParentDirectory(filePath) {
 function createPanel({ fs, cacheEntries = [], diskBuckets = [] }) {
     const cacheBucketByCompositeKey = new Map();
 
-    const panel = {
+    const runtime = {
         translationCache: new Map(cacheEntries),
         cacheBucketByCompositeKey,
         sourceLang: 'ja',
@@ -141,21 +141,21 @@ function createPanel({ fs, cacheEntries = [], diskBuckets = [] }) {
         },
     };
 
-    for (const key of panel.translationCache.keys()) {
-        panel.rememberCacheBucketForKey(key);
+    for (const key of runtime.translationCache.keys()) {
+        runtime.rememberCacheBucketForKey(key);
     }
 
-    return panel;
+    return runtime;
 }
 
 describe('TranslateCacheMigrations', () => {
     it('initializes settings to current version when no settings and no cache content exist', () => {
         const fs = new MemoryFs({ directories: ['/cache'] });
-        const panel = createPanel({ fs, cacheEntries: [], diskBuckets: [] });
+        const runtime = createPanel({ fs, cacheEntries: [], diskBuckets: [] });
 
-        runCacheMigrationsIfNeeded(panel);
+        runCacheMigrationsIfNeeded(runtime);
 
-        const settingsPath = getCacheSettingsFilePath(panel);
+        const settingsPath = getCacheSettingsFilePath(runtime);
         const settings = JSON.parse(fs.readFileSync(settingsPath));
         expect(settings.version).toBe(CURRENT_CACHE_VERSION);
     });
@@ -169,20 +169,20 @@ describe('TranslateCacheMigrations', () => {
                 [textBucketPath]: '{"hello":"czesc"}\n',
             },
         });
-        const panel = createPanel({
+        const runtime = createPanel({
             fs,
             cacheEntries: [['text:ja-en-hello', 'czesc']],
             diskBuckets: ['text:ja-en'],
         });
 
-        runCacheMigrationsIfNeeded(panel);
+        runCacheMigrationsIfNeeded(runtime);
 
-        const settingsPath = getCacheSettingsFilePath(panel);
+        const settingsPath = getCacheSettingsFilePath(runtime);
         const settings = JSON.parse(fs.readFileSync(settingsPath));
         expect(settings.version).toBe(CURRENT_CACHE_VERSION);
 
-        expect(panel.translationCache.has('text:ja-en-hello')).toBe(false);
-        expect(panel.translationCache.get('message:ja-en-hello')).toBe('czesc');
+        expect(runtime.translationCache.has('text:ja-en-hello')).toBe(false);
+        expect(runtime.translationCache.get('message:ja-en-hello')).toBe('czesc');
         expect(fs.existsSync(textBucketPath)).toBe(false);
         expect(fs.existsSync(messageBucketPath)).toBe(true);
     });

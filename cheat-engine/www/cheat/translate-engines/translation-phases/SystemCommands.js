@@ -129,7 +129,7 @@ export class SystemCommands extends BasePhase {
         return mergedSource;
     }
 
-    countAmountSync({ panel }) {
+    countAmountSync({ runtime }) {
         const source = this.getSourceCommands();
         if (!source.length) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
@@ -139,8 +139,8 @@ export class SystemCommands extends BasePhase {
         let left = 0;
         for (const val of source) {
             total += 1;
-            const cacheKey = panel.getCacheKey(val, 'command');
-            if (!panel.hasUsableCacheValue(cacheKey)) {
+            const cacheKey = runtime.getCacheKey(val, 'command');
+            if (!runtime.hasUsableCacheValue(cacheKey)) {
                 left += 1;
             }
         }
@@ -148,7 +148,7 @@ export class SystemCommands extends BasePhase {
         return { total, left, totalStrings: total, leftStrings: left };
     }
 
-    collectUntranslated({ panel }) {
+    collectUntranslated({ runtime }) {
         const sourceCommands = this.getSourceCommands();
         if (!sourceCommands.length) {
             return [];
@@ -157,8 +157,8 @@ export class SystemCommands extends BasePhase {
         const pending = [];
         for (let i = 0; i < sourceCommands.length; i++) {
             const value = sourceCommands[i];
-            const cacheKey = panel.getCacheKey(value, 'command');
-            if (!panel.hasUsableCacheValue(cacheKey)) {
+            const cacheKey = runtime.getCacheKey(value, 'command');
+            if (!runtime.hasUsableCacheValue(cacheKey)) {
                 pending.push({
                     type: 'system_command',
                     id: `cmd_${i}`,
@@ -172,7 +172,7 @@ export class SystemCommands extends BasePhase {
         return pending;
     }
 
-    setData({ panel, successes, failures, pendingItems }) {
-        super.setData({ panel, successes, failures });
+    setData({ runtime, successes, failures, pendingItems }) {
+        super.setData({ runtime, successes, failures });
     }
 }

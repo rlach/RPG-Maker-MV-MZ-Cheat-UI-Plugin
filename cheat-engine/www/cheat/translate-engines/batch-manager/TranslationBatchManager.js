@@ -5,10 +5,10 @@ import { BatchSummaryReporter } from './BatchSummaryReporter.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../plugins/PluginTranslatorRegistry.js';
 
 export class TranslationBatchManager {
-    constructor(panel) {
-        this.panel = panel;
+    constructor(runtime) {
+        this.runtime = runtime;
         this.errorRecovery = new ErrorRecoveryStrategy('default');
-        this.progressTracker = new BatchProgressTracker(panel);
+        this.progressTracker = new BatchProgressTracker(runtime);
         this.kindRegistry = new Map();
     }
 
@@ -22,7 +22,7 @@ export class TranslationBatchManager {
                 definition.applyDataOnLifecycle({
                     ...context,
                     manager: this,
-                    panel: this.panel,
+                    runtime: this.runtime,
                 });
             } catch (error) {
                 console.warn(
@@ -76,7 +76,7 @@ export class TranslationBatchManager {
     }
 
     isQueueAbortRequested() {
-        return !!(this.panel && this.panel.isBatchQueueAbortRequested());
+        return !!(this.runtime && this.runtime.isBatchQueueAbortRequested());
     }
 
     countBatchRequestedChars(batchItems) {
@@ -126,7 +126,7 @@ export class TranslationBatchManager {
 
         {
             const types = strategy.getQueueScopeCacheTypes?.({
-                panel: this.panel,
+                runtime: this.runtime,
                 request,
             });
             this.addCacheTypesFromItems(
@@ -178,8 +178,8 @@ export class TranslationBatchManager {
             return;
         }
 
-        if (kind === 'gameArrays' && this.panel) {
-            const defs = this.panel.getGameArrayDefs() || [];
+        if (kind === 'gameArrays' && this.runtime) {
+            const defs = this.runtime.getGameArrayDefs() || [];
             for (const def of defs) {
                 const type = def?.type;
                 if (!type) {
@@ -255,29 +255,29 @@ export class TranslationBatchManager {
                 continue;
             }
 
-            this.panel.setCacheValue(success.cacheKey, success.translated, {
+            this.runtime.setCacheValue(success.cacheKey, success.translated, {
                 persist: false,
             });
             changedKeys.push(success.cacheKey);
         }
 
         const safeFailures = Array.isArray(failures) ? failures : [];
-        this.panel.markBatchFailuresAsUntranslated(safeFailures, true);
+        this.runtime.markBatchFailuresAsUntranslated(safeFailures, true);
 
         for (const failure of safeFailures) {
             if (!failure || !failure.cacheKey) {
                 continue;
             }
 
-            const hasUsable = this.panel.hasUsableCacheValue(failure.cacheKey);
+            const hasUsable = this.runtime.hasUsableCacheValue(failure.cacheKey);
             if (!hasUsable) {
-                this.panel.setCacheValue(failure.cacheKey, '', { persist: false });
+                this.runtime.setCacheValue(failure.cacheKey, '', { persist: false });
                 changedKeys.push(failure.cacheKey);
             }
         }
 
         if (persist) {
-            this.panel.persistCache(changedKeys);
+            this.runtime.persistCache(changedKeys);
         }
 
         return changedKeys;
@@ -298,12 +298,12 @@ export class TranslationBatchManager {
                 ? request.itemLimit
                 : hasOwn(options, 'itemLimit')
                   ? options.itemLimit
-                  : this.panel && this.panel.batchItemsLimit,
+                  : this.runtime && this.runtime.batchItemsLimit,
             charLimit: hasOwn(request, 'charLimit')
                 ? request.charLimit
                 : hasOwn(options, 'charLimit')
                   ? options.charLimit
-                  : this.panel && this.panel.charLimit,
+                  : this.runtime && this.runtime.charLimit,
             dryRun: hasOwn(request, 'dryRun')
                 ? !!request.dryRun
                 : hasOwn(options, 'dryRun')
@@ -319,8 +319,8 @@ export class TranslationBatchManager {
     }
 
     async runBatchedTranslation(items, options = {}) {
-        if (this.panel) {
-            this.panel.clearQueueCompletionScope();
+        if (this.runtime) {
+            this.runtime.clearQueueCompletionScope();
         }
 
         const queueEntries = [];
@@ -345,7 +345,7 @@ export class TranslationBatchManager {
                 (await definition.createEntries({
                     request,
                     manager: this,
-                    panel: this.panel,
+                    runtime: this.runtime,
                 })) || [];
             this.addCacheTypesFromKindFallback(queueScopeCacheTypes, request, definition);
             const executionOptions = this.createExecutionOptions(request, options);
@@ -385,7 +385,7 @@ export class TranslationBatchManager {
                 }
                 pendingItems =
                     strategy.collectUntranslated({
-                        panel: this.panel,
+                        runtime: this.runtime,
                     }) || [];
             }
 
@@ -403,7 +403,7 @@ export class TranslationBatchManager {
                   : [];
             const translationPhaseLabel = hasStrategy
                 ? strategy.getTranslationPhaseLabel({
-                      panel: this.panel,
+                      runtime: this.runtime,
                   })
                 : entryOptions.translationPhaseLabel ||
                   entryOptions.stepLabel ||
@@ -508,11 +508,11 @@ export class TranslationBatchManager {
                         }));
                     } else {
                         const result = backgroundJob
-                            ? await this.panel.batchTranslateWithBackgroundRetry(
+                            ? await this.runtime.batchTranslateWithBackgroundRetry(
                                   batch,
                                   translationPhaseLabel
                               )
-                            : await this.panel.engine.batchTranslate(batch, {
+                            : await this.runtime.engine.batchTranslate(batch, {
                                   backgroundJob: false,
                               });
 
@@ -560,7 +560,7 @@ export class TranslationBatchManager {
                 });
 
                 if (!dryRun && changedKeys.length > 0) {
-                    this.panel.persistCache(changedKeys);
+                    this.runtime.persistCache(changedKeys);
                 }
 
                 phaseFailures += failures.length;
@@ -578,7 +578,7 @@ export class TranslationBatchManager {
 
                 if (hasStrategy) {
                     await strategy.setData({
-                        panel: this.panel,
+                        runtime: this.runtime,
                         pendingItems,
                         successes,
                         failures,
@@ -595,8 +595,8 @@ export class TranslationBatchManager {
                 // Let all detected plugin translators inspect batch results for knowledge extraction
                 this._notifyPluginKnowledgeBase(successes, failures);
 
-                if (!dryRun && this.panel) {
-                    this.panel.recordBatchThroughputSample(
+                if (!dryRun && this.runtime) {
+                    this.runtime.recordBatchThroughputSample(
                         batchRequestedChars,
                         Date.now() - batchStartedAt
                     );
@@ -655,7 +655,7 @@ export class TranslationBatchManager {
 
             if (!interruptedForCurrentMap && hasStrategy) {
                 strategy.finalizePhase?.({
-                    panel: this.panel,
+                    runtime: this.runtime,
                     pendingItems,
                 });
             }
@@ -672,8 +672,8 @@ export class TranslationBatchManager {
         const safeQueueEntries = [...queueEntries];
         const dryRun = !!options.dryRun;
 
-        if (dryRun && this.panel) {
-            this.panel.markDryRunExecuted();
+        if (dryRun && this.runtime) {
+            this.runtime.markDryRunExecuted();
         }
 
         if (safeQueueEntries.length === 0) {
@@ -693,8 +693,8 @@ export class TranslationBatchManager {
             };
         }
 
-        if (this.panel) {
-            this.panel.startQueueCompletionScope(Array.from(queueScopeCacheTypes));
+        if (this.runtime) {
+            this.runtime.startQueueCompletionScope(Array.from(queueScopeCacheTypes));
         }
 
         this.progressTracker.beginQueue();
@@ -704,7 +704,7 @@ export class TranslationBatchManager {
                     break;
                 }
 
-                const currentMapId = this.panel.getCurrentMapIdForPhasePriority();
+                const currentMapId = this.runtime.getCurrentMapIdForPhasePriority();
                 if (currentMapId > 0) {
                     const currentMapEntryIndex = this.getCurrentMapEntryIndex(
                         safeQueueEntries,
@@ -722,13 +722,13 @@ export class TranslationBatchManager {
                 }
 
                 const allowCurrentMapMidPhaseSwitch = !!(
-                    this.panel && this.panel.changeToCurrentMapInMassTranslationMidPhase
+                    this.runtime && this.runtime.changeToCurrentMapInMassTranslationMidPhase
                 );
 
                 let translated;
                 if (typeof entry.execute === 'function') {
                     translated = await entry.execute({
-                        panel: this.panel,
+                        runtime: this.runtime,
                         executionOptions: entry.executionOptions || {},
                     });
                 } else {
@@ -746,7 +746,8 @@ export class TranslationBatchManager {
                                 return false;
                             }
 
-                            const freshCurrentMapId = this.panel.getCurrentMapIdForPhasePriority();
+                            const freshCurrentMapId =
+                                this.runtime.getCurrentMapIdForPhasePriority();
                             const freshCurrentMapEntryIndex = this.getCurrentMapEntryIndex(
                                 safeQueueEntries,
                                 freshCurrentMapId
@@ -775,7 +776,7 @@ export class TranslationBatchManager {
                 if (
                     typeof entry.shouldRepeat === 'function' &&
                     entry.shouldRepeat(translated, {
-                        panel: this.panel,
+                        runtime: this.runtime,
                         executionOptions: entry.executionOptions || {},
                     })
                 ) {
@@ -786,8 +787,8 @@ export class TranslationBatchManager {
             }
         } finally {
             this.progressTracker.endQueue();
-            if (this.panel) {
-                this.panel.clearQueueCompletionScope();
+            if (this.runtime) {
+                this.runtime.clearQueueCompletionScope();
             }
         }
 
@@ -800,7 +801,7 @@ export class TranslationBatchManager {
                 }
             );
             if (changedKeys.length > 0) {
-                this.panel.persistCache(changedKeys);
+                this.runtime.persistCache(changedKeys);
             }
         }
 
@@ -820,7 +821,7 @@ export class TranslationBatchManager {
                 persist: false,
             });
             if (changedKeys.length > 0) {
-                this.panel.persistCache(changedKeys);
+                this.runtime.persistCache(changedKeys);
             }
         }
 
@@ -863,7 +864,7 @@ export class TranslationBatchManager {
                 definition.countAmountSync?.({
                     request,
                     manager: this,
-                    panel: this.panel,
+                    runtime: this.runtime,
                 }) || {};
             result.push({
                 kind: request && request.kind,

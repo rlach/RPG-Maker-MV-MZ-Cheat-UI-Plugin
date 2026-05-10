@@ -1,4 +1,3 @@
-import { Alert } from '../../js/AlertHelper.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { wrapTextByVisibleWidth } from './TextWrap.js';
 
@@ -398,7 +397,7 @@ export const translateOnTheFlyMessageMethods = {
                     hasEngine: !!this.engine,
                     engineType: this.engine ? this.engine.constructor.name : 'null',
                 });
-                Alert.error('Translation engine not initialized');
+                this.notify('error', 'Translation engine not initialized');
                 return;
             }
             if (!this.batchManager) {

@@ -17,16 +17,16 @@ export class CacheEmptyStrings extends BasePhase {
         return 'translate empty strings';
     }
 
-    collectUntranslated({ panel } = {}) {
-        if (!panel?.translationCache || !panel?.sourceLang || !panel?.targetLang) {
+    collectUntranslated({ runtime } = {}) {
+        if (!runtime?.translationCache || !runtime?.sourceLang || !runtime?.targetLang) {
             return [];
         }
 
         const items = [];
         let idCounter = 0;
 
-        for (const [cacheKey, value] of panel.translationCache.entries()) {
-            const parsed = parseCacheKeyForLangPair(cacheKey, panel.sourceLang, panel.targetLang);
+        for (const [cacheKey, value] of runtime.translationCache.entries()) {
+            const parsed = parseCacheKeyForLangPair(cacheKey, runtime.sourceLang, runtime.targetLang);
             if (!parsed) {
                 continue;
             }
@@ -52,8 +52,8 @@ export class CacheEmptyStrings extends BasePhase {
         return items;
     }
 
-    countAmountSync({ panel } = {}) {
-        const items = this.collectUntranslated({ panel });
+    countAmountSync({ runtime } = {}) {
+        const items = this.collectUntranslated({ runtime });
         const count = items.length;
         return {
             total: count,
@@ -66,13 +66,13 @@ export class CacheEmptyStrings extends BasePhase {
     async createEntries({ request }) {
         const repeatUntilSuccess = !!request.repeatUntilSuccess;
         const dryRun = !!request.dryRun;
-        const countUntranslated = (panel) => this.collectUntranslated({ panel }).length;
+        const countUntranslated = (runtime) => this.collectUntranslated({ runtime }).length;
 
         return [
             {
                 priorityMapId: 0,
                 strategy: this,
-                shouldRepeat(result, { panel, executionOptions } = {}) {
+                shouldRepeat(result, { runtime, executionOptions } = {}) {
                     if (!repeatUntilSuccess) {
                         return false;
                     }
@@ -90,7 +90,7 @@ export class CacheEmptyStrings extends BasePhase {
                         return false;
                     }
 
-                    return countUntranslated(panel) > 0;
+                    return countUntranslated(runtime) > 0;
                 },
             },
         ];
