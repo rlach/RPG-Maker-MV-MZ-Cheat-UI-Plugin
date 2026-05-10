@@ -88,7 +88,7 @@ export class ExternBaseTranslator extends BasePluginTranslator {
 
     // ── Translation pipeline ──────────────────────────────────────────────
 
-    buildUniquePendingItems(panel) {
+    buildUniquePendingItems(runtime) {
         this.ensureScanEntriesSync();
 
         const byCacheKey = new Map();
@@ -98,7 +98,7 @@ export class ExternBaseTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            const cacheKey = panel.getCacheKey(text, this.getCacheType());
+            const cacheKey = runtime.getCacheKey(text, this.getCacheType());
             if (!byCacheKey.has(cacheKey)) {
                 byCacheKey.set(cacheKey, {
                     type: this.getCacheType(),
@@ -112,24 +112,24 @@ export class ExternBaseTranslator extends BasePluginTranslator {
         return Array.from(byCacheKey.values());
     }
 
-    collectUntranslated({ panel }) {
-        if (!panel) {
+    collectUntranslated({ runtime }) {
+        if (!runtime) {
             return [];
         }
 
-        const items = this.buildUniquePendingItems(panel);
-        return items.filter((item) => !panel.hasUsableCacheValue(item.cacheKey));
+        const items = this.buildUniquePendingItems(runtime);
+        return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ panel }) {
-        if (!panel) {
+    countPluginAmountSync({ runtime }) {
+        if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 
-        const items = this.buildUniquePendingItems(panel);
+        const items = this.buildUniquePendingItems(runtime);
         const totalStrings = items.length;
         const leftStrings = items.filter(
-            (item) => !panel.hasUsableCacheValue(item.cacheKey)
+            (item) => !runtime.hasUsableCacheValue(item.cacheKey)
         ).length;
 
         return { total: totalStrings, left: leftStrings, totalStrings, leftStrings };

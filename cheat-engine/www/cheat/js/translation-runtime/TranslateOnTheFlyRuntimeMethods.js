@@ -2,7 +2,7 @@ import { createTranslationBatchManager } from '../../translate-engines/batch-man
 import {
     installCommandTranslationHook,
     isTranslationActive,
-} from '../../js/CommandTranslationManager.js';
+} from '../CommandTranslationManager.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../../translate-engines/plugins/PluginTranslatorRegistry.js';
 
 export const translateOnTheFlyRuntimeMethods = {

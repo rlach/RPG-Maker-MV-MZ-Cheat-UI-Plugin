@@ -1,8 +1,8 @@
-import { KeyValueStorage } from '../../js/KeyValueStorage.js';
-import { createSecureSecretStorage } from '../../js/SecureSecretStorage.js';
-import { ensureSettingsMigration } from '../../js/UnifiedSettings.js';
-import { TranslateOnTheFlyState } from '../../js/TranslateOnTheFlyState.js';
-import { ensureTranslateCacheRuntime } from '../../js/TranslateCacheRuntime.js';
+import { KeyValueStorage } from '../KeyValueStorage.js';
+import { createSecureSecretStorage } from '../SecureSecretStorage.js';
+import { ensureSettingsMigration } from '../UnifiedSettings.js';
+import { TranslateOnTheFlyState } from '../TranslateOnTheFlyState.js';
+import { ensureTranslateCacheRuntime } from '../TranslateCacheRuntime.js';
 import { createEngine, getAvailableEngines } from '../../translate-engines/index.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { translateOnTheFlySettingsMethods } from './TranslateOnTheFlySettingsMethods.js';
@@ -13,7 +13,7 @@ import { translateOnTheFlyFlowMethods } from './TranslateOnTheFlyFlowMethods.js'
 import { translateOnTheFlyRuntimeMethods } from './TranslateOnTheFlyRuntimeMethods.js';
 import { objectTranslationRuntimeMethods } from './ObjectTranslationModalMethods.js';
 import { translateOnTheFlyCoreMethods } from './TranslateOnTheFlyCoreMethods.js';
-import { ensureKnowledgeForLangPair } from '../../js/KnowledgeBaseRuntime.js';
+import { ensureKnowledgeForLangPair } from '../KnowledgeBaseRuntime.js';
 import {
     createTranslationRuntimeStateDefaults,
     UI_SYNC_STATE_KEYS,

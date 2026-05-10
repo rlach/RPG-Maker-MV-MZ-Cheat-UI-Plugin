@@ -1,8 +1,8 @@
 import BaseTranslationEngine from './BaseTranslationEngine.js';
 
 export default class LibreTranslateEngine extends BaseTranslationEngine {
-    constructor(panel) {
-        super(panel);
+    constructor(runtime) {
+        super(runtime);
         this.host = 'http://127.0.0.1:5000';
         this.apiKey = '';
     }
@@ -50,11 +50,11 @@ export default class LibreTranslateEngine extends BaseTranslationEngine {
         return {
             onChangeLibreTranslateHost() {
                 self.host = this.libreTranslateHost;
-                self.panel.saveSettings();
+                self.runtime.saveSettings();
             },
             onChangeLibreTranslateApiKey() {
                 self.apiKey = this.libreTranslateApiKey;
-                self.panel.saveSettings();
+                self.runtime.saveSettings();
             },
         };
     }
@@ -114,8 +114,8 @@ export default class LibreTranslateEngine extends BaseTranslationEngine {
             const url = `${this.host}/translate`;
             const payload = {
                 q: htmlPayload,
-                source: this.panel.sourceLang === 'auto' ? 'auto' : this.panel.sourceLang,
-                target: this.panel.targetLang,
+                source: this.runtime.sourceLang === 'auto' ? 'auto' : this.runtime.sourceLang,
+                target: this.runtime.targetLang,
                 format: 'html',
             };
 
@@ -205,7 +205,7 @@ export default class LibreTranslateEngine extends BaseTranslationEngine {
 
             const translated = this.decodeHtml(rawHtml);
             const isSame = translated.trim() === (item.value || '').trim();
-            if (this.panel.sourceLang !== this.panel.targetLang && isSame) {
+            if (this.runtime.sourceLang !== this.runtime.targetLang && isSame) {
                 failures.push({
                     type: item.type,
                     id: item.id,

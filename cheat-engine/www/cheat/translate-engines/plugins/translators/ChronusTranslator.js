@@ -86,7 +86,7 @@ export class ChronusTranslator extends BasePluginTranslator {
         return entries;
     }
 
-    _buildUniquePendingItems(panel) {
+    _buildUniquePendingItems(runtime) {
         const byCacheKey = new Map();
 
         for (const entry of this._scanEntries) {
@@ -95,7 +95,7 @@ export class ChronusTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            const cacheKey = panel.getCacheKey(text, this.getCacheType());
+            const cacheKey = runtime.getCacheKey(text, this.getCacheType());
             if (!byCacheKey.has(cacheKey)) {
                 byCacheKey.set(cacheKey, {
                     type: this.getCacheType(),
@@ -109,23 +109,23 @@ export class ChronusTranslator extends BasePluginTranslator {
         return Array.from(byCacheKey.values());
     }
 
-    collectUntranslated({ panel }) {
-        if (!panel) {
+    collectUntranslated({ runtime }) {
+        if (!runtime) {
             return [];
         }
 
-        const items = this._buildUniquePendingItems(panel);
-        return items.filter((item) => !panel.hasUsableCacheValue(item.cacheKey));
+        const items = this._buildUniquePendingItems(runtime);
+        return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ panel }) {
-        if (!panel) {
+    countPluginAmountSync({ runtime }) {
+        if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 
-        const items = this._buildUniquePendingItems(panel);
+        const items = this._buildUniquePendingItems(runtime);
         const totalStrings = items.length;
-        const leftStrings = items.filter((item) => !panel.hasUsableCacheValue(item.cacheKey)).length;
+        const leftStrings = items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey)).length;
 
         return {
             total: totalStrings,

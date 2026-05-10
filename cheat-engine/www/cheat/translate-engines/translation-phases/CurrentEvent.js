@@ -64,8 +64,8 @@ export class CurrentEvent extends BasePhase {
         return 'currentEvent';
     }
 
-    async createEntries({ request, panel }) {
-        const gameMessage = panel.currentGameMessage || window.$gameMessage;
+    async createEntries({ request, runtime }) {
+        const gameMessage = runtime.currentGameMessage || window.$gameMessage;
         if (!gameMessage || typeof gameMessage.allText !== 'function') {
             return [];
         }
@@ -83,7 +83,7 @@ export class CurrentEvent extends BasePhase {
         const messageHasPortrait =
             typeof request.hasPortrait === 'boolean'
                 ? request.hasPortrait
-                : panel.hasCurrentMessagePortrait(gameMessage);
+                : runtime.hasCurrentMessagePortrait(gameMessage);
         const fullEvent = !!request.fullEvent;
         const maxDepth = fullEvent ? request.maxDepth : 0;
 
@@ -91,31 +91,31 @@ export class CurrentEvent extends BasePhase {
             const refreshKeys = [];
             if (originalText && originalText.trim()) {
                 refreshKeys.push(
-                    ...panel.getMessageCacheLookupKeys(originalText, {
+                    ...runtime.getMessageCacheLookupKeys(originalText, {
                         hasPortrait: messageHasPortrait,
                     })
                 );
             }
             if (originalSpeakerName && originalSpeakerName.trim()) {
-                refreshKeys.push(panel.getCacheKey(originalSpeakerName, 'speaker'));
+                refreshKeys.push(runtime.getCacheKey(originalSpeakerName, 'speaker'));
             }
             const choices = gameMessage.choices ? gameMessage.choices() : [];
             const originalChoices = gameMessage._translateOriginalChoices || choices;
             for (const choice of originalChoices || []) {
                 if (choice && String(choice).trim()) {
-                    refreshKeys.push(panel.getCacheKey(choice, 'choice'));
+                    refreshKeys.push(runtime.getCacheKey(choice, 'choice'));
                 }
             }
 
             for (const key of refreshKeys) {
-                panel.deleteCacheValue(key, {
+                runtime.deleteCacheValue(key, {
                     persist: false,
                     notify: false,
                     deleteSeen: false,
                 });
             }
-            panel.persistCache(refreshKeys);
-            panel.notifyCacheRuntime('cache-force-retranslate');
+            runtime.persistCache(refreshKeys);
+            runtime.notifyCacheRuntime('cache-force-retranslate');
         }
 
         return [
@@ -127,8 +127,8 @@ export class CurrentEvent extends BasePhase {
                     maxDepth,
                     messageHasPortrait,
                 }),
-                priorityMapId: panel.getCurrentMapIdForPhasePriority
-                    ? panel.getCurrentMapIdForPhasePriority()
+                priorityMapId: runtime.getCurrentMapIdForPhasePriority
+                    ? runtime.getCurrentMapIdForPhasePriority()
                     : 0,
             },
         ];
@@ -138,11 +138,11 @@ export class CurrentEvent extends BasePhase {
         return { total: 1, left: 1, totalStrings: 1, leftStrings: 1 };
     }
 
-    collectAheadItems(panel, currentText, currentSpeaker, interpreter, options = {}) {
-        const charLimit = options.charLimit || panel.charLimit;
-        const maxItems = options.maxItems || panel.batchItemsLimit || 20;
+    collectAheadItems(runtime, currentText, currentSpeaker, interpreter, options = {}) {
+        const charLimit = options.charLimit || runtime.charLimit;
+        const maxItems = options.maxItems || runtime.batchItemsLimit || 20;
         const maxDepth = options.maxDepth !== undefined ? options.maxDepth : 999;
-        const messageType = panel.getMessageCacheType({
+        const messageType = runtime.getMessageCacheType({
             hasPortrait: !!options.messageHasPortrait,
         });
 
@@ -165,19 +165,19 @@ export class CurrentEvent extends BasePhase {
                 return true;
             }
 
-            const cacheKey = panel.getCacheKey(value, type);
+            const cacheKey = runtime.getCacheKey(value, type);
             if (!force) {
                 // For message types check all variants so that a text already cached as
                 // message_portrait is not re-harvested and stored again as message (or vice
                 // versa), which would cause cache duplication and translation mismatches.
-                const isMessageType = panel.isMessageCacheType(type);
+                const isMessageType = runtime.isMessageCacheType(type);
                 const hasUsable = isMessageType
-                    ? panel
+                    ? runtime
                           .getMessageCacheLookupKeys(value, {
                               hasPortrait: type === 'message_portrait',
                           })
-                          .some((k) => panel.hasUsableCacheValue(k))
-                    : panel.hasUsableCacheValue(cacheKey);
+                          .some((k) => runtime.hasUsableCacheValue(k))
+                    : runtime.hasUsableCacheValue(cacheKey);
                 if (hasUsable) {
                     return true;
                 }
@@ -227,7 +227,7 @@ export class CurrentEvent extends BasePhase {
         const list = interpreter._list;
         const entries = collectEventCommandEntries(list, {
             transformEntry(entry) {
-                return normalizeMessageEntryForPlugins(panel, entry);
+                return normalizeMessageEntryForPlugins(runtime, entry);
             },
         });
 
@@ -273,20 +273,20 @@ export class CurrentEvent extends BasePhase {
         return items;
     }
 
-    collectMandatoryChoiceCacheKeys(panel) {
+    collectMandatoryChoiceCacheKeys(runtime) {
         const mandatoryChoiceCacheKeys = [];
         if (window.$gameMessage && $gameMessage.isChoice && $gameMessage.isChoice()) {
             const currentChoices = $gameMessage._translateOriginalChoices || $gameMessage.choices();
             if (Array.isArray(currentChoices)) {
                 for (const choice of currentChoices) {
-                    mandatoryChoiceCacheKeys.push(panel.getCacheKey(choice, 'choice'));
+                    mandatoryChoiceCacheKeys.push(runtime.getCacheKey(choice, 'choice'));
                 }
             }
         }
         return mandatoryChoiceCacheKeys;
     }
 
-    appendCurrentChoiceItems(panel, items) {
+    appendCurrentChoiceItems(runtime, items) {
         if (!(window.$gameMessage && $gameMessage.isChoice && $gameMessage.isChoice())) {
             return;
         }
@@ -298,8 +298,8 @@ export class CurrentEvent extends BasePhase {
 
         for (let i = 0; i < currentChoices.length; i++) {
             const choice = currentChoices[i];
-            const choiceCacheKey = panel.getCacheKey(choice, 'choice');
-            if (panel.hasUsableCacheValue(choiceCacheKey)) {
+            const choiceCacheKey = runtime.getCacheKey(choice, 'choice');
+            if (runtime.hasUsableCacheValue(choiceCacheKey)) {
                 continue;
             }
 
@@ -317,16 +317,16 @@ export class CurrentEvent extends BasePhase {
         }
     }
 
-    applyCurrentText(panel, items, fallbackText, textSuccesses = 0) {
+    applyCurrentText(runtime, items, fallbackText, textSuccesses = 0) {
         const firstTextItem = items.find((item) => isMessageTextType(item.type));
         if (!firstTextItem) {
             return;
         }
 
-        let translated = panel.translationCache.get(firstTextItem.cacheKey);
+        let translated = runtime.translationCache.get(firstTextItem.cacheKey);
         if (!translated) {
             const state = this._ensureState();
-            const preferred = panel.getPreferredMessageCacheEntry(
+            const preferred = runtime.getPreferredMessageCacheEntry(
                 firstTextItem.value || fallbackText || '',
                 {
                     hasPortrait: !!state.messageHasPortrait,
@@ -336,36 +336,36 @@ export class CurrentEvent extends BasePhase {
         }
 
         if (translated) {
-            panel.replaceMessageText(translated);
-            panel._translationApplied = true;
+            runtime.replaceMessageText(translated);
+            runtime._translationApplied = true;
 
-            panel.translationCount += Math.max(0, Number(textSuccesses) || 0);
-            panel.saveSettings();
+            runtime.translationCount += Math.max(0, Number(textSuccesses) || 0);
+            runtime.saveSettings();
             return;
         }
 
-        panel.replaceMessageText(fallbackText || '');
-        panel._translationApplied = true;
+        runtime.replaceMessageText(fallbackText || '');
+        runtime._translationApplied = true;
     }
 
-    applyCurrentChoices(panel) {
+    applyCurrentChoices(runtime) {
         if (!(window.$gameMessage && $gameMessage.isChoice && $gameMessage.isChoice())) {
             return;
         }
 
         const originalChoices = $gameMessage._translateOriginalChoices || $gameMessage.choices();
         const translatedChoices = originalChoices.map((choice) => {
-            const choiceCacheKey = panel.getCacheKey(choice, 'choice');
-            return panel.translationCache.get(choiceCacheKey) || choice;
+            const choiceCacheKey = runtime.getCacheKey(choice, 'choice');
+            return runtime.translationCache.get(choiceCacheKey) || choice;
         });
 
-        panel.replaceChoiceText(translatedChoices);
+        runtime.replaceChoiceText(translatedChoices);
     }
 
-    collectUntranslated({ panel }) {
+    collectUntranslated({ runtime }) {
         const state = this._ensureState();
-        const interpreter = panel.findMessageInterpreter();
-        const normalized = panel.resolveOriginalMessageContext(
+        const interpreter = runtime.findMessageInterpreter();
+        const normalized = runtime.resolveOriginalMessageContext(
             this.currentText,
             this.currentSpeakerName,
             interpreter
@@ -374,7 +374,7 @@ export class CurrentEvent extends BasePhase {
         const normalizedCurrentSpeaker = normalized.speaker || this.currentSpeakerName || '';
 
         const items = this.collectAheadItems(
-            panel,
+            runtime,
             normalizedCurrentText,
             normalizedCurrentSpeaker,
             interpreter,
@@ -386,7 +386,7 @@ export class CurrentEvent extends BasePhase {
             }
         );
 
-        this.appendCurrentChoiceItems(panel, items);
+        this.appendCurrentChoiceItems(runtime, items);
         state.items = items;
         state.normalizedCurrentText = normalizedCurrentText;
         state.messageHasPortrait = !!this.messageHasPortrait;
@@ -398,15 +398,15 @@ export class CurrentEvent extends BasePhase {
         const mandatoryCacheKeys = new Set();
         if (normalizedCurrentText) {
             mandatoryCacheKeys.add(
-                panel.getMessageCacheKey(normalizedCurrentText, {
+                runtime.getMessageCacheKey(normalizedCurrentText, {
                     hasPortrait: !!state.messageHasPortrait,
                 })
             );
         }
         if (normalizedCurrentSpeaker) {
-            mandatoryCacheKeys.add(panel.getCacheKey(normalizedCurrentSpeaker, 'speaker'));
+            mandatoryCacheKeys.add(runtime.getCacheKey(normalizedCurrentSpeaker, 'speaker'));
         }
-        for (const choiceCacheKey of this.collectMandatoryChoiceCacheKeys(panel)) {
+        for (const choiceCacheKey of this.collectMandatoryChoiceCacheKeys(runtime)) {
             mandatoryCacheKeys.add(choiceCacheKey);
         }
 
@@ -415,12 +415,12 @@ export class CurrentEvent extends BasePhase {
                 return false;
             }
 
-            if (panel.hasUsableCacheValue(item.cacheKey)) {
+            if (runtime.hasUsableCacheValue(item.cacheKey)) {
                 return false;
             }
 
             if (
-                panel.failedTranslations.has(item.cacheKey) &&
+                runtime.failedTranslations.has(item.cacheKey) &&
                 !item.mandatory &&
                 !mandatoryCacheKeys.has(item.cacheKey)
             ) {
@@ -457,7 +457,7 @@ export class CurrentEvent extends BasePhase {
         state.textSuccesses = 0;
 
         for (const item of uniqueItems) {
-            panel.pendingTranslations.set(item.cacheKey, true);
+            runtime.pendingTranslations.set(item.cacheKey, true);
             state.pendingKeys.add(item.cacheKey);
         }
 
@@ -468,9 +468,9 @@ export class CurrentEvent extends BasePhase {
         return uniqueItems;
     }
 
-    setData({ panel, successes, failures }) {
+    setData({ runtime, successes, failures }) {
         const state = this._ensureState();
-        super.setData({ panel, successes, failures });
+        super.setData({ runtime, successes, failures });
 
         for (const success of successes || []) {
             if (success && isMessageTextType(success.type)) {
@@ -482,7 +482,7 @@ export class CurrentEvent extends BasePhase {
             if (!failure || !failure.cacheKey) {
                 continue;
             }
-            panel.setCacheValue(failure.cacheKey, '');
+            runtime.setCacheValue(failure.cacheKey, '');
         }
 
         for (const failure of failures || []) {
@@ -495,32 +495,32 @@ export class CurrentEvent extends BasePhase {
         }
     }
 
-    finalizePhase({ panel }) {
+    finalizePhase({ runtime }) {
         const state = this._ensureState();
         try {
             this.applyCurrentText(
-                panel,
+                runtime,
                 state.items,
                 state.normalizedCurrentText || this.currentText || '',
                 state.textSuccesses
             );
-            this.applyCurrentChoices(panel);
+            this.applyCurrentChoices(runtime);
         } finally {
             for (const key of state.pendingKeys || []) {
-                panel.pendingTranslations.delete(key);
+                runtime.pendingTranslations.delete(key);
             }
         }
     }
 
-    handleFatalError({ panel, error }) {
+    handleFatalError({ runtime, error }) {
         const state = this._ensureState();
         console.error('[TranslateOnTheFly] Ahead translation error:', error);
         for (const key of state.pendingKeys || []) {
-            panel.failedTranslations.set(key, Date.now());
-            panel.pendingTranslations.delete(key);
+            runtime.failedTranslations.set(key, Date.now());
+            runtime.pendingTranslations.delete(key);
         }
-        panel.replaceMessageText(this.currentText || '');
-        panel._translationApplied = true;
+        runtime.replaceMessageText(this.currentText || '');
+        runtime._translationApplied = true;
     }
 }
 

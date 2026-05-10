@@ -100,8 +100,8 @@ export class OtherStrings extends BasePhase {
         return originals[field.id] || '';
     }
 
-    getFieldCacheKey(panel, source) {
-        if (!panel) {
+    getFieldCacheKey(runtime, source) {
+        if (!runtime) {
             return null;
         }
 
@@ -109,10 +109,10 @@ export class OtherStrings extends BasePhase {
             return null;
         }
 
-        return panel.getCacheKey(source, 'other');
+        return runtime.getCacheKey(source, 'other');
     }
 
-    buildPendingItems({ panel }) {
+    buildPendingItems({ runtime }) {
         const pending = [];
 
         for (const field of OtherStrings.FIELD_DEFINITIONS) {
@@ -121,8 +121,8 @@ export class OtherStrings extends BasePhase {
                 continue;
             }
 
-            const cacheKey = this.getFieldCacheKey(panel, source);
-            if (cacheKey && panel?.hasUsableCacheValue(cacheKey)) {
+            const cacheKey = this.getFieldCacheKey(runtime, source);
+            if (cacheKey && runtime?.hasUsableCacheValue(cacheKey)) {
                 continue;
             }
 
@@ -156,18 +156,18 @@ export class OtherStrings extends BasePhase {
         return this.setValueByPath(dataSystem, field.path, translatedValue);
     }
 
-    applyCachedDataForField({ panel, field }) {
+    applyCachedDataForField({ runtime, field }) {
         const source = this.getOriginalFieldValue(field);
         if (!source || source.trim() === '') {
             return false;
         }
 
-        const cacheKey = this.getFieldCacheKey(panel, source);
-        if (!cacheKey || !panel.hasUsableCacheValue(cacheKey)) {
+        const cacheKey = this.getFieldCacheKey(runtime, source);
+        if (!cacheKey || !runtime.hasUsableCacheValue(cacheKey)) {
             return false;
         }
 
-        const translated = panel.translationCache.get(cacheKey);
+        const translated = runtime.translationCache.get(cacheKey);
         if (typeof translated !== 'string') {
             return false;
         }
@@ -179,13 +179,13 @@ export class OtherStrings extends BasePhase {
         return this.getOriginalFieldValue(OtherStrings.FIELD_DEFINITIONS[0]);
     }
 
-    getTitleCacheKey(panel) {
+    getTitleCacheKey(runtime) {
         const source = this.getTitleOriginalValue();
-        return this.getFieldCacheKey(panel, source);
+        return this.getFieldCacheKey(runtime, source);
     }
 
-    getTranslatableFieldsCount({ panel }) {
-        const pending = this.buildPendingItems({ panel });
+    getTranslatableFieldsCount({ runtime }) {
+        const pending = this.buildPendingItems({ runtime });
         let total = 0;
         for (const field of OtherStrings.FIELD_DEFINITIONS) {
             const source = this.getOriginalFieldValue(field);
@@ -206,8 +206,8 @@ export class OtherStrings extends BasePhase {
         ];
     }
 
-    countAmountSync({ panel }) {
-        const counts = this.getTranslatableFieldsCount({ panel });
+    countAmountSync({ runtime }) {
+        const counts = this.getTranslatableFieldsCount({ runtime });
 
         return {
             total: counts.total,
@@ -217,12 +217,12 @@ export class OtherStrings extends BasePhase {
         };
     }
 
-    collectUntranslated({ panel }) {
-        return this.buildPendingItems({ panel });
+    collectUntranslated({ runtime }) {
+        return this.buildPendingItems({ runtime });
     }
 
-    setData({ panel, successes, failures, pendingItems }) {
-        super.setData({ panel, successes, failures });
+    setData({ runtime, successes, failures, pendingItems }) {
+        super.setData({ runtime, successes, failures });
 
         const fieldIdsByCacheKey = new Map();
         for (const item of pendingItems || []) {
@@ -248,14 +248,14 @@ export class OtherStrings extends BasePhase {
     }
 
     applyDataOnLifecycle(context = {}) {
-        const { panel } = context;
-        if (!panel || !this.getSystemData()) {
+        const { runtime } = context;
+        if (!runtime || !this.getSystemData()) {
             return false;
         }
 
         let appliedAny = false;
         for (const field of OtherStrings.FIELD_DEFINITIONS) {
-            appliedAny = this.applyCachedDataForField({ panel, field }) || appliedAny;
+            appliedAny = this.applyCachedDataForField({ runtime, field }) || appliedAny;
         }
 
         return appliedAny;

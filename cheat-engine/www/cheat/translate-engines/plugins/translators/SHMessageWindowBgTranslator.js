@@ -98,13 +98,13 @@ export class SHMessageWindowBgTranslator extends BasePluginTranslator {
         window[RUNTIME_HOOK_GUARD] = true;
     }
 
-    collectUntranslated({ panel }) {
-        void panel;
+    collectUntranslated({ runtime }) {
+        void runtime;
         return [];
     }
 
-    countPluginAmountSync({ panel }) {
-        void panel;
+    countPluginAmountSync({ runtime }) {
+        void runtime;
         return {
             total: 0,
             left: 0,

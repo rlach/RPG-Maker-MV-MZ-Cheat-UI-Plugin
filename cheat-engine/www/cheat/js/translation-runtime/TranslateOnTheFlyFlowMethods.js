@@ -1,9 +1,9 @@
-import { Alert } from '../../js/AlertHelper.js';
-import { findNearestMessageEntry } from '../../js/EventCommandTraversal.js';
+import { Alert } from '../AlertHelper.js';
+import { findNearestMessageEntry } from '../EventCommandTraversal.js';
 import {
     computeLangPairCompletionByKeyLength,
     computeLangPairCompletionByCacheTypes,
-} from '../../js/TranslationCompletionMetrics.js';
+} from '../TranslationCompletionMetrics.js';
 import { BatchSummaryReporter } from '../../translate-engines/batch-manager/BatchSummaryReporter.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { CurrentEvent } from '../../translate-engines/translation-phases/CurrentEvent.js';
@@ -707,7 +707,7 @@ export const translateOnTheFlyFlowMethods = {
         } catch (error) {
             const strategy = CurrentEvent.getInstance();
             if (typeof strategy.handleFatalError === 'function') {
-                strategy.handleFatalError({ panel: this, error });
+                strategy.handleFatalError({ runtime: this, error });
             }
             return null;
         }

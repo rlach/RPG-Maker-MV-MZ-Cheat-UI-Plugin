@@ -1,6 +1,6 @@
 import { TRANSLATE_SETTINGS, TRANSLATOR } from '../js/TranslateHelper.js';
 import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
-import { ensureTranslationRuntime } from './translate-on-the-fly/TranslationRuntime.js';
+import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
 
 export default {
     name: 'VariableSettingPanel',
@@ -83,7 +83,7 @@ export default {
             </div>
         </template>
     </v-data-table>
-    
+
     <v-tooltip
         bottom>
         <span>Reload from game data</span>

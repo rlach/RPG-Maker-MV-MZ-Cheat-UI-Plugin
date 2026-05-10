@@ -1,16 +1,14 @@
-import { Alert } from '../../js/AlertHelper.js';
-import { MessageCheat } from '../../js/CheatHelper.js';
-import { TranslateOnTheFlyState } from '../../js/TranslateOnTheFlyState.js';
-import { ensureTranslateCacheRuntime } from '../../js/TranslateCacheRuntime.js';
+import { Alert } from '../AlertHelper.js';
+import { MessageCheat } from '../CheatHelper.js';
+import { TranslateOnTheFlyState } from '../TranslateOnTheFlyState.js';
+import { ensureTranslateCacheRuntime } from '../TranslateCacheRuntime.js';
 import {
     getMessageSourceTextVariants as getMessageSourceTextVariantsHelper,
     buildMessageCacheLookupKeys,
-} from '../../js/MessageCacheKeyHelper.js';
+} from '../MessageCacheKeyHelper.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { DATA_CONTAINER_TRANSLATION_DEFINITIONS } from '../../translate-engines/translation-phases/DataContainerDefinitions.js';
-import {
-    runCacheMigrationsIfNeeded,
-} from './TranslateCacheMigrations.js';
+import { runCacheMigrationsIfNeeded } from './TranslateCacheMigrations.js';
 
 export const translateOnTheFlyCoreMethods = {
     isBatchQueueAbortRequested() {

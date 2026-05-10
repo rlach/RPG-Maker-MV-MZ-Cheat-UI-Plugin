@@ -1,4 +1,4 @@
-import { OBJECT_TRANSLATION_SERVICE } from '../panels/translate-on-the-fly/ObjectTranslationService.js';
+import { OBJECT_TRANSLATION_SERVICE } from '../js/translation-runtime/ObjectTranslationService.js';
 
 export default {
     name: 'ObjectTranslationModalHost',

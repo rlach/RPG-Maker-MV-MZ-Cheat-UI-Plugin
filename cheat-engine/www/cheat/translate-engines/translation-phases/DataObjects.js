@@ -20,7 +20,7 @@ export class DataObjects extends BasePhase {
         return this;
     }
 
-    static countAmountFromObjects(panel, dataObjects, fields, type) {
+    static countAmountFromObjects(runtime, dataObjects, fields, type) {
         const safeDataObjects = Array.isArray(dataObjects) ? dataObjects : [];
         const safeFields = Array.isArray(fields) ? fields : [];
         const safeType = type || 'data';
@@ -56,8 +56,8 @@ export class DataObjects extends BasePhase {
                 }
 
                 totalStrings += 1;
-                const cacheKey = panel.getCacheKey(originalValue, `${safeType}_${field}`);
-                if (!panel.hasUsableCacheValue(cacheKey)) {
+                const cacheKey = runtime.getCacheKey(originalValue, `${safeType}_${field}`);
+                if (!runtime.hasUsableCacheValue(cacheKey)) {
                     leftStrings += 1;
                     hasUntranslated = true;
                 }
@@ -71,7 +71,7 @@ export class DataObjects extends BasePhase {
         return { total, left, totalStrings, leftStrings };
     }
 
-    static countAmountFromContainer(panel, container, fields, cachePrefix) {
+    static countAmountFromContainer(runtime, container, fields, cachePrefix) {
         if (!Array.isArray(container)) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
@@ -81,7 +81,7 @@ export class DataObjects extends BasePhase {
             objects.push(container[i]);
         }
 
-        return DataObjects.countAmountFromObjects(panel, objects, fields, cachePrefix);
+        return DataObjects.countAmountFromObjects(runtime, objects, fields, cachePrefix);
     }
 
     getTranslationPhaseLabel() {
@@ -108,16 +108,16 @@ export class DataObjects extends BasePhase {
         ];
     }
 
-    countAmountSync({ request, panel }) {
+    countAmountSync({ request, runtime }) {
         return DataObjects.countAmountFromObjects(
-            panel,
+            runtime,
             request.dataObjects,
             request.fields,
             request.type
         );
     }
 
-    collectUntranslated({ panel }) {
+    collectUntranslated({ runtime }) {
         if (!this.type || this.fields.length === 0) {
             return [];
         }
@@ -143,8 +143,8 @@ export class DataObjects extends BasePhase {
                 }
 
                 const originalValue = dataObject._translateOriginal[field];
-                const cacheKey = panel.getCacheKey(originalValue, `${this.type}_${field}`);
-                if (panel.hasUsableCacheValue(cacheKey)) {
+                const cacheKey = runtime.getCacheKey(originalValue, `${this.type}_${field}`);
+                if (runtime.hasUsableCacheValue(cacheKey)) {
                     continue;
                 }
 
@@ -225,7 +225,7 @@ export class DataObjects extends BasePhase {
         return false;
     }
 
-    finalizePhase({ panel }) {
+    finalizePhase({ runtime }) {
         for (const dataObject of this.dataObjects) {
             if (!dataObject || !dataObject._translateOriginal) {
                 continue;
@@ -237,12 +237,12 @@ export class DataObjects extends BasePhase {
                     continue;
                 }
 
-                const cacheKey = panel.getCacheKey(originalValue, `${this.type}_${field}`);
-                if (panel.hasUsableCacheValue(cacheKey)) {
+                const cacheKey = runtime.getCacheKey(originalValue, `${this.type}_${field}`);
+                if (runtime.hasUsableCacheValue(cacheKey)) {
                     this.applyTranslatedFieldValue(
                         dataObject,
                         field,
-                        panel.translationCache.get(cacheKey)
+                        runtime.translationCache.get(cacheKey)
                     );
                 }
             }

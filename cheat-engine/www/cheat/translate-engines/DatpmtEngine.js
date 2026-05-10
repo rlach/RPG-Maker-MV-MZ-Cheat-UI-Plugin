@@ -34,20 +34,20 @@ export default class DatpmtEngine extends BaseTranslationEngine {
 
         const joined = payloadParts.join('');
 
-        // Call Datpmt API directly (CORRECT endpoint from old panel)
+        // Call Datpmt API directly (CORRECT endpoint from old runtime)
         let translatedJoinedRaw;
         try {
             const url = 'https://api.datpmt.com/api/v2/dictionary/translate';
             const params = {
                 string: joined,
-                from_lang: this.panel.sourceLang || 'auto',
-                to_lang: this.panel.targetLang || 'en',
+                from_lang: this.runtime.sourceLang || 'auto',
+                to_lang: this.runtime.targetLang || 'en',
             };
 
             const response = await axios.get(url, { params });
             const data = response && response.data;
 
-            // Try multiple possible response paths (from old panel)
+            // Try multiple possible response paths (from old runtime)
             const candidate = [
                 data && data.data && data.data.translated_text,
                 data && data.data && data.data.translate_string,
@@ -118,7 +118,7 @@ export default class DatpmtEngine extends BaseTranslationEngine {
             const translated = rawSlice.replace(new RegExp(NL, 'g'), '\n');
 
             const isSame = translated.trim() === (item.value || '').trim();
-            if (this.panel.sourceLang !== this.panel.targetLang && isSame) {
+            if (this.runtime.sourceLang !== this.runtime.targetLang && isSame) {
                 failures.push({
                     type: item.type,
                     id: item.id,

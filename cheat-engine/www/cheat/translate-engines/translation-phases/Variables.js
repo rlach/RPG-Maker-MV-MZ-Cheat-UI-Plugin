@@ -1,5 +1,5 @@
 import { collectVariableAssignmentEntries } from '../../js/EventCommandTraversal.js';
-import { loadMapDataById } from '../../panels/translate-on-the-fly/ObjectTranslationModalMethods.js';
+import { loadMapDataById } from '../../js/translation-runtime/ObjectTranslationModalMethods.js';
 import { BasePhase } from './BasePhase.js';
 
 const VARIABLE_VALUE_CACHE_TYPE = 'variable_value';
@@ -37,13 +37,13 @@ export class Variables extends BasePhase {
         };
     }
 
-    static getMarkedVariableIdSet(panel) {
-        const safeIds = panel ? panel.getSafeVariableTranslationIds() : [];
+    static getMarkedVariableIdSet(runtime) {
+        const safeIds = runtime ? runtime.getSafeVariableTranslationIds() : [];
         return new Set(safeIds.map(Number).filter((id) => Number.isInteger(id) && id > 0));
     }
 
-    static countMarkedVariables(panel) {
-        return Variables.getMarkedVariableIdSet(panel).size;
+    static countMarkedVariables(runtime) {
+        return Variables.getMarkedVariableIdSet(runtime).size;
     }
 
     static collectListEntries(list, allowedVariableIds) {
@@ -64,9 +64,9 @@ export class Variables extends BasePhase {
         }
     }
 
-    static async collectMapEntries(panel, allowedVariableIds) {
+    static async collectMapEntries(runtime, allowedVariableIds) {
         const entries = [];
-        const validMaps = panel ? panel.getValidMapInfos() : [];
+        const validMaps = runtime ? runtime.getValidMapInfos() : [];
 
         for (const mapInfo of validMaps) {
             let mapData = null;
@@ -128,14 +128,14 @@ export class Variables extends BasePhase {
         return entries;
     }
 
-    static mergeEntriesIntoUniqueItems(panel, allEntries) {
+    static mergeEntriesIntoUniqueItems(runtime, allEntries) {
         const uniqueItemsMap = new Map();
         for (const entry of allEntries) {
             if (!entry || typeof entry.value !== 'string' || entry.value.trim() === '') {
                 continue;
             }
 
-            const cacheKey = panel.getCacheKey(entry.value, VARIABLE_VALUE_CACHE_TYPE);
+            const cacheKey = runtime.getCacheKey(entry.value, VARIABLE_VALUE_CACHE_TYPE);
             if (!uniqueItemsMap.has(cacheKey)) {
                 uniqueItemsMap.set(cacheKey, {
                     type: VARIABLE_VALUE_CACHE_TYPE,
@@ -157,7 +157,7 @@ export class Variables extends BasePhase {
 
         const uniqueItems = Array.from(uniqueItemsMap.values());
         const pendingItems = uniqueItems.filter(
-            (item) => !panel.hasUsableCacheValue(item.cacheKey)
+            (item) => !runtime.hasUsableCacheValue(item.cacheKey)
         );
 
         return {
@@ -170,8 +170,8 @@ export class Variables extends BasePhase {
         };
     }
 
-    static async buildScanResult(panel) {
-        const allowedVariableIds = Variables.getMarkedVariableIdSet(panel);
+    static async buildScanResult(runtime) {
+        const allowedVariableIds = Variables.getMarkedVariableIdSet(runtime);
         if (allowedVariableIds.size === 0) {
             return Variables.createEmptyScanResult();
         }
@@ -179,10 +179,10 @@ export class Variables extends BasePhase {
         const allEntries = [
             ...Variables.collectCommonEventEntries(allowedVariableIds),
             ...Variables.collectTroopEntries(allowedVariableIds),
-            ...(await Variables.collectMapEntries(panel, allowedVariableIds)),
+            ...(await Variables.collectMapEntries(runtime, allowedVariableIds)),
         ];
 
-        return Variables.mergeEntriesIntoUniqueItems(panel, allEntries);
+        return Variables.mergeEntriesIntoUniqueItems(runtime, allEntries);
     }
 
     getKind() {
@@ -193,8 +193,8 @@ export class Variables extends BasePhase {
         return 'translating variables';
     }
 
-    async createEntries({ panel }) {
-        const scanResult = await Variables.buildScanResult(panel);
+    async createEntries({ runtime }) {
+        const scanResult = await Variables.buildScanResult(runtime);
         if (scanResult.total <= 0) {
             return [];
         }
@@ -207,8 +207,8 @@ export class Variables extends BasePhase {
         ];
     }
 
-    countAmountSync({ panel }) {
-        const configuredVariableCount = Variables.countMarkedVariables(panel);
+    countAmountSync({ runtime }) {
+        const configuredVariableCount = Variables.countMarkedVariables(runtime);
         return {
             total: configuredVariableCount,
             left: configuredVariableCount,

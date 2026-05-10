@@ -21,8 +21,8 @@ export class SystemMessages extends BasePhase {
         return 'systemMessages';
     }
 
-    getPrimaryCacheKey(panel, messageKey, messageValue) {
-        return getSystemMessageCacheKey(panel, messageKey, messageValue);
+    getPrimaryCacheKey(runtime, messageKey, messageValue) {
+        return getSystemMessageCacheKey(runtime, messageKey, messageValue);
     }
 
     async createEntries() {
@@ -34,7 +34,7 @@ export class SystemMessages extends BasePhase {
         ];
     }
 
-    countAmountSync({ panel }) {
+    countAmountSync({ runtime }) {
         if (
             !window.$dataSystem ||
             !$dataSystem.terms ||
@@ -59,8 +59,8 @@ export class SystemMessages extends BasePhase {
             }
 
             total += 1;
-            const cacheKey = this.getPrimaryCacheKey(panel, key, value);
-            if (!cacheKey || !panel.hasUsableCacheValue(cacheKey)) {
+            const cacheKey = this.getPrimaryCacheKey(runtime, key, value);
+            if (!cacheKey || !runtime.hasUsableCacheValue(cacheKey)) {
                 left += 1;
             }
         }
@@ -68,7 +68,7 @@ export class SystemMessages extends BasePhase {
         return { total, left, totalStrings: total, leftStrings: left };
     }
 
-    collectUntranslated({ panel }) {
+    collectUntranslated({ runtime }) {
         if (
             !(
                 window.$dataSystem &&
@@ -93,8 +93,8 @@ export class SystemMessages extends BasePhase {
                 continue;
             }
 
-            const cacheKey = this.getPrimaryCacheKey(panel, key, value);
-            if (!cacheKey || !panel.hasUsableCacheValue(cacheKey)) {
+            const cacheKey = this.getPrimaryCacheKey(runtime, key, value);
+            if (!cacheKey || !runtime.hasUsableCacheValue(cacheKey)) {
                 pending.push({
                     type: 'system_message',
                     id: `msg_${key}`,
@@ -108,8 +108,8 @@ export class SystemMessages extends BasePhase {
         return pending;
     }
 
-    setData({ panel, pendingItems, successes, failures }) {
-        super.setData({ panel, successes, failures });
+    setData({ runtime, pendingItems, successes, failures }) {
+        super.setData({ runtime, successes, failures });
 
         if (
             !window.$dataSystem ||
@@ -149,9 +149,9 @@ export class SystemMessages extends BasePhase {
         }
     }
 
-    applyDataOnLifecycle({ panel } = {}) {
+    applyDataOnLifecycle({ runtime } = {}) {
         if (
-            !panel ||
+            !runtime ||
             !window.$dataSystem ||
             !$dataSystem.terms ||
             !$dataSystem.terms.messages ||
@@ -175,12 +175,12 @@ export class SystemMessages extends BasePhase {
                 continue;
             }
 
-            const cacheKey = this.getPrimaryCacheKey(panel, key, sourceValue);
-            if (!cacheKey || !panel.hasUsableCacheValue(cacheKey)) {
+            const cacheKey = this.getPrimaryCacheKey(runtime, key, sourceValue);
+            if (!cacheKey || !runtime.hasUsableCacheValue(cacheKey)) {
                 continue;
             }
 
-            const translated = panel.translationCache.get(cacheKey);
+            const translated = runtime.translationCache.get(cacheKey);
             if (translated !== undefined && Object.prototype.hasOwnProperty.call(messages, key)) {
                 messages[key] = translated;
                 applied += 1;

@@ -3,8 +3,8 @@
  * All engines must implement these methods
  */
 export default class BaseTranslationEngine {
-    constructor(panel) {
-        this.panel = panel; // Reference to TranslateOnTheFlyPanel for cache, settings, etc.
+    constructor(runtime) {
+        this.runtime = runtime;
     }
 
     /**
@@ -93,23 +93,23 @@ export default class BaseTranslationEngine {
 
     // Helper methods available to all engines
     getCacheKey(text, type) {
-        return this.panel.getCacheKey(text, type);
+        return this.runtime.getCacheKey(text, type);
     }
 
     setCacheValue(key, value) {
-        return this.panel.setCacheValue(key, value);
+        return this.runtime.setCacheValue(key, value);
     }
 
     wrapText(text, maxWidth, options = {}) {
-        return this.panel.wrapText(text, maxWidth, options);
+        return this.runtime.wrapText(text, maxWidth, options);
     }
 
     cleanTranslatedText(text) {
-        return this.panel.cleanTranslatedText(text);
+        return this.runtime.cleanTranslatedText(text);
     }
 
     normalizeSpeakerNameCase(name) {
-        return this.panel.normalizeSpeakerNameCase(name);
+        return this.runtime.normalizeSpeakerNameCase(name);
     }
 
     isDescriptionType(type) {
@@ -123,11 +123,11 @@ export default class BaseTranslationEngine {
     getWrapConfigForType(type) {
         const isDescription = this.isDescriptionType(type);
         const isPortraitMessage = type === 'message_portrait';
-        let maxWidth = this.panel.maxLineWidth;
+        let maxWidth = this.runtime.maxLineWidth;
         if (isDescription) {
-            maxWidth = this.panel.descriptionMaxLineWidth || this.panel.maxLineWidth;
+            maxWidth = this.runtime.descriptionMaxLineWidth || this.runtime.maxLineWidth;
         } else if (isPortraitMessage) {
-            maxWidth = this.panel.maxLineWidthWithPortrait || this.panel.maxLineWidth;
+            maxWidth = this.runtime.maxLineWidthWithPortrait || this.runtime.maxLineWidth;
         }
         const wrapOptions = isDescription ? { flattenExistingNewlines: true } : undefined;
         return { isDescription, maxWidth, wrapOptions, isMessage: this.isMessageType(type) };

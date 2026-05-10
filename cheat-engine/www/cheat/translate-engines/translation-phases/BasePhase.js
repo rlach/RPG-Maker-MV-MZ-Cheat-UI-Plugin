@@ -17,16 +17,16 @@ export class BasePhase {
         }));
     }
 
-    setData({ panel, successes, failures }) {
+    setData({ runtime, successes, failures }) {
         for (const success of successes || []) {
             if (!success || !success.cacheKey) {
                 continue;
             }
 
-            panel.setCacheValue(success.cacheKey, success.translated);
+            runtime.setCacheValue(success.cacheKey, success.translated);
         }
 
-        panel.markBatchFailuresAsUntranslated(failures || [], true);
+        runtime.markBatchFailuresAsUntranslated(failures || [], true);
     }
 
     finalizePhase() {

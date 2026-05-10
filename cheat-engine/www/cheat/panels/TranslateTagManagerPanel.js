@@ -1,5 +1,5 @@
 import { getRowsPerPage, setRowsPerPage as setTableRowsPerPage } from '../js/TableSettings.js';
-import { ensureTranslationRuntime } from './translate-on-the-fly/TranslationRuntime.js';
+import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
 import { TAG_CONFIGS } from '../translate-engines/ai-engine/constants.js';
 
 const tagManagerTableStateMemory = {

@@ -1,4 +1,4 @@
-import { ensureTranslationRuntime } from './translate-on-the-fly/TranslationRuntime.js';
+import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
 import { createTranslationBatchManager } from '../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
 import { ConfirmDialog } from '../js/DialogHelper.js';

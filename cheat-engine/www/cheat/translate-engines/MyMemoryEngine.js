@@ -34,10 +34,10 @@ export default class MyMemoryEngine extends BaseTranslationEngine {
 
         const joined = payloadParts.join('');
 
-        // Call MyMemory API directly (CORRECT endpoint from old panel)
+        // Call MyMemory API directly (CORRECT endpoint from old runtime)
         let translatedJoinedRaw;
         try {
-            const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(joined)}&langpair=${this.panel.sourceLang}|${this.panel.targetLang}`;
+            const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(joined)}&langpair=${this.runtime.sourceLang}|${this.runtime.targetLang}`;
             const response = await axios.get(url);
 
             if (
@@ -104,7 +104,7 @@ export default class MyMemoryEngine extends BaseTranslationEngine {
             const translated = rawSlice.replace(new RegExp(NL, 'g'), '\n');
 
             const isSame = translated.trim() === (item.value || '').trim();
-            if (this.panel.sourceLang !== this.panel.targetLang && isSame) {
+            if (this.runtime.sourceLang !== this.runtime.targetLang && isSame) {
                 failures.push({
                     type: item.type,
                     id: item.id,

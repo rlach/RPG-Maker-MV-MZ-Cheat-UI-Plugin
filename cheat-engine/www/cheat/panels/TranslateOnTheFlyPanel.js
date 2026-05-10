@@ -1,7 +1,7 @@
 import { TranslateOnTheFlyState } from '../js/TranslateOnTheFlyState.js';
 import { AIEngine } from '../translate-engines/index.js';
-import { ensureTranslationRuntime } from './translate-on-the-fly/TranslationRuntime.js';
-import { TRANSLATION_RUNTIME_STATE_KEYS } from './translate-on-the-fly/TranslationRuntimeDefaults.js';
+import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
+import { TRANSLATION_RUNTIME_STATE_KEYS } from '../js/translation-runtime/TranslationRuntimeDefaults.js';
 
 const runtimeStateProxyComputed = TRANSLATION_RUNTIME_STATE_KEYS.reduce((acc, key) => {
     acc[key] = {
@@ -400,12 +400,15 @@ export default {
         },
 
         textWrapLevel1RegularWidth() {
-            return Math.floor((Number(this.maxLineWidth) || 0) * this.normalizedTextWrapFontScaleMultiplier);
+            return Math.floor(
+                (Number(this.maxLineWidth) || 0) * this.normalizedTextWrapFontScaleMultiplier
+            );
         },
 
         textWrapLevel1PortraitWidth() {
             return Math.floor(
-                (Number(this.maxLineWidthWithPortrait) || 0) * this.normalizedTextWrapFontScaleMultiplier
+                (Number(this.maxLineWidthWithPortrait) || 0) *
+                    this.normalizedTextWrapFontScaleMultiplier
             );
         },
 
@@ -416,7 +419,9 @@ export default {
 
         textWrapLevel2PortraitWidth() {
             const multiplier = this.normalizedTextWrapFontScaleMultiplier;
-            return Math.floor((Number(this.maxLineWidthWithPortrait) || 0) * multiplier * multiplier);
+            return Math.floor(
+                (Number(this.maxLineWidthWithPortrait) || 0) * multiplier * multiplier
+            );
         },
     },
 

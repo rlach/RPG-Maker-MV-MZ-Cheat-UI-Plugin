@@ -151,13 +151,13 @@ export class BasePluginTranslator extends BasePhase {
     }
 
     isActive(context = {}) {
-        const panel = context?.panel;
+        const runtime = context?.runtime;
         if (!this.ensureDetection()) {
             return false;
         }
 
-        if (panel && typeof panel.isPluginTranslatorEnabled === 'function') {
-            return !!panel.isPluginTranslatorEnabled(this.getPluginName());
+        if (runtime && typeof runtime.isPluginTranslatorEnabled === 'function') {
+            return !!runtime.isPluginTranslatorEnabled(this.getPluginName());
         }
 
         return true;

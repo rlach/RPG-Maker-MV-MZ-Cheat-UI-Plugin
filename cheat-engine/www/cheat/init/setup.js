@@ -4,7 +4,7 @@ import '../libs/vue.js';
 import '../libs/vuetify.js';
 
 import MainComponent from '../MainComponent.js';
-import { ensureTranslationRuntime } from '../panels/translate-on-the-fly/TranslationRuntime.js';
+import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../translate-engines/plugins/PluginTranslatorRegistry.js';
 import { ensureHacksRuntime } from '../js/HacksRuntime.js';
 import { getRpgMakerName } from '../js/RpgMakerRuntime.js';

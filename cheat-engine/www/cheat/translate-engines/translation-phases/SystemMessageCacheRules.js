@@ -32,8 +32,8 @@ export function getSystemMessagesSource() {
     return $dataSystem.terms.messagesOriginal;
 }
 
-export function getSystemMessageCacheKey(panel, messageKey, messageValue) {
-    if (!panel) {
+export function getSystemMessageCacheKey(runtime, messageKey, messageValue) {
+    if (!runtime) {
         return null;
     }
 
@@ -42,8 +42,8 @@ export function getSystemMessageCacheKey(panel, messageKey, messageValue) {
             return null;
         }
 
-        return panel.getCacheKey(messageValue, 'command');
+        return runtime.getCacheKey(messageValue, 'command');
     }
 
-    return panel.getCacheKey(messageKey, 'system_message');
+    return runtime.getCacheKey(messageKey, 'system_message');
 }

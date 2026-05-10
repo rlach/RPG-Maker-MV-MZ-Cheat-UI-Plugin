@@ -19,13 +19,13 @@ export class CommonEvents extends MapEvents {
         ];
     }
 
-    static countCommonEventsAmount(panel, commonEvents) {
+    static countCommonEventsAmount(runtime, commonEvents) {
         if (!Array.isArray(commonEvents)) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 
         const stats = this.countEventCommandListStats(
-            panel,
+            runtime,
             commonEvents.flatMap((entry) => (entry && entry.list) || [])
         );
         return {
@@ -36,7 +36,7 @@ export class CommonEvents extends MapEvents {
         };
     }
 
-    countAmountSync({ panel }) {
-        return this.constructor.countCommonEventsAmount(panel, window.$dataCommonEvents);
+    countAmountSync({ runtime }) {
+        return this.constructor.countCommonEventsAmount(runtime, window.$dataCommonEvents);
     }
 }

@@ -1,4 +1,4 @@
-import { Alert } from '../../js/AlertHelper.js';
+import { Alert } from '../AlertHelper.js';
 import { ensureTranslationRuntime } from './TranslationRuntime.js';
 
 const makeObservable = (value) => {

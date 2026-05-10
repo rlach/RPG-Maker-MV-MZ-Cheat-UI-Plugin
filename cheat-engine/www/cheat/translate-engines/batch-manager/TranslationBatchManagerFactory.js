@@ -48,8 +48,8 @@ function registerDefaultStrategies(manager) {
     manager.register(CurrentEvent.getInstance());
 }
 
-export function createTranslationBatchManager(panel) {
-    const manager = new TranslationBatchManager(panel);
+export function createTranslationBatchManager(runtime) {
+    const manager = new TranslationBatchManager(runtime);
     registerDefaultStrategies(manager);
     return manager;
 }

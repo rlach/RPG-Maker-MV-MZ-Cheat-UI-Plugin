@@ -1,4 +1,4 @@
-import { Alert } from '../../js/AlertHelper.js';
+import { Alert } from '../AlertHelper.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { wrapTextByVisibleWidth } from './TextWrap.js';
 

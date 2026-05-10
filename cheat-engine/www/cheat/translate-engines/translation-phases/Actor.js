@@ -13,8 +13,8 @@ export class Actor extends DataContainer {
         });
     }
 
-    applyCachedData(panel) {
-        if (!panel || !Array.isArray(window.$dataActors)) {
+    applyCachedData(runtime) {
+        if (!runtime || !Array.isArray(window.$dataActors)) {
             return true;
         }
 
@@ -57,12 +57,12 @@ export class Actor extends DataContainer {
                     continue;
                 }
 
-                const cacheKey = panel.getCacheKey(originalValue, `${this.cachePrefix}_${field}`);
-                if (!panel.hasUsableCacheValue(cacheKey)) {
+                const cacheKey = runtime.getCacheKey(originalValue, `${this.cachePrefix}_${field}`);
+                if (!runtime.hasUsableCacheValue(cacheKey)) {
                     continue;
                 }
 
-                const translatedValue = panel.translationCache.get(cacheKey);
+                const translatedValue = runtime.translationCache.get(cacheKey);
                 item[field] = translatedValue;
                 if (actorInstance) {
                     actorInstance[`_${field}`] = translatedValue;

@@ -6,18 +6,18 @@ export class Plugins extends BasePhase {
         return 'plugins';
     }
 
-    async createEntries({ panel }) {
-        await PLUGIN_TRANSLATOR_REGISTRY.ensureDetectionCompleted({ runtime: panel });
+    async createEntries({ runtime }) {
+        await PLUGIN_TRANSLATOR_REGISTRY.ensureDetectionCompleted({ runtime: runtime });
 
         const translators = PLUGIN_TRANSLATOR_REGISTRY.getDetectedTranslatorInstances();
         const entries = [];
 
         for (const translator of translators) {
-            if (!translator || !translator.isActive({ panel })) {
+            if (!translator || !translator.isActive({ runtime })) {
                 continue;
             }
 
-            const counts = translator.countAmountSync({ panel });
+            const counts = translator.countAmountSync({ runtime });
             const leftStrings = Math.max(
                 0,
                 Number((counts && counts.leftStrings) || (counts && counts.left) || 0)
@@ -35,8 +35,8 @@ export class Plugins extends BasePhase {
         return entries;
     }
 
-    countAmountSync({ panel }) {
-        PLUGIN_TRANSLATOR_REGISTRY.ensureDetectionStarted({ runtime: panel });
+    countAmountSync({ runtime }) {
+        PLUGIN_TRANSLATOR_REGISTRY.ensureDetectionStarted({ runtime: runtime });
 
         const translators = PLUGIN_TRANSLATOR_REGISTRY.getDetectedTranslatorInstances();
         let totalPlugins = 0;
@@ -50,7 +50,7 @@ export class Plugins extends BasePhase {
             }
 
             totalPlugins += 1;
-            const counts = translator.countAmountSync({ panel });
+            const counts = translator.countAmountSync({ runtime });
             const pluginTotalStrings = Math.max(
                 0,
                 Number((counts && counts.totalStrings) || (counts && counts.total) || 0)
@@ -61,10 +61,10 @@ export class Plugins extends BasePhase {
             );
 
             totalStrings += pluginTotalStrings;
-            if (translator.isActive({ panel })) {
+            if (translator.isActive({ runtime })) {
                 leftStrings += pluginLeftStrings;
             }
-            if (translator.isActive({ panel }) && pluginLeftStrings > 0) {
+            if (translator.isActive({ runtime }) && pluginLeftStrings > 0) {
                 leftPlugins += 1;
             }
         }
