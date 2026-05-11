@@ -415,10 +415,7 @@ export default {
         async onRunCheckedSteps() {
             try {
                 await this._koharuRuntime.openCurrentProject();
-                await this._koharuRuntime.runSteps(
-                    this.checkedStepIds,
-                    this._buildStepCallbacks()
-                );
+                await this._koharuRuntime.runSteps(this.checkedStepIds, this._buildStepCallbacks());
                 this._syncFromSnapshot();
                 Alert.info('All checked steps completed', null, 2200);
             } catch (error) {

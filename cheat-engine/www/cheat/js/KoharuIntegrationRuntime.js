@@ -15,9 +15,7 @@ import {
 } from './RootWindowState.js';
 import { KeyValueStorage } from './KeyValueStorage.js';
 import * as KoharuApi from './KoharuApiClient.js';
-import {
-    isSupportedImageFileName,
-} from './ImageExporterRuntime.js';
+import { isSupportedImageFileName } from './ImageExporterRuntime.js';
 import { ensureTranslationRuntime } from './translation-runtime/TranslationRuntime.js';
 
 const ROOT_STATE_KEY = '__CheatKoharuIntegrationRuntime';
@@ -172,8 +170,7 @@ class KoharuIntegrationRuntime {
             this._connected = connected;
 
             if (!connected) {
-                this._lastError =
-                    'Koharu is off or address is different. Click refresh to retry.';
+                this._lastError = 'Koharu is off or address is different. Click refresh to retry.';
                 this._engines = null;
                 this._projects = [];
                 this._notify('connection-failed');
@@ -364,9 +361,7 @@ class KoharuIntegrationRuntime {
                 if (entry.isDirectory()) {
                     queue.push(fullPath);
                 } else if (entry.name.toLowerCase().endsWith('.png')) {
-                    const relativePath = path
-                        .relative(sourceDirPath, fullPath)
-                        .replace(/\\/g, '/');
+                    const relativePath = path.relative(sourceDirPath, fullPath).replace(/\\/g, '/');
                     files.push({ fullPath, relativePath, fileName: entry.name });
                 }
             }
@@ -453,10 +448,9 @@ class KoharuIntegrationRuntime {
     }
 
     async runRender() {
-        const steps = [
-            this._settings.selectedInpainter,
-            this._settings.selectedRenderer,
-        ].filter(Boolean);
+        const steps = [this._settings.selectedInpainter, this._settings.selectedRenderer].filter(
+            Boolean
+        );
 
         return this._runKoharuPipeline('render', steps);
     }
@@ -508,7 +502,7 @@ class KoharuIntegrationRuntime {
 
             const result = await KoharuApi.getOperations(baseUrl);
             const operations = Array.isArray(result?.operations || result)
-                ? (result?.operations || result)
+                ? result?.operations || result
                 : [];
 
             const operation = operations.find(

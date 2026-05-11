@@ -30,7 +30,11 @@ export class Koharu extends BasePhase {
         let idCounter = 0;
 
         for (const [cacheKey, value] of runtime.translationCache.entries()) {
-            const parsed = parseCacheKeyForLangPair(cacheKey, runtime.sourceLang, runtime.targetLang);
+            const parsed = parseCacheKeyForLangPair(
+                cacheKey,
+                runtime.sourceLang,
+                runtime.targetLang
+            );
             if (parsed?.type !== 'koharu') {
                 continue;
             }
