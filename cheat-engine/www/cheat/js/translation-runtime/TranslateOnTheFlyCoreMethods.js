@@ -1,4 +1,3 @@
-
 import { TranslateOnTheFlyState } from '../TranslateOnTheFlyState.js';
 import { ensureTranslateCacheRuntime } from '../TranslateCacheRuntime.js';
 import {

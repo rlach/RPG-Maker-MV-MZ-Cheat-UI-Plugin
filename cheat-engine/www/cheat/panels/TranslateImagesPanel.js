@@ -1,6 +1,9 @@
 import { Alert } from '../js/AlertHelper.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
-import { isRpgMakerMv } from '../js/RpgMakerRuntime.js';
+import {
+    ensureImageExporterRuntime,
+    isSupportedImageFileName,
+} from '../js/ImageExporterRuntime.js';
 
 function sortByName(a, b) {
     return String(a.name || '').localeCompare(String(b.name || ''));
@@ -38,10 +41,9 @@ export default {
 
             <v-btn
                 color="primary"
-                :loading="isDecompressing"
-                :disabled="isDecompressing || selectedFolderIds.length === 0"
+                :disabled="isExportButtonDisabled()"
                 @click="decompressSelectedImagesToPng">
-                Decompress images to png
+                {{ exportButtonLabel() }}
             </v-btn>
         </div>
 
@@ -55,15 +57,18 @@ export default {
     <v-card-text class="pt-2 pb-2" style="max-height: calc(100vh - 320px); overflow-y: auto;">
         <v-treeview
             v-if="folderTreeItems.length > 0"
-            v-model="selectedFolderIds"
             :items="folderTreeItems"
             item-key="id"
-            selectable
-            selection-type="independent"
             open-all
             dense>
+            <template v-slot:prepend="{ item }">
+                <v-icon small @click.stop="toggleFolderSelection(item.id)">
+                    {{ checkboxIconForFolder(item.id) }}
+                </v-icon>
+            </template>
+
             <template v-slot:label="{ item }">
-                <span class="caption">{{ item.name }}</span>
+                <span class="caption">{{ item.name }} ({{ item.directImageCount }})</span>
             </template>
         </v-treeview>
 
@@ -80,13 +85,19 @@ export default {
             selectedTargetLang: 'en',
             sourceImageRootDisplay: '',
             folderTreeItems: [],
-            selectedFolderIds: [],
-            isDecompressing: false,
+            folderSelectionById: {},
+            folderChildrenById: {},
+            directImageCountByFolderId: {},
+            exportTotalCount: 0,
+            exportProcessedCount: 0,
+            isExportInProgress: false,
+            _progressPollIntervalId: 0,
         };
     },
 
     created() {
         this._runtime = ensureTranslationRuntime();
+        this._imageExporterRuntime = ensureImageExporterRuntime();
 
         const runtimeOptions = Array.isArray(this._runtime?.languageOptions)
             ? this._runtime.languageOptions
@@ -109,6 +120,17 @@ export default {
         }
 
         this.refreshFolderTree();
+        this.refreshExportStatus();
+        this._progressPollIntervalId = setInterval(() => {
+            this.refreshExportStatus();
+        }, 1000);
+    },
+
+    beforeDestroy() {
+        if (this._progressPollIntervalId) {
+            clearInterval(this._progressPollIntervalId);
+            this._progressPollIntervalId = 0;
+        }
     },
 
     methods: {
@@ -117,56 +139,58 @@ export default {
             return typeof nodeRequire === 'function' ? nodeRequire : null;
         },
 
-        getImageRootAbsolutePath() {
-            const nodeRequire = this.getNodeRequire();
-            if (!nodeRequire) {
-                return '';
-            }
-
-            const path = nodeRequire('path');
-            const nodeProcess = globalThis && globalThis.process;
-            const cwd =
-                nodeProcess && typeof nodeProcess.cwd === 'function' ? nodeProcess.cwd() : '.';
-            return isRpgMakerMv() ? path.join(cwd, 'www', 'img') : path.join(cwd, 'img');
-        },
-
         refreshFolderTree() {
             const nodeRequire = this.getNodeRequire();
             if (!nodeRequire) {
                 this.folderTreeItems = [];
-                this.selectedFolderIds = [];
+                this.folderSelectionById = {};
+                this.folderChildrenById = {};
+                this.directImageCountByFolderId = {};
                 this.sourceImageRootDisplay = '(filesystem unavailable)';
                 return;
             }
 
             const fs = nodeRequire('fs');
             const path = nodeRequire('path');
-            const rootPath = this.getImageRootAbsolutePath();
+            const rootPath = this._imageExporterRuntime.getImageRootAbsolutePath();
             this.sourceImageRootDisplay = toPosixPath(rootPath);
 
             if (!rootPath || !fs.existsSync(rootPath)) {
                 this.folderTreeItems = [];
-                this.selectedFolderIds = [];
+                this.folderSelectionById = {};
+                this.folderChildrenById = {};
+                this.directImageCountByFolderId = {};
                 return;
             }
 
+            const folderChildrenById = {};
+            const directImageCountByFolderId = {};
+            const folderSelectionById = {};
+
             const buildNode = (absolutePath, relativePath) => {
-                const directoryEntries = fs
-                    .readdirSync(absolutePath, { withFileTypes: true })
+                const directoryEntriesRaw = fs.readdirSync(absolutePath, { withFileTypes: true });
+                const directoryEntries = directoryEntriesRaw
                     .filter((entry) => entry.isDirectory())
-                    .map((entry) =>
-                        buildNode(
-                            path.join(absolutePath, entry.name),
-                            `${relativePath}/${entry.name}`
-                        )
-                    );
+                    .map((entry) => {
+                        const childPath = `${relativePath}/${entry.name}`;
+                        return buildNode(path.join(absolutePath, entry.name), childPath);
+                    });
 
                 directoryEntries.sort(sortByName);
+
+                const directImageCount = directoryEntriesRaw.filter(
+                    (entry) => entry.isFile() && isSupportedImageFileName(entry.name)
+                ).length;
+
+                folderChildrenById[relativePath] = directoryEntries.map((entry) => entry.id);
+                directImageCountByFolderId[relativePath] = directImageCount;
+                folderSelectionById[relativePath] = false;
 
                 return {
                     id: relativePath,
                     relPath: relativePath,
                     name: relativePath.split('/').pop() || relativePath,
+                    directImageCount,
                     children: directoryEntries,
                 };
             };
@@ -179,182 +203,165 @@ export default {
             topLevelItems.sort(sortByName);
             this.folderTreeItems = topLevelItems;
 
-            const defaultSelection = [];
-            const walk = (items) => {
-                for (const item of items) {
-                    if (item.relPath === 'pictures' || item.relPath.startsWith('pictures/')) {
-                        defaultSelection.push(item.id);
-                    }
-                    if (Array.isArray(item.children) && item.children.length > 0) {
-                        walk(item.children);
-                    }
-                }
-            };
-            walk(topLevelItems);
-            this.selectedFolderIds = defaultSelection;
-        },
+            this.folderSelectionById = folderSelectionById;
+            this.folderChildrenById = folderChildrenById;
+            this.directImageCountByFolderId = directImageCountByFolderId;
 
-        collectSourceImageFiles(rootPath) {
-            const nodeRequire = this.getNodeRequire();
-            if (!nodeRequire) {
-                return [];
+            if (Object.prototype.hasOwnProperty.call(this.folderSelectionById, 'pictures')) {
+                this.setSubtreeSelection('pictures', true);
             }
-
-            const fs = nodeRequire('fs');
-            const path = nodeRequire('path');
-            const queue = [rootPath];
-            const relFiles = [];
-
-            while (queue.length > 0) {
-                const currentDir = queue.shift();
-                const entries = fs.readdirSync(currentDir, { withFileTypes: true });
-                for (const entry of entries) {
-                    const fullPath = path.join(currentDir, entry.name);
-                    if (entry.isDirectory()) {
-                        queue.push(fullPath);
-                        continue;
-                    }
-
-                    const lowerName = entry.name.toLowerCase();
-                    if (
-                        lowerName.endsWith('.png') ||
-                        lowerName.endsWith('.png_') ||
-                        lowerName.endsWith('.rpgmvp')
-                    ) {
-                        const relativePath = toPosixPath(path.relative(rootPath, fullPath));
-                        relFiles.push(relativePath);
-                    }
-                }
-            }
-
-            return relFiles;
         },
 
-        toLogicalRelativePath(relativeFilePath) {
-            return toPosixPath(relativeFilePath).replace(/(\.png_|\.rpgmvp|\.png)$/i, '');
+        getFolderChildren(folderId) {
+            return Array.isArray(this.folderChildrenById[folderId])
+                ? this.folderChildrenById[folderId]
+                : [];
         },
 
-        isSelectedByFolderPrefix(relativeDirectoryPath, selectedFolders) {
-            const safeDir = toPosixPath(relativeDirectoryPath || '');
-            for (const folderPath of selectedFolders) {
-                if (!folderPath) {
+        collectSubtreeFolderIds(folderId) {
+            const result = [];
+            const stack = [folderId];
+
+            while (stack.length > 0) {
+                const currentId = stack.pop();
+                if (!Object.prototype.hasOwnProperty.call(this.folderSelectionById, currentId)) {
                     continue;
                 }
-                if (safeDir === folderPath || safeDir.startsWith(`${folderPath}/`)) {
+
+                result.push(currentId);
+                const childIds = this.getFolderChildren(currentId);
+                for (let index = childIds.length - 1; index >= 0; index -= 1) {
+                    stack.push(childIds[index]);
+                }
+            }
+
+            return result;
+        },
+
+        isFolderSelected(folderId) {
+            return !!this.folderSelectionById[folderId];
+        },
+
+        getSelectedFolderIds() {
+            return Object.keys(this.folderSelectionById).filter((folderId) =>
+                this.isFolderSelected(folderId)
+            );
+        },
+
+        getSelectedExportImageCount() {
+            let total = 0;
+            const selectedFolderIds = this.getSelectedFolderIds();
+            for (const folderId of selectedFolderIds) {
+                total += Number(this.directImageCountByFolderId[folderId] || 0);
+            }
+            return total;
+        },
+
+        isExportButtonDisabled() {
+            return this.isExportInProgress || this.getSelectedExportImageCount() <= 0;
+        },
+
+        exportButtonLabel() {
+            if (this.isExportInProgress) {
+                return `Exporting. Progress: ${this.exportProcessedCount} of ${this.exportTotalCount}`;
+            }
+
+            return `Decompress images to png (${this.getSelectedExportImageCount()})`;
+        },
+
+        hasAnySelectionInSubtree(folderId) {
+            if (this.isFolderSelected(folderId)) {
+                return true;
+            }
+
+            const childIds = this.getFolderChildren(folderId);
+            for (const childId of childIds) {
+                if (this.hasAnySelectionInSubtree(childId)) {
                     return true;
                 }
             }
+
             return false;
         },
 
-        encodeRelativeLogicalPath(relativePath) {
-            const safePath = toPosixPath(relativePath || '');
-            const runtimeUtils =
-                typeof globalThis !== 'undefined' ? Reflect.get(globalThis, 'Utils') : null;
-            const encodePart =
-                runtimeUtils &&
-                (typeof runtimeUtils === 'object' || typeof runtimeUtils === 'function') &&
-                typeof runtimeUtils.encodeURI === 'function'
-                    ? (part) => runtimeUtils.encodeURI(part)
-                    : (part) => encodeURIComponent(part);
+        isSubtreeFullySelected(folderId) {
+            if (!this.isFolderSelected(folderId)) {
+                return false;
+            }
 
-            return safePath
-                .split('/')
-                .filter((part) => part !== '')
-                .map((part) => encodePart(part))
-                .join('/');
-        },
-
-        loadBitmapByUrl(url) {
-            return new Promise((resolve, reject) => {
-                const BitmapApi = globalThis && globalThis.Bitmap;
-                if (!BitmapApi || typeof BitmapApi.load !== 'function') {
-                    reject(new Error('Bitmap API is unavailable'));
-                    return;
-                }
-
-                let settled = false;
-                const bitmap = BitmapApi.load(url);
-                const settle = (kind, value) => {
-                    if (settled) {
-                        return;
-                    }
-                    settled = true;
-                    clearInterval(pollTimer);
-                    clearTimeout(timeoutTimer);
-                    if (kind === 'resolve') {
-                        resolve(value);
-                    } else {
-                        reject(value);
-                    }
-                };
-
-                const tryResolve = () => {
-                    if (bitmap && typeof bitmap.isReady === 'function' && bitmap.isReady()) {
-                        settle('resolve', bitmap);
-                        return true;
-                    }
-                    if (bitmap && typeof bitmap.isError === 'function' && bitmap.isError()) {
-                        settle('reject', new Error(`Bitmap failed to load: ${url}`));
-                        return true;
-                    }
+            const childIds = this.getFolderChildren(folderId);
+            for (const childId of childIds) {
+                if (!this.isSubtreeFullySelected(childId)) {
                     return false;
-                };
-
-                if (tryResolve()) {
-                    return;
                 }
+            }
 
-                if (bitmap && typeof bitmap.addLoadListener === 'function') {
-                    bitmap.addLoadListener(() => {
-                        settle('resolve', bitmap);
-                    });
-                }
-
-                const pollTimer = setInterval(() => {
-                    tryResolve();
-                }, 50);
-
-                const timeoutTimer = setTimeout(() => {
-                    settle('reject', new Error(`Bitmap load timeout: ${url}`));
-                }, 30000);
-            });
+            return true;
         },
 
-        bitmapToPngBuffer(bitmap) {
-            const width = Number(bitmap?.width) || Number(bitmap?._image?.width) || 0;
-            const height = Number(bitmap?.height) || Number(bitmap?._image?.height) || 0;
-            if (width <= 0 || height <= 0) {
-                throw new Error('Bitmap has invalid dimensions');
+        isFolderPartiallySelected(folderId) {
+            const childIds = this.getFolderChildren(folderId);
+            if (childIds.length <= 0) {
+                return false;
             }
 
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const context = canvas.getContext('2d');
-            if (!context) {
-                throw new Error('Canvas context unavailable');
+            const selfSelected = this.isFolderSelected(folderId);
+            const anyChildSelected = childIds.some((childId) =>
+                this.hasAnySelectionInSubtree(childId)
+            );
+
+            if (!selfSelected && anyChildSelected) {
+                return true;
             }
 
-            if (bitmap._canvas) {
-                context.drawImage(bitmap._canvas, 0, 0);
-            } else if (bitmap._image) {
-                context.drawImage(bitmap._image, 0, 0);
-            } else {
-                throw new Error('Bitmap source image not available');
+            if (!selfSelected) {
+                return false;
             }
 
-            const dataUrl = canvas.toDataURL('image/png');
-            const base64 = dataUrl.replace(/^data:image\/png;base64,/, '');
-            const BufferApi = globalThis && globalThis.Buffer;
-            if (!BufferApi || typeof BufferApi.from !== 'function') {
-                throw new Error('Buffer API unavailable');
+            return childIds.some((childId) => !this.isSubtreeFullySelected(childId));
+        },
+
+        checkboxIconForFolder(folderId) {
+            if (this.isFolderPartiallySelected(folderId)) {
+                return 'mdi-minus-box';
             }
-            return BufferApi.from(base64, 'base64');
+            return this.isFolderSelected(folderId)
+                ? 'mdi-checkbox-marked'
+                : 'mdi-checkbox-blank-outline';
+        },
+
+        setSubtreeSelection(folderId, selected) {
+            const subtreeFolderIds = this.collectSubtreeFolderIds(folderId);
+            if (subtreeFolderIds.length <= 0) {
+                return;
+            }
+
+            const nextSelection = { ...this.folderSelectionById };
+            for (const subtreeFolderId of subtreeFolderIds) {
+                nextSelection[subtreeFolderId] = selected;
+            }
+
+            this.folderSelectionById = nextSelection;
+        },
+
+        toggleFolderSelection(folderId) {
+            if (!Object.prototype.hasOwnProperty.call(this.folderSelectionById, folderId)) {
+                return;
+            }
+
+            const shouldSelectWholeSubtree = !this.isSubtreeFullySelected(folderId);
+            this.setSubtreeSelection(folderId, shouldSelectWholeSubtree);
+        },
+
+        refreshExportStatus() {
+            const status = this._imageExporterRuntime.getStatus();
+            this.isExportInProgress = !!status.inProgress;
+            this.exportTotalCount = Number(status.totalCount) || 0;
+            this.exportProcessedCount = Number(status.processedCount) || 0;
         },
 
         async decompressSelectedImagesToPng() {
-            if (this.isDecompressing) {
+            if (this._imageExporterRuntime.isExportInProgress()) {
                 return;
             }
 
@@ -364,24 +371,17 @@ export default {
                 return;
             }
 
-            const selectedFolders = Array.isArray(this.selectedFolderIds)
-                ? this.selectedFolderIds
-                      .map((value) => toPosixPath(value).replace(/^\/+/, '').replace(/\/+$/, ''))
-                      .filter((value) => value)
-                : [];
+            const selectedFolders = this.getSelectedFolderIds()
+                .map((folderId) => toPosixPath(folderId).replace(/^\/+/, '').replace(/\/+$/, ''))
+                .filter((folderId) => folderId);
 
             if (selectedFolders.length === 0) {
                 Alert.warn('Select at least one folder');
                 return;
             }
 
-            const fs = nodeRequire('fs');
             const path = nodeRequire('path');
-            const sourceRoot = this.getImageRootAbsolutePath();
-            if (!sourceRoot || !fs.existsSync(sourceRoot)) {
-                Alert.error('Image source directory does not exist');
-                return;
-            }
+            const sourceRoot = this._imageExporterRuntime.getImageRootAbsolutePath();
 
             const runtime = this._runtime || ensureTranslationRuntime();
             if (!runtime || typeof runtime.getSplitCacheDirectoryPath !== 'function') {
@@ -395,60 +395,30 @@ export default {
                 this.selectedTargetLang
             );
 
-            this.isDecompressing = true;
-
-            let decodedCount = 0;
-            let failedCount = 0;
-
             try {
-                fs.mkdirSync(cacheRoot, { recursive: true });
-                for (const selectedFolder of selectedFolders) {
-                    fs.mkdirSync(path.join(cacheRoot, selectedFolder), { recursive: true });
+                const exportPromise = this._imageExporterRuntime.startExport({
+                    sourceRoot,
+                    cacheRoot,
+                    selectedFolders,
+                    targetLang: this.selectedTargetLang,
+                });
+
+                this.refreshExportStatus();
+
+                const result = await exportPromise;
+                if (!result || !result.started) {
+                    Alert.warn('Image export is already running');
+                    return;
                 }
 
-                const sourceFiles = this.collectSourceImageFiles(sourceRoot);
-                for (const relativeFilePath of sourceFiles) {
-                    const logicalRelativePath = this.toLogicalRelativePath(relativeFilePath);
-                    const relativeDir = toPosixPath(path.dirname(logicalRelativePath)).replace(
-                        /^\.$/,
-                        ''
-                    );
-
-                    if (!this.isSelectedByFolderPrefix(relativeDir, selectedFolders)) {
-                        continue;
-                    }
-
-                    const logicalUrl = `img/${this.encodeRelativeLogicalPath(logicalRelativePath)}.png`;
-
-                    try {
-                        const bitmap = await this.loadBitmapByUrl(logicalUrl);
-                        const pngBuffer = this.bitmapToPngBuffer(bitmap);
-                        const targetFilePath = path.join(cacheRoot, `${logicalRelativePath}.png`);
-                        fs.mkdirSync(path.dirname(targetFilePath), { recursive: true });
-                        fs.writeFileSync(targetFilePath, pngBuffer);
-                        decodedCount += 1;
-
-                        if (bitmap && typeof bitmap.destroy === 'function') {
-                            bitmap.destroy();
-                        }
-                    } catch (error) {
-                        failedCount += 1;
-                        console.warn('[TranslateImagesPanel] Failed to decode image', {
-                            relativeFilePath,
-                            logicalUrl,
-                            error,
-                        });
-                    }
-                }
-
-                if (failedCount > 0) {
+                if (result.failedCount > 0) {
                     Alert.info(
-                        `Decoded ${decodedCount} images to png (${failedCount} failed)`,
+                        `Decoded ${result.processedCount} images to png (${result.failedCount} failed)`,
                         null,
                         2200
                     );
                 } else {
-                    Alert.info(`Decoded ${decodedCount} images to png`, null, 2200);
+                    Alert.info(`Decoded ${result.processedCount} images to png`, null, 2200);
                 }
             } catch (error) {
                 const errorMessage =
@@ -456,9 +426,9 @@ export default {
                         ? String(error.message)
                         : String(error);
                 Alert.error(`Failed to decompress images to png: ${errorMessage}`, null, 2200);
-            } finally {
-                this.isDecompressing = false;
             }
+
+            this.refreshExportStatus();
         },
     },
 };
