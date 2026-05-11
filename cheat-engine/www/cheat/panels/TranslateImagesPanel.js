@@ -18,7 +18,7 @@ export default {
 
     template: `
 <v-card flat class="ma-0 pa-0 fill-height d-flex flex-column">
-    <v-card-title class="subtitle-1 font-weight-bold pb-1">Images</v-card-title>
+    <v-card-title class="subtitle-1 font-weight-bold pb-1">Images Exporter</v-card-title>
 
     <v-card-text class="pt-0 pb-2">
         <div class="caption mb-2">
