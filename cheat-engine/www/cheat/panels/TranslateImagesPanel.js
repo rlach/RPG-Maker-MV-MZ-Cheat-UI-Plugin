@@ -17,7 +17,7 @@ export default {
     name: 'TranslateImagesPanel',
 
     template: `
-<v-card flat class="ma-0 pa-0 fill-height">
+<v-card flat class="ma-0 pa-0 fill-height d-flex flex-column">
     <v-card-title class="subtitle-1 font-weight-bold pb-1">Images</v-card-title>
 
     <v-card-text class="pt-0 pb-2">
@@ -54,7 +54,7 @@ export default {
 
     <v-divider></v-divider>
 
-    <v-card-text class="pt-2 pb-2" style="max-height: calc(100vh - 320px); overflow-y: auto;">
+    <v-card-text class="pt-2 pb-2 flex-grow-1" style="min-height: 0; overflow-y: auto;">
         <v-treeview
             v-if="folderTreeItems.length > 0"
             :items="folderTreeItems"
