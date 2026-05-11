@@ -123,22 +123,22 @@ export default {
         <div class="caption font-weight-bold mb-1">Pipeline Steps</div>
 
         <div v-for="step in pipelineSteps" :key="step.id" class="d-flex align-center mb-1">
-            <v-checkbox
-                v-model="checkedStepIds"
-                :value="step.id"
-                :label="step.label"
-                dense
-                hide-details
-                class="mt-0 pt-0"
-                :disabled="isStepRunning">
-            </v-checkbox>
-
-            <v-spacer></v-spacer>
+            <div class="mr-2" :style="{ width: getStepLabelColumnWidth() }">
+                <v-checkbox
+                    v-model="checkedStepIds"
+                    :value="step.id"
+                    :label="step.label"
+                    dense
+                    hide-details
+                    class="mt-0 pt-0"
+                    :disabled="isStepRunning">
+                </v-checkbox>
+            </div>
 
             <span
-                v-if="runningStepId === step.id && stepProgress.total > 0"
+                v-if="runningStepId === step.id && formatRunningStepProgress()"
                 class="caption grey--text mr-2">
-                {{ stepProgress.processed }} / {{ stepProgress.total }}
+                {{ formatRunningStepProgress() }}
             </span>
 
             <v-btn
@@ -205,7 +205,6 @@ export default {
             isStepRunning: false,
 
             // Internal — not exposed to Vue
-            _pollTimerId: 0,
             _unsubscribe: null,
         };
     },
@@ -236,12 +235,7 @@ export default {
             });
         }
 
-        // Poll snapshot every second for progress updates
-        this._pollTimerId = setInterval(() => {
-            this._syncFromSnapshot();
-        }, 1000);
-
-        // Also subscribe to root events for immediate updates
+        // Subscribe to root events for immediate updates.
         this._unsubscribe = onKoharuRuntimeUpdated(() => {
             this._syncFromSnapshot();
         });
@@ -251,10 +245,6 @@ export default {
     },
 
     beforeDestroy() {
-        if (this._pollTimerId) {
-            clearInterval(this._pollTimerId);
-            this._pollTimerId = 0;
-        }
         if (typeof this._unsubscribe === 'function') {
             this._unsubscribe();
             this._unsubscribe = null;
@@ -262,6 +252,64 @@ export default {
     },
 
     methods: {
+        getStepLabelColumnWidth() {
+            const maxLabelLength = this.pipelineSteps.reduce((maxLen, step) => {
+                return Math.max(maxLen, String(step?.label || '').length);
+            }, 0);
+
+            const estimatedWidthPx = maxLabelLength * 11 + 54;
+            return `${Math.max(220, estimatedWidthPx)}px`;
+        },
+
+        formatRunningStepProgress() {
+            if (!this.isStepRunning) {
+                return '';
+            }
+
+            const parts = [];
+            const stepName = String(this.stepProgress?.step || '').trim();
+            if (stepName) {
+                parts.push(stepName);
+            }
+
+            const processed = Number(this.stepProgress?.processed) || 0;
+            const total = Number(this.stepProgress?.total) || 0;
+            if (total > 0) {
+                parts.push(`${processed} / ${total}`);
+            }
+
+            const overallPercent = Number(this.stepProgress?.overallPercent);
+            if (Number.isFinite(overallPercent) && overallPercent > 0) {
+                parts.push(`${Math.round(overallPercent)}%`);
+            }
+
+            const stepIndex = Number(this.stepProgress?.currentStepIndex) || 0;
+            const stepCount = Number(this.stepProgress?.totalSteps) || 0;
+            if (stepCount > 0) {
+                parts.push(`step ${stepIndex}/${stepCount}`);
+            }
+
+            return parts.join(' | ');
+        },
+
+        async waitForTranslationQueueToFinish(runtime, timeoutMs = 30 * 60 * 1000) {
+            const startedAt = Date.now();
+
+            while (Date.now() - startedAt < timeoutMs) {
+                const queueActive =
+                    runtime.isNonOtfTranslationProcessActive() ||
+                    !!runtime.objectTranslationJob?.active;
+
+                if (!queueActive) {
+                    return;
+                }
+
+                await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+
+            throw new Error('Timed out while waiting for translation queue to finish');
+        },
+
         _syncFromSnapshot() {
             const snapshot = this._koharuRuntime.getSnapshot();
             this.connected = snapshot.connected;
@@ -393,7 +441,11 @@ export default {
                     2200
                 );
             } catch (error) {
-                Alert.error(String(error?.message || error));
+                const message =
+                    error && typeof error === 'object' && 'message' in error
+                        ? String(error.message)
+                        : String(error);
+                Alert.error(message);
             } finally {
                 this.isCreatingProject = false;
                 this._syncFromSnapshot();
@@ -407,7 +459,11 @@ export default {
                 this._syncFromSnapshot();
                 Alert.info(`Step "${stepId}" completed`, null, 1500);
             } catch (error) {
-                Alert.error(String(error?.message || error));
+                const message =
+                    error && typeof error === 'object' && 'message' in error
+                        ? String(error.message)
+                        : String(error);
+                Alert.error(message);
                 this._syncFromSnapshot();
             }
         },
@@ -419,7 +475,11 @@ export default {
                 this._syncFromSnapshot();
                 Alert.info('All checked steps completed', null, 2200);
             } catch (error) {
-                Alert.error(String(error?.message || error));
+                const message =
+                    error && typeof error === 'object' && 'message' in error
+                        ? String(error.message)
+                        : String(error);
+                Alert.error(message);
                 this._syncFromSnapshot();
             }
         },
@@ -430,7 +490,11 @@ export default {
                 this._syncFromSnapshot();
                 Alert.info('Operation cancelled', null, 1500);
             } catch (error) {
-                Alert.error(String(error?.message || error));
+                const message =
+                    error && typeof error === 'object' && 'message' in error
+                        ? String(error.message)
+                        : String(error);
+                Alert.error(message);
             }
         },
 
@@ -438,11 +502,7 @@ export default {
             return {
                 getTranslationsForKeys: (keys) => {
                     const runtime = ensureTranslationRuntime();
-                    if (
-                        !runtime ||
-                        !runtime.translationCache ||
-                        typeof runtime.getCacheKey !== 'function'
-                    ) {
+                    if (!runtime?.translationCache || typeof runtime.getCacheKey !== 'function') {
                         return {};
                     }
 
@@ -486,7 +546,12 @@ export default {
                         2200
                     );
 
-                    await runtime.runObjectTranslationJob(['koharu']);
+                    const queueResult = await runtime.runObjectTranslationJob(['koharu']);
+                    if (queueResult?.started === false && queueResult?.reason === 'process-active') {
+                        throw new Error('Another translation queue is already running');
+                    }
+
+                    await this.waitForTranslationQueueToFinish(runtime);
                 },
             };
         },

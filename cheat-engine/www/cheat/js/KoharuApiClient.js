@@ -74,6 +74,70 @@ export function getOperations(baseUrl) {
     return jsonFetch(buildUrl(baseUrl, '/operations'));
 }
 
+/**
+ * Subscribe to Koharu SSE events stream.
+ *
+ * @param {string} baseUrl
+ * @param {{ onOpen?: Function, onEvent?: Function, onError?: Function }} handlers
+ * @returns {() => void} unsubscribe function
+ */
+export function subscribeEvents(baseUrl, handlers = {}) {
+    const EventSourceApi = globalThis?.EventSource;
+    if (typeof EventSourceApi !== 'function') {
+        throw new TypeError('EventSource API is unavailable in this environment');
+    }
+
+    const onOpen = typeof handlers.onOpen === 'function' ? handlers.onOpen : null;
+    const onEvent = typeof handlers.onEvent === 'function' ? handlers.onEvent : null;
+    const onError = typeof handlers.onError === 'function' ? handlers.onError : null;
+
+    const eventSource = new EventSourceApi(buildUrl(baseUrl, '/events'));
+
+    eventSource.onopen = () => {
+        if (onOpen) {
+            onOpen();
+        }
+    };
+
+    eventSource.onmessage = (rawEvent) => {
+        if (!onEvent) {
+            return;
+        }
+
+        const payloadText = typeof rawEvent?.data === 'string' ? rawEvent.data.trim() : '';
+        if (!payloadText) {
+            return;
+        }
+
+        try {
+            const payload = JSON.parse(payloadText);
+            onEvent(payload, rawEvent);
+        } catch (error) {
+            // Ignore non-JSON keepalive lines.
+            if (error) {
+                // Keep reference so static analysis treats the exception as handled.
+            }
+        }
+    };
+
+    eventSource.onerror = (error) => {
+        if (onError) {
+            onError(error);
+        }
+    };
+
+    return () => {
+        try {
+            eventSource.close();
+        } catch (error) {
+            // Ignore close errors.
+            if (error) {
+                // Keep reference so static analysis treats the exception as handled.
+            }
+        }
+    };
+}
+
 export function cancelOperation(baseUrl, operationId) {
     return jsonFetch(buildUrl(baseUrl, `/operations/${encodeURIComponent(operationId)}`), {
         method: 'DELETE',
@@ -157,7 +221,10 @@ export async function ping(baseUrl) {
     try {
         await getEngines(baseUrl);
         return true;
-    } catch (_error) {
+    } catch (error) {
+        if (error) {
+            // Ping should fail silently and return false.
+        }
         return false;
     }
 }

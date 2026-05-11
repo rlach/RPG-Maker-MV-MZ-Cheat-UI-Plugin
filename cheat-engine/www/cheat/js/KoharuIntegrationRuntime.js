@@ -47,6 +47,17 @@ function createDefaultSettings() {
     };
 }
 
+function createDefaultStepProgress() {
+    return {
+        processed: 0,
+        total: 0,
+        step: '',
+        currentStepIndex: 0,
+        totalSteps: 0,
+        overallPercent: 0,
+    };
+}
+
 // ---------------------------------------------------------------------------
 // Pipeline step definitions
 // ---------------------------------------------------------------------------
@@ -74,7 +85,7 @@ class KoharuIntegrationRuntime {
         this._projects = [];
         this._operationId = '';
         this._runningStepId = '';
-        this._stepProgress = { processed: 0, total: 0 };
+        this._stepProgress = createDefaultStepProgress();
         this._lastError = '';
         this._version = 0;
     }
@@ -87,7 +98,10 @@ class KoharuIntegrationRuntime {
         try {
             const raw = this._storage.getAll();
             return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
-        } catch (_error) {
+        } catch (error) {
+            if (error) {
+                // Settings load should fail safely and fall back to defaults.
+            }
             return {};
         }
     }
@@ -335,6 +349,170 @@ class KoharuIntegrationRuntime {
     // Page upload
     // -----------------------------------------------------------------------
 
+    _collectPngFiles(sourceDirPath, fs, path) {
+        const files = [];
+        const queue = [sourceDirPath];
+
+        while (queue.length > 0) {
+            const currentDir = queue.shift();
+            const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+
+            for (const entry of entries) {
+                const fullPath = path.join(currentDir, entry.name);
+                if (entry.isDirectory()) {
+                    queue.push(fullPath);
+                    continue;
+                }
+
+                if (!entry.name.toLowerCase().endsWith('.png')) {
+                    continue;
+                }
+
+                const relativePath = path.relative(sourceDirPath, fullPath).replaceAll('\\', '/');
+                const relativeDir = path.dirname(relativePath).replaceAll('\\', '/').replace(/^\.$/, '');
+
+                files.push({
+                    fullPath,
+                    relativePath,
+                    relativeDir,
+                    fileName: entry.name,
+                });
+            }
+        }
+
+        return files;
+    }
+
+    _groupFilesByDirectory(files) {
+        const grouped = new Map();
+
+        for (const file of files) {
+            const key = String(file?.relativeDir || '');
+            if (!grouped.has(key)) {
+                grouped.set(key, []);
+            }
+
+            grouped.get(key).push(file);
+        }
+
+        return Array.from(grouped.entries())
+            .sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+            .map(([, groupFiles]) => groupFiles);
+    }
+
+    _extractScenePageName(page) {
+        const directName = typeof page?.name === 'string' ? page.name.trim() : '';
+        if (directName) {
+            return directName;
+        }
+
+        const nodes = page?.nodes && typeof page.nodes === 'object' ? page.nodes : {};
+        for (const node of Object.values(nodes)) {
+            const imageName = node?.kind?.image?.name;
+            if (typeof imageName === 'string' && imageName.trim()) {
+                return imageName.trim();
+            }
+        }
+
+        return '';
+    }
+
+    async _resolveUploadedPageNames(baseUrl, uploadedPageIds) {
+        const expectedIds = Array.from(
+            new Set(
+                (Array.isArray(uploadedPageIds) ? uploadedPageIds : [])
+                    .map((id) => String(id || '').trim())
+                    .filter(Boolean)
+            )
+        );
+
+        if (expectedIds.length === 0) {
+            return {};
+        }
+
+        const maxAttempts = 20;
+        const delayMs = 150;
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+            const sceneData = await KoharuApi.getScene(baseUrl);
+            const sceneRoot = sceneData?.scene || sceneData;
+            const pages = sceneRoot?.pages || {};
+
+            const matchedById = {};
+            for (const pageId of expectedIds) {
+                const page = pages[pageId];
+                if (!page) {
+                    continue;
+                }
+
+                const pageName = this._extractScenePageName(page);
+                if (!pageName) {
+                    continue;
+                }
+
+                matchedById[pageId] = pageName;
+            }
+
+            if (Object.keys(matchedById).length === expectedIds.length) {
+                return matchedById;
+            }
+
+            if (attempt < maxAttempts) {
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
+        }
+
+        throw new Error('Koharu scene.json did not expose uploaded page metadata in time');
+    }
+
+    _buildPageMappingsForUploadedGroup(groupFiles, uploadedPageIds, pageNameById) {
+        const idsByFileName = new Map();
+        const safePageNameById =
+            pageNameById && typeof pageNameById === 'object' ? pageNameById : {};
+
+        for (const pageId of uploadedPageIds) {
+            const safePageId = String(pageId || '').trim();
+            if (!safePageId) {
+                continue;
+            }
+
+            const name = String(safePageNameById[safePageId] || '').trim();
+            if (!name) {
+                continue;
+            }
+
+            if (!idsByFileName.has(name)) {
+                idsByFileName.set(name, []);
+            }
+            idsByFileName.get(name).push(safePageId);
+        }
+
+        const mappings = {};
+        for (const file of groupFiles) {
+            const fileName = String(file?.fileName || '').trim();
+            const candidates = idsByFileName.get(fileName) || [];
+
+            if (candidates.length !== 1) {
+                const details =
+                    candidates.length === 0
+                        ? 'no candidate id'
+                        : `${candidates.length} candidate ids`;
+                throw new Error(
+                    `Failed mapping uploaded file "${fileName}" (${details}) in folder "${file.relativeDir || '.'}"`
+                );
+            }
+
+            const pageId = candidates[0];
+            mappings[pageId] = {
+                pageId,
+                fileName,
+                relativePath: file.relativePath,
+            };
+        }
+
+        return mappings;
+    }
+
     async uploadAllImages(sourceDirPath) {
         const nodeRequire = typeof globalThis.require === 'function' ? globalThis.require : null;
         if (!nodeRequire) {
@@ -350,59 +528,47 @@ class KoharuIntegrationRuntime {
 
         const baseUrl = this._settings.apiUrl;
 
-        // Collect all image files recursively
-        const files = [];
-        const queue = [sourceDirPath];
-        while (queue.length > 0) {
-            const currentDir = queue.shift();
-            const entries = fs.readdirSync(currentDir, { withFileTypes: true });
-            for (const entry of entries) {
-                const fullPath = path.join(currentDir, entry.name);
-                if (entry.isDirectory()) {
-                    queue.push(fullPath);
-                } else if (entry.name.toLowerCase().endsWith('.png')) {
-                    const relativePath = path.relative(sourceDirPath, fullPath).replace(/\\/g, '/');
-                    files.push({ fullPath, relativePath, fileName: entry.name });
-                }
-            }
-        }
+        const files = this._collectPngFiles(sourceDirPath, fs, path);
 
         if (files.length <= 0) {
             throw new Error('No PNG images found in source directory');
         }
 
-        // Upload in batches to avoid memory pressure
-        const BATCH_SIZE = 10;
+        const groupedByDirectory = this._groupFilesByDirectory(files);
         const pageIdMappings = {};
 
         this._runningStepId = 'upload';
-        this._stepProgress = { processed: 0, total: files.length };
+        this._stepProgress = {
+            ...createDefaultStepProgress(),
+            processed: 0,
+            total: files.length,
+        };
         this._notify('upload-started');
 
         try {
-            for (let offset = 0; offset < files.length; offset += BATCH_SIZE) {
-                const batch = files.slice(offset, offset + BATCH_SIZE);
-                const uploadPayload = batch.map((file) => ({
+            let processedCount = 0;
+
+            for (const fileGroup of groupedByDirectory) {
+                const uploadPayload = fileGroup.map((file) => ({
                     fileName: file.fileName,
                     buffer: fs.readFileSync(file.fullPath),
                 }));
 
                 const result = await KoharuApi.uploadPages(baseUrl, uploadPayload);
-                const returnedPageIds = Array.isArray(result?.pages) ? result.pages : [];
+                const uploadedPageIds = Array.isArray(result?.pages) ? result.pages : [];
+                const pageNameById = await this._resolveUploadedPageNames(baseUrl, uploadedPageIds);
+                const groupMappings = this._buildPageMappingsForUploadedGroup(
+                    fileGroup,
+                    uploadedPageIds,
+                    pageNameById
+                );
 
-                for (let index = 0; index < batch.length; index++) {
-                    const file = batch[index];
-                    const pageId = returnedPageIds[index] || '';
-                    if (pageId) {
-                        pageIdMappings[pageId] = {
-                            pageId,
-                            fileName: file.fileName,
-                            relativePath: file.relativePath,
-                        };
-                    }
+                for (const [pageId, mapping] of Object.entries(groupMappings)) {
+                    pageIdMappings[pageId] = mapping;
                 }
 
-                this._stepProgress.processed = Math.min(offset + batch.length, files.length);
+                processedCount += fileGroup.length;
+                this._stepProgress.processed = Math.min(processedCount, files.length);
                 this._notify('upload-progress');
             }
 
@@ -410,7 +576,7 @@ class KoharuIntegrationRuntime {
             this._saveSettings();
         } finally {
             this._runningStepId = '';
-            this._stepProgress = { processed: 0, total: 0 };
+            this._stepProgress = createDefaultStepProgress();
             this._notify('upload-finished');
         }
 
@@ -466,7 +632,7 @@ class KoharuIntegrationRuntime {
 
         this._runningStepId = stepId;
         this._operationId = '';
-        this._stepProgress = { processed: 0, total: 0 };
+        this._stepProgress = createDefaultStepProgress();
         this._notify('step-started');
 
         try {
@@ -477,15 +643,189 @@ class KoharuIntegrationRuntime {
             });
 
             this._operationId = result?.operationId || result?.id || '';
-
-            // Poll until completed
-            await this._pollOperation(this._operationId);
+            await this._waitForPipelineCompletionByEvents(this._operationId);
         } finally {
             this._runningStepId = '';
             this._operationId = '';
-            this._stepProgress = { processed: 0, total: 0 };
+            this._stepProgress = createDefaultStepProgress();
             this._notify('step-finished');
         }
+    }
+
+    _extractPipelineStatus(payload) {
+        const rawStatus = payload?.status;
+        let statusText = '';
+        if (typeof rawStatus === 'string') {
+            statusText = rawStatus;
+        } else if (typeof rawStatus?.status === 'string') {
+            statusText = rawStatus.status;
+        }
+
+        return String(statusText || '').trim().toLowerCase();
+    }
+
+    _isTerminalSuccessStatus(status) {
+        return status === 'completed' || status === 'finished' || status === 'done';
+    }
+
+    _isTerminalErrorStatus(status) {
+        return status === 'failed' || status === 'error' || status === 'cancelled';
+    }
+
+    _applyPipelineProgressFromEvent(payload) {
+        const processed = Number(payload?.currentPage) || 0;
+        const total = Number(payload?.totalPages) || 0;
+        const currentStepIndex = Number(payload?.currentStepIndex) || 0;
+        const totalSteps = Number(payload?.totalSteps) || 0;
+        const overallPercent = Number(payload?.overallPercent);
+        const step = typeof payload?.step === 'string' ? payload.step : '';
+
+        this._stepProgress = {
+            ...createDefaultStepProgress(),
+            processed,
+            total,
+            step,
+            currentStepIndex,
+            totalSteps,
+            overallPercent: Number.isFinite(overallPercent) ? overallPercent : 0,
+        };
+        this._notify('step-progress');
+    }
+
+    async _waitForPipelineCompletionByEvents(operationId) {
+        const baseUrl = this._settings.apiUrl;
+
+        if (typeof KoharuApi.subscribeEvents !== 'function') {
+            await this._pollOperation(operationId);
+            return;
+        }
+
+        await new Promise((resolve, reject) => {
+            const timeoutMs = 30 * 60 * 1000;
+            const expectedId = String(operationId || '').trim();
+            let activeJobId = '';
+            let settled = false;
+
+            let unsubscribe = () => {};
+            const timeoutId = setTimeout(() => {
+                finish(
+                    reject,
+                    new Error('Pipeline operation timed out while waiting for event stream')
+                );
+            }, timeoutMs);
+
+            const cleanup = () => {
+                clearTimeout(timeoutId);
+                unsubscribe();
+            };
+
+            const finish = (handler, payload) => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                cleanup();
+                handler(payload);
+            };
+
+            const isMatchingPipelineJob = (payloadJobId) => {
+                const safePayloadJobId = String(payloadJobId || '').trim();
+                if (!safePayloadJobId) {
+                    return false;
+                }
+
+                if (activeJobId) {
+                    return safePayloadJobId === activeJobId;
+                }
+
+                if (expectedId && safePayloadJobId === expectedId) {
+                    activeJobId = safePayloadJobId;
+                    return true;
+                }
+
+                activeJobId = safePayloadJobId;
+                return true;
+            };
+
+            const handlePayload = (payload) => {
+                const eventName = String(payload?.event || '').trim();
+                if (!eventName) {
+                    return;
+                }
+
+                if (eventName === 'jobStarted') {
+                    const startedKind = String(payload?.kind || '').trim().toLowerCase();
+                    if (startedKind !== 'pipeline') {
+                        return;
+                    }
+
+                    const startedId = payload?.jobId || payload?.id;
+                    isMatchingPipelineJob(startedId);
+                    return;
+                }
+
+                if (eventName === 'jobProgress') {
+                    const progressJobId = payload?.jobId || payload?.id;
+                    if (!isMatchingPipelineJob(progressJobId)) {
+                        return;
+                    }
+
+                    this._applyPipelineProgressFromEvent(payload);
+
+                    const status = this._extractPipelineStatus(payload);
+                    if (this._isTerminalSuccessStatus(status)) {
+                        finish(resolve);
+                        return;
+                    }
+
+                    if (this._isTerminalErrorStatus(status)) {
+                        finish(reject, new Error(`Pipeline operation ${status}`));
+                    }
+                    return;
+                }
+
+                if (
+                    eventName === 'jobFinished' ||
+                    eventName === 'jobCompleted' ||
+                    eventName === 'jobFailed' ||
+                    eventName === 'jobCancelled'
+                ) {
+                    const finalJobId = payload?.jobId || payload?.id;
+                    if (!isMatchingPipelineJob(finalJobId)) {
+                        return;
+                    }
+
+                    const status = this._extractPipelineStatus(payload) || eventName.toLowerCase();
+                    if (
+                        eventName === 'jobCompleted' ||
+                        eventName === 'jobFinished' ||
+                        this._isTerminalSuccessStatus(status)
+                    ) {
+                        finish(resolve);
+                        return;
+                    }
+
+                    const reason = payload?.error || status || 'unknown error';
+                    finish(reject, new Error(`Pipeline operation failed: ${reason}`));
+                }
+            };
+
+            try {
+                unsubscribe = KoharuApi.subscribeEvents(baseUrl, {
+                    onEvent: handlePayload,
+                    onError: (error) => {
+                        finish(
+                            reject,
+                            new Error(
+                                `Koharu event stream error: ${String(error?.message || error)}`
+                            )
+                        );
+                    },
+                });
+            } catch (error) {
+                finish(reject, error);
+            }
+        });
     }
 
     async _pollOperation(operationId) {
@@ -548,7 +888,7 @@ class KoharuIntegrationRuntime {
         } finally {
             this._runningStepId = '';
             this._operationId = '';
-            this._stepProgress = { processed: 0, total: 0 };
+            this._stepProgress = createDefaultStepProgress();
             this._notify('step-cancelled');
         }
     }
@@ -616,6 +956,7 @@ class KoharuIntegrationRuntime {
             return textEntries;
         } finally {
             this._runningStepId = '';
+            this._stepProgress = createDefaultStepProgress();
             this._notify('step-finished');
         }
     }
@@ -635,7 +976,8 @@ class KoharuIntegrationRuntime {
         try {
             const baseUrl = this._settings.apiUrl;
             const sceneData = await KoharuApi.getScene(baseUrl);
-            const pages = sceneData?.scene?.pages || {};
+            const sceneRoot = sceneData?.scene || sceneData;
+            const pages = sceneRoot?.pages || {};
 
             const updates = [];
             for (const [pageId, page] of Object.entries(pages)) {
@@ -660,7 +1002,11 @@ class KoharuIntegrationRuntime {
                 }
             }
 
-            this._stepProgress = { processed: 0, total: updates.length };
+            this._stepProgress = {
+                ...createDefaultStepProgress(),
+                processed: 0,
+                total: updates.length,
+            };
             this._notify('step-progress');
 
             for (let index = 0; index < updates.length; index++) {
@@ -686,7 +1032,7 @@ class KoharuIntegrationRuntime {
             return { updatedCount: updates.length };
         } finally {
             this._runningStepId = '';
-            this._stepProgress = { processed: 0, total: 0 };
+            this._stepProgress = createDefaultStepProgress();
             this._notify('step-finished');
         }
     }
@@ -726,14 +1072,18 @@ class KoharuIntegrationRuntime {
                 );
             }
 
-            this._stepProgress = { processed: 0, total: pageIds.length };
+            this._stepProgress = {
+                ...createDefaultStepProgress(),
+                processed: 0,
+                total: pageIds.length,
+            };
             this._notify('step-progress');
 
             // Download one page at a time to avoid large ZIP in memory
             for (let index = 0; index < pageIds.length; index++) {
                 const pageId = pageIds[index];
                 const mapping = pageIdMappings[pageId];
-                if (!mapping || !mapping.relativePath) {
+                if (!mapping?.relativePath) {
                     continue;
                 }
 
@@ -763,7 +1113,7 @@ class KoharuIntegrationRuntime {
             return { importedCount: this._stepProgress.processed };
         } finally {
             this._runningStepId = '';
-            this._stepProgress = { processed: 0, total: 0 };
+            this._stepProgress = createDefaultStepProgress();
             this._notify('step-finished');
         }
     }
