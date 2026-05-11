@@ -461,8 +461,6 @@ export default {
                 },
 
                 runCheatEngineTranslation: async () => {
-                    // Gather keys first
-                    const textEntries = await this._koharuRuntime.gatherKeys();
                     const runtime = ensureTranslationRuntime();
                     if (
                         !runtime ||
@@ -472,19 +470,26 @@ export default {
                         throw new Error('Translation runtime unavailable');
                     }
 
-                    // Populate empty cache entries so the batch translator picks them up
-                    for (const entry of textEntries) {
-                        const cacheKey = runtime.getCacheKey(entry.sourceText, 'koharu');
-                        if (!runtime.translationCache.has(cacheKey)) {
-                            runtime.translationCache.set(cacheKey, '');
-                        }
+                    if (runtime.isNonOtfTranslationProcessActive()) {
+                        const activeLabel = runtime.getActiveNonOtfTranslationProcessLabel();
+                        Alert.warn(
+                            `Another translation is already in progress (${activeLabel}).`,
+                            null,
+                            2200
+                        );
+                        throw new Error('Another translation queue is already running');
                     }
 
+                    // Ensure latest scene text is materialized into koharu cache before translating.
+                    const textEntries = await this._koharuRuntime.gatherKeys();
+
                     Alert.info(
-                        `${textEntries.length} Koharu keys added to translation queue`,
+                        `${textEntries.length} Koharu keys queued for translation`,
                         null,
                         2200
                     );
+
+                    await runtime.runObjectTranslationJob(['koharu']);
                 },
             };
         },

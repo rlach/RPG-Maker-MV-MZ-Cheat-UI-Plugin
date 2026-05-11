@@ -32,6 +32,7 @@ const DEFAULT_OBJECT_TRANSLATION_TYPE_DEFS = Object.freeze([
     { id: 'otherStrings', label: 'other strings' },
     { id: 'gameArrays', label: 'game arrays (terms, types, elements)' },
     { id: 'troops', label: 'Troops' },
+    { id: 'koharu', label: 'Koharu' },
     { id: 'plugins', label: 'Plugins' },
     {
         id: 'cacheEmptyStrings',

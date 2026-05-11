@@ -191,6 +191,11 @@ export class TranslationBatchManager {
 
         if (kind === 'variables') {
             targetSet.add('variable_value');
+            return;
+        }
+
+        if (kind === 'koharu') {
+            targetSet.add('koharu');
         }
     }
 

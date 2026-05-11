@@ -257,7 +257,7 @@ class KoharuIntegrationRuntime {
     }
 
     getTargetImagePath() {
-        const targetLang = this._settings.targetLanguage;
+        const targetLang = this._settings.targetLanguage || 'en';
         if (!targetLang) {
             return '';
         }
@@ -574,7 +574,8 @@ class KoharuIntegrationRuntime {
         try {
             const baseUrl = this._settings.apiUrl;
             const sceneData = await KoharuApi.getScene(baseUrl);
-            const pages = sceneData?.scene?.pages || {};
+            const sceneRoot = sceneData?.scene || sceneData;
+            const pages = sceneRoot?.pages || {};
             const textEntries = [];
 
             for (const [pageId, page] of Object.entries(pages)) {
@@ -597,6 +598,22 @@ class KoharuIntegrationRuntime {
                         existingTranslation: textKind.translation || null,
                     });
                 }
+            }
+
+            const translationRuntime = ensureTranslationRuntime();
+            const addedCacheKeys = [];
+            for (const entry of textEntries) {
+                const cacheKey = translationRuntime.getCacheKey(entry.sourceText, 'koharu');
+                if (translationRuntime.translationCache.has(cacheKey)) {
+                    continue;
+                }
+
+                translationRuntime.setCacheValue(cacheKey, '', { persist: false });
+                addedCacheKeys.push(cacheKey);
+            }
+
+            if (addedCacheKeys.length > 0) {
+                translationRuntime.persistCache(addedCacheKeys);
             }
 
             this._stepProgress = { processed: textEntries.length, total: textEntries.length };
