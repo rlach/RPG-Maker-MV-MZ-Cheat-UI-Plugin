@@ -6,87 +6,47 @@ import { BasePluginTranslator } from '../BasePluginTranslator.js';
 const CACHE_TYPE = 'plugin_ll_standing_picture';
 const PLUGIN_NAME_ALIASES = ['LL_StandingPicture', 'LL_StandingPictureMV'];
 
+const createMaskedBracketTag = (description, tagSymbol) => ({
+    description,
+    type: 'withCustomParameter',
+    tagSymbol,
+    bracket: '[',
+    maskValue: true,
+    requiredConsistency: true,
+});
+
 const LL_STANDING_PICTURE_PLUGIN_TAGS = [
-    {
-        description: 'LL StandingPicture show slot 1',
-        type: 'withCustomParameter',
-        tagSymbol: 'F',
-        bracket: '[',
-        maskValue: true,
-        requiredConsistency: true,
-    },
-    {
-        description: 'LL StandingPicture show slot 2',
-        type: 'withCustomParameter',
-        tagSymbol: 'FF',
-        bracket: '[',
-        maskValue: true,
-        requiredConsistency: true,
-    },
-    {
-        description: 'LL StandingPicture show slot 3',
-        type: 'withCustomParameter',
-        tagSymbol: 'FFF',
-        bracket: '[',
-        maskValue: true,
-        requiredConsistency: true,
-    },
-    {
-        description: 'LL StandingPicture show slot 4',
-        type: 'withCustomParameter',
-        tagSymbol: 'FFFF',
-        bracket: '[',
-        maskValue: true,
-        requiredConsistency: true,
-    },
-    {
-        description: 'LL StandingPicture motion slot 1',
-        type: 'withCustomParameter',
-        tagSymbol: 'M',
-        bracket: '[',
-        maskValue: true,
-        requiredConsistency: true,
-    },
-    {
-        description: 'LL StandingPicture motion slot 2',
-        type: 'withCustomParameter',
-        tagSymbol: 'MM',
-        bracket: '[',
-        maskValue: true,
-        requiredConsistency: true,
-    },
-    {
-        description: 'LL StandingPicture motion slot 3',
-        type: 'withCustomParameter',
-        tagSymbol: 'MMM',
-        bracket: '[',
-        maskValue: true,
-        requiredConsistency: true,
-    },
-    {
-        description: 'LL StandingPicture motion slot 4',
-        type: 'withCustomParameter',
-        tagSymbol: 'MMMM',
-        bracket: '[',
-        maskValue: true,
-        requiredConsistency: true,
-    },
-    {
-        description: 'LL StandingPicture focus control',
-        type: 'withCustomParameter',
-        tagSymbol: 'AA',
-        bracket: '[',
-        maskValue: true,
-        requiredConsistency: true,
-    },
-    {
-        description: 'LL StandingPicture hold control',
-        type: 'withCustomParameter',
-        tagSymbol: 'FH',
-        bracket: '[',
-        maskValue: true,
-        requiredConsistency: true,
-    },
+    // Show picture tags documented for LL_StandingPicture (MV/MZ).
+    createMaskedBracketTag('LL StandingPicture show slot 1 (shorthand)', 'F'),
+    createMaskedBracketTag('LL StandingPicture show slot 2 (shorthand)', 'FF'),
+    createMaskedBracketTag('LL StandingPicture show slot 3 (shorthand)', 'FFF'),
+    createMaskedBracketTag('LL StandingPicture show slot 4 (shorthand)', 'FFFF'),
+    createMaskedBracketTag('LL StandingPicture show slot 1', 'F1'),
+    createMaskedBracketTag('LL StandingPicture show slot 2', 'F2'),
+    createMaskedBracketTag('LL StandingPicture show slot 3', 'F3'),
+    createMaskedBracketTag('LL StandingPicture show slot 4', 'F4'),
+    createMaskedBracketTag('LL StandingPicture show slot 5', 'F5'),
+    createMaskedBracketTag('LL StandingPicture show slot 6', 'F6'),
+    createMaskedBracketTag('LL StandingPicture show slot 7', 'F7'),
+    createMaskedBracketTag('LL StandingPicture show slot 8', 'F8'),
+
+    // Motion tags documented for LL_StandingPicture (MV/MZ).
+    createMaskedBracketTag('LL StandingPicture motion slot 1 (shorthand)', 'M'),
+    createMaskedBracketTag('LL StandingPicture motion slot 2 (shorthand)', 'MM'),
+    createMaskedBracketTag('LL StandingPicture motion slot 3 (shorthand)', 'MMM'),
+    createMaskedBracketTag('LL StandingPicture motion slot 4 (shorthand)', 'MMMM'),
+    createMaskedBracketTag('LL StandingPicture motion slot 1', 'M1'),
+    createMaskedBracketTag('LL StandingPicture motion slot 2', 'M2'),
+    createMaskedBracketTag('LL StandingPicture motion slot 3', 'M3'),
+    createMaskedBracketTag('LL StandingPicture motion slot 4', 'M4'),
+    createMaskedBracketTag('LL StandingPicture motion slot 5', 'M5'),
+    createMaskedBracketTag('LL StandingPicture motion slot 6', 'M6'),
+    createMaskedBracketTag('LL StandingPicture motion slot 7', 'M7'),
+    createMaskedBracketTag('LL StandingPicture motion slot 8', 'M8'),
+
+    // Focus and hold tags.
+    createMaskedBracketTag('LL StandingPicture focus control', 'AA'),
+    createMaskedBracketTag('LL StandingPicture hold control', 'FH'),
 ];
 
 export class LLStandingPictureTranslator extends BasePluginTranslator {
