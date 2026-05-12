@@ -164,13 +164,52 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
         return text;
     }
 
+    translateRuntimeDestinationValue(destinationValue, runtime) {
+        if (Array.isArray(destinationValue)) {
+            if (!destinationValue.length) {
+                return destinationValue;
+            }
+
+            const allStringItems = destinationValue.every((item) => typeof item === 'string');
+
+            if (allStringItems) {
+                const originalJoined = destinationValue.join('\n');
+                const translatedJoined = this.translateRuntimeDestination(originalJoined, runtime);
+                if (translatedJoined !== originalJoined) {
+                    return translatedJoined.split('\n');
+                }
+            }
+
+            let changed = false;
+            const translatedList = destinationValue.map((item) => {
+                if (typeof item !== 'string') {
+                    return item;
+                }
+
+                const translated = this.translateRuntimeDestination(item, runtime);
+                if (translated !== item) {
+                    changed = true;
+                }
+                return translated;
+            });
+
+            return changed ? translatedList : destinationValue;
+        }
+
+        if (typeof destinationValue === 'string') {
+            return this.translateRuntimeDestination(destinationValue, runtime);
+        }
+
+        return destinationValue;
+    }
+
     enablePluginTranslation() {
         if (!window.Game_System || !Game_System.prototype) {
             return;
         }
 
         const getRuntime = this.getRuntime.bind(this);
-        const translateRuntimeDestination = this.translateRuntimeDestination.bind(this);
+        const translateRuntimeDestinationValue = this.translateRuntimeDestinationValue.bind(this);
         const originalGetDestination = Game_System.prototype.getDestination;
 
         if (typeof originalGetDestination === 'function') {
@@ -178,7 +217,7 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
                 const destinationText = originalGetDestination.apply(this, arguments);
 
                 try {
-                    return translateRuntimeDestination(destinationText, getRuntime());
+                    return translateRuntimeDestinationValue(destinationText, getRuntime());
                 } catch (error) {
                     console.warn(
                         '[DestinationWindowTranslator] Failed to apply runtime destination translation',
@@ -304,6 +343,26 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
                     cmdIdx,
                 },
             });
+
+            const lines = parsed.text.split('\n');
+            if (lines.length > 1) {
+                for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+                    const lineText = lines[lineIdx];
+                    if (!this.isUsableText(lineText)) {
+                        continue;
+                    }
+
+                    output.push({
+                        text: lineText,
+                        command: parsed.command,
+                        source: {
+                            ...baseMeta,
+                            cmdIdx,
+                            lineIdx,
+                        },
+                    });
+                }
+            }
         }
     }
 
