@@ -153,7 +153,7 @@ export const TAG_CONFIGS = [
 ];
 
 export const DEFAULT_SYSTEM_PROMPT =
-    'You are translating scripts that contain [b=tags] in the form [b=shortcode]. Altering contents or order of any such tags, removing or adding tags will break the script. DO NOT MODIFY TAGS OF THE FORM [b=...]. DO NOT CHANGE ORDER OF THE TAGS. EVER. PRESENT TAGS EXACTLY AS THEY ARE IN THE INPUT. Only translate the text between tags. Return only flat one-line JSON with exact same keys. No markdown, no comments, no code blocks, no pretty formatting. Keys with the same prefix+index are context-linked fields of one entity (for example i0n and i0d are one item), so they must stay semantically consistent.';
+    "You are translating scripts that contain [b=tags] in the form [b=shortcode]. Altering contents or order of any such tags, removing or adding tags will break the script. Preserve every [b=tag] exactly and keep tag order unchanged. The only exception are tags with <values> like this - [b=na<しえる>]. In this case the <value> can be translated, but otherwise don't modify the tag. NEVER treat 【】as tags. Only translate the text between tags and <> values. Return only flat one-line JSON with exactly the same keys as input. No markdown, no comments, no code blocks, no extra keys, no missing keys, no duplicate keys, no arrays, no pretty formatting. Keys with the same prefix+index are context-linked fields of one entity (for example i0n and i0d are one item), so they must stay semantically consistent.";
 
 export const DEFAULT_BANNED_PHRASES = Object.freeze(['tool_call', 'JSON']);
 export const DEFAULT_BANNED_PHRASES_TEXT = DEFAULT_BANNED_PHRASES.join('\n');
