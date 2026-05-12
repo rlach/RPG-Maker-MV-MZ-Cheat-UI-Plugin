@@ -7,12 +7,44 @@ import {
     getSystemMessageCacheKey,
     getSystemMessagesSource,
 } from '../../translate-engines/translation-phases/SystemMessageCacheRules.js';
-import { ensureRootWindowStateValue } from '../RootWindowState.js';
+import { ensureRootWindowStateValue, setRootWindowStateValue } from '../RootWindowState.js';
 
 const MAP_DATA_CACHE_KEY = '__CHEAT_MAP_DATA_CACHE__';
+const MAP_DATA_LOAD_METHOD_STATE_KEY = '__CHEAT_MAP_DATA_LOAD_METHOD_STATE__';
+const MAP_DATA_LOAD_METHOD_XHR = 'xhr';
+const MAP_DATA_LOAD_METHOD_DATA_MANAGER = 'dataManager';
 
 function getMapDataCache() {
     return ensureRootWindowStateValue(MAP_DATA_CACHE_KEY, () => new Map());
+}
+
+function getMapDataLoadMethodState() {
+    return ensureRootWindowStateValue(MAP_DATA_LOAD_METHOD_STATE_KEY, () => ({
+        method: MAP_DATA_LOAD_METHOD_XHR,
+    }));
+}
+
+function getMapDataLoadMethod() {
+    const state = getMapDataLoadMethodState();
+    return state.method === MAP_DATA_LOAD_METHOD_DATA_MANAGER
+        ? MAP_DATA_LOAD_METHOD_DATA_MANAGER
+        : MAP_DATA_LOAD_METHOD_XHR;
+}
+
+function setMapDataLoadMethod(method) {
+    const nextMethod =
+        method === MAP_DATA_LOAD_METHOD_DATA_MANAGER
+            ? MAP_DATA_LOAD_METHOD_DATA_MANAGER
+            : MAP_DATA_LOAD_METHOD_XHR;
+    const current = getMapDataLoadMethodState();
+    if (current.method === nextMethod) {
+        return;
+    }
+
+    setRootWindowStateValue(MAP_DATA_LOAD_METHOD_STATE_KEY, {
+        ...current,
+        method: nextMethod,
+    });
 }
 
 const DEFAULT_OBJECT_TRANSLATION_TYPE_DEFS = Object.freeze([
@@ -53,9 +85,19 @@ export function loadMapDataById(mapId) {
         return Promise.resolve(cached);
     }
 
-    const promise = loadMapDataViaXhr(safeMapId)
-        .then((mapData) => validateXhrMapDataOrThrow(mapData))
-        .catch(() => loadMapDataViaDataManager(DataManager, safeMapId));
+    const loadViaDataManager = () => loadMapDataViaDataManager(DataManager, safeMapId);
+    const shouldUseDataManagerOnly = getMapDataLoadMethod() === MAP_DATA_LOAD_METHOD_DATA_MANAGER;
+
+    const promise = shouldUseDataManagerOnly
+        ? loadViaDataManager()
+        : loadMapDataViaXhr(safeMapId)
+              .then((mapData) => validateXhrMapDataOrThrow(mapData))
+              .catch(() =>
+                  loadViaDataManager().then((mapData) => {
+                      setMapDataLoadMethod(MAP_DATA_LOAD_METHOD_DATA_MANAGER);
+                      return mapData;
+                  })
+              );
 
     return promise.then((mapData) => {
         cache.set(safeMapId, mapData);
