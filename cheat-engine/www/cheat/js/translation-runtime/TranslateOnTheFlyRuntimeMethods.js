@@ -1379,38 +1379,48 @@ export const translateOnTheFlyRuntimeMethods = {
         };
 
         if (typeof Scene_Title !== 'undefined') {
+            const originalCreateCommandWindow =
+                Scene_Title.prototype._translateOriginalCreateCommandWindow ||
+                Scene_Title.prototype.createCommandWindow;
+
             if (!Scene_Title.prototype._translateOriginalCreateCommandWindow) {
                 Scene_Title.prototype._translateOriginalCreateCommandWindow =
-                    Scene_Title.prototype.createCommandWindow;
+                    originalCreateCommandWindow;
             }
 
             Scene_Title.prototype.createCommandWindow = function () {
                 applyLifecycleTranslations('sceneTitleCreateCommandWindow');
-                return Scene_Title.prototype._translateOriginalCreateCommandWindow.call(this);
+                return originalCreateCommandWindow.call(this);
             };
         }
 
         if (typeof Scene_Load !== 'undefined') {
+            const originalHelpWindowText =
+                Scene_Load.prototype._translateOriginalHelpWindowText ||
+                Scene_Load.prototype.helpWindowText;
+
             if (!Scene_Load.prototype._translateOriginalHelpWindowText) {
-                Scene_Load.prototype._translateOriginalHelpWindowText =
-                    Scene_Load.prototype.helpWindowText;
+                Scene_Load.prototype._translateOriginalHelpWindowText = originalHelpWindowText;
             }
 
             Scene_Load.prototype.helpWindowText = function () {
                 applyLifecycleTranslations('sceneLoadHelpWindowText');
-                return Scene_Load.prototype._translateOriginalHelpWindowText.call(this);
+                return originalHelpWindowText.call(this);
             };
         }
 
         if (typeof Scene_Map !== 'undefined') {
+            const originalOnMapLoaded =
+                Scene_Map.prototype._translateOriginalOnMapLoaded || Scene_Map.prototype.onMapLoaded;
+
             if (!Scene_Map.prototype._translateOriginalOnMapLoaded) {
-                Scene_Map.prototype._translateOriginalOnMapLoaded = Scene_Map.prototype.onMapLoaded;
+                Scene_Map.prototype._translateOriginalOnMapLoaded = originalOnMapLoaded;
             }
 
             Scene_Map.prototype.onMapLoaded = function () {
                 applyLifecycleTranslations('sceneMapOnMapLoaded');
                 applyCurrentMapDisplayNameFromCache();
-                return Scene_Map.prototype._translateOriginalOnMapLoaded.call(this);
+                return originalOnMapLoaded.call(this);
             };
         }
 

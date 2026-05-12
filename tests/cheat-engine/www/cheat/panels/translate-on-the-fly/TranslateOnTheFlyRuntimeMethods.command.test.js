@@ -552,4 +552,33 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
             false
         );
     });
+
+    it('keeps Scene_Title lifecycle hook working when another plugin reassigns Scene_Title class', () => {
+        installRpgMakerGlobals();
+        const runtime = createRuntime({
+            translationEnabled: false,
+            translateCacheWhenDisabled: true,
+        });
+
+        translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
+
+        const Scene_Title_old = globalThis.Scene_Title;
+        let titleMapCreateCommandWindowCalls = 0;
+
+        globalThis.Scene_Title = class Scene_TitleMap {
+            createWindowLayer() {}
+
+            createCommandWindow() {
+                titleMapCreateCommandWindowCalls += 1;
+                return Scene_Title_old.prototype.createCommandWindow.call(this);
+            }
+        };
+
+        const scene = new globalThis.Scene_Title();
+        expect(() => scene.createCommandWindow()).not.toThrow();
+        expect(titleMapCreateCommandWindowCalls).toBe(1);
+        expect(runtime.batchManager.applyDataOnLifecycle).toHaveBeenCalledWith({
+            trigger: 'sceneTitleCreateCommandWindow',
+        });
+    });
 });
