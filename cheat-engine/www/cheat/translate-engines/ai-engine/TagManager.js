@@ -482,7 +482,7 @@ export class TagManager {
 
             if (entry.type === TAG_TYPE.WITH_CUSTOM_PARAMETER) {
                 const maskedValues = [];
-                result = result.replace(entry.prePattern, (_, paramValue) => {
+                const replacementFactory = (paramValue) => {
                     if (!entry.maskValue) {
                         return `[b=${entry.tagId}${entry.bracket}${paramValue}${entry.bracketClose}]`;
                     }
@@ -490,7 +490,19 @@ export class TagManager {
                     const nextMaskId = maskedValues.length;
                     maskedValues.push(paramValue);
                     return `[b=${entry.tagId}${entry.bracket}${nextMaskId}${entry.bracketClose}]`;
-                });
+                };
+
+                const replacementResult =
+                    entry.style === TAG_STYLE.XML
+                        ? {
+                              text: result.replace(entry.prePattern, (_, paramValue) =>
+                                  replacementFactory(paramValue)
+                              ),
+                              count: (result.match(entry.prePattern) || []).length,
+                          }
+                        : this.replaceRawCustomTags(result, entry, replacementFactory);
+                result = replacementResult.text;
+                tagCounts[entry.key] = replacementResult.count;
 
                 if (entry.maskValue) {
                     caseMap.maskedByTagKey[entry.key] = maskedValues;
@@ -826,6 +838,74 @@ export class TagManager {
 
             output += replacementFactory(balanced.value);
             cursor = balanced.closeIndex + 2;
+            count += 1;
+        }
+
+        return { text: output, count };
+    }
+
+    replaceRawCustomTags(text, entry, replacementFactory) {
+        if (typeof text !== 'string') {
+            return { text, count: 0 };
+        }
+
+        const source = text;
+        const sourceLower = source.toLowerCase();
+        const symbol = String(entry.tagSymbol || '');
+        const symbolLower = symbol.toLowerCase();
+        const symbolLength = symbol.length;
+        const open = entry.bracket;
+        const close = entry.bracketClose;
+        let cursor = 0;
+        let count = 0;
+        let output = '';
+
+        if (!symbolLength) {
+            return { text, count };
+        }
+
+        while (cursor < source.length) {
+            let tokenStart = -1;
+            let openIndex = -1;
+
+            for (let i = cursor; i < source.length; i++) {
+                const prefix = source[i];
+                if (prefix !== '\\' && prefix !== '\u001b') {
+                    continue;
+                }
+
+                const symbolStart = i + 1;
+                const symbolEnd = symbolStart + symbolLength;
+                if (sourceLower.slice(symbolStart, symbolEnd) !== symbolLower) {
+                    continue;
+                }
+
+                if (source[symbolEnd] !== open) {
+                    continue;
+                }
+
+                tokenStart = i;
+                openIndex = symbolEnd;
+                break;
+            }
+
+            if (tokenStart === -1) {
+                output += source.slice(cursor);
+                break;
+            }
+
+            output += source.slice(cursor, tokenStart);
+            const balanced = this.readBalancedValue(source, openIndex, open, close);
+
+            if (!balanced) {
+                // Keep malformed token as-is and continue from the next character.
+                output += source[tokenStart];
+                cursor = tokenStart + 1;
+                continue;
+            }
+
+            output += replacementFactory(balanced.value);
+            cursor = balanced.closeIndex + 1;
             count += 1;
         }
 
