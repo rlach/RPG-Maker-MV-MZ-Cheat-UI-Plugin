@@ -851,7 +851,10 @@ export class MessageCheat {
                 return;
             }
 
-            let previewLine = '1234567890'.repeat(10);
+            let previewLine = Array.from(
+                { length: 10 },
+                (_, i) => String.raw`\c[${i}]1234567890`
+            ).join('');
             previewLine = `${previewLine}\n\\{${previewLine}\n\\{${previewLine}`;
 
             if (typeof runtime.replaceMessageText === 'function') {
