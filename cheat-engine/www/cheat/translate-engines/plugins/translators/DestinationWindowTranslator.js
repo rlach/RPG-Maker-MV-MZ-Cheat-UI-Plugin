@@ -133,13 +133,9 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
         };
     }
 
-    translateRuntimeDestination(text, runtime) {
-        if (!this.isUsableText(text)) {
-            return text;
-        }
-
-        if (!runtime || !this.isRuntimeTranslationActive(runtime)) {
-            return text;
+    resolveCachedDestinationText(text, runtime) {
+        if (!this.isUsableText(text) || !runtime) {
+            return null;
         }
 
         const sourceCandidates = [text];
@@ -161,7 +157,52 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
             }
         }
 
-        return text;
+        return null;
+    }
+
+    buildTranslatedMZCommandParams(params, runtime) {
+        if (!runtime || !Array.isArray(params)) {
+            return null;
+        }
+
+        const pluginName = String(params[0] || '').trim();
+        const commandName = String(params[1] || '').trim();
+        if (
+            !this.isDestinationWindowPlugin(pluginName) ||
+            !this.isSetDestinationMZCommand(commandName)
+        ) {
+            return null;
+        }
+
+        const args = params[3] && typeof params[3] === 'object' ? params[3] : null;
+        const parsed = this.parseMZSetDestinationArgs(args);
+        if (!parsed) {
+            return null;
+        }
+
+        const cached = this.resolveCachedDestinationText(parsed.text, runtime);
+        if (!this.isUsableText(cached)) {
+            return null;
+        }
+
+        const nextParams = params.slice();
+        nextParams[3] = {
+            ...args,
+            destination: cached,
+        };
+        return nextParams;
+    }
+
+    translateRuntimeDestination(text, runtime) {
+        if (!this.isUsableText(text)) {
+            return text;
+        }
+
+        if (!runtime || !this.isRuntimeTranslationActive(runtime)) {
+            return text;
+        }
+
+        return this.resolveCachedDestinationText(text, runtime) || text;
     }
 
     translateRuntimeDestinationValue(destinationValue, runtime) {
