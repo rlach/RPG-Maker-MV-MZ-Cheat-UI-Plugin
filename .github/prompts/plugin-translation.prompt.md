@@ -88,12 +88,12 @@ Implementation workflow:
 - If both flags are false/disabled, plugin-specific runtime patches must early-return without applying any hook logic (preserve original behavior).
 - To check at hook time, call `this.isRuntimeTranslationActive(runtime)` (preferred canonical helper from `BasePluginTranslator`).
 
-5. Seen tracking rules:
+5. Seen/cache-usage tracking rules:
 
-- If runtime provides getCacheKey, call markCacheKeySeen(cacheKey) at the observation point.
-- Do not add type-based seen restrictions.
-- Do not introduce wrapper helpers for seen unless truly necessary.
-- Respect existing runtime guard behavior (shouldTrackRealtimeCacheUsage is handled by markCacheKeySeen).
+- If runtime provides getCacheKey, call trackCacheKeyUsage(cacheKey) at the observation point.
+- Do not add type-based tracking restrictions.
+- Do not introduce wrapper helpers for tracking unless truly necessary.
+- Respect existing runtime guard behavior (shouldTrackRealtimeCacheUsage is handled by trackCacheKeyUsage).
 
 6. Registry wiring:
 
