@@ -228,14 +228,11 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
         return entries;
     }
 
-    resolveRuntimeText(text, runtime, { markSeen = false } = {}) {
-        return this.resolveRuntimeTextWithOptions(text, runtime, {
-            markSeen,
-            onlyKnown: false,
-        });
+    resolveRuntimeText(text, runtime) {
+        return this.resolveRuntimeTextWithOptions(text, runtime);
     }
 
-    resolveRuntimeTextWithOptions(text, runtime, { markSeen = false, onlyKnown = false } = {}) {
+    resolveRuntimeTextWithOptions(text, runtime, { onlyKnown = false } = {}) {
         if (!this.isUsableText(text)) {
             return text;
         }
@@ -247,10 +244,6 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
         const cacheKey = runtime.getCacheKey(text, this.getCacheType());
         runtime.trackCacheKeyUsage(cacheKey);
 
-        if (markSeen) {
-            runtime.markCacheKeySeen?.(cacheKey);
-        }
-
         if (!this.isRuntimeTranslationActive(runtime) || !runtime.hasUsableCacheValue(cacheKey)) {
             return text;
         }
@@ -259,18 +252,18 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
         return this.isUsableText(cached) ? cached : text;
     }
 
-    applyTranslatedParamFields(data, runtime, options = {}) {
+    applyTranslatedParamFields(data, runtime) {
         if (!data || typeof data !== 'object') {
             return data;
         }
 
         const translated = { ...data };
         if (typeof translated.ParamName === 'string') {
-            translated.ParamName = this.resolveRuntimeText(translated.ParamName, runtime, options);
+            translated.ParamName = this.resolveRuntimeText(translated.ParamName, runtime);
         }
 
         if (typeof translated.Text === 'string') {
-            translated.Text = this.resolveRuntimeText(translated.Text, runtime, options);
+            translated.Text = this.resolveRuntimeText(translated.Text, runtime);
         }
 
         return translated;
@@ -292,9 +285,7 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
                 try {
                     const runtime = getRuntime();
                     if (runtime) {
-                        arguments[0] = applyTranslatedParamFields(data, runtime, {
-                            markSeen: true,
-                        });
+                        arguments[0] = applyTranslatedParamFields(data, runtime);
                     }
                 } catch (error) {
                     console.warn(
@@ -318,9 +309,7 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
                 try {
                     const runtime = getRuntime();
                     if (runtime) {
-                        arguments[0] = applyTranslatedParamFields(data, runtime, {
-                            markSeen: true,
-                        });
+                        arguments[0] = applyTranslatedParamFields(data, runtime);
                     }
                 } catch (error) {
                     console.warn(
@@ -345,7 +334,6 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
                     const runtime = getRuntime();
                     if (runtime && typeof str === 'string') {
                         arguments[0] = resolveRuntimeTextWithOptions(str, runtime, {
-                            markSeen: true,
                             onlyKnown: true,
                         });
                     }
@@ -372,7 +360,6 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
                     const runtime = getRuntime();
                     if (runtime && typeof text === 'string') {
                         arguments[0] = resolveRuntimeTextWithOptions(text, runtime, {
-                            markSeen: true,
                             onlyKnown: true,
                         });
                     }
@@ -399,7 +386,6 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
                     const runtime = getRuntime();
                     if (runtime && typeof text === 'string') {
                         arguments[0] = resolveRuntimeTextWithOptions(text, runtime, {
-                            markSeen: true,
                             onlyKnown: true,
                         });
                     }

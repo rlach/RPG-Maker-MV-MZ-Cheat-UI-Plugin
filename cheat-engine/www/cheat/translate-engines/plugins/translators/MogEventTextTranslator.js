@@ -37,9 +37,7 @@ export class MogEventTextTranslator extends BasePluginTranslator {
         const cacheKey = runtime.getCacheKey(text, CACHE_TYPE);
 
         // Mark cache key as seen for real-time tracking
-        if (typeof runtime.markCacheKeySeen === 'function') {
-            runtime.markCacheKeySeen(cacheKey);
-        }
+        runtime.trackCacheKeyUsage(cacheKey);
 
         // Apply cached translation if runtime translation is active
         if (

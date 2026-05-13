@@ -76,6 +76,10 @@ declare const Window_EquipItem: any;
 declare const Window_ShopCommand: any;
 declare const Window_ShopBuy: any;
 declare const Window_ShopSell: any;
+declare const Window_ShopNumber: any;
+declare const Window_ShopStatus: any;
+declare const Window_InfoMenu: any;
+declare const Window_StatusBase: any;
 
 declare const Game_Picture: any;
 declare const Spriteset_Map: any;
@@ -142,6 +146,8 @@ declare interface Window {
     Window_MenuCommand?: any;
     Window_ActorCommand?: any;
     Window_TitleCommand?: any;
+    Window_StatusBase?: any;
+    Window_InfoMenu?: any;
     Window_Help?: any;
     Window_CustomMenuCommand?: any;
     Window_ChoiceList?: any;

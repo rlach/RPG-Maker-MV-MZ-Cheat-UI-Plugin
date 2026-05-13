@@ -46,6 +46,9 @@ const QUEST_FIELD_CONFIGS = [
     { key: 'Subtext', array: true },
 ];
 
+const QUEST_TITLE_ICON_REGEX = /\\I\[\d+\]/gi;
+const QUEST_TITLE_COLOR_REGEX = /\\C\[\d+\]/gi;
+
 function normalizeNoteValue(value) {
     let result = value;
     for (let i = 0; i < 3; i++) {
@@ -84,6 +87,25 @@ function parseObjectStruct(rawValue) {
     }
 
     return parsed;
+}
+
+function buildQuestTitleVariants(value, translator) {
+    const normalized = normalizeNoteValue(value);
+    if (!translator.isUsableText(normalized)) {
+        return [];
+    }
+
+    const variants = [normalized];
+    const plain = normalized
+        .replaceAll(QUEST_TITLE_ICON_REGEX, '')
+        .replaceAll(QUEST_TITLE_COLOR_REGEX, '')
+        .trim();
+
+    if (translator.isUsableText(plain) && plain !== normalized) {
+        variants.push(plain);
+    }
+
+    return variants;
 }
 
 export class YepQuestJournalTranslator extends BasePluginTranslator {
@@ -258,6 +280,23 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
                 return;
             }
 
+            if (fieldConfig.key === 'Title' && fieldConfig.cacheType === COMMAND_CACHE_TYPE) {
+                const titleVariants = buildQuestTitleVariants(fieldValue, this);
+                for (const variant of titleVariants) {
+                    this.addEntry(
+                        output,
+                        variant,
+                        {
+                            scope: sourceScope,
+                            questKey,
+                            field: fieldConfig.key,
+                        },
+                        fieldConfig.cacheType
+                    );
+                }
+                return;
+            }
+
             this.addEntry(
                 output,
                 normalizeNoteValue(fieldValue),
@@ -421,14 +460,10 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
 
         const getRuntime = this.getRuntime.bind(this);
         const resolveCachedText = this.resolveCachedText.bind(this);
-        const getCacheType = this.getCacheType.bind(this);
         const original = klass.prototype.setText;
         klass.prototype.setText = function (text) {
             const runtime = getRuntime();
-            const translated = resolveCachedText(runtime, text, [
-                COMMAND_CACHE_TYPE,
-                getCacheType(),
-            ]);
+            const translated = resolveCachedText(runtime, text, [COMMAND_CACHE_TYPE]);
             return original.call(this, translated);
         };
 
@@ -561,7 +596,7 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
                 let title = questData.name;
                 title = title.replaceAll(/\\I\[\d+\]/gi, '').trim();
                 title = title.replaceAll(/\\C\[\d+\]/gi, '').trim();
-                title = resolveCachedText(runtime, title, [COMMAND_CACHE_TYPE, getCacheType()]);
+                title = resolveCachedText(runtime, title, [COMMAND_CACHE_TYPE]);
                 const difficulty = resolveCachedText(runtime, questData.difficulty, [
                     getCacheType(),
                 ]);
