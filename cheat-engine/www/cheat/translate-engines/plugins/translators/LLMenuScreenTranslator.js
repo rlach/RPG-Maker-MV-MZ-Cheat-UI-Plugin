@@ -251,6 +251,7 @@ export class LLMenuScreenTranslator extends BasePluginTranslator {
         }
 
         const menuHelpTexts = this._parseMenuHelpTexts(plugin.parameters);
+        const knownSourceTexts = new Set();
 
         // Build a map from original command display name (symbol) → original helpText.
         // This allows us to find the correct helpText when given a (possibly translated)
@@ -261,6 +262,14 @@ export class LLMenuScreenTranslator extends BasePluginTranslator {
             const helpText = typeof item.helpText === 'string' ? item.helpText.trim() : '';
             if (symbol && helpText) {
                 symbolToOriginalHelpText.set(symbol, helpText);
+                knownSourceTexts.add(helpText);
+            }
+        }
+
+        for (const field of LABEL_PARAM_FIELDS) {
+            const text = plugin.parameters[field]?.trim() ?? '';
+            if (text) {
+                knownSourceTexts.add(text);
             }
         }
 
@@ -424,7 +433,7 @@ export class LLMenuScreenTranslator extends BasePluginTranslator {
                         try {
                             if (typeof text === 'string' && text.trim()) {
                                 const runtime = getRuntime?.();
-                                if (runtime && isActive?.(runtime)) {
+                                if (runtime && isActive?.(runtime) && knownSourceTexts.has(text)) {
                                     resolved = resolveFromCache(text, runtime);
                                 }
                             }
