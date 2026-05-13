@@ -213,6 +213,12 @@ export default {
             </v-text-field>
         </div>
 
+        <div
+            v-if="showNoPortraitMessagesDetectedInfo"
+            class="caption orange--text text--darken-2 mb-1">
+            No messages with portraits detected in game.
+        </div>
+
         <div class="d-flex align-center" style="gap: 8px;">
             <v-text-field
                 v-model.number="maxLineWidthWithPortrait"
@@ -387,6 +393,26 @@ export default {
         cachedCount() {
             void this.stateVersion;
             return this._translationCache ? this._translationCache.size : 0;
+        },
+
+        hasMessagePortraitCacheEntries() {
+            void this.stateVersion;
+
+            if (!this._translationCache) {
+                return false;
+            }
+
+            for (const cacheKey of this._translationCache.keys()) {
+                if (cacheKey.startsWith('message_portrait:')) {
+                    return true;
+                }
+            }
+
+            return false;
+        },
+
+        showNoPortraitMessagesDetectedInfo() {
+            return this.dryRunExecutedAtLeastOnce && !this.hasMessagePortraitCacheEntries;
         },
 
         normalizedTextWrapFontScaleMultiplier() {
