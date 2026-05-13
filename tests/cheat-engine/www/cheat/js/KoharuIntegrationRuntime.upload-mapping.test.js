@@ -17,11 +17,14 @@ vi.mock('../../../../../cheat-engine/www/cheat/js/KoharuApiClient.js', () => ({
     subscribeEvents: vi.fn(),
 }));
 
-vi.mock('../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslationRuntime.js', () => ({
-    ensureTranslationRuntime: vi.fn(() => ({
-        getSplitCacheDirectoryPath: () => './www/cheat-settings/translate-cache',
-    })),
-}));
+vi.mock(
+    '../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslationRuntime.js',
+    () => ({
+        ensureTranslationRuntime: vi.fn(() => ({
+            getSplitCacheDirectoryPath: () => './www/cheat-settings/translate-cache',
+        })),
+    })
+);
 
 vi.mock('../../../../../cheat-engine/www/cheat/js/KeyValueStorage.js', () => {
     class KeyValueStorageMock {
@@ -56,18 +59,9 @@ function createFsMock() {
     const normalizePath = (targetPath) => String(targetPath || '').replaceAll('\\', '/');
 
     const dirEntries = new Map([
-        [
-            '/src',
-            [createDirent('pictures', 'dir')],
-        ],
-        [
-            '/src/pictures',
-            [createDirent('tutorial', 'dir')],
-        ],
-        [
-            '/src/pictures/tutorial',
-            [createDirent('01', 'dir'), createDirent('02', 'dir')],
-        ],
+        ['/src', [createDirent('pictures', 'dir')]],
+        ['/src/pictures', [createDirent('tutorial', 'dir')]],
+        ['/src/pictures/tutorial', [createDirent('01', 'dir'), createDirent('02', 'dir')]],
         [
             '/src/pictures/tutorial/01',
             [createDirent('01.png', 'file'), createDirent('02.png', 'file')],
@@ -147,10 +141,10 @@ describe('KoharuIntegrationRuntime upload mapping', () => {
             throw new Error(`Unexpected module request: ${name}`);
         };
 
-        const KoharuApi = await import('../../../../../cheat-engine/www/cheat/js/KoharuApiClient.js');
-        const { ensureKoharuIntegrationRuntime } = await import(
-            '../../../../../cheat-engine/www/cheat/js/KoharuIntegrationRuntime.js'
-        );
+        const KoharuApi =
+            await import('../../../../../cheat-engine/www/cheat/js/KoharuApiClient.js');
+        const { ensureKoharuIntegrationRuntime } =
+            await import('../../../../../cheat-engine/www/cheat/js/KoharuIntegrationRuntime.js');
 
         KoharuApi.uploadPages
             .mockResolvedValueOnce({
@@ -209,5 +203,65 @@ describe('KoharuIntegrationRuntime upload mapping', () => {
         expect(result.uploadedCount).toBe(4);
         expect(KoharuApi.uploadPages).toHaveBeenCalledTimes(2);
         expect(KoharuApi.getScene).toHaveBeenCalledTimes(2);
+    });
+
+    it('runs detect step with detector only and segment with segmentation stack', async () => {
+        globalThis.require = (name) => {
+            if (name === 'fs') {
+                return createFsMock();
+            }
+            if (name === 'path') {
+                return path;
+            }
+            throw new Error(`Unexpected module request: ${name}`);
+        };
+
+        const KoharuApi =
+            await import('../../../../../cheat-engine/www/cheat/js/KoharuApiClient.js');
+        const { ensureKoharuIntegrationRuntime, PIPELINE_STEPS } =
+            await import('../../../../../cheat-engine/www/cheat/js/KoharuIntegrationRuntime.js');
+
+        KoharuApi.runPipeline.mockResolvedValue({ operationId: 'op_1' });
+        KoharuApi.subscribeEvents.mockImplementation((baseUrl, handlers) => {
+            handlers.onEvent({
+                event: 'jobProgress',
+                jobId: 'op_1',
+                status: 'completed',
+                currentPage: 0,
+                totalPages: 0,
+                currentStepIndex: 1,
+                totalSteps: 1,
+                overallPercent: 100,
+                step: 'done',
+            });
+            return () => {};
+        });
+
+        const runtime = ensureKoharuIntegrationRuntime();
+        runtime.setSetting('selectedDetector', 'detector-x');
+        runtime.setSetting('selectedSegmenter', 'segmenter-x');
+        runtime.setSetting('selectedBubbleSegmenter', 'bubble-x');
+        runtime.setSetting('selectedFontDetector', 'font-x');
+
+        await runtime.runDetect();
+        await runtime.runSegment();
+
+        expect(PIPELINE_STEPS.map((entry) => entry.id)).toContain('segment');
+        expect(KoharuApi.runPipeline).toHaveBeenNthCalledWith(
+            1,
+            'http://localhost:4000/api/v1',
+            expect.objectContaining({
+                steps: ['detector-x'],
+                targetLanguage: 'en',
+            })
+        );
+        expect(KoharuApi.runPipeline).toHaveBeenNthCalledWith(
+            2,
+            'http://localhost:4000/api/v1',
+            expect.objectContaining({
+                steps: ['segmenter-x', 'bubble-x', 'font-x'],
+                targetLanguage: 'en',
+            })
+        );
     });
 });

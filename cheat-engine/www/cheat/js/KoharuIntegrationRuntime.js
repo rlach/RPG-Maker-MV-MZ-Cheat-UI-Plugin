@@ -64,6 +64,7 @@ function createDefaultStepProgress() {
 
 export const PIPELINE_STEPS = Object.freeze([
     { id: 'detect', label: 'Detect' },
+    { id: 'segment', label: 'Segment' },
     { id: 'ocr', label: 'OCR' },
     { id: 'gather-keys', label: 'Gather keys' },
     { id: 'translate', label: 'Translate' },
@@ -369,7 +370,10 @@ class KoharuIntegrationRuntime {
                 }
 
                 const relativePath = path.relative(sourceDirPath, fullPath).replaceAll('\\', '/');
-                const relativeDir = path.dirname(relativePath).replaceAll('\\', '/').replace(/^\.$/, '');
+                const relativeDir = path
+                    .dirname(relativePath)
+                    .replaceAll('\\', '/')
+                    .replace(/^\.$/, '');
 
                 files.push({
                     fullPath,
@@ -593,14 +597,19 @@ class KoharuIntegrationRuntime {
     }
 
     async runDetect() {
+        const steps = [this._settings.selectedDetector].filter(Boolean);
+
+        return this._runKoharuPipeline('detect', steps);
+    }
+
+    async runSegment() {
         const steps = [
-            this._settings.selectedDetector,
             this._settings.selectedSegmenter,
             this._settings.selectedBubbleSegmenter,
             this._settings.selectedFontDetector,
         ].filter(Boolean);
 
-        return this._runKoharuPipeline('detect', steps);
+        return this._runKoharuPipeline('segment', steps);
     }
 
     async runOcr() {
@@ -661,7 +670,9 @@ class KoharuIntegrationRuntime {
             statusText = rawStatus.status;
         }
 
-        return String(statusText || '').trim().toLowerCase();
+        return String(statusText || '')
+            .trim()
+            .toLowerCase();
     }
 
     _isTerminalSuccessStatus(status) {
@@ -754,7 +765,9 @@ class KoharuIntegrationRuntime {
                 }
 
                 if (eventName === 'jobStarted') {
-                    const startedKind = String(payload?.kind || '').trim().toLowerCase();
+                    const startedKind = String(payload?.kind || '')
+                        .trim()
+                        .toLowerCase();
                     if (startedKind !== 'pipeline') {
                         return;
                     }
@@ -1135,6 +1148,9 @@ class KoharuIntegrationRuntime {
             switch (stepId) {
                 case 'detect':
                     await this.runDetect();
+                    break;
+                case 'segment':
+                    await this.runSegment();
                     break;
                 case 'ocr':
                     await this.runOcr();

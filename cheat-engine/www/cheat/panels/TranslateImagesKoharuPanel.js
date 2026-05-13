@@ -6,6 +6,7 @@ import {
     PIPELINE_STEPS,
     CHEAT_ENGINE_TRANSLATOR_ID,
 } from '../js/KoharuIntegrationRuntime.js';
+import { Koharu } from '../translate-engines/translation-phases/Koharu.js';
 
 export default {
     name: 'TranslateImagesKoharuPanel',
@@ -429,7 +430,11 @@ export default {
                     return;
                 }
 
-                const projectName = `rpgmaker-${this.targetLanguage}-${Date.now()}`;
+                const translationRuntime = ensureTranslationRuntime();
+                const projectName = Koharu.getInstance().buildProjectId({
+                    runtime: translationRuntime,
+                    targetLanguage: this.targetLanguage,
+                });
                 await this._koharuRuntime.createProject(projectName);
                 await this._koharuRuntime.openCurrentProject();
                 await this._koharuRuntime.uploadAllImages(targetPath);
@@ -547,7 +552,10 @@ export default {
                     );
 
                     const queueResult = await runtime.runObjectTranslationJob(['koharu']);
-                    if (queueResult?.started === false && queueResult?.reason === 'process-active') {
+                    if (
+                        queueResult?.started === false &&
+                        queueResult?.reason === 'process-active'
+                    ) {
                         throw new Error('Another translation queue is already running');
                     }
 

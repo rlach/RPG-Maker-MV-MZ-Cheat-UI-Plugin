@@ -1,5 +1,7 @@
 import { parseCacheKeyForLangPair } from '../../js/TranslateCacheRuntime.js';
+import { isRpgMakerMv } from '../../js/RpgMakerRuntime.js';
 import { BasePhase } from './BasePhase.js';
+import { OtherStrings } from './OtherStrings.js';
 
 export class Koharu extends BasePhase {
     /** @type {Koharu | null} */
@@ -79,5 +81,36 @@ export class Koharu extends BasePhase {
                 priorityMapId: 0,
             },
         ];
+    }
+
+    normalizeProjectNamePart(value) {
+        return String(value || '')
+            .trim()
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-');
+    }
+
+    resolveProjectNameBase({ runtime }) {
+        const otherStrings = OtherStrings.getInstance();
+        const titleCacheKey = otherStrings.getTitleCacheKey(runtime);
+        const translatedTitle = this.normalizeProjectNamePart(
+            titleCacheKey ? runtime.translationCache.get(titleCacheKey) : ''
+        );
+        if (translatedTitle) {
+            return translatedTitle;
+        }
+
+        const originalTitle = this.normalizeProjectNamePart(otherStrings.getTitleOriginalValue());
+        if (originalTitle) {
+            return originalTitle;
+        }
+
+        return isRpgMakerMv() ? 'rpmMV' : 'rpmMZ';
+    }
+
+    buildProjectId({ runtime, targetLanguage, timestamp = Date.now() }) {
+        const base = this.resolveProjectNameBase({ runtime });
+        const lang = String(targetLanguage || '').trim() || 'en';
+        return `${base}-${lang}-${timestamp}`;
     }
 }
