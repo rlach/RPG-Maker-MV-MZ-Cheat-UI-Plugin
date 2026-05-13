@@ -179,47 +179,6 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
         }
     }
 
-    resolveRuntimeTranslation(text, runtime, cacheType) {
-        if (!this.isUsableText(text)) {
-            return text;
-        }
-
-        if (
-            !runtime
-        ) {
-            debugLog('resolveRuntimeTranslation skipped (runtime unavailable)', {
-                cacheType,
-                text: previewText(text),
-                hasRuntime: !!runtime,
-            });
-            return text;
-        }
-
-        const cacheKey = runtime.getCacheKey(text, cacheType);
-        debugLog('cache lookup', {
-            cacheType,
-            cacheKey,
-            text: previewText(text),
-        });
-
-        runtime.trackCacheKeyUsage(cacheKey);
-        debugLog('trackCacheKeyUsage', { cacheKey, cacheType });
-
-        if (!runtime.hasUsableCacheValue(cacheKey)) {
-            debugLog('cache miss', { cacheKey, cacheType, text: previewText(text) });
-            return text;
-        }
-
-        const cached = runtime.translationCache.get(cacheKey);
-        debugLog('cache hit', {
-            cacheKey,
-            cacheType,
-            original: previewText(text),
-            translated: previewText(cached),
-        });
-        return this.isUsableText(cached) ? cached : text;
-    }
-
     patchSpotListItems(windowInstance, runtime) {
         if (!windowInstance || !Array.isArray(windowInstance._data)) {
             return false;

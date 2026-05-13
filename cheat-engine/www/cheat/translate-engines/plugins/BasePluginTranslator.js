@@ -280,6 +280,56 @@ export class BasePluginTranslator extends BasePhase {
         return BasePluginTranslator.ensureGlobalRuntimeContract();
     }
 
+    /**
+     * Resolve translated text from runtime cache.
+     * @param {*} text - Source text
+     * @param {object|null} runtime - Translation runtime
+     * @param {string|string[]} cacheType - Cache type or ordered cache type list
+     * @param {object} options - Optional resolver options
+     * @param {boolean} [options.requireRuntimeTranslationActive=false] - Require runtime translation active state
+     * @param {*} [options.missValue] - Value returned on cache miss/runtime unavailable (defaults to source text)
+     * @returns {*} Resolved translated text or fallback
+     */
+    resolveRuntimeTranslation(
+        text,
+        runtime = this.getRuntime(),
+        cacheType = this.getCacheType(),
+        options = {}
+    ) {
+        const missValue = Object.prototype.hasOwnProperty.call(options, 'missValue')
+            ? options.missValue
+            : text;
+
+        if (!this.isUsableText(text) || !runtime) {
+            return missValue;
+        }
+
+        if (options.requireRuntimeTranslationActive && !this.isRuntimeTranslationActive(runtime)) {
+            return missValue;
+        }
+
+        const cacheTypes = Array.isArray(cacheType) ? cacheType : [cacheType];
+        for (const currentCacheType of cacheTypes) {
+            if (!this.isUsableText(currentCacheType)) {
+                continue;
+            }
+
+            const cacheKey = runtime.getCacheKey(text, currentCacheType);
+            runtime.trackCacheKeyUsage(cacheKey);
+
+            if (!runtime.hasUsableCacheValue(cacheKey)) {
+                continue;
+            }
+
+            const cached = runtime.translationCache.get(cacheKey);
+            if (this.isUsableText(cached)) {
+                return cached;
+            }
+        }
+
+        return missValue;
+    }
+
     isRuntimeTranslationActive(runtime = this.getRuntime()) {
         if (!runtime) {
             return false;

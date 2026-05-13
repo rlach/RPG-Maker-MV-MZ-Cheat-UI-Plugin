@@ -115,29 +115,6 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
         return result;
     }
 
-    resolveRuntimeTranslation(text, field) {
-        if (!this.isUsableText(text)) {
-            return text;
-        }
-
-        const runtime = this.getRuntime();
-        if (!runtime) {
-            return text;
-        }
-
-        const cacheType = this.getCacheTypeByField(field);
-        const cacheKey = runtime.getCacheKey(text, cacheType);
-
-        runtime.trackCacheKeyUsage(cacheKey);
-
-        if (!runtime.hasUsableCacheValue(cacheKey)) {
-            return text;
-        }
-
-        const cached = runtime.translationCache.get(cacheKey);
-        return this.isUsableText(cached) ? cached : text;
-    }
-
     translateIfSkillCpField(text, fields) {
         if (!this.isUsableText(text) || !Array.isArray(fields) || fields.length === 0) {
             return text;
@@ -146,7 +123,11 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
         const byField = this.getSourceTextByField();
         for (const field of fields) {
             if (byField.get(field) === text) {
-                return this.resolveRuntimeTranslation(text, field);
+                return this.resolveRuntimeTranslation(
+                    text,
+                    this.getRuntime(),
+                    this.getCacheTypeByField(field)
+                );
             }
         }
 

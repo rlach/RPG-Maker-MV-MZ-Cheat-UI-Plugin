@@ -205,30 +205,6 @@ export class CustomizeConfigItemTranslator extends BasePluginTranslator {
         return /^Boolean\d+$/.test(symbol) || /^String\d+$/.test(symbol);
     }
 
-    resolveRuntimeTranslation(text, runtime, cacheType) {
-        if (!this.isUsableText(text)) {
-            return text;
-        }
-
-        if (!runtime) {
-            return text;
-        }
-
-        const cacheKey = runtime.getCacheKey(text, cacheType);
-        runtime.trackCacheKeyUsage(cacheKey);
-
-        if (!this.isRuntimeTranslationActive(runtime)) {
-            return text;
-        }
-
-        if (!runtime.hasUsableCacheValue(cacheKey)) {
-            return text;
-        }
-
-        const cached = runtime.translationCache.get(cacheKey);
-        return this.isUsableText(cached) ? cached : text;
-    }
-
     enablePluginTranslation() {
         if (!window.Window_Options || !Window_Options.prototype) {
             return;
@@ -254,7 +230,9 @@ export class CustomizeConfigItemTranslator extends BasePluginTranslator {
                     }
 
                     const runtime = getRuntime();
-                    const resolvedTranslation = resolveRuntimeTranslation(name, runtime, 'command');
+                    const resolvedTranslation = resolveRuntimeTranslation(name, runtime, 'command', {
+                        requireRuntimeTranslationActive: true,
+                    });
                     if (resolvedTranslation !== name) {
                         customOption._translationApplied = true;
                     }
@@ -288,7 +266,9 @@ export class CustomizeConfigItemTranslator extends BasePluginTranslator {
                     }
 
                     const runtime = getRuntime();
-                    return resolveRuntimeTranslation(status, runtime, getCacheType());
+                    return resolveRuntimeTranslation(status, runtime, getCacheType(), {
+                        requireRuntimeTranslationActive: true,
+                    });
                 } catch (error) {
                     console.warn(
                         '[CustomizeConfigItemTranslator] Failed to translate option value text',

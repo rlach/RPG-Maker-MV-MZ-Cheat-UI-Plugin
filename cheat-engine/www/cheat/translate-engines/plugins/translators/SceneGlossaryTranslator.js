@@ -413,44 +413,10 @@ function appendEntriesFromParameters(parameters, scope, output) {
     }
 }
 
-function applyRuntimeTranslation(runtime, text, cacheTypes) {
-    if (!(typeof text === 'string' && text.trim() !== '')) {
-        return text;
-    }
-
-    const list = Array.isArray(cacheTypes) ? cacheTypes : [];
-    for (const cacheType of list) {
-        if (!(typeof cacheType === 'string' && cacheType.trim() !== '')) {
-            continue;
-        }
-
-        const cacheKey = runtime.getCacheKey(text, cacheType);
-        runtime.trackCacheKeyUsage(cacheKey);
-
-        if (!runtime.hasUsableCacheValue(cacheKey)) {
-            continue;
-        }
-
-        const cached = runtime.translationCache.get(cacheKey);
-        if (typeof cached === 'string' && cached.trim() !== '') {
-            return cached;
-        }
-    }
-
-    return text;
-}
-
 function resolveRuntimeTranslation(translator, text, cacheTypes) {
-    const runtime = translator.getRuntime();
-    if (
-        !runtime ||
-        !translator.isRuntimeTranslationActive(runtime) ||
-        !translator.isUsableText(text)
-    ) {
-        return text;
-    }
-
-    return applyRuntimeTranslation(runtime, text, cacheTypes);
+    return translator.resolveRuntimeTranslation(text, translator.getRuntime(), cacheTypes, {
+        requireRuntimeTranslationActive: true,
+    });
 }
 
 function patchGlossaryDescription(translator) {

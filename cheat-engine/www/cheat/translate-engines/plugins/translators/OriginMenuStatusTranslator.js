@@ -163,28 +163,6 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
         }
     }
 
-    resolveRuntimeTranslation(text, runtime) {
-        if (!this.isUsableText(text)) {
-            return text;
-        }
-
-        if (
-            !runtime
-        ) {
-            return text;
-        }
-
-        const cacheKey = runtime.getCacheKey(text, this.getCacheType());
-        runtime.trackCacheKeyUsage(cacheKey);
-
-        if (!runtime.hasUsableCacheValue(cacheKey)) {
-            return text;
-        }
-
-        const cached = runtime.translationCache.get(cacheKey);
-        return this.isUsableText(cached) ? cached : text;
-    }
-
     patchOriginBaseWindowInstance(windowInstance) {
         if (!windowInstance || typeof windowInstance !== 'object') {
             return;

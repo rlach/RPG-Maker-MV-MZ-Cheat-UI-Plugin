@@ -80,6 +80,9 @@ declare const Window_ShopSell: any;
 declare const Game_Picture: any;
 declare const Spriteset_Map: any;
 declare const PluginManager: any;
+declare const ConfigManager: any;
+declare const TouchInput: any;
+declare const Graphics: any;
 declare const Utils: any;
 declare const Imported: any;
 declare function require(name: string): any;
@@ -143,6 +146,7 @@ declare interface Window {
     Window_CustomMenuCommand?: any;
     Window_ChoiceList?: any;
     PluginManager?: any;
+    ConfigManager?: any;
     Torigoya?: any;
     TRP_CORE?: {
         skitParameters?: {

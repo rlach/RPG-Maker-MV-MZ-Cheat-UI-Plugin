@@ -95,28 +95,20 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
         const dataType = this.getDataTypeByObject(dataObject);
         if (dataType) {
             const dataCacheType = `${dataType}_${field}`;
-            const dataCacheKey = runtime.getCacheKey(originalText, dataCacheType);
-
-            runtime.trackCacheKeyUsage(dataCacheKey);
-
-            if (runtime.hasUsableCacheValue(dataCacheKey)) {
-                const directCached = runtime.translationCache.get(dataCacheKey);
-                if (this.isUsableText(directCached)) {
-                    return directCached;
-                }
+            const directCached = super.resolveRuntimeTranslation(
+                originalText,
+                runtime,
+                dataCacheType,
+                { missValue: null }
+            );
+            if (this.isUsableText(directCached)) {
+                return directCached;
             }
         }
 
-        const pluginCacheKey = runtime.getCacheKey(originalText, this.getCacheType());
-
-        runtime.trackCacheKeyUsage(pluginCacheKey);
-
-        if (!runtime.hasUsableCacheValue(pluginCacheKey)) {
-            return null;
-        }
-
-        const pluginCached = runtime.translationCache.get(pluginCacheKey);
-        return this.isUsableText(pluginCached) ? pluginCached : null;
+        return super.resolveRuntimeTranslation(originalText, runtime, this.getCacheType(), {
+            missValue: null,
+        });
     }
 
     enablePluginTranslation() {
