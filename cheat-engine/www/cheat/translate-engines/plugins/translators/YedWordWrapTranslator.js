@@ -78,7 +78,6 @@ export class YedWordWrapTranslator extends BasePluginTranslator {
             return;
         }
 
-        const cacheType = this.getCacheType();
         const originalWrapText = runtimeProto.wrapText;
 
         runtimeProto.wrapText = function (text, maxWidth, options = {}) {
@@ -93,9 +92,10 @@ export class YedWordWrapTranslator extends BasePluginTranslator {
                     return originalWrapText.call(this, text, maxWidth, options);
                 }
 
-                if (activeRuntime) {
-                    const cacheKey = activeRuntime.getCacheKey(sourceText, cacheType);
-                    activeRuntime.trackCacheKeyUsage(cacheKey);
+                if (activeRuntime && typeof activeRuntime.getPreferredMessageCacheEntry === 'function') {
+                    activeRuntime.getPreferredMessageCacheEntry(sourceText, {
+                        hasPortrait: !!activeRuntime.hasCurrentMessagePortrait?.(),
+                    });
                 }
 
                 const tokens = tokenizeByBrTag(sourceText);
