@@ -5,6 +5,7 @@ import { ChronusTranslator } from './translators/ChronusTranslator.js';
 import { CbrEroStatusTranslator } from './translators/CbrEroStatusTranslator.js';
 import { ExternMessageTranslator } from './translators/ExternMessageTranslator.js';
 import { CbrEroStatusMvTranslator } from './translators/CbrEroStatusMvTranslator.js';
+import { CustomizeConfigItemTranslator } from './translators/CustomizeConfigItemTranslator.js';
 import { DarkPlasmaCharacterTextTranslator } from './translators/DarkPlasmaCharacterTextTranslator.js';
 import { DTextPictureTranslator } from './translators/DTextPictureTranslator.js';
 import { DynamicDatabaseTranslator } from './translators/DynamicDatabaseTranslator.js';
@@ -63,6 +64,7 @@ class PluginTranslatorRegistry {
             CbrEroStatusTranslator,
             ExternMessageTranslator,
             CbrEroStatusMvTranslator,
+            CustomizeConfigItemTranslator,
             DarkPlasmaCharacterTextTranslator,
             DTextPictureTranslator,
             DynamicDatabaseTranslator,

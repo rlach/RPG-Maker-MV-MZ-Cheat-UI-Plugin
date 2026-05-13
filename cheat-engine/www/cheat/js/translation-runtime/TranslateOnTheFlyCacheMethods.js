@@ -37,6 +37,9 @@ export const translateOnTheFlyCacheMethods = {
         const count = this.translationCache.size;
         const seenCount = this.lastSeenByCacheKey ? this.lastSeenByCacheKey.size : 0;
         this.translationCache.clear();
+        if (this.reverseCommandLookup instanceof Map) {
+            this.reverseCommandLookup.clear();
+        }
         if (this.lastSeenByCacheKey) {
             this.lastSeenByCacheKey.clear();
         }
@@ -129,6 +132,13 @@ export const translateOnTheFlyCacheMethods = {
         }
 
         this.translationCache.delete(cacheKey);
+        if (
+            typeof cacheKey === 'string' &&
+            cacheKey.startsWith('command:') &&
+            typeof this.removeReverseCommandLookupByCacheKey === 'function'
+        ) {
+            this.removeReverseCommandLookupByCacheKey(cacheKey);
+        }
         if (options.deleteSeen !== false && this.lastSeenByCacheKey) {
             this.lastSeenByCacheKey.delete(cacheKey);
         }

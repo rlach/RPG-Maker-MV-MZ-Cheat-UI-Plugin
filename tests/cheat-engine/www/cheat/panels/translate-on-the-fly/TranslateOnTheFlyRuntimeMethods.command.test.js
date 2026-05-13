@@ -38,43 +38,49 @@ vi.mock('../../../../../../cheat-engine/www/cheat/js/HookGuardHelper.js', () => 
 import { translateOnTheFlyRuntimeMethods } from '../../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslateOnTheFlyRuntimeMethods.js';
 
 function getCanonicalSystemCommandName(commandName) {
-    let normalizedName = '';
-    if (typeof commandName === 'string') {
-        normalizedName = commandName.trim();
-    } else if (commandName !== null && commandName !== undefined) {
-        normalizedName = String(commandName).trim();
-    }
+    const normalizedName =
+        typeof commandName === 'string'
+            ? commandName.trim()
+            : commandName == null
+              ? ''
+              : String(commandName).trim();
 
     if (!normalizedName) {
         return normalizedName;
     }
 
-    const terms = globalThis.$dataSystem?.terms;
-    const originalCommands = Array.isArray(terms?.commandsOriginal) ? terms.commandsOriginal : null;
-    if (!originalCommands) {
+    if (!(this.reverseCommandLookup instanceof Map)) {
+        this.reverseCommandLookup = new Map();
+    }
+
+    if (this.reverseCommandLookup.size === 0 && this.translationCache instanceof Map) {
+        for (const [cacheKey, translatedValue] of this.translationCache.entries()) {
+            if (typeof cacheKey !== 'string' || !cacheKey.startsWith('command:')) {
+                continue;
+            }
+
+            const lookupText = typeof translatedValue === 'string' ? translatedValue.trim() : '';
+            if (!lookupText) {
+                continue;
+            }
+
+            this.reverseCommandLookup.set(lookupText, cacheKey);
+        }
+    }
+
+    const mappedCacheKey = this.reverseCommandLookup.get(normalizedName);
+    if (typeof mappedCacheKey !== 'string' || !mappedCacheKey.startsWith('command:')) {
         return normalizedName;
     }
 
-    const currentCommands = Array.isArray(terms?.commands) ? terms.commands : [];
-    for (let i = 0; i < originalCommands.length; i++) {
-        const originalValue =
-            typeof originalCommands[i] === 'string' ? originalCommands[i].trim() : '';
-        if (!originalValue) {
-            continue;
-        }
-
-        if (normalizedName === originalValue) {
-            return originalValue;
-        }
-
-        const currentValue =
-            typeof currentCommands[i] === 'string' ? currentCommands[i].trim() : '';
-        if (currentValue && normalizedName === currentValue) {
-            return originalValue;
-        }
+    const marker = `${this.sourceLang}-${this.targetLang}-`;
+    const markerIndex = mappedCacheKey.indexOf(marker);
+    if (markerIndex < 0) {
+        return normalizedName;
     }
 
-    return normalizedName;
+    const canonicalName = mappedCacheKey.slice(markerIndex + marker.length).trim();
+    return canonicalName || normalizedName;
 }
 
 function createCommandWindowClass(BaseSelectable) {
@@ -249,8 +255,21 @@ function createRuntime({
     cacheEntries = [],
     batchResult = { successes: [], failures: [] },
 } = {}) {
+    const removeReverseCommandLookupByCacheKey = function (cacheKey) {
+        if (!(this.reverseCommandLookup instanceof Map) || !cacheKey) {
+            return;
+        }
+
+        for (const [lookupText, mappedCacheKey] of this.reverseCommandLookup.entries()) {
+            if (mappedCacheKey === cacheKey) {
+                this.reverseCommandLookup.delete(lookupText);
+            }
+        }
+    };
+
     return {
         translationCache: new Map(cacheEntries),
+        reverseCommandLookup: new Map(),
         lastSeenByCacheKey: new Map(),
         pendingTranslations: new Map(),
         failedTranslations: new Map(),
@@ -274,13 +293,50 @@ function createRuntime({
             return `${type}:${this.sourceLang}-${this.targetLang}-${normalizedText}`;
         },
         getCanonicalSystemCommandName(commandName) {
-            return getCanonicalSystemCommandName(commandName);
+            return getCanonicalSystemCommandName.call(this, commandName);
         },
         hasUsableCacheValue(cacheKey) {
             return this.translationCache.has(cacheKey) && this.translationCache.get(cacheKey) !== '';
         },
         setCacheValue(cacheKey, value) {
-            this.translationCache.set(cacheKey, typeof value === 'string' ? value : String(value || ''));
+            const normalizedValue =
+                typeof value === 'string' ? value : value == null ? '' : String(value);
+
+            let resolvedKey = cacheKey;
+            if (typeof cacheKey === 'string' && cacheKey.startsWith('command:')) {
+                const marker = `${this.sourceLang}-${this.targetLang}-`;
+                const markerIndex = cacheKey.indexOf(marker);
+                if (markerIndex >= 0) {
+                    const sourceName = cacheKey.slice(markerIndex + marker.length).trim();
+                    const canonicalName = this.getCanonicalSystemCommandName(sourceName);
+                    if (canonicalName && canonicalName !== sourceName) {
+                        resolvedKey = this.getCacheKey(canonicalName, 'command');
+                    }
+                }
+            }
+
+            if (resolvedKey !== cacheKey && this.translationCache.has(cacheKey)) {
+                this.translationCache.delete(cacheKey);
+                removeReverseCommandLookupByCacheKey.call(this, cacheKey);
+            }
+
+            const existingValue = this.translationCache.get(resolvedKey);
+            const hasExistingTranslatedValue =
+                existingValue !== '' && existingValue !== null && existingValue !== undefined;
+            const incomingIsPlaceholder = normalizedValue === '';
+
+            if (!(incomingIsPlaceholder && hasExistingTranslatedValue)) {
+                this.translationCache.set(resolvedKey, normalizedValue);
+            }
+
+            if (typeof resolvedKey === 'string' && resolvedKey.startsWith('command:')) {
+                removeReverseCommandLookupByCacheKey.call(this, resolvedKey);
+                const currentValue = this.translationCache.get(resolvedKey);
+                const lookupText = typeof currentValue === 'string' ? currentValue.trim() : '';
+                if (lookupText) {
+                    this.reverseCommandLookup.set(lookupText, resolvedKey);
+                }
+            }
         },
         trackCacheKeyUsage(cacheKey, options = {}) {
             const shouldHarvestMissing =
@@ -390,6 +446,27 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         expect(runtime.lastSeenByCacheKey.has(commandKey(runtime, 'Galeria'))).toBe(true);
         expect(runtime.lastSeenByCacheKey.has(commandKey(runtime, 'Gallery'))).toBe(false);
         expect(runtime.translationCache.has(commandKey(runtime, 'Gallery'))).toBe(false);
+    });
+
+    it('does not create duplicate translated-name command key during harvest', () => {
+        installRpgMakerGlobals();
+        const runtime = createRuntime({
+            translationEnabled: false,
+            translateCacheWhenDisabled: true,
+            cacheEntries: [['command:ja-en-CGｼｰﾝﾃｷｽﾄ背景', 'CG Scene Text Background']],
+        });
+
+        // Keep test cache key construction consistent with runtime language pair.
+        runtime.sourceLang = 'ja';
+        runtime.targetLang = 'en';
+
+        const canonicalKey = commandKey(runtime, 'CGｼｰﾝﾃｷｽﾄ背景');
+        const translatedNameKey = commandKey(runtime, 'CG Scene Text Background');
+
+        runtime.trackCacheKeyUsage(translatedNameKey);
+
+        expect(runtime.translationCache.get(canonicalKey)).toBe('CG Scene Text Background');
+        expect(runtime.translationCache.has(translatedNameKey)).toBe(false);
     });
 
     it('harvests missing menu commands into cache and seen when no cached translation exists', () => {

@@ -25,7 +25,7 @@ export function isTranslationActive(runtime) {
  * @param {object} runtime - The translation runtime (TranslationRuntime instance)
  */
 export function applyTranslationsToCommands(commandList, runtime) {
-    if (!commandList || !commandList.length || !isTranslationActive(runtime)) {
+    if (!commandList?.length || !isTranslationActive(runtime)) {
         return;
     }
 
@@ -42,11 +42,9 @@ export function applyTranslationsToCommands(commandList, runtime) {
         const canonicalName = runtime.getCanonicalSystemCommandName(name);
         const cacheKey = runtime.getCacheKey(canonicalName, 'command');
 
+        runtime.trackCacheKeyUsage(cacheKey);
         if (runtime.hasUsableCacheValue(cacheKey)) {
-            runtime.trackCacheKeyUsage(cacheKey, { harvestMissing: false });
             entry.name = runtime.translationCache.get(cacheKey);
-        } else {
-            runtime.trackCacheKeyUsage(cacheKey);
         }
     }
 }

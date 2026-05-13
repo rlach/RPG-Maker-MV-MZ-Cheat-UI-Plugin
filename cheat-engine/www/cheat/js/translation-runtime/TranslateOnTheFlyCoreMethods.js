@@ -205,65 +205,160 @@ export const translateOnTheFlyCoreMethods = {
         return null;
     },
 
-    getCanonicalSystemCommandName(commandName) {
-        let normalizedName = '';
+    normalizeCommandLookupText(commandName) {
         if (typeof commandName === 'string') {
-            normalizedName = commandName.trim();
-        } else if (commandName !== null && commandName !== undefined) {
-            normalizedName = String(commandName).trim();
+            return commandName.trim();
         }
+
+        if (commandName === null || commandName === undefined) {
+            return '';
+        }
+
+        return String(commandName).trim();
+    },
+
+    buildReverseCommandLookupFromCache() {
+        if (!(this.reverseCommandLookup instanceof Map)) {
+            this.reverseCommandLookup = new Map();
+        }
+
+        if (!(this.translationCache instanceof Map)) {
+            return;
+        }
+
+        for (const [cacheKey, translatedValue] of this.translationCache.entries()) {
+            if (typeof cacheKey !== 'string' || !cacheKey.startsWith('command:')) {
+                continue;
+            }
+
+            const normalizedTranslatedValue =
+                typeof translatedValue === 'string' ? translatedValue.trim() : '';
+            if (!normalizedTranslatedValue) {
+                continue;
+            }
+
+            this.reverseCommandLookup.set(normalizedTranslatedValue, cacheKey);
+        }
+    },
+
+    resolveCanonicalCommandNameFromCacheKey(commandCacheKey, fallbackName) {
+        if (typeof commandCacheKey !== 'string' || !commandCacheKey) {
+            return fallbackName;
+        }
+
+        const parsed = this.parseCompositeCacheKey(commandCacheKey);
+        if (!parsed || parsed.type !== 'command' || typeof parsed.textKey !== 'string') {
+            return fallbackName;
+        }
+
+        const canonicalName = parsed.textKey.trim();
+        return canonicalName || fallbackName;
+    },
+
+    getCanonicalSystemCommandName(commandName) {
+        const normalizedName = this.normalizeCommandLookupText(commandName);
 
         if (!normalizedName) {
             return normalizedName;
         }
 
-        const terms = window.$dataSystem?.terms;
-        const originalCommands = Array.isArray(terms?.commandsOriginal)
-            ? terms.commandsOriginal
-            : null;
-        if (!originalCommands) {
-            return normalizedName;
+        if (!(this.reverseCommandLookup instanceof Map)) {
+            this.reverseCommandLookup = new Map();
         }
 
-        const currentCommands = Array.isArray(terms?.commands) ? terms.commands : [];
-
-        for (let i = 0; i < originalCommands.length; i++) {
-            const originalValue =
-                typeof originalCommands[i] === 'string' ? originalCommands[i].trim() : '';
-            if (!originalValue) {
-                continue;
-            }
-
-            if (normalizedName === originalValue) {
-                return originalValue;
-            }
-
-            const currentValue =
-                typeof currentCommands[i] === 'string' ? currentCommands[i].trim() : '';
-            if (currentValue && normalizedName === currentValue) {
-                return originalValue;
-            }
+        if (this.reverseCommandLookup.size === 0 && this.translationCache instanceof Map) {
+            this.buildReverseCommandLookupFromCache();
         }
 
-        return normalizedName;
+        const commandCacheKey = this.reverseCommandLookup.get(normalizedName);
+        return this.resolveCanonicalCommandNameFromCacheKey(commandCacheKey, normalizedName);
+    },
+
+    removeReverseCommandLookupByCacheKey(cacheKey) {
+        if (!(this.reverseCommandLookup instanceof Map) || !cacheKey) {
+            return;
+        }
+
+        for (const [lookupText, mappedCacheKey] of this.reverseCommandLookup.entries()) {
+            if (mappedCacheKey === cacheKey) {
+                this.reverseCommandLookup.delete(lookupText);
+            }
+        }
+    },
+
+    updateReverseCommandLookup(cacheKey, normalizedValue) {
+        if (typeof cacheKey !== 'string' || !cacheKey.startsWith('command:')) {
+            return;
+        }
+
+        if (!(this.reverseCommandLookup instanceof Map)) {
+            this.reverseCommandLookup = new Map();
+        }
+
+        this.removeReverseCommandLookupByCacheKey(cacheKey);
+
+        const normalizedLookupKey =
+            typeof normalizedValue === 'string' ? normalizedValue.trim() : '';
+        if (!normalizedLookupKey) {
+            return;
+        }
+
+        this.reverseCommandLookup.set(normalizedLookupKey, cacheKey);
+    },
+
+    resolveCommandCacheWriteKey(cacheKey) {
+        if (typeof cacheKey !== 'string' || !cacheKey.startsWith('command:')) {
+            return cacheKey;
+        }
+
+        const parsed = this.parseCompositeCacheKey(cacheKey);
+        const sourceCommandName = parsed?.type === 'command' ? this.normalizeCommandLookupText(parsed.textKey) : '';
+        if (!sourceCommandName) {
+            return cacheKey;
+        }
+
+        const canonicalName = this.getCanonicalSystemCommandName(sourceCommandName);
+        if (!canonicalName || canonicalName === sourceCommandName) {
+            return cacheKey;
+        }
+
+        return this.getCacheKey(canonicalName, 'command');
     },
 
     setCacheValue(key, value, options = {}) {
-        const normalizedValue =
-            typeof value === 'string'
-                ? value
-                : value === null || value === undefined
-                  ? ''
-                  : String(value);
-        this.translationCache.set(key, normalizedValue);
-        this.rememberCacheBucketForKey(key);
+        const normalizedValue = this.normalizeCacheValue(value);
+        const resolvedKey = this.resolveCommandCacheWriteKey(key);
+        const changedKeys = new Set();
+
+        // Guard against duplicate command keys (e.g. translated-name harvest keys).
+        if (resolvedKey !== key && this.translationCache.has(key)) {
+            this.translationCache.delete(key);
+            this.removeReverseCommandLookupByCacheKey(key);
+            changedKeys.add(key);
+        }
+
+        const currentValue = this.translationCache.get(resolvedKey);
+        const hasExistingTranslatedValue = this.isTranslatedCacheValue(currentValue);
+        const incomingIsPlaceholder = normalizedValue === '';
+
+        // Never downgrade an existing translated command value with a harvested placeholder.
+        if (!(incomingIsPlaceholder && hasExistingTranslatedValue)) {
+            this.translationCache.set(resolvedKey, normalizedValue);
+            changedKeys.add(resolvedKey);
+        }
+
+        this.updateReverseCommandLookup(resolvedKey, this.translationCache.get(resolvedKey));
+        this.rememberCacheBucketForKey(resolvedKey);
 
         const persist = options.persist === undefined ? true : !!options.persist;
         if (persist) {
-            this.persistCache([key]);
+            const changedKeyList = Array.from(changedKeys);
+            if (changedKeyList.length > 0) {
+                this.persistCache(changedKeyList);
+            }
         }
 
-        this.notifyCacheRuntime('cache-set', key);
+        this.notifyCacheRuntime('cache-set', resolvedKey);
     },
 
     getCacheFileSystem() {
@@ -648,6 +743,7 @@ export const translateOnTheFlyCoreMethods = {
             }
 
             this.translationCache.clear();
+            this.reverseCommandLookup = new Map();
             this.cacheBucketByCompositeKey = new Map();
             this.loadSplitCacheFromDisk();
             runCacheMigrationsIfNeeded(this);
@@ -659,6 +755,7 @@ export const translateOnTheFlyCoreMethods = {
             const runtime = ensureTranslateCacheRuntime(new Map());
             this.translationCache = runtime.cache;
             this.lastSeenByCacheKey = runtime.lastSeenByCacheKey;
+            this.reverseCommandLookup = new Map();
             this.cacheBucketByCompositeKey = new Map();
             this.safeVariableTranslationIds = [];
             this.safeVariableTranslationIdSet = new Set();
