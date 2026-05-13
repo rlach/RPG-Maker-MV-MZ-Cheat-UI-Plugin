@@ -133,126 +133,98 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
         };
     }
 
-    buildTranslatedArgs(command, args, runtime) {
-        if (!runtime) {
-            return null;
+    translateRuntimeDestination(text, runtime) {
+        if (!this.isUsableText(text)) {
+            return text;
         }
 
-        const parsed = this.parseCommandLine(
-            [String(command || ''), ...((Array.isArray(args) && args) || [])].join(' ')
-        );
-        if (!parsed?.text) {
-            return null;
+        if (!runtime || !this.isRuntimeTranslationActive(runtime)) {
+            return text;
         }
 
-        const cacheKey = runtime.getCacheKey(parsed.text, this.getCacheType());
-
-        runtime.trackCacheKeyUsage(cacheKey);
-
-        if (!runtime.hasUsableCacheValue(cacheKey)) {
-            return null;
+        const sourceCandidates = [text];
+        if (text.startsWith(' ')) {
+            sourceCandidates.push(text.slice(1));
         }
 
-        const cached = runtime.translationCache.get(cacheKey);
-        if (typeof cached !== 'string' || !cached.trim()) {
-            return null;
-        }
+        for (const sourceText of sourceCandidates) {
+            const cacheKey = runtime.getCacheKey(sourceText, this.getCacheType());
+            runtime.trackCacheKeyUsage(cacheKey);
 
-        if (this.isSetDestinationWithIconCommand(parsed.command)) {
-            if (parsed.icon) {
-                return [parsed.icon, cached];
+            if (!runtime.hasUsableCacheValue(cacheKey)) {
+                continue;
             }
-            return [cached];
+
+            const cached = runtime.translationCache.get(cacheKey);
+            if (this.isUsableText(cached)) {
+                return cached;
+            }
         }
 
-        return [cached];
+        return text;
     }
 
-    buildTranslatedMZCommandParams(params, runtime) {
-        if (!runtime || !Array.isArray(params)) {
-            return null;
+    translateRuntimeDestinationValue(destinationValue, runtime) {
+        if (Array.isArray(destinationValue)) {
+            if (!destinationValue.length) {
+                return destinationValue;
+            }
+
+            const allStringItems = destinationValue.every((item) => typeof item === 'string');
+
+            if (allStringItems) {
+                const originalJoined = destinationValue.join('\n');
+                const translatedJoined = this.translateRuntimeDestination(originalJoined, runtime);
+                if (translatedJoined !== originalJoined) {
+                    return translatedJoined.split('\n');
+                }
+            }
+
+            let changed = false;
+            const translatedList = destinationValue.map((item) => {
+                if (typeof item !== 'string') {
+                    return item;
+                }
+
+                const translated = this.translateRuntimeDestination(item, runtime);
+                if (translated !== item) {
+                    changed = true;
+                }
+                return translated;
+            });
+
+            return changed ? translatedList : destinationValue;
         }
 
-        const pluginName = String(params[0] || '').trim();
-        const commandName = String(params[1] || '').trim();
-        if (
-            !this.isDestinationWindowPlugin(pluginName) ||
-            !this.isSetDestinationMZCommand(commandName)
-        ) {
-            return null;
+        if (typeof destinationValue === 'string') {
+            return this.translateRuntimeDestination(destinationValue, runtime);
         }
 
-        const args = params[3] && typeof params[3] === 'object' ? params[3] : null;
-        const parsed = this.parseMZSetDestinationArgs(args);
-        if (!parsed) {
-            return null;
-        }
-
-        const cacheKey = runtime.getCacheKey(parsed.text, this.getCacheType());
-        runtime.trackCacheKeyUsage(cacheKey);
-
-        if (!runtime.hasUsableCacheValue(cacheKey)) {
-            return null;
-        }
-
-        const cached = runtime.translationCache.get(cacheKey);
-        if (!this.isUsableText(cached)) {
-            return null;
-        }
-
-        const nextParams = params.slice();
-        nextParams[3] = {
-            ...args,
-            destination: cached,
-        };
-        return nextParams;
+        return destinationValue;
     }
 
     enablePluginTranslation() {
-        if (!window.Game_Interpreter || !Game_Interpreter.prototype) {
+        if (!window.Game_System || !Game_System.prototype) {
             return;
         }
 
         const getRuntime = this.getRuntime.bind(this);
-        const buildTranslatedArgs = this.buildTranslatedArgs.bind(this);
-        const buildTranslatedMZCommandParams = this.buildTranslatedMZCommandParams.bind(this);
-        const originalPluginCommand = Game_Interpreter.prototype.pluginCommand;
-        if (typeof originalPluginCommand === 'function') {
-            Game_Interpreter.prototype.pluginCommand = function (command, args) {
+        const translateRuntimeDestinationValue = this.translateRuntimeDestinationValue.bind(this);
+        const originalGetDestination = Game_System.prototype.getDestination;
+
+        if (typeof originalGetDestination === 'function') {
+            Game_System.prototype.getDestination = function () {
+                const destinationText = originalGetDestination.apply(this, arguments);
+
                 try {
-                    const runtime = getRuntime();
-                    const translatedArgs = buildTranslatedArgs(command, args, runtime);
-                    if (Array.isArray(translatedArgs)) {
-                        arguments[1] = translatedArgs;
-                    }
+                    return translateRuntimeDestinationValue(destinationText, getRuntime());
                 } catch (error) {
                     console.warn(
-                        '[DestinationWindowTranslator] Failed to apply cached plugin command translation',
+                        '[DestinationWindowTranslator] Failed to apply runtime destination translation',
                         error
                     );
+                    return destinationText;
                 }
-
-                return originalPluginCommand.apply(this, arguments);
-            };
-        }
-
-        const originalCommand357 = Game_Interpreter.prototype.command357;
-        if (typeof originalCommand357 === 'function') {
-            Game_Interpreter.prototype.command357 = function (params) {
-                try {
-                    const runtime = getRuntime();
-                    const translatedParams = buildTranslatedMZCommandParams(params, runtime);
-                    if (Array.isArray(translatedParams)) {
-                        arguments[0] = translatedParams;
-                    }
-                } catch (error) {
-                    console.warn(
-                        '[DestinationWindowTranslator] Failed to apply cached MZ plugin command translation',
-                        error
-                    );
-                }
-
-                return originalCommand357.apply(this, arguments);
             };
         }
     }
@@ -371,6 +343,26 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
                     cmdIdx,
                 },
             });
+
+            const lines = parsed.text.split('\n');
+            if (lines.length > 1) {
+                for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+                    const lineText = lines[lineIdx];
+                    if (!this.isUsableText(lineText)) {
+                        continue;
+                    }
+
+                    output.push({
+                        text: lineText,
+                        command: parsed.command,
+                        source: {
+                            ...baseMeta,
+                            cmdIdx,
+                            lineIdx,
+                        },
+                    });
+                }
+            }
         }
     }
 

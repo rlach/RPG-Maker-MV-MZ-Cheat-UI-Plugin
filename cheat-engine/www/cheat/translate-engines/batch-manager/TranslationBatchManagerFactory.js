@@ -9,6 +9,7 @@ import { CurrentEvent } from '../translation-phases/CurrentEvent.js';
 import { DataObjects } from '../translation-phases/DataObjects.js';
 import { CacheEmptyStrings } from '../translation-phases/CacheEmptyStrings.js';
 import { EmptyStrings } from '../translation-phases/EmptyStrings.js';
+import { Koharu } from '../translation-phases/Koharu.js';
 import { MapEvents } from '../translation-phases/MapEvents.js';
 import { OtherStrings } from '../translation-phases/OtherStrings.js';
 import { Plugins } from '../translation-phases/Plugins.js';
@@ -44,6 +45,7 @@ function registerDefaultStrategies(manager) {
     manager.register(new GameArrays());
     manager.register(Variables.getInstance());
     manager.register(Troops.getInstance());
+    manager.register(Koharu.getInstance());
     manager.register(new Plugins());
     manager.register(CurrentEvent.getInstance());
 }

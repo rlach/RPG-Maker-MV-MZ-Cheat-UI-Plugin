@@ -451,25 +451,25 @@ export const translateOnTheFlyFlowMethods = {
     },
 
     async runObjectTranslationJob(selectedTypeIds, options = {}) {
-        const dryRun = !!(options && options.dryRun);
+        const dryRun = !!options?.dryRun;
 
         if (this.objectTranslationJob.active) {
             this.notify('warn', 'Object translation is already in progress');
-            return;
+            return { started: false, reason: 'already-running' };
         }
 
         if (!this.engine || typeof this.engine.batchTranslate !== 'function') {
             this.notify('error', 'Translation engine not initialized');
-            return;
+            return { started: false, reason: 'engine-not-initialized' };
         }
 
         if (!this.isEngineFullyConfigured()) {
             this.notify('warn', 'Translation engine is not fully configured');
-            return;
+            return { started: false, reason: 'engine-not-configured' };
         }
 
         if (!this.beginNonOtfTranslationProcess('object translation')) {
-            return;
+            return { started: false, reason: 'process-active' };
         }
 
         const allStats = this.getObjectTranslationStats();
@@ -527,9 +527,24 @@ export const translateOnTheFlyFlowMethods = {
             });
             BatchSummaryReporter.showAlert(summary);
             BatchSummaryReporter.logSummary(summary);
+
+            return {
+                started: true,
+                completed: true,
+                totalDone: this.objectTranslationJob.totalDone,
+                totalTarget: this.objectTranslationJob.totalTarget,
+                runErrors: this.objectTranslationJob.runErrors,
+            };
         } catch (error) {
             console.error('[TranslateOnTheFly] Object translation job failed:', error);
             this.notify('error', `Object translation failed: ${error.message || error}`);
+
+            return {
+                started: true,
+                completed: false,
+                reason: 'job-failed',
+                error: error instanceof Error ? error : new Error(String(error || 'unknown error')),
+            };
         } finally {
             this.objectTranslationJob.active = false;
             this.endNonOtfTranslationProcess();
