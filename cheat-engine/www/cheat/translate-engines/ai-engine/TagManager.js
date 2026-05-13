@@ -24,6 +24,7 @@ const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 const ESCAPE_PREFIX_PATTERN = '(?:\\\\|\\u001b)';
 const SPACE_RUN_TRIGGER_THRESHOLD = LLM_MAX_CONSECUTIVE_IDENTICAL_CHARS + 1;
 const ESCAPE_TAG_SYMBOL_START_CLASS = 'A-Za-z${}|.!><^';
+const PROTECTED_B_TAG_PREFIX = '__protected_b_tag__';
 const LONG_RUN_TAG_CONFIGS = Object.freeze([
     { tagId: 'sp', character: ' ' },
     { tagId: 'sw', character: '　' },
@@ -482,25 +483,33 @@ export class TagManager {
 
             if (entry.type === TAG_TYPE.WITH_CUSTOM_PARAMETER) {
                 const maskedValues = [];
-                const replacementFactory = (paramValue) => {
-                    if (!entry.maskValue) {
-                        return `[b=${entry.tagId}${entry.bracket}${paramValue}${entry.bracketClose}]`;
-                    }
+                let replacementResult;
 
-                    const nextMaskId = maskedValues.length;
-                    maskedValues.push(paramValue);
-                    return `[b=${entry.tagId}${entry.bracket}${nextMaskId}${entry.bracketClose}]`;
-                };
+                if (entry.style === TAG_STYLE.XML) {
+                    replacementResult = {
+                        count: (result.match(entry.prePattern) || []).length,
+                        text: result.replace(entry.prePattern, (_, paramValue) => {
+                            if (!entry.maskValue) {
+                                return `[b=${entry.tagId}${entry.bracket}${paramValue}${entry.bracketClose}]`;
+                            }
 
-                const replacementResult =
-                    entry.style === TAG_STYLE.XML
-                        ? {
-                              text: result.replace(entry.prePattern, (_, paramValue) =>
-                                  replacementFactory(paramValue)
-                              ),
-                              count: (result.match(entry.prePattern) || []).length,
-                          }
-                        : this.replaceRawCustomTags(result, entry, replacementFactory);
+                            const nextMaskId = maskedValues.length;
+                            maskedValues.push(paramValue);
+                            return `[b=${entry.tagId}${entry.bracket}${nextMaskId}${entry.bracketClose}]`;
+                        }),
+                    };
+                } else {
+                    replacementResult = this.replaceEscapeStyleCustomTags(result, entry, (paramValue) => {
+                        if (!entry.maskValue) {
+                            return `[b=${entry.tagId}${entry.bracket}${paramValue}${entry.bracketClose}]`;
+                        }
+
+                        const nextMaskId = maskedValues.length;
+                        maskedValues.push(paramValue);
+                        return `[b=${entry.tagId}${entry.bracket}${nextMaskId}${entry.bracketClose}]`;
+                    });
+                }
+
                 result = replacementResult.text;
                 tagCounts[entry.key] = replacementResult.count;
 
@@ -556,6 +565,12 @@ export class TagManager {
             ...this.tagEntries.filter((entry) => entry.type === TAG_TYPE.WITH_CUSTOM_PARAMETER),
             ...this.tagEntries.filter((entry) => entry.type !== TAG_TYPE.WITH_CUSTOM_PARAMETER),
         ];
+        const malformedCustomRanges = this.findMalformedEncodedCustomTagRanges(result);
+        result = this.protectEncodedTagsInRanges(
+            result,
+            malformedCustomRanges,
+            PROTECTED_B_TAG_PREFIX
+        );
 
         for (const entry of processingEntries) {
             if (entry.type === TAG_TYPE.WITH_NUMERIC_PARAMETER) {
@@ -658,6 +673,7 @@ export class TagManager {
         }
 
         const originalHadClosingBTag = !!(caseMap && caseMap.hasLiteralClosingBTag);
+        result = this.restoreProtectedEncodedTags(result, PROTECTED_B_TAG_PREFIX);
         if (!originalHadClosingBTag && /\[\/b\]/i.test(result)) {
             result = result.replace(/\[\/b\]/gi, '');
         }
@@ -842,6 +858,138 @@ export class TagManager {
         }
 
         return { text: output, count };
+    }
+
+    replaceEscapeStyleCustomTags(text, entry, replacementFactory) {
+        if (typeof text !== 'string') {
+            return { text, count: 0 };
+        }
+
+        const open = entry.bracket;
+        const close = entry.bracketClose;
+        const escapedSymbol = escapeRegExp(entry.tagSymbol);
+        const escapedOpen = escapeRegExp(open);
+        const pattern = new RegExp(`${ESCAPE_PREFIX_PATTERN}${escapedSymbol}${escapedOpen}`, 'gi');
+        const source = text;
+        let cursor = 0;
+        let count = 0;
+        let output = '';
+        let match;
+
+        pattern.lastIndex = 0;
+        while ((match = pattern.exec(source)) !== null) {
+            const tokenStart = match.index;
+            const openIndex = tokenStart + match[0].length - 1;
+            const balanced = this.readBalancedValue(source, openIndex, open, close);
+
+            if (!balanced) {
+                continue;
+            }
+
+            output += source.slice(cursor, tokenStart);
+            output += replacementFactory(balanced.value);
+            cursor = balanced.closeIndex + 1;
+            count += 1;
+            pattern.lastIndex = cursor;
+        }
+
+        output += source.slice(cursor);
+        return { text: output, count };
+    }
+
+    findMalformedEncodedCustomTagRanges(text) {
+        if (typeof text !== 'string' || text.length === 0) {
+            return [];
+        }
+
+        const ranges = [];
+        const entries = this.customParameterEntries;
+
+        for (const entry of entries) {
+            const tokenPrefix = `[b=${entry.tagId}${entry.bracket}`.toLowerCase();
+            const source = text;
+            const sourceLower = source.toLowerCase();
+            const open = entry.bracket;
+            const close = entry.bracketClose;
+            let cursor = 0;
+
+            while (cursor < source.length) {
+                const tokenStart = sourceLower.indexOf(tokenPrefix, cursor);
+                if (tokenStart === -1) {
+                    break;
+                }
+
+                const openIndex = tokenStart + tokenPrefix.length - 1;
+                const balanced = this.readBalancedValue(source, openIndex, open, close);
+
+                if (!balanced) {
+                    cursor = tokenStart + 1;
+                    continue;
+                }
+
+                if (source[balanced.closeIndex + 1] !== ']') {
+                    ranges.push({
+                        start: tokenStart,
+                        end: balanced.closeIndex + 1,
+                    });
+                    cursor = balanced.closeIndex + 1;
+                    continue;
+                }
+
+                cursor = balanced.closeIndex + 2;
+            }
+        }
+
+        return this.mergeOverlappingRanges(ranges);
+    }
+
+    mergeOverlappingRanges(ranges) {
+        if (!Array.isArray(ranges) || ranges.length === 0) {
+            return [];
+        }
+
+        const sorted = [...ranges].sort((a, b) => a.start - b.start);
+        const merged = [sorted[0]];
+
+        for (let i = 1; i < sorted.length; i++) {
+            const current = sorted[i];
+            const last = merged[merged.length - 1];
+            if (current.start <= last.end) {
+                last.end = Math.max(last.end, current.end);
+            } else {
+                merged.push({ ...current });
+            }
+        }
+
+        return merged;
+    }
+
+    protectEncodedTagsInRanges(text, ranges, marker) {
+        if (typeof text !== 'string' || !Array.isArray(ranges) || ranges.length === 0) {
+            return text;
+        }
+
+        let output = '';
+        let cursor = 0;
+
+        for (const range of ranges) {
+            output += text.slice(cursor, range.start);
+            const segment = text.slice(range.start, range.end);
+            output += segment.replace(/\[b=/gi, `[${marker}=`);
+            cursor = range.end;
+        }
+
+        output += text.slice(cursor);
+        return output;
+    }
+
+    restoreProtectedEncodedTags(text, marker) {
+        if (typeof text !== 'string') {
+            return text;
+        }
+
+        const restorePattern = new RegExp(`\\[${escapeRegExp(marker)}=`, 'gi');
+        return text.replace(restorePattern, '[b=');
     }
 
     replaceRawCustomTags(text, entry, replacementFactory) {
