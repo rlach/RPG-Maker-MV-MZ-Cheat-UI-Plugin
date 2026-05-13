@@ -5,9 +5,12 @@ import { parseJsonSafely } from './TranslatorHelpers.js';
  * CustomizeConfigItem.js translator
  *
  * Supported plugin:
+ * - CustomizeConfigItem.js v2.1.0 (MV)
  * - CustomizeConfigItem.js v3.3.0 (MZ)
  *
  * Notes:
+ * - MV 2.x stores plugin parameters with Japanese keys:
+ *   `数値項目`, `文字項目`, `スイッチ項目`, `音量項目`.
  * - Collects custom option labels (Name) and mirrors them into the core `command` cache.
  * - Collects switch display values (OnText/OffText) and string option values (StringItems)
  *   into a dedicated plugin cache.
@@ -99,15 +102,36 @@ export class CustomizeConfigItemTranslator extends BasePluginTranslator {
         return parsed.map((item) => String(item ?? '')).filter((item) => this.isUsableText(item));
     }
 
+    readOptionArrayByAlias(parameters, aliases) {
+        if (!parameters || typeof parameters !== 'object') {
+            return [];
+        }
+
+        for (const alias of aliases) {
+            const parsed = this.parseStructArray(parameters[alias]);
+            if (parsed.length > 0) {
+                return parsed;
+            }
+
+            // Preserve explicit empty arrays when they are intentionally configured.
+            const rawValue = parameters[alias];
+            if (typeof rawValue === 'string' && rawValue.trim() === '[]') {
+                return [];
+            }
+        }
+
+        return [];
+    }
+
     appendEntriesFromParameters(parameters, scope, output) {
         if (!parameters || typeof parameters !== 'object' || !Array.isArray(output)) {
             return;
         }
 
-        const numberOptions = this.parseStructArray(parameters.NumberOptions);
-        const stringOptions = this.parseStructArray(parameters.StringOptions);
-        const switchOptions = this.parseStructArray(parameters.SwitchOptions);
-        const volumeOptions = this.parseStructArray(parameters.VolumeOptions);
+        const numberOptions = this.readOptionArrayByAlias(parameters, ['NumberOptions', '数値項目']);
+        const stringOptions = this.readOptionArrayByAlias(parameters, ['StringOptions', '文字項目']);
+        const switchOptions = this.readOptionArrayByAlias(parameters, ['SwitchOptions', 'スイッチ項目']);
+        const volumeOptions = this.readOptionArrayByAlias(parameters, ['VolumeOptions', '音量項目']);
 
         const appendNameEntries = (options, group) => {
             for (let optionIndex = 0; optionIndex < options.length; optionIndex++) {
@@ -199,6 +223,35 @@ export class CustomizeConfigItemTranslator extends BasePluginTranslator {
         }
 
         return customParams[symbol] || null;
+    }
+
+    resolveRuntimeTranslation(
+        text,
+        runtime,
+        cacheType,
+        { requireRuntimeTranslationActive = false } = {}
+    ) {
+        if (!this.isUsableText(text)) {
+            return text;
+        }
+
+        if (!runtime) {
+            return text;
+        }
+
+        const cacheKey = runtime.getCacheKey(text, cacheType);
+        runtime.trackCacheKeyUsage(cacheKey);
+
+        if (requireRuntimeTranslationActive && !this.isRuntimeTranslationActive(runtime)) {
+            return text;
+        }
+
+        if (!runtime.hasUsableCacheValue(cacheKey)) {
+            return text;
+        }
+
+        const cached = runtime.translationCache.get(cacheKey);
+        return this.isUsableText(cached) ? cached : text;
     }
 
     isCustomizeConfigValueSymbol(symbol) {
