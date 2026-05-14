@@ -61,6 +61,19 @@ declare const Window_Selectable: any;
 declare const Window_SavefileList: any;
 declare const Window_Message: any;
 declare const Window_Command: any;
+
+/** Saba_Tachie plugin namespace (立ち絵プラグイン by Sabakan). */
+declare const Saba: {
+    Tachie?: {
+        Window_TachieMessage?: any;
+        [key: string]: any;
+    };
+    BackLog?: {
+        $gameBackLog?: any;
+        [key: string]: any;
+    };
+    [key: string]: any;
+} | undefined;
 declare const Window_MenuCommand: any;
 declare const Window_ScrollText: any;
 declare const Window_BattleLog: any;
