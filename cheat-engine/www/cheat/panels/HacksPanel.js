@@ -1,4 +1,5 @@
 import { HACKS_RUNTIME } from '../js/HacksRuntime.js';
+import { isRpgMakerMv } from '../js/RpgMakerRuntime.js';
 
 export default {
     name: 'HacksPanel',
@@ -30,6 +31,31 @@ export default {
         Some games may require a restart before this change affects all plugin code paths.
     </v-card-text>
 
+    <template v-if="isMv">
+        <v-card-subtitle class="mt-3 pb-0 font-weight-bold">MV Save Path Fix</v-card-subtitle>
+        <v-card-text class="py-0">
+            <v-switch
+                v-model="mvLocalSavePathFix"
+                label="Fix StorageManager local save directory path"
+                dense
+                hide-details
+                @click.self.stop
+                @change="onMvLocalSavePathFixChange">
+            </v-switch>
+        </v-card-text>
+        <v-card-text class="pt-2 pb-0 caption grey--text text--lighten-1">
+            Replaces StorageManager.localFileDirectoryPath with a corrected version that resolves the save
+            folder relative to the game executable. The oldest (unversioned) builds of RPG Maker MV store
+            saves at the root of the C: drive (e.g. C:/save/) and mix save files across different games,
+            which causes load/save errors. Enable this only if your saves are appearing in C:/save/ or
+            another unexpected root-level folder instead of inside the game folder. This might also help when
+            game crashes due to missing images when opening Save/Load screen.
+        </v-card-text>
+        <v-card-text class="pt-1 pb-0 caption amber--text text--darken-1">
+            A game restart may be required for this fix to take effect on all save/load code paths.
+        </v-card-text>
+    </template>
+
     <template v-if="hasMessageSkipSkipSwitchConfig">
         <v-card-subtitle class="mt-3 pb-0 font-weight-bold">MessageSkip Compatibility</v-card-subtitle>
         <v-card-text class="py-0">
@@ -53,6 +79,8 @@ export default {
     data() {
         return {
             bitmapGetPixelLongFix: false,
+            mvLocalSavePathFix: false,
+            isMv: false,
             hasMessageSkipSkipSwitchConfig: false,
             messageSkipSwitchId: 0,
             messageSkipForcedSkipEnabled: false,
@@ -75,7 +103,9 @@ export default {
 
     methods: {
         initializeVariables() {
+            this.isMv = isRpgMakerMv();
             this.bitmapGetPixelLongFix = HACKS_RUNTIME.isBitmapGetPixelLongFixEnabled();
+            this.mvLocalSavePathFix = HACKS_RUNTIME.isMvLocalSavePathFixEnabled();
             this.hasMessageSkipSkipSwitchConfig =
                 HACKS_RUNTIME.hasMessageSkipConfiguredSkipSwitch();
             this.messageSkipSwitchId = HACKS_RUNTIME.getMessageSkipForcedSkipSwitchId();
@@ -84,6 +114,10 @@ export default {
 
         onBitmapGetPixelLongFixChange(enabled) {
             HACKS_RUNTIME.setBitmapGetPixelLongFixEnabled(!!enabled);
+        },
+
+        onMvLocalSavePathFixChange(enabled) {
+            HACKS_RUNTIME.setMvLocalSavePathFixEnabled(!!enabled);
         },
 
         onMessageSkipForcedSkipChange(enabled) {

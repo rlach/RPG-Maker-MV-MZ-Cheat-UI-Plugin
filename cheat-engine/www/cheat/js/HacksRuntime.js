@@ -10,6 +10,9 @@ const STORAGE_KEY = 'data';
 const BITMAP_GET_PIXEL_LONG_FIX_KEY = 'bitmapGetPixelLongFix';
 const PATCH_GUARD_KEY = '__CHEAT_BITMAP_GET_PIXEL_LONG_FIX_PATCHED__';
 const PATCH_ORIGINAL_KEY = '__CHEAT_BITMAP_GET_PIXEL_LONG_FIX_ORIGINAL__';
+const MV_LOCAL_SAVE_PATH_FIX_KEY = 'mvLocalSavePathFix';
+const MV_SAVE_PATH_PATCH_GUARD_KEY = '__CHEAT_MV_LOCAL_SAVE_PATH_FIX_PATCHED__';
+const MV_SAVE_PATH_PATCH_ORIGINAL_KEY = '__CHEAT_MV_LOCAL_SAVE_PATH_FIX_ORIGINAL__';
 const MESSAGE_SKIP_PLUGIN_NAME = 'MessageSkip';
 const MESSAGE_SKIP_SWITCH_KEYS = ['SkipSwitchId', 'スキップスイッチ'];
 
@@ -91,6 +94,7 @@ class HacksRuntime {
     constructor() {
         this.state = {
             [BITMAP_GET_PIXEL_LONG_FIX_KEY]: false,
+            [MV_LOCAL_SAVE_PATH_FIX_KEY]: false,
         };
         this._load();
     }
@@ -103,8 +107,13 @@ class HacksRuntime {
             }
 
             const data = JSON.parse(json);
-            if (data && typeof data === 'object' && hasOwn(data, BITMAP_GET_PIXEL_LONG_FIX_KEY)) {
-                this.state[BITMAP_GET_PIXEL_LONG_FIX_KEY] = !!data[BITMAP_GET_PIXEL_LONG_FIX_KEY];
+            if (data && typeof data === 'object') {
+                if (hasOwn(data, BITMAP_GET_PIXEL_LONG_FIX_KEY)) {
+                    this.state[BITMAP_GET_PIXEL_LONG_FIX_KEY] = !!data[BITMAP_GET_PIXEL_LONG_FIX_KEY];
+                }
+                if (hasOwn(data, MV_LOCAL_SAVE_PATH_FIX_KEY)) {
+                    this.state[MV_LOCAL_SAVE_PATH_FIX_KEY] = !!data[MV_LOCAL_SAVE_PATH_FIX_KEY];
+                }
             }
         } catch (err) {
             console.warn('[HacksRuntime] Failed to load settings', err);
@@ -141,6 +150,9 @@ class HacksRuntime {
     applyEnabledHacks() {
         if (this.isBitmapGetPixelLongFixEnabled()) {
             this.applyBitmapGetPixelLongFix();
+        }
+        if (this.isMvLocalSavePathFixEnabled()) {
+            this.applyMvLocalSavePathFix();
         }
     }
 
@@ -239,6 +251,94 @@ class HacksRuntime {
         });
 
         console.log('[HacksRuntime] Installed Bitmap.getPixel long-type fix');
+        return true;
+    }
+
+    isMvLocalSavePathFixEnabled() {
+        return !!this.state[MV_LOCAL_SAVE_PATH_FIX_KEY];
+    }
+
+    setMvLocalSavePathFixEnabled(enabled) {
+        this.state[MV_LOCAL_SAVE_PATH_FIX_KEY] = !!enabled;
+        this._save();
+
+        if (this.state[MV_LOCAL_SAVE_PATH_FIX_KEY]) {
+            return this.applyMvLocalSavePathFix();
+        }
+
+        return this.removeMvLocalSavePathFix();
+    }
+
+    applyMvLocalSavePathFix() {
+        const root = getRootWindow();
+        const storageManager = root?.StorageManager;
+
+        if (!storageManager || typeof storageManager.localFileDirectoryPath !== 'function') {
+            return false;
+        }
+
+        if (storageManager[MV_SAVE_PATH_PATCH_GUARD_KEY]) {
+            return true;
+        }
+
+        const original = storageManager.localFileDirectoryPath;
+
+        Object.defineProperty(storageManager, MV_SAVE_PATH_PATCH_ORIGINAL_KEY, {
+            value: original,
+            configurable: true,
+            writable: true,
+            enumerable: false,
+        });
+
+        storageManager.localFileDirectoryPath = function () {
+            const path = require('path');
+            const base = path.dirname(process.mainModule.filename);
+            return path.join(base, 'save/');
+        };
+
+        Object.defineProperty(storageManager, MV_SAVE_PATH_PATCH_GUARD_KEY, {
+            value: true,
+            configurable: true,
+            writable: true,
+            enumerable: false,
+        });
+
+        console.log('[HacksRuntime] Installed MV StorageManager.localFileDirectoryPath fix');
+        return true;
+    }
+
+    removeMvLocalSavePathFix() {
+        const root = getRootWindow();
+        const storageManager = root?.StorageManager;
+
+        if (!storageManager) {
+            return false;
+        }
+
+        if (!storageManager[MV_SAVE_PATH_PATCH_GUARD_KEY]) {
+            return true;
+        }
+
+        const original = storageManager[MV_SAVE_PATH_PATCH_ORIGINAL_KEY];
+        if (typeof original === 'function') {
+            storageManager.localFileDirectoryPath = original;
+        }
+
+        try {
+            delete storageManager[MV_SAVE_PATH_PATCH_GUARD_KEY];
+        } catch (err) {
+            console.warn('[HacksRuntime] Failed to delete MV save path patch guard', err);
+            storageManager[MV_SAVE_PATH_PATCH_GUARD_KEY] = false;
+        }
+
+        try {
+            delete storageManager[MV_SAVE_PATH_PATCH_ORIGINAL_KEY];
+        } catch (err) {
+            console.warn('[HacksRuntime] Failed to delete MV save path original reference', err);
+            storageManager[MV_SAVE_PATH_PATCH_ORIGINAL_KEY] = undefined;
+        }
+
+        console.log('[HacksRuntime] Removed MV StorageManager.localFileDirectoryPath fix');
         return true;
     }
 
