@@ -5,17 +5,14 @@ import { ChronusTranslator } from './translators/ChronusTranslator.js';
 import { CbrEroStatusTranslator } from './translators/CbrEroStatusTranslator.js';
 import { ExternMessageTranslator } from './translators/ExternMessageTranslator.js';
 import { CbrEroStatusMvTranslator } from './translators/CbrEroStatusMvTranslator.js';
-import { CustomizeConfigItemTranslator } from './translators/CustomizeConfigItemTranslator.js';
 import { DarkPlasmaCharacterTextTranslator } from './translators/DarkPlasmaCharacterTextTranslator.js';
 import { DTextPictureTranslator } from './translators/DTextPictureTranslator.js';
 import { DynamicDatabaseTranslator } from './translators/DynamicDatabaseTranslator.js';
 import { EventLabelTranslator } from './translators/EventLabelTranslator.js';
 import { ExtraWindowTranslator } from './translators/ExtraWindowTranslator.js';
 import { GetInformationTranslator } from './translators/GetInformationTranslator.js';
-import { GirlsWindowTranslator } from './translators/GirlsWindowTranslator.js';
 import { HelpWindowPluginTranslator } from './translators/HelpWindowPluginTranslator.js';
 import { DestinationWindowTranslator } from './translators/DestinationWindowTranslator.js';
-import { ItemCombinationMZTranslator } from './translators/ItemCombinationMZTranslator.js';
 import { KmsMapActiveMessageTranslator } from './translators/KmsMapActiveMessageTranslator.js';
 import { KzPictureChoicesTranslator } from './translators/KzPictureChoicesTranslator.js';
 import { KekeVariableActorCommandTranslator } from './translators/KekeVariableActorCommandTranslator.js';
@@ -25,6 +22,7 @@ import { LLMenuScreenTranslator } from './translators/LLMenuScreenTranslator.js'
 import { LLStandingPictureTranslator } from './translators/LLStandingPictureTranslator.js';
 import { MgpExternChoicesTranslator } from './translators/MgpExternChoicesTranslator.js';
 import { MogSceneMenuFileRenameTranslator } from './translators/MogSceneMenuFileRenameTranslator.js';
+import { MogSceneMenuTranslator } from './translators/MogSceneMenuTranslator.js';
 import { MogBattleCommandsTranslator } from './translators/MogBattleCommandsTranslator.js';
 import { MogEventTextTranslator } from './translators/MogEventTextTranslator.js';
 import { MessageWindowPopupTranslator } from './translators/MessageWindowPopupTranslator.js';
@@ -33,17 +31,12 @@ import { MppChoiceExTranslator } from './translators/MppChoiceExTranslator.js';
 import { MppMessageExTranslator } from './translators/MppMessageExTranslator.js';
 import { MultipleWindowSkinSystemTranslator } from './translators/MultipleWindowSkinSystemTranslator.js';
 import { NrpMapTravelTranslator } from './translators/NrpMapTravelTranslator.js';
-import { NuunMenuScreenExTranslator } from './translators/NuunMenuScreenExTranslator.js';
 import { NuunSaveScreenTranslator } from './translators/NuunSaveScreenTranslator.js';
 import { OriginMenuStatusTranslator } from './translators/OriginMenuStatusTranslator.js';
 import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTextWindowTranslator.js';
 import { QuestSystemTranslator } from './translators/QuestSystemTranslator.js';
-import { ResidentWindowTranslator } from './translators/ResidentWindowTranslator.js';
 import { SceneCustomMenuTranslator } from './translators/SceneCustomMenuTranslator.js';
 import { SceneGlossaryTranslator } from './translators/SceneGlossaryTranslator.js';
-import { SabaSimpleScenarioTranslator } from './translators/SabaSimpleScenarioTranslator.js';
-import { SabaTachieTranslator } from './translators/SabaTachieTranslator.js';
-import { SaveNameInputTranslator } from './translators/SaveNameInputTranslator.js';
 import { SetMessageFontSizeTranslator } from './translators/SetMessageFontSizeTranslator.js';
 import { SHMessageWindowBgTranslator } from './translators/SHMessageWindowBgTranslator.js';
 import { SkillCPSystemTranslator } from './translators/SkillCPSystemTranslator.js';
@@ -60,6 +53,8 @@ import { YedWordWrapTranslator } from './translators/YedWordWrapTranslator.js';
 import { YEPCoreEngineScriptTranslator } from './translators/YEPCoreEngineScriptTranslator.js';
 import { YepMessageCoreTranslator } from './translators/YepMessageCoreTranslator.js';
 import { YepQuestJournalTranslator } from './translators/YepQuestJournalTranslator.js';
+import { SabaSimpleScenarioTranslator } from './translators/SabaSimpleScenarioTranslator.js';
+import { SabaTachieTranslator } from './translators/SabaTachieTranslator.js';
 
 class PluginTranslatorRegistry {
     constructor() {
@@ -70,17 +65,14 @@ class PluginTranslatorRegistry {
             CbrEroStatusTranslator,
             ExternMessageTranslator,
             CbrEroStatusMvTranslator,
-            CustomizeConfigItemTranslator,
             DarkPlasmaCharacterTextTranslator,
             DTextPictureTranslator,
             DynamicDatabaseTranslator,
             EventLabelTranslator,
             ExtraWindowTranslator,
             GetInformationTranslator,
-            GirlsWindowTranslator,
             HelpWindowPluginTranslator,
             DestinationWindowTranslator,
-            ItemCombinationMZTranslator,
             KmsMapActiveMessageTranslator,
             KzPictureChoicesTranslator,
             KekeVariableActorCommandTranslator,
@@ -90,6 +82,7 @@ class PluginTranslatorRegistry {
             ManoInputConfigTranslator,
             MgpExternChoicesTranslator,
             MogSceneMenuFileRenameTranslator,
+            MogSceneMenuTranslator,
             MessageWindowPopupTranslator,
             MogBattleCommandsTranslator,
             MogEventTextTranslator,
@@ -98,17 +91,14 @@ class PluginTranslatorRegistry {
             MppMessageExTranslator,
             MultipleWindowSkinSystemTranslator,
             NrpMapTravelTranslator,
-            NuunMenuScreenExTranslator,
             NuunSaveScreenTranslator,
             OriginMenuStatusTranslator,
             PandaProgressTextWindowTranslator,
             QuestSystemTranslator,
-            ResidentWindowTranslator,
-            SceneCustomMenuTranslator,
-            SceneGlossaryTranslator,
             SabaSimpleScenarioTranslator,
             SabaTachieTranslator,
-            SaveNameInputTranslator,
+            SceneCustomMenuTranslator,
+            SceneGlossaryTranslator,
             SetMessageFontSizeTranslator,
             SHMessageWindowBgTranslator,
             SkillCPSystemTranslator,
@@ -226,55 +216,15 @@ class PluginTranslatorRegistry {
         });
     }
 
-    normalizeMessageCacheContext(context) {
-        return context && typeof context === 'object' ? context : {};
-    }
-
-    coerceMessageSourceText(value) {
-        if (typeof value === 'string') {
-            return value;
-        }
-
-        if (value === null || value === undefined) {
-            return '';
-        }
-
-        return String(value);
-    }
-
-    shouldSkipTranslatorMessageNormalization(translator, runtime) {
-        return (
-            !translator ||
-            typeof translator.resolveMessageCacheSourceText !== 'function' ||
-            !translator.isActive({ panel: runtime })
-        );
-    }
-
-    applyTranslatorMessageNormalization(translator, context, runtime, resolvedText) {
-        try {
-            const nextValue = translator.resolveMessageCacheSourceText({
-                ...context,
-                runtime,
-                text: resolvedText,
-            });
-
-            if (typeof nextValue === 'string' && nextValue !== resolvedText) {
-                return nextValue;
-            }
-        } catch (error) {
-            console.warn(
-                `[PluginTranslatorRegistry] Failed to normalize message cache source for ${translator.getPluginName()}`,
-                error
-            );
-        }
-
-        return resolvedText;
-    }
-
     resolveMessageCacheSourceText(context = {}) {
-        const contextObject = this.normalizeMessageCacheContext(context);
+        const contextObject = context && typeof context === 'object' ? context : {};
         const runtime = contextObject['runtime'] || null;
-        const sourceText = this.coerceMessageSourceText(contextObject['text']);
+        const sourceText =
+            typeof contextObject['text'] === 'string'
+                ? contextObject['text']
+                : contextObject['text'] !== null && contextObject['text'] !== undefined
+                  ? String(contextObject['text'])
+                  : '';
 
         if (!sourceText) {
             return sourceText;
@@ -285,7 +235,7 @@ class PluginTranslatorRegistry {
         let resolvedText = sourceText;
         const translators = this.getDetectedTranslatorInstances();
         for (const translator of translators) {
-            if (this.shouldSkipTranslatorMessageNormalization(translator, runtime)) {
+            if (!translator || typeof translator.resolveMessageCacheSourceText !== 'function') {
                 continue;
             }
 
