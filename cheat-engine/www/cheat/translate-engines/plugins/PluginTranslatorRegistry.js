@@ -39,6 +39,7 @@ import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTe
 import { QuestSystemTranslator } from './translators/QuestSystemTranslator.js';
 import { SceneCustomMenuTranslator } from './translators/SceneCustomMenuTranslator.js';
 import { SceneGlossaryTranslator } from './translators/SceneGlossaryTranslator.js';
+import { SaveNameInputTranslator } from './translators/SaveNameInputTranslator.js';
 import { SetMessageFontSizeTranslator } from './translators/SetMessageFontSizeTranslator.js';
 import { SHMessageWindowBgTranslator } from './translators/SHMessageWindowBgTranslator.js';
 import { SkillCPSystemTranslator } from './translators/SkillCPSystemTranslator.js';
@@ -99,6 +100,7 @@ class PluginTranslatorRegistry {
             QuestSystemTranslator,
             SceneCustomMenuTranslator,
             SceneGlossaryTranslator,
+            SaveNameInputTranslator,
             SetMessageFontSizeTranslator,
             SHMessageWindowBgTranslator,
             SkillCPSystemTranslator,
