@@ -39,7 +39,6 @@
  *     speaker names for mass translation (stored in actor_name cache).
  */
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
-import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
 
 // MV plugin command prefix and subcommand for speaker names.
 const TACHIE_COMMAND = 'tachie';
@@ -392,7 +391,6 @@ export class SabaTachieTranslator extends BasePluginTranslator {
     async _buildScanEntries() {
         const entries = [];
         this._collectCommonEventEntries(entries);
-        await this._collectMapEntries(entries);
         return entries;
     }
 
@@ -408,46 +406,6 @@ export class SabaTachieTranslator extends BasePluginTranslator {
             }
 
             this._collectNamesFromList(commonEvent.list, { scope: 'commonEvent', commonEventId: i }, output);
-        }
-    }
-
-    async _collectMapEntries(output) {
-        const mapInfos = Array.isArray(window.$dataMapInfos) ? window.$dataMapInfos : [];
-
-        for (const mapInfo of mapInfos) {
-            const mapId = Number(mapInfo?.id);
-            if (!mapId) {
-                continue;
-            }
-
-            try {
-                const mapData = await loadMapDataById(mapId);
-                if (!mapData || !Array.isArray(mapData.events)) {
-                    continue;
-                }
-
-                for (let eventIdx = 0; eventIdx < mapData.events.length; eventIdx++) {
-                    const event = mapData.events[eventIdx];
-                    if (!event || !Array.isArray(event.pages)) {
-                        continue;
-                    }
-
-                    for (let pageIdx = 0; pageIdx < event.pages.length; pageIdx++) {
-                        const page = event.pages[pageIdx];
-                        if (!page || !Array.isArray(page.list)) {
-                            continue;
-                        }
-
-                        this._collectNamesFromList(
-                            page.list,
-                            { scope: 'mapEvent', mapId, eventIdx, pageIdx },
-                            output
-                        );
-                    }
-                }
-            } catch (error) {
-                console.warn(`[SabaTachieTranslator] Failed to scan map ${mapId}`, error);
-            }
         }
     }
 
