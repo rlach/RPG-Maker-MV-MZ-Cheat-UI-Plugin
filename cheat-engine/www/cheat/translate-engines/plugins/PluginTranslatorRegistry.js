@@ -53,8 +53,10 @@ import { YedWordWrapTranslator } from './translators/YedWordWrapTranslator.js';
 import { YEPCoreEngineScriptTranslator } from './translators/YEPCoreEngineScriptTranslator.js';
 import { YepMessageCoreTranslator } from './translators/YepMessageCoreTranslator.js';
 import { YepQuestJournalTranslator } from './translators/YepQuestJournalTranslator.js';
+import { YepEventMiniLabelTranslator } from './translators/YepEventMiniLabelTranslator.js';
 import { SabaSimpleScenarioTranslator } from './translators/SabaSimpleScenarioTranslator.js';
 import { SabaTachieTranslator } from './translators/SabaTachieTranslator.js';
+import { YepGabWindowTranslator } from './translators/YepGabWindowTranslator.js';
 
 class PluginTranslatorRegistry {
     constructor() {
@@ -113,6 +115,8 @@ class PluginTranslatorRegistry {
             UoTesEventTranslator,
             YedWordWrapTranslator,
             YEPCoreEngineScriptTranslator,
+            YepGabWindowTranslator,
+            YepEventMiniLabelTranslator,
             YepMessageCoreTranslator,
             YepQuestJournalTranslator,
         ];
@@ -216,15 +220,35 @@ class PluginTranslatorRegistry {
         });
     }
 
+    _normalizeResolveContext(context = {}) {
+        return context && typeof context === 'object' ? context : {};
+    }
+
+    _extractResolveSourceText(contextObject) {
+        const sourceValue = contextObject?.text;
+        if (typeof sourceValue === 'string') {
+            return sourceValue;
+        }
+
+        if (sourceValue === null || sourceValue === undefined) {
+            return '';
+        }
+
+        return String(sourceValue);
+    }
+
+    _canResolveWithTranslator(translator, runtime) {
+        if (!translator || typeof translator.resolveMessageCacheSourceText !== 'function') {
+            return false;
+        }
+
+        return translator.isActive({ runtime });
+    }
+
     resolveMessageCacheSourceText(context = {}) {
-        const contextObject = context && typeof context === 'object' ? context : {};
+        const contextObject = this._normalizeResolveContext(context);
         const runtime = contextObject['runtime'] || null;
-        const sourceText =
-            typeof contextObject['text'] === 'string'
-                ? contextObject['text']
-                : contextObject['text'] !== null && contextObject['text'] !== undefined
-                  ? String(contextObject['text'])
-                  : '';
+        const sourceText = this._extractResolveSourceText(contextObject);
 
         if (!sourceText) {
             return sourceText;
@@ -235,11 +259,7 @@ class PluginTranslatorRegistry {
         let resolvedText = sourceText;
         const translators = this.getDetectedTranslatorInstances();
         for (const translator of translators) {
-            if (!translator || typeof translator.resolveMessageCacheSourceText !== 'function') {
-                continue;
-            }
-
-            if (!translator.isActive({ runtime: runtime })) {
+            if (!this._canResolveWithTranslator(translator, runtime)) {
                 continue;
             }
 
