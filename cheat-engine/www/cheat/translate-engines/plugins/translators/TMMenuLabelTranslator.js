@@ -82,16 +82,17 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
             return;
         }
 
-        if (!SceneMenuCtor?.prototype) {
+        const sceneMenuCtor = window.Scene_Menu;
+        if (!sceneMenuCtor?.prototype) {
             return;
         }
 
-        const translator = this;
-        const originalCreateMenuLabelWindow = SceneMenuCtor.prototype.createMenuLabelWindow;
+        const sceneMenuPrototype = sceneMenuCtor.prototype;
+        const originalCreateMenuLabelWindow = sceneMenuPrototype.createMenuLabelWindow;
+        const originalCreate = sceneMenuPrototype.create;
 
-        if (typeof originalCreateMenuLabelWindow !== 'function') {
-            return;
-        }
+        const getRuntime = this.getRuntime.bind(this);
+        const resolveRuntimeTranslation = this.resolveRuntimeTranslation.bind(this);
 
         function patchWindowInstanceDraw(windowInstance) {
             if (!windowInstance || typeof windowInstance !== 'object') {
@@ -112,12 +113,9 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
             proto.drawMenuLabel = function (x, y, label, value) {
                 try {
                     if (label && typeof label === 'object') {
-                        const runtime = this.getRuntime();
-                        const translatedName = translator.resolveRuntimeTranslation(
-                            label.name,
-                            runtime
-                        );
-                        const translatedFooter = translator.resolveRuntimeTranslation(
+                        const runtime = getRuntime();
+                        const translatedName = resolveRuntimeTranslation(label.name, runtime);
+                        const translatedFooter = resolveRuntimeTranslation(
                             label.footer,
                             runtime
                         );
@@ -148,24 +146,43 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
             });
         }
 
-        SceneMenuCtor.prototype.createMenuLabelWindow = function () {
-            const result = originalCreateMenuLabelWindow.apply(this, arguments);
+        if (typeof originalCreateMenuLabelWindow === 'function') {
+            sceneMenuPrototype.createMenuLabelWindow = function () {
+                const result = originalCreateMenuLabelWindow.apply(this, arguments);
 
-            try {
-                patchWindowInstanceDraw(this._menuLabelWindow);
+                try {
+                    patchWindowInstanceDraw(this._menuLabelWindow);
 
-                // TMMenuLabel refreshes once in its constructor before this patch point.
-                // Refresh again so the first menu open immediately reflects cached translations.
-                this._menuLabelWindow?.refresh?.();
-            } catch (error) {
-                console.warn(
-                    '[TMMenuLabelTranslator] Failed to patch menu label window instance',
-                    error
-                );
-            }
+                    // TMMenuLabel refreshes once in its constructor before this patch point.
+                    // Refresh again so the first menu open immediately reflects cached translations.
+                    this._menuLabelWindow?.refresh?.();
+                } catch (error) {
+                    console.warn(
+                        '[TMMenuLabelTranslator] Failed to patch menu label window instance',
+                        error
+                    );
+                }
 
-            return result;
-        };
+                return result;
+            };
+        } else if (typeof originalCreate === 'function') {
+            // Compatibility fallback for versions that do not expose createMenuLabelWindow.
+            sceneMenuPrototype.create = function () {
+                const result = originalCreate.apply(this, arguments);
+
+                try {
+                    patchWindowInstanceDraw(this._menuLabelWindow);
+                    this._menuLabelWindow?.refresh?.();
+                } catch (error) {
+                    console.warn(
+                        '[TMMenuLabelTranslator] Failed to patch menu label window instance',
+                        error
+                    );
+                }
+
+                return result;
+            };
+        }
 
         window[RUNTIME_HOOK_GUARD] = true;
     }
@@ -202,7 +219,7 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
         const entries = [];
 
         const pluginEntry = this.findPluginEntry();
-        if (pluginEntry && pluginEntry.parameters) {
+        if (pluginEntry?.parameters) {
             this.appendEntriesFromParameters(
                 pluginEntry.parameters,
                 'pluginEntryParameter',
