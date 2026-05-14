@@ -52,6 +52,10 @@ const NAME_CACHE_TYPE = 'speaker';
 /**
  * Parse a Tachie MV plugin command line and return the speaker name, or null.
  * Format: "Tachie showName <name>" or "立ち絵 showName <name>"
+ *
+ * MV splits plugin commands by regular space (" ") only — NOT by all whitespace.
+ * Names may contain full-width spaces (U+3000), escape codes like \\i[250], etc.
+ * The name is everything after "showName " (the rest of args[1..] in MV terms).
  */
 function extractSpeakerNameFromPluginCommand(cmd) {
     const commandLine = typeof cmd.parameters?.[0] === 'string' ? cmd.parameters[0] : '';
@@ -59,7 +63,8 @@ function extractSpeakerNameFromPluginCommand(cmd) {
         return null;
     }
 
-    const parts = commandLine.trim().split(/\s+/);
+    // Split on regular space only to match MV's command356 parsing behavior.
+    const parts = commandLine.split(' ');
     const command = String(parts[0] || '').trim().toLowerCase();
 
     if (command !== TACHIE_COMMAND && command !== TACHIE_COMMAND_JP) {
@@ -70,10 +75,12 @@ function extractSpeakerNameFromPluginCommand(cmd) {
         return null;
     }
 
-    // parts[2] is the speaker name. It may contain spaces if the game dev
-    // used a single-token name, but Saba_Tachie reads args[1] which is
-    // the second space-separated token after the command prefix.
-    const name = String(parts[2] || '').trim();
+    // In MV, Game_Interpreter.command356 does: args = params[0].split(" "); command = args.shift();
+    // Then pluginCommand(command, args) is called with args = ["showName", "<name>"]
+    // Saba_Tachie reads args[1] which is parts[2] here (everything in that single token).
+    // However some games may have the name as multiple space-separated tokens after showName.
+    // Join everything from parts[2] onward to handle both cases.
+    const name = parts.slice(2).join(' ').trim();
     return name || null;
 }
 
@@ -113,21 +120,37 @@ export class SabaTachieTranslator extends BasePluginTranslator {
     enablePluginTranslation() {
         const TachieMessageClass = this._resolveTachieMessageClass();
         if (!TachieMessageClass?.prototype) {
+            console.warn('[SabaTachieTranslator] Window_TachieMessage not found at enablePluginTranslation time, deferring hook');
+            this._deferHookInstallation();
             return;
         }
 
+        this._installHooks(TachieMessageClass);
+    }
+
+    _deferHookInstallation() {
+        let attempts = 0;
+        const maxAttempts = 20;
+        const interval = setInterval(() => {
+            attempts++;
+            const TachieMessageClass = this._resolveTachieMessageClass();
+            if (TachieMessageClass?.prototype) {
+                clearInterval(interval);
+                console.log('[SabaTachieTranslator] Deferred hook: class found after', attempts, 'attempts');
+                this._installHooks(TachieMessageClass);
+            } else if (attempts >= maxAttempts) {
+                clearInterval(interval);
+                console.warn('[SabaTachieTranslator] Deferred hook: gave up after', maxAttempts, 'attempts');
+            }
+        }, 500);
+    }
+
+    _installHooks(TachieMessageClass) {
         const originalStartMessage = TachieMessageClass.prototype.startMessage;
         const originalTerminateMessage = TachieMessageClass.prototype.terminateMessage;
         const translator = this;
 
         // --- Bypass the main engine's canStart hook for Tachie messages ---
-        // The main engine patches Window_Message.prototype.canStart to block until
-        // translation is ready. Since Window_TachieMessage inherits from Window_Message,
-        // it picks up that patch, which conflicts with Tachie's flow (blocks indefinitely,
-        // stale _translateOriginalText causes wrong cache keys, choices get stuck).
-        //
-        // Override canStart on the Tachie prototype to use the vanilla behavior.
-        // Translation is handled entirely in the startMessage hook below.
         const vanillaCanStart =
             Window_Message.prototype._originalCanStart || Window_Message.prototype.canStart;
         TachieMessageClass.prototype.canStart = vanillaCanStart;
@@ -140,11 +163,18 @@ export class SabaTachieTranslator extends BasePluginTranslator {
                 console.warn('[SabaTachieTranslator] Failed to process message', error);
             }
             originalStartMessage.call(this);
+            // Speaker name must be translated AFTER originalStartMessage sets up the window
+            // but BEFORE _messageNameWindow.draw reads tachieName — however Tachie draws
+            // inside startMessage itself. So we also hook post-startMessage to re-draw
+            // the name window with the translated name if a cached translation exists.
+            try {
+                translator._applyTachieNamePostDraw(this);
+            } catch (error) {
+                console.warn('[SabaTachieTranslator] Failed to apply name translation', error);
+            }
         };
 
         // --- Clean up stale translation state between messages ---
-        // Tachie's terminateMessage does not call super, so the cheat engine's
-        // Window_Message.terminateMessage patch never fires.
         TachieMessageClass.prototype.terminateMessage = function () {
             this._translationApplied = false;
             if (window.$gameMessage) {
@@ -154,6 +184,8 @@ export class SabaTachieTranslator extends BasePluginTranslator {
             }
             originalTerminateMessage.call(this);
         };
+
+        console.log('[SabaTachieTranslator] Hooks installed successfully');
     }
 
     /**
@@ -210,13 +242,16 @@ export class SabaTachieTranslator extends BasePluginTranslator {
 
     /**
      * Core translation hook — runs before the original startMessage.
-     * Handles text, choices, and seen tracking for the current Tachie message.
+     * Handles text, choices, speaker name and seen tracking for the current Tachie message.
      */
     _applyTachieTranslation() {
         const runtime = this.getRuntime();
         if (!runtime || !this.isRuntimeTranslationActive(runtime)) {
             return;
         }
+
+        // --- Speaker name translation ---
+        this._trackAndTranslateSpeakerName(runtime);
 
         // --- Text translation ---
         const originalText = this._resolveOriginalText();
@@ -232,8 +267,6 @@ export class SabaTachieTranslator extends BasePluginTranslator {
 
             if (entry && typeof entry.value === 'string' && entry.value.trim()) {
                 this._applyTranslatedLines(entry.value);
-                // getPreferredMessageCacheEntry already tracks the resolved key internally,
-                // but also track explicitly so seen always updates even on fast skipping.
                 runtime.trackCacheKeyUsage(entry.cacheKey);
             } else {
                 // No cached translation — harvest the key for batch translation.
@@ -267,16 +300,58 @@ export class SabaTachieTranslator extends BasePluginTranslator {
                 $gameMessage._choices = translatedChoices.slice();
             }
         }
+    }
 
-        // --- Speaker name translation ---
-        const speakerName = window.$gameTemp?.tachieName;
-        if (typeof speakerName === 'string' && speakerName.trim()) {
+    /**
+     * Track speaker name and translate $gameTemp.tachieName if cached.
+     */
+    _trackAndTranslateSpeakerName(runtime) {
+        const speakerName = $gameTemp?.tachieName;
+        if (typeof speakerName !== 'string' || !speakerName.trim()) {
+            return;
+        }
+
+        const speakerKey = runtime.getCacheKey(speakerName, NAME_CACHE_TYPE);
+        runtime.trackCacheKeyUsage(speakerKey);
+
+        if (runtime.hasUsableCacheValue(speakerKey)) {
+            const cached = runtime.translationCache.get(speakerKey);
+            if (typeof cached === 'string' && cached.trim()) {
+                $gameTemp.tachieName = cached;
+            }
+        }
+    }
+
+    /**
+     * Post-draw hook: after the original startMessage has already called
+     * _messageNameWindow.draw(tachieName), re-draw with translated name
+     * if translation was applied to $gameTemp.tachieName.
+     * This handles the case where tachieName was translated but the original
+     * startMessage already read the pre-translation value.
+     */
+    _applyTachieNamePostDraw(messageWindow) {
+        const runtime = this.getRuntime();
+        if (!runtime) {
+            return;
+        }
+
+        const speakerName = $gameTemp?.tachieName;
+        if (typeof speakerName !== 'string' || !speakerName.trim()) {
+            return;
+        }
+
+        // If tachieName was already translated (in _applyTachieTranslation before
+        // the original startMessage ran), the name window already has the right text.
+        // But if translation happens to be available now (e.g. cache populated between
+        // pre and post), apply it by re-drawing the name window.
+        if (messageWindow._messageNameWindow && typeof messageWindow._messageNameWindow.draw === 'function') {
             const speakerKey = runtime.getCacheKey(speakerName, NAME_CACHE_TYPE);
-            runtime.trackCacheKeyUsage(speakerKey);
+            // Already tracked in _trackAndTranslateSpeakerName, just check cache
             if (runtime.hasUsableCacheValue(speakerKey)) {
                 const cached = runtime.translationCache.get(speakerKey);
-                if (typeof cached === 'string' && cached.trim()) {
+                if (typeof cached === 'string' && cached.trim() && cached !== speakerName) {
                     $gameTemp.tachieName = cached;
+                    messageWindow._messageNameWindow.draw(cached);
                 }
             }
         }
