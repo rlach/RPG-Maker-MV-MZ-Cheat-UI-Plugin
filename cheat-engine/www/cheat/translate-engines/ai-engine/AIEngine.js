@@ -486,6 +486,15 @@ class AIEngine extends BaseTranslationEngine {
 
         const counts = new Map();
 
+        const normalizeEscapePattern = (pattern) => {
+            const match = /^\\([A-Za-z${}|.!><^][A-Za-z0-9]*)(.*)$/.exec(String(pattern || ''));
+            if (!match) {
+                return String(pattern || '');
+            }
+
+            return `\\${match[1].toUpperCase()}${match[2]}`;
+        };
+
         const recordXml = (sym, val) => {
             let pattern;
             if (val === undefined || val === null) {
@@ -499,7 +508,7 @@ class AIEngine extends BaseTranslationEngine {
         };
 
         const recordEsc = (sym, numVal, sqVal, angVal, roundVal, curlyVal) => {
-            const normalizedSym = String(sym || '');
+            const normalizedSym = String(sym || '').toUpperCase();
             let pattern;
             if (numVal !== undefined) {
                 pattern = `\\${normalizedSym}[N]`;
@@ -543,7 +552,7 @@ class AIEngine extends BaseTranslationEngine {
         // Filter out patterns already covered by registered tags
         const registeredPatterns = this.tagManager.getRegisteredDetectionPatterns();
         for (const pattern of registeredPatterns) {
-            counts.delete(pattern);
+            counts.delete(normalizeEscapePattern(pattern));
         }
 
         return Array.from(counts.entries())

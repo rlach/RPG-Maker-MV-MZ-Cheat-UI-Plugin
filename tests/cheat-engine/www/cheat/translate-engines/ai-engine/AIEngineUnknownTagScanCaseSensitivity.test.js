@@ -6,18 +6,18 @@ function createEngine() {
 }
 
 describe('AIEngine.scanForUnknownTags case sensitivity', () => {
-    it('reports lowercase unknown tag symbol as lowercase (does not upcase to \\N)', () => {
+    it(String.raw`normalizes lowercase unknown tag symbol to uppercase suggestion pattern`, () => {
         const engine = createEngine();
-        const cache = new Map([['message:ja-en-\\n[hero_name] says hi', '']]);
+        const cache = new Map([[String.raw`message:ja-en-\n[hero_name] says hi`, '']]);
 
         const results = engine.scanForUnknownTags(cache);
         const patterns = new Set(results.map((r) => r.pattern));
 
-        expect(patterns.has('\\n[…]')).toBe(true);
-        expect(patterns.has('\\N[…]')).toBe(false);
+        expect(patterns.has(String.raw`\N[…]`)).toBe(true);
+        expect(patterns.has(String.raw`\n[…]`)).toBe(false);
     });
 
-    it('does not let registered uppercase \\N<...> hide lowercase unknown \\n[...]', () => {
+    it(String.raw`keeps unknown lowercase \n[...] visible when only uppercase \N<...> is registered`, () => {
         const engine = createEngine();
 
         engine.setCustomTags([
@@ -31,11 +31,24 @@ describe('AIEngine.scanForUnknownTags case sensitivity', () => {
             },
         ]);
 
-        const cache = new Map([['message:ja-en-\\n[hero_name] says hi', '']]);
+        const cache = new Map([[String.raw`message:ja-en-\n[hero_name] says hi`, '']]);
         const results = engine.scanForUnknownTags(cache);
         const patterns = new Set(results.map((r) => r.pattern));
 
-        expect(patterns.has('\\n[…]')).toBe(true);
-        expect(patterns.has('\\N[…]')).toBe(false);
+        expect(patterns.has(String.raw`\N[…]`)).toBe(true);
+        expect(patterns.has(String.raw`\n[…]`)).toBe(false);
+    });
+
+    it(String.raw`aggregates \N[...] and \n[...] into one normalized suggestion`, () => {
+        const engine = createEngine();
+        const cache = new Map([
+            [String.raw`message:ja-en-\N[hero_name] and \n[hero_name]`, ''],
+        ]);
+
+        const results = engine.scanForUnknownTags(cache);
+        const normalizedTag = results.find((r) => r.pattern === String.raw`\N[…]`);
+
+        expect(normalizedTag?.count).toBe(2);
+        expect(results.some((r) => r.pattern === String.raw`\n[…]`)).toBe(false);
     });
 });
