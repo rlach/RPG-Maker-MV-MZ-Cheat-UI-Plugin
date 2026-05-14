@@ -112,8 +112,14 @@ declare interface Window {
     __CHEAT_EXTERNAL_WINDOW__?: boolean;
     $externMessage?: any;
     $gameMessage?: any;
+    $gameTemp?: any;
     $gameParty?: any;
     $gameSystem?: any;
+    Saba?: {
+        Tachie?: { Window_TachieMessage?: any; [key: string]: any };
+        BackLog?: { $gameBackLog?: any; [key: string]: any };
+        [key: string]: any;
+    };
     $gameActors?: any;
     $dataMap?: any;
     $dataActors?: any;
