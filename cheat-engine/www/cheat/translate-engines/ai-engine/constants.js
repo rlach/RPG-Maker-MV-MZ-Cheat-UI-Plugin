@@ -62,6 +62,8 @@ export const TAG_CONFIGS = [
         type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
         tagSymbol: 'N',
         reservedWidth: 6,
+        extraPromptForLlm:
+            'This tag represents names, so treat them as such in text. NEVER change those tags into pronouns or implied subject.',
         requiredConsistency: true,
     },
     {

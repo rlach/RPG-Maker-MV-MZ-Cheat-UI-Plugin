@@ -110,7 +110,7 @@ export default {
             <v-card-title class="subtitle-1 font-weight-bold">
                 {{
                     customTagReadOnlyMode
-                        ? 'Edit Reserved Width'
+                        ? 'Edit Tag Overrides'
                         : customTagEditIndex >= 0
                             ? 'Edit Custom Tag'
                             : 'Add Custom Tag'
@@ -183,6 +183,21 @@ export default {
                     @keydown.stop
                     class="mb-2"
                 ></v-text-field>
+
+                <v-textarea
+                    v-model="customTagForm.extraPromptForLlm"
+                    label="Extra prompt for LLM"
+                    outlined
+                    dense
+                    hide-details
+                    rows="3"
+                    auto-grow
+                    @keydown.stop
+                    class="mb-2"
+                ></v-textarea>
+                <div class="caption grey--text text--lighten-1 mb-2">
+                    Tag name will be listed before the description.
+                </div>
 
                 <template v-if="customTagForm.type === 'withCustomParameter'">
                     <v-select
@@ -330,6 +345,7 @@ export default {
                 bracket: '<',
                 maskValue: false,
                 reservedWidth: 0,
+                extraPromptForLlm: '',
                 alwaysTranslate: false,
                 alwaysAddToKnowledgeBase: false,
             },
@@ -455,6 +471,7 @@ export default {
                     tag: {
                         ...tag,
                         reservedWidth: this.resolveEffectiveReservedWidth(tag, 'default', ''),
+                        extraPromptForLlm: this.resolveEffectiveExtraPrompt(tag, 'default', ''),
                     },
                     pluginName: '',
                     customIndex: -1,
@@ -473,6 +490,11 @@ export default {
                         tag: {
                             ...tag,
                             reservedWidth: this.resolveEffectiveReservedWidth(
+                                tag,
+                                'plugin',
+                                pluginName
+                            ),
+                            extraPromptForLlm: this.resolveEffectiveExtraPrompt(
                                 tag,
                                 'plugin',
                                 pluginName
@@ -497,6 +519,7 @@ export default {
                     tag: {
                         ...tag,
                         reservedWidth: this.resolveEffectiveReservedWidth(tag, 'custom', ''),
+                        extraPromptForLlm: this.resolveEffectiveExtraPrompt(tag, 'custom', ''),
                     },
                     pluginName: '',
                     customIndex: idx,
@@ -545,6 +568,15 @@ export default {
             }
 
             return this.normalizeReservedWidthInput(tag && tag.reservedWidth);
+        },
+
+        resolveEffectiveExtraPrompt(tag, source, pluginName) {
+            const engine = this._runtime && this._runtime.engine;
+            if (engine && typeof engine.resolveTagExtraPrompt === 'function') {
+                return engine.resolveTagExtraPrompt(tag, source, pluginName || '');
+            }
+
+            return String((tag && tag.extraPromptForLlm) || '').trim();
         },
 
         callRuntime(methodName, ...args) {
@@ -630,6 +662,7 @@ export default {
                 bracket: '<',
                 maskValue: false,
                 reservedWidth: 0,
+                extraPromptForLlm: '',
                 alwaysTranslate: false,
                 alwaysAddToKnowledgeBase: false,
             };
@@ -653,6 +686,7 @@ export default {
                 bracket: String(tag.bracket || '<'),
                 maskValue: !!tag.maskValue,
                 reservedWidth: this.normalizeReservedWidthInput(tag.reservedWidth),
+                extraPromptForLlm: String(tag.extraPromptForLlm || ''),
                 alwaysTranslate: !!tag.alwaysTranslate,
                 alwaysAddToKnowledgeBase: !!tag.alwaysAddToKnowledgeBase,
             };
@@ -679,6 +713,7 @@ export default {
                 alwaysTranslate: !!tag.alwaysTranslate,
                 alwaysAddToKnowledgeBase: !!tag.alwaysAddToKnowledgeBase,
                 reservedWidth: this.normalizeReservedWidthInput(tag.reservedWidth),
+                extraPromptForLlm: String(tag.extraPromptForLlm || ''),
             };
             this.customTagDialogVisible = true;
         },
@@ -703,6 +738,13 @@ export default {
                 tagSource,
                 tagConfig,
                 this.normalizeReservedWidthInput(this.customTagForm.reservedWidth),
+                pluginName || ''
+            );
+            this.callRuntime(
+                'updateAiTagExtraPrompt',
+                tagSource,
+                tagConfig,
+                String(this.customTagForm.extraPromptForLlm || '').trim(),
                 pluginName || ''
             );
             this.callRuntime('bindEngineConfigTo', this._runtime);
@@ -731,6 +773,7 @@ export default {
                 requiredConsistency: !!this.customTagForm.requiredConsistency,
                 style: String(this.customTagForm.style || 'escape'),
                 reservedWidth: this.normalizeReservedWidthInput(this.customTagForm.reservedWidth),
+                extraPromptForLlm: String(this.customTagForm.extraPromptForLlm || '').trim(),
                 alwaysTranslate: !maskValue && !!this.customTagForm.alwaysTranslate,
                 alwaysAddToKnowledgeBase:
                     !maskValue &&
@@ -825,6 +868,7 @@ export default {
                     maskValue: false,
                     requiredConsistency: false,
                     reservedWidth: 0,
+                    extraPromptForLlm: '',
                 };
             }
 
@@ -859,6 +903,7 @@ export default {
                     maskValue: false,
                     requiredConsistency: false,
                     reservedWidth: 0,
+                    extraPromptForLlm: '',
                 };
             }
 
@@ -871,6 +916,7 @@ export default {
                 maskValue: false,
                 requiredConsistency: false,
                 reservedWidth: 0,
+                extraPromptForLlm: '',
             };
         },
 

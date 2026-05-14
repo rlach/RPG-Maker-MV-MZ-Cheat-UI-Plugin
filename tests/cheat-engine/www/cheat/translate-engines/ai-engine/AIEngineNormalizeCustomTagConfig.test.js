@@ -113,6 +113,32 @@ describe('AIEngine.normalizeCustomTagConfig: preserves alwaysAddToKnowledgeBase'
     });
 });
 
+describe('AIEngine.normalizeCustomTagConfig: extraPromptForLlm', () => {
+    it('preserves and trims extraPromptForLlm', () => {
+        const engine = createEngine();
+        const result = engine.normalizeCustomTagConfig({
+            description: 'name tag',
+            type: 'withNumericParameter',
+            tagSymbol: 'N',
+            requiredConsistency: true,
+            extraPromptForLlm: '  names only, do not paraphrase  ',
+        });
+        expect(result.extraPromptForLlm).toBe('names only, do not paraphrase');
+    });
+
+    it('defaults extraPromptForLlm to empty string for non-string input', () => {
+        const engine = createEngine();
+        const result = engine.normalizeCustomTagConfig({
+            description: 'name tag',
+            type: 'withNumericParameter',
+            tagSymbol: 'N',
+            requiredConsistency: true,
+            extraPromptForLlm: null,
+        });
+        expect(result.extraPromptForLlm).toBe('');
+    });
+});
+
 // ---------------------------------------------------------------------------
 // Regression: addPluginTags must preserve alwaysTranslate through the full
 // normalizeCustomTagConfig → _refreshTagManager → tagEntries pipeline.

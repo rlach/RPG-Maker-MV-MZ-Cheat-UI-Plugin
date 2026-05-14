@@ -294,6 +294,7 @@ export class ConfigManager {
             useJsonFixer: this.aiEngine.useJsonFixer,
             aiCustomTags: this.aiEngine.customTags,
             aiTagReservedWidthOverrides: this.aiEngine.tagReservedWidthOverrides,
+            aiTagExtraPromptOverrides: this.aiEngine.tagExtraPromptOverrides,
             aiCustomTagTypeOptions: this.aiEngine.customTagTypeOptions,
             aiCustomTagBracketOptions: this.aiEngine.customTagBracketOptions,
             aiCustomTagStyleOptions: this.aiEngine.customTagStyleOptions,
@@ -384,6 +385,19 @@ export class ConfigManager {
                         source,
                         pluginName,
                         reservedWidth
+                    );
+                },
+                {
+                    syncPanel: true,
+                }
+            ),
+            updateAiTagExtraPrompt: this._createPersistedHandler(
+                (source, tagConfig, extraPromptForLlm, pluginName = '') => {
+                    this.aiEngine.setTagExtraPromptOverride(
+                        tagConfig,
+                        source,
+                        pluginName,
+                        extraPromptForLlm
                     );
                 },
                 {

@@ -300,6 +300,11 @@ export class TagManager {
                 ? Math.floor(parsedReservedWidth)
                 : 0;
 
+        normalized.extraPromptForLlm =
+            typeof normalized.extraPromptForLlm === 'string'
+                ? normalized.extraPromptForLlm.trim()
+                : '';
+
         // alwaysTranslate: only valid for non-masked withCustomParameter or withoutParameter
         // (not applicable when maskValue is true — value is not sent to LLM)
         const isMasked =
@@ -1149,6 +1154,35 @@ export class TagManager {
                 result.push(`b=${entry.tagId}`);
             }
         }
+        return result;
+    }
+
+    /**
+     * Collect additional prompt entries for tags that are present in preprocessed texts.
+     * Returns values formatted as "b=tagId - extraPromptText".
+     * @param {string[]} preprocessedTexts
+     * @returns {string[]}
+     */
+    getAdditionalTagPromptInfos(preprocessedTexts) {
+        const texts = Array.isArray(preprocessedTexts) ? preprocessedTexts : [];
+        const result = [];
+
+        for (const entry of this.tagEntries) {
+            const extraPrompt =
+                typeof entry.extraPromptForLlm === 'string' ? entry.extraPromptForLlm.trim() : '';
+            if (!extraPrompt) {
+                continue;
+            }
+
+            const needle = `[b=${entry.tagId}`;
+            if (!texts.some((t) => typeof t === 'string' && t.includes(needle))) {
+                continue;
+            }
+
+            const compactPrompt = extraPrompt.replace(/\s+/g, ' ').trim();
+            result.push(`b=${entry.tagId} - ${compactPrompt}`);
+        }
+
         return result;
     }
 

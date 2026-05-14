@@ -90,6 +90,14 @@ const TAG_PLAIN_NO_FLAGS = {
     requiredConsistency: true,
 };
 
+const TAG_WITH_EXTRA_PROMPT = {
+    description: 'numeric extra prompt tag',
+    type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
+    tagSymbol: 'NP',
+    requiredConsistency: true,
+    extraPromptForLlm: '  first line\nsecond line  ',
+};
+
 // ---------------------------------------------------------------------------
 // validateAndNormalizeConfig: alwaysTranslate constraints
 // ---------------------------------------------------------------------------
@@ -258,6 +266,41 @@ describe('getAlwaysAddToKnowledgeBaseTagIds', () => {
         const tm = createTagManager([TAG_ALWAYS_KBASE]);
         expect(tm.getAlwaysAddToKnowledgeBaseTagIds(null)).toEqual([]);
         expect(tm.getAlwaysAddToKnowledgeBaseTagIds(undefined)).toEqual([]);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// getAdditionalTagPromptInfos
+// ---------------------------------------------------------------------------
+
+describe('getAdditionalTagPromptInfos', () => {
+    it('returns empty array when tag with extra prompt is not present in texts', () => {
+        const tm = createTagManager([TAG_WITH_EXTRA_PROMPT]);
+        const infos = tm.getAdditionalTagPromptInfos(['plain text without tags']);
+        expect(infos).toEqual([]);
+    });
+
+    it('returns compact b=tagId entry with normalized whitespace when tag is present', () => {
+        const tm = createTagManager([TAG_WITH_EXTRA_PROMPT]);
+        const entry = tm.tagEntries.find((e) => e.tagSymbol === 'NP');
+        const { preprocessedText } = tm.preprocessTags('before \\NP[3] after');
+        const infos = tm.getAdditionalTagPromptInfos([preprocessedText]);
+        expect(infos).toEqual([`b=${entry.tagId} - first line second line`]);
+    });
+
+    it('ignores tags with empty extra prompt', () => {
+        const tm = createTagManager([
+            {
+                description: 'empty prompt tag',
+                type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
+                tagSymbol: 'EP',
+                requiredConsistency: true,
+                extraPromptForLlm: '   ',
+            },
+        ]);
+        const { preprocessedText } = tm.preprocessTags('before \\EP[1] after');
+        const infos = tm.getAdditionalTagPromptInfos([preprocessedText]);
+        expect(infos).toEqual([]);
     });
 });
 

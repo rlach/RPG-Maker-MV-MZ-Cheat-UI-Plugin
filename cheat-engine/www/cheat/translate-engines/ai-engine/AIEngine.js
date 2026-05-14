@@ -63,6 +63,7 @@ class AIEngine extends BaseTranslationEngine {
         this.customTags = [];
         this.pluginTags = []; // auto-registered by plugin translators, not user-editable
         this.tagReservedWidthOverrides = {};
+        this.tagExtraPromptOverrides = {};
         this.customTagTypeOptions = [...TAG_TYPE_OPTIONS];
         this.customTagBracketOptions = [...TAG_BRACKET_OPTIONS];
         this.customTagStyleOptions = [...TAG_STYLE_OPTIONS];
@@ -203,6 +204,12 @@ class AIEngine extends BaseTranslationEngine {
                     this.setTagReservedWidthOverrides(v);
                 },
             },
+            aiTagExtraPromptOverrides: {
+                get: () => this.tagExtraPromptOverrides,
+                set: (v) => {
+                    this.setTagExtraPromptOverrides(v);
+                },
+            },
             aiCustomTagTypeOptions: {
                 get: () => this.customTagTypeOptions,
             },
@@ -292,6 +299,9 @@ class AIEngine extends BaseTranslationEngine {
                 ? Math.floor(parsedReservedWidth)
                 : 0;
 
+        normalized.extraPromptForLlm =
+            typeof config.extraPromptForLlm === 'string' ? config.extraPromptForLlm.trim() : '';
+
         if (normalized.type === 'withCustomParameter') {
             normalized.bracket = String(
                 config.bracket || (normalized.style === 'xml' ? 'none' : '<')
@@ -323,6 +333,26 @@ class AIEngine extends BaseTranslationEngine {
                     : 0;
             if (reservedWidth > 0) {
                 normalized[trimmedKey] = reservedWidth;
+            }
+        });
+
+        return normalized;
+    }
+
+    normalizeTagExtraPromptOverrides(overrides = {}) {
+        if (!overrides || typeof overrides !== 'object') {
+            return {};
+        }
+
+        const normalized = {};
+        Object.entries(overrides).forEach(([key, value]) => {
+            const trimmedKey = String(key || '').trim();
+            if (!trimmedKey) {
+                return;
+            }
+            const normalizedValue = typeof value === 'string' ? value.trim() : '';
+            if (normalizedValue) {
+                normalized[trimmedKey] = normalizedValue;
             }
         });
 
@@ -387,16 +417,56 @@ class AIEngine extends BaseTranslationEngine {
         };
     }
 
+    resolveTagExtraPrompt(tagConfig = {}, source = 'default', pluginName = '') {
+        const baseExtraPrompt = this.normalizeCustomTagConfig(tagConfig).extraPromptForLlm;
+        const key = this.buildTagReservedWidthOverrideKey(tagConfig, source, pluginName);
+        const overrideValue = this.tagExtraPromptOverrides[key];
+        const normalizedOverride = typeof overrideValue === 'string' ? overrideValue.trim() : '';
+        return normalizedOverride || baseExtraPrompt;
+    }
+
+    setTagExtraPromptOverride(
+        tagConfig = {},
+        source = 'default',
+        pluginName = '',
+        extraPromptForLlm = ''
+    ) {
+        const key = this.buildTagReservedWidthOverrideKey(tagConfig, source, pluginName);
+        const nextExtraPrompt =
+            typeof extraPromptForLlm === 'string' ? extraPromptForLlm.trim() : '';
+        const baseExtraPrompt = this.normalizeCustomTagConfig(tagConfig).extraPromptForLlm;
+        const nextOverrides = { ...this.tagExtraPromptOverrides };
+
+        if (nextExtraPrompt === baseExtraPrompt || !nextExtraPrompt) {
+            delete nextOverrides[key];
+        } else {
+            nextOverrides[key] = nextExtraPrompt;
+        }
+
+        this.tagExtraPromptOverrides = this.normalizeTagExtraPromptOverrides(nextOverrides);
+        this._refreshTagManager();
+    }
+
+    applyTagExtraPrompt(tagConfig, source, pluginName) {
+        return {
+            ...tagConfig,
+            extraPromptForLlm: this.resolveTagExtraPrompt(tagConfig, source, pluginName),
+        };
+    }
+
     /** Merge plugin + user custom tags and push to TagManager. */
     _refreshTagManager() {
         const defaultTags = TAG_CONFIGS.map((tag) => {
-            return this.applyTagReservedWidth(tag, 'default', '');
+            const withReservedWidth = this.applyTagReservedWidth(tag, 'default', '');
+            return this.applyTagExtraPrompt(withReservedWidth, 'default', '');
         });
         const pluginTags = (this.pluginTags || []).map((tag) => {
-            return this.applyTagReservedWidth(tag, 'plugin', tag._pluginName || '');
+            const withReservedWidth = this.applyTagReservedWidth(tag, 'plugin', tag._pluginName || '');
+            return this.applyTagExtraPrompt(withReservedWidth, 'plugin', tag._pluginName || '');
         });
         const customTags = (this.customTags || []).map((tag) => {
-            return this.applyTagReservedWidth(tag, 'custom', '');
+            const withReservedWidth = this.applyTagReservedWidth(tag, 'custom', '');
+            return this.applyTagExtraPrompt(withReservedWidth, 'custom', '');
         });
         this.tagManager.setBaseTagConfigs(defaultTags);
         this.tagManager.setCustomTagConfigs([...pluginTags, ...customTags]);
@@ -410,6 +480,11 @@ class AIEngine extends BaseTranslationEngine {
 
     setTagReservedWidthOverrides(overrides) {
         this.tagReservedWidthOverrides = this.normalizeTagReservedWidthOverrides(overrides);
+        this._refreshTagManager();
+    }
+
+    setTagExtraPromptOverrides(overrides) {
+        this.tagExtraPromptOverrides = this.normalizeTagExtraPromptOverrides(overrides);
         this._refreshTagManager();
     }
 
@@ -921,12 +996,18 @@ class AIEngine extends BaseTranslationEngine {
                     ? ` When translating following tags always put all translations into knowledge base: ${alwaysKbaseTagIds.join(', ')}.`
                     : '';
 
+            const additionalTagInfos = this.tagManager.getAdditionalTagPromptInfos(preprocessedTexts);
+            const additionalTagInfoPart =
+                additionalTagInfos.length > 0
+                    ? ` Additional tag info: ${additionalTagInfos.join('; ')}.`
+                    : '';
+
             const payload = {
                 model: this.selectedModel,
                 messages: [
                     {
                         role: 'system',
-                        content: `Translate video game text from ${sourceName} to ${targetName}. ${this.systemPrompt} Official name translations, they HAVE to be used for consistency with existing material, don't make up your own translations: ${nameHints}.${knowledgePromptPart} The names might contain additional info, like gender, in brackets. Use it for additional context.${alwaysTranslatePart}${kbaseInstructionPart}${alwaysKbasePart}`,
+                        content: `Translate video game text from ${sourceName} to ${targetName}. ${this.systemPrompt}${additionalTagInfoPart} Official name translations, they HAVE to be used for consistency with existing material, don't make up your own translations: ${nameHints}.${knowledgePromptPart} The names might contain additional info, like gender, in brackets. Use it for additional context.${alwaysTranslatePart}${kbaseInstructionPart}${alwaysKbasePart}`,
                     },
                     // {
                     //     role: 'user',
