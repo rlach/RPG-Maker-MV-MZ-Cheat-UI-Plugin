@@ -12,6 +12,7 @@ import { DynamicDatabaseTranslator } from './translators/DynamicDatabaseTranslat
 import { EventLabelTranslator } from './translators/EventLabelTranslator.js';
 import { ExtraWindowTranslator } from './translators/ExtraWindowTranslator.js';
 import { GetInformationTranslator } from './translators/GetInformationTranslator.js';
+import { GirlsWindowTranslator } from './translators/GirlsWindowTranslator.js';
 import { HelpWindowPluginTranslator } from './translators/HelpWindowPluginTranslator.js';
 import { DestinationWindowTranslator } from './translators/DestinationWindowTranslator.js';
 import { ItemCombinationMZTranslator } from './translators/ItemCombinationMZTranslator.js';
@@ -37,6 +38,7 @@ import { NuunSaveScreenTranslator } from './translators/NuunSaveScreenTranslator
 import { OriginMenuStatusTranslator } from './translators/OriginMenuStatusTranslator.js';
 import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTextWindowTranslator.js';
 import { QuestSystemTranslator } from './translators/QuestSystemTranslator.js';
+import { ResidentWindowTranslator } from './translators/ResidentWindowTranslator.js';
 import { SceneCustomMenuTranslator } from './translators/SceneCustomMenuTranslator.js';
 import { SceneGlossaryTranslator } from './translators/SceneGlossaryTranslator.js';
 import { SaveNameInputTranslator } from './translators/SaveNameInputTranslator.js';
@@ -73,6 +75,7 @@ class PluginTranslatorRegistry {
             EventLabelTranslator,
             ExtraWindowTranslator,
             GetInformationTranslator,
+            GirlsWindowTranslator,
             HelpWindowPluginTranslator,
             DestinationWindowTranslator,
             ItemCombinationMZTranslator,
@@ -98,6 +101,7 @@ class PluginTranslatorRegistry {
             OriginMenuStatusTranslator,
             PandaProgressTextWindowTranslator,
             QuestSystemTranslator,
+            ResidentWindowTranslator,
             SceneCustomMenuTranslator,
             SceneGlossaryTranslator,
             SaveNameInputTranslator,
