@@ -23,6 +23,7 @@ import { LLStandingPictureTranslator } from './translators/LLStandingPictureTran
 import { MgpExternChoicesTranslator } from './translators/MgpExternChoicesTranslator.js';
 import { MogSceneMenuFileRenameTranslator } from './translators/MogSceneMenuFileRenameTranslator.js';
 import { MogSceneMenuTranslator } from './translators/MogSceneMenuTranslator.js';
+import { MogSceneItemTranslator } from './translators/MogSceneItemTranslator.js';
 import { MogBattleCommandsTranslator } from './translators/MogBattleCommandsTranslator.js';
 import { MogEventTextTranslator } from './translators/MogEventTextTranslator.js';
 import { MessageWindowPopupTranslator } from './translators/MessageWindowPopupTranslator.js';
@@ -85,6 +86,7 @@ class PluginTranslatorRegistry {
             MgpExternChoicesTranslator,
             MogSceneMenuFileRenameTranslator,
             MogSceneMenuTranslator,
+            MogSceneItemTranslator,
             MessageWindowPopupTranslator,
             MogBattleCommandsTranslator,
             MogEventTextTranslator,

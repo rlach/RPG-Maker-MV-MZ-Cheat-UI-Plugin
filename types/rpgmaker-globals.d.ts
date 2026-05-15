@@ -81,6 +81,8 @@ declare const Window_TitleCommand: any;
 declare const Window_Options: any;
 declare const Window_Help: any;
 declare const Window_ActorCommand: any;
+declare const Window_ItemCategory: any;
+declare const Window_ItemListM: any;
 declare const Window_ChoiceList: any;
 declare const Window_EquipStatus: any;
 declare const Window_EquipCommand: any;
@@ -165,6 +167,8 @@ declare interface Window {
     Window_Options?: any;
     Window_MenuCommand?: any;
     Window_ActorCommand?: any;
+    Window_ItemCategory?: any;
+    Window_ItemListM?: any;
     Window_TitleCommand?: any;
     Window_StatusBase?: any;
     Window_Gab?: any;

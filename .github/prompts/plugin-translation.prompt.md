@@ -112,3 +112,7 @@ Output requirements in final response:
 - Explain runtime hook point.
 - Confirm whether seen tracking was added and where.
 - Mention any assumptions or unresolved ambiguity.
+
+8. Image handling
+
+If user complains some of the text is not translated and code analysis shows the text is part of an image/texture do not make random solutions like overlaying text over the image. Inform user about the situation and ask for clarification on how they want to proceed. Remind user there's image extractor tools available in cheat engine that can be used to extract the text from the image, which can then be translated and re-inserted as a new image. Do not automate this process beyond existing tools.
