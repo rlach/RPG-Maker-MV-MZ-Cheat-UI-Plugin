@@ -145,7 +145,7 @@ async function bootstrapCheatUi() {
     setTimeout(() => {
         const runtime = ensureTranslateOnTheFlyRuntimeWithRetry({ maxAttempts: 10, delayMs: 500 });
         PLUGIN_TRANSLATOR_REGISTRY.ensureDetectionStarted({ runtime });
-    }, 2000);
+    }, 0);
 }
 
 bootstrapCheatUi();
