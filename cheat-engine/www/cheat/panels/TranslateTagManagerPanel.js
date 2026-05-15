@@ -105,7 +105,7 @@ export default {
     </v-data-table>
 
     <!-- Add / Edit custom tag dialog -->
-    <v-dialog v-model="customTagDialogVisible" max-width="560" @keydown.stop>
+    <v-dialog v-model="customTagDialogVisible" max-width="560" scrollable @keydown.stop>
         <v-card dark class="pt-2">
             <v-card-title class="subtitle-1 font-weight-bold">
                 {{
@@ -116,7 +116,7 @@ export default {
                             : 'Add Custom Tag'
                 }}
             </v-card-title>
-            <v-card-text>
+            <v-card-text style="max-height: 62vh; overflow-y: auto;">
                 <v-text-field
                     v-model="customTagForm.description"
                     label="Description"
@@ -349,6 +349,8 @@ export default {
                 alwaysTranslate: false,
                 alwaysAddToKnowledgeBase: false,
             },
+            pendingUnknownTagPattern: null,
+            returnToUnknownTagsAfterCustomDialog: false,
 
             // Static options (populated from runtime engine or fallback defaults)
             tagStyleOptions: [
@@ -759,6 +761,11 @@ export default {
                 pluginName: '',
                 tagConfig: null,
             };
+
+            if (this.returnToUnknownTagsAfterCustomDialog) {
+                this.returnToUnknownTagsAfterCustomDialog = false;
+                this.findUnknownTagsVisible = true;
+            }
         },
 
         saveCustomTag() {
@@ -795,12 +802,12 @@ export default {
             this.callRuntime('bindEngineConfigTo', this._runtime);
 
             // If this save was triggered from unknown-tag flow, remove matched pattern
-            if (this._pendingUnknownTagPattern !== null) {
+            if (this.pendingUnknownTagPattern !== null) {
                 this.unknownTagsList = this.unknownTagsList.filter(
-                    (u) => u.pattern !== this._pendingUnknownTagPattern
+                    (u) => u.pattern !== this.pendingUnknownTagPattern
                 );
                 this.saveUnknownTagsToStorage(this.unknownTagsList);
-                this._pendingUnknownTagPattern = null;
+                this.pendingUnknownTagPattern = null;
             }
 
             this.closeCustomTagDialog();
@@ -921,11 +928,17 @@ export default {
         },
 
         openAddCustomTagFromUnknown(unknownTag) {
-            this._pendingUnknownTagPattern = unknownTag.pattern;
+            this.pendingUnknownTagPattern = unknownTag.pattern;
+            this.returnToUnknownTagsAfterCustomDialog = true;
             const guessed = this.guessConfigFromPattern(unknownTag.pattern);
             this.customTagEditIndex = -1;
             this.customTagForm = guessed;
-            this.customTagDialogVisible = true;
+
+            // Avoid nested focus traps from two active dialogs (Vuetify can recurse on focusin).
+            this.findUnknownTagsVisible = false;
+            this.$nextTick(() => {
+                this.customTagDialogVisible = true;
+            });
         },
     },
 };

@@ -47,6 +47,7 @@ declare const Game_Screen: any;
 
 declare const Scene_Base: any;
 declare const Scene_Map: any;
+declare const Scene_Message: any;
 declare const Scene_Battle: any;
 declare const Scene_HelpWindow: any;
 declare const Scene_Title: any;
@@ -63,17 +64,19 @@ declare const Window_Message: any;
 declare const Window_Command: any;
 
 /** Saba_Tachie plugin namespace (立ち絵プラグイン by Sabakan). */
-declare const Saba: {
-    Tachie?: {
-        Window_TachieMessage?: any;
-        [key: string]: any;
-    };
-    BackLog?: {
-        $gameBackLog?: any;
-        [key: string]: any;
-    };
-    [key: string]: any;
-} | undefined;
+declare const Saba:
+    | {
+          Tachie?: {
+              Window_TachieMessage?: any;
+              [key: string]: any;
+          };
+          BackLog?: {
+              $gameBackLog?: any;
+              [key: string]: any;
+          };
+          [key: string]: any;
+      }
+    | undefined;
 declare const Window_MenuCommand: any;
 declare const Window_ScrollText: any;
 declare const Window_BattleLog: any;
@@ -84,6 +87,7 @@ declare const Window_ActorCommand: any;
 declare const Window_ItemCategory: any;
 declare const Window_ItemListM: any;
 declare const Window_ChoiceList: any;
+declare const Window_GalgeChoiceList: any;
 declare const Window_EquipStatus: any;
 declare const Window_EquipCommand: any;
 declare const Window_EquipSlot: any;
@@ -149,6 +153,7 @@ declare interface Window {
     SceneCheat?: any;
     Scene_Base?: any;
     Scene_Menu?: any;
+    Scene_Message?: any;
     SceneManager?: any;
     MessageCheat?: any;
     Game_Message?: any;
@@ -162,6 +167,7 @@ declare interface Window {
     DataManager?: any;
     Scene_Map?: any;
     Window_Base?: any;
+    Window_Command?: any;
     Window_Message?: any;
     Window_SavefileList?: any;
     Window_Options?: any;
@@ -176,6 +182,7 @@ declare interface Window {
     Window_Help?: any;
     Window_CustomMenuCommand?: any;
     Window_ChoiceList?: any;
+    Window_GalgeChoiceList?: any;
     PluginManager?: any;
     ConfigManager?: any;
     Torigoya?: any;

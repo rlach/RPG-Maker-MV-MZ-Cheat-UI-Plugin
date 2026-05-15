@@ -17,6 +17,7 @@ import { KmsMapActiveMessageTranslator } from './translators/KmsMapActiveMessage
 import { KzPictureChoicesTranslator } from './translators/KzPictureChoicesTranslator.js';
 import { KekeVariableActorCommandTranslator } from './translators/KekeVariableActorCommandTranslator.js';
 import { LunatlazurActorNameWindowTranslator } from './translators/LunatlazurActorNameWindowTranslator.js';
+import { LLGalgeChoiceWindowTranslator } from './translators/LLGalgeChoiceWindowTranslator.js';
 import { ManoInputConfigTranslator } from './translators/ManoInputConfigTranslator.js';
 import { LLMenuScreenTranslator } from './translators/LLMenuScreenTranslator.js';
 import { LLStandingPictureTranslator } from './translators/LLStandingPictureTranslator.js';
@@ -80,6 +81,7 @@ class PluginTranslatorRegistry {
             KzPictureChoicesTranslator,
             KekeVariableActorCommandTranslator,
             LunatlazurActorNameWindowTranslator,
+            LLGalgeChoiceWindowTranslator,
             LLMenuScreenTranslator,
             LLStandingPictureTranslator,
             ManoInputConfigTranslator,

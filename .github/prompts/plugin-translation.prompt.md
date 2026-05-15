@@ -90,6 +90,7 @@ Implementation workflow:
 
 5. Seen/cache-usage tracking rules:
 
+- ALWAYS prefer use of BasePluginTranslator resolveRuntimeTranslation. DO NOT REIMPLEMENT EXISTING FUNCTIONS WITH SLIGHT CHANGES.
 - If runtime provides getCacheKey, call trackCacheKeyUsage(cacheKey) at the observation point.
 - Do not add type-based tracking restrictions.
 - Do not introduce wrapper helpers for tracking unless truly necessary.
