@@ -2,8 +2,8 @@ import { TranslateOnTheFlyState } from '../TranslateOnTheFlyState.js';
 import { createEngine } from '../../translate-engines/index.js';
 import { ensureKnowledgeForLangPair } from '../KnowledgeBaseRuntime.js';
 import {
-    DEFAULT_TEXT_WRAP_FONT_SCALE_MULTIPLIER,
     createPersistedTranslationSettingsDefaults,
+    getDefaultEngineSpecificSettings,
     normalizePersistedTranslationSettings,
     serializePersistedTranslationSettings,
 } from './TranslationRuntimeDefaults.js';
@@ -247,7 +247,7 @@ export const translateOnTheFlySettingsMethods = {
         this.textWrapFontScaleMultiplier =
             Number.isFinite(parsedMultiplier) && parsedMultiplier > 0
                 ? parsedMultiplier
-                : DEFAULT_TEXT_WRAP_FONT_SCALE_MULTIPLIER;
+                : getDefaultEngineSpecificSettings().textWrapFontScaleMultiplier;
 
         // Don't clear cache - wrapping is applied on display, not stored in cache
         this.saveSettings();

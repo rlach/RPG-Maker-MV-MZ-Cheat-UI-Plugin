@@ -32,28 +32,29 @@ export const AI_INVALID_JSON_HANDLING_STRATEGY_OPTIONS = [
     { text: 'None', value: 'none' },
 ];
 
-export const DEFAULT_DIALOG_MAX_LINE_WIDTH_MV = 52;
+export const DEFAULT_DIALOG_MAX_LINE_WIDTH_MV = 55;
 export const DEFAULT_DIALOG_MAX_LINE_WIDTH_MZ = 60;
-export const DEFAULT_DIALOG_MAX_LINE_WIDTH_WITH_PORTRAIT_MV = 44;
+export const DEFAULT_DIALOG_MAX_LINE_WIDTH_WITH_PORTRAIT_MV = 43;
 export const DEFAULT_DIALOG_MAX_LINE_WIDTH_WITH_PORTRAIT_MZ = 47;
 export const DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MV = 53;
 export const DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MZ = 59;
-export const DEFAULT_TEXT_WRAP_FONT_SCALE_MULTIPLIER = 0.69;
+export const DEFAULT_TEXT_WRAP_FONT_SCALE_MULTIPLIER_MV = 0.72;
+export const DEFAULT_TEXT_WRAP_FONT_SCALE_MULTIPLIER_MZ = 0.69;
 
-export function getDefaultDialogMaxLineWidth() {
-    return isRpgMakerMv() ? DEFAULT_DIALOG_MAX_LINE_WIDTH_MV : DEFAULT_DIALOG_MAX_LINE_WIDTH_MZ;
-}
-
-export function getDefaultDescriptionMaxLineWidth() {
+export function getDefaultEngineSpecificSettings() {
     return isRpgMakerMv()
-        ? DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MV
-        : DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MZ;
-}
-
-export function getDefaultDialogMaxLineWidthWithPortrait() {
-    return isRpgMakerMv()
-        ? DEFAULT_DIALOG_MAX_LINE_WIDTH_WITH_PORTRAIT_MV
-        : DEFAULT_DIALOG_MAX_LINE_WIDTH_WITH_PORTRAIT_MZ;
+        ? {
+              textWrapFontScaleMultiplier: DEFAULT_TEXT_WRAP_FONT_SCALE_MULTIPLIER_MV,
+              dialogMaxLineWidth: DEFAULT_DIALOG_MAX_LINE_WIDTH_MV,
+              dialogMaxLineWidthWithPortrait: DEFAULT_DIALOG_MAX_LINE_WIDTH_WITH_PORTRAIT_MV,
+              descriptionMaxLineWidth: DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MV,
+          }
+        : {
+              textWrapFontScaleMultiplier: DEFAULT_TEXT_WRAP_FONT_SCALE_MULTIPLIER_MZ,
+              dialogMaxLineWidth: DEFAULT_DIALOG_MAX_LINE_WIDTH_MZ,
+              dialogMaxLineWidthWithPortrait: DEFAULT_DIALOG_MAX_LINE_WIDTH_WITH_PORTRAIT_MZ,
+              descriptionMaxLineWidth: DEFAULT_DESCRIPTION_MAX_LINE_WIDTH_MZ,
+          };
 }
 
 export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
@@ -231,10 +232,10 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
         targetLang: 'en',
         translationCount: 0,
         enableTextWrapping: true,
-        maxLineWidth: getDefaultDialogMaxLineWidth(),
-        maxLineWidthWithPortrait: getDefaultDialogMaxLineWidthWithPortrait(),
-        descriptionMaxLineWidth: getDefaultDescriptionMaxLineWidth(),
-        textWrapFontScaleMultiplier: DEFAULT_TEXT_WRAP_FONT_SCALE_MULTIPLIER,
+        maxLineWidth: getDefaultEngineSpecificSettings().dialogMaxLineWidth,
+        maxLineWidthWithPortrait: getDefaultEngineSpecificSettings().dialogMaxLineWidthWithPortrait,
+        descriptionMaxLineWidth: getDefaultEngineSpecificSettings().descriptionMaxLineWidth,
+        textWrapFontScaleMultiplier: getDefaultEngineSpecificSettings().textWrapFontScaleMultiplier,
         translationEngine: 'mymemory',
         translateCacheWhenDisabled: false,
         translateImagesInCacheIfAny: true,
