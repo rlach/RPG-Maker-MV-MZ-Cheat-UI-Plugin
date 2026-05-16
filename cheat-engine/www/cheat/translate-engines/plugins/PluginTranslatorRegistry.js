@@ -60,6 +60,7 @@ import { YepEventMiniLabelTranslator } from './translators/YepEventMiniLabelTran
 import { SabaSimpleScenarioTranslator } from './translators/SabaSimpleScenarioTranslator.js';
 import { SabaTachieTranslator } from './translators/SabaTachieTranslator.js';
 import { YepGabWindowTranslator } from './translators/YepGabWindowTranslator.js';
+import { PHQuestBookTranslator } from './translators/PHQuestBookTranslator.js';
 
 class PluginTranslatorRegistry {
     constructor() {
@@ -102,6 +103,7 @@ class PluginTranslatorRegistry {
             NuunSaveScreenTranslator,
             OriginMenuStatusTranslator,
             PandaProgressTextWindowTranslator,
+            PHQuestBookTranslator,
             QuestSystemTranslator,
             SabaSimpleScenarioTranslator,
             SabaTachieTranslator,
