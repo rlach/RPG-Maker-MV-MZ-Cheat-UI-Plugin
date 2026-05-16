@@ -22,8 +22,11 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        this._hookDrawContentsBase();
+        if (!this._hookDrawContentsBase()) {
+            return false;
+        }
         this._hookDrawAnyName();
+        return true;
     }
 
     _hookDrawContentsBase() {
@@ -32,7 +35,7 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
             !Window_SavefileList.prototype ||
             typeof Window_SavefileList.prototype.drawContentsBase !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const cacheType = this.getCacheType();
@@ -80,6 +83,7 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
 
             return original.call(this, info, x, y, width, effectiveData, savefileId, r);
         };
+        return true;
     }
 
     _hookDrawAnyName() {
@@ -88,7 +92,7 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
             !Window_SavefileList.prototype ||
             typeof Window_SavefileList.prototype.drawAnyName !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const cacheType = this.getCacheType();
@@ -104,12 +108,7 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
                     (!!(runtime.isTranslationEnabled?.() || runtime.enabled) ||
                         !!runtime.translateCacheWhenDisabled);
 
-                if (
-                    isActive &&
-                    info &&
-                    typeof info.AnyName === 'string' &&
-                    info.AnyName.trim()
-                ) {
+                if (isActive && info && typeof info.AnyName === 'string' && info.AnyName.trim()) {
                     const cacheKey = runtime.getCacheKey(info.AnyName, cacheType);
                     runtime.trackCacheKeyUsage(cacheKey);
                     if (runtime.hasUsableCacheValue(cacheKey)) {
@@ -128,6 +127,7 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
 
             return original.call(this, effectiveInfo, x, y, width, data);
         };
+        return true;
     }
 
     async prepareTranslator() {
@@ -241,9 +241,7 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
 
         const pluginEntry = window.$plugins.find(
             (p) =>
-                p &&
-                typeof p.name === 'string' &&
-                p.name.trim().toLowerCase() === 'nuun_savescreen'
+                p && typeof p.name === 'string' && p.name.trim().toLowerCase() === 'nuun_savescreen'
         );
 
         if (!pluginEntry?.parameters) {
@@ -259,7 +257,10 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
         try {
             parsed = JSON.parse(rawContentsList);
         } catch (error) {
-            console.warn('[NuunSaveScreenTranslator] Failed to parse ContentsList parameter', error);
+            console.warn(
+                '[NuunSaveScreenTranslator] Failed to parse ContentsList parameter',
+                error
+            );
             return;
         }
 
@@ -276,7 +277,10 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
             try {
                 entry = JSON.parse(rawEntry);
             } catch (parseError) {
-                console.warn('[NuunSaveScreenTranslator] Failed to parse ContentsList entry', parseError);
+                console.warn(
+                    '[NuunSaveScreenTranslator] Failed to parse ContentsList entry',
+                    parseError
+                );
                 continue;
             }
 

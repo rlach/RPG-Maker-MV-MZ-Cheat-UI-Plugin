@@ -366,15 +366,15 @@ export class EventLabelTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (window.__CHEAT_EVENT_LABEL_TRANSLATOR_HOOKED__) {
-            return;
+            return true;
         }
 
         if (!window.Game_Event || !Game_Event.prototype) {
-            return;
+            return false;
         }
 
         if (typeof Game_Event.prototype.getEventLabel !== 'function') {
-            return;
+            return false;
         }
 
         const originalGetEventLabel = Game_Event.prototype.getEventLabel;
@@ -424,6 +424,7 @@ export class EventLabelTranslator extends BasePluginTranslator {
         };
 
         window.__CHEAT_EVENT_LABEL_TRANSLATOR_HOOKED__ = true;
+        return true;
     }
 
     buildUniquePendingItems(runtime) {

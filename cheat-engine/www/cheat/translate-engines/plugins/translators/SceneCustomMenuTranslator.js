@@ -117,7 +117,7 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
     enablePluginTranslation() {
         const WindowCustomMenuCommand = window.Window_CustomMenuCommand;
         if (!WindowCustomMenuCommand?.prototype) {
-            return;
+            return false;
         }
 
         const cacheType = this.getCacheType();
@@ -125,6 +125,9 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
         const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
 
         const originalDrawItemSub = WindowCustomMenuCommand.prototype.drawItemSub;
+        if (!originalDrawItemSub || typeof originalDrawItemSub !== 'function') {
+            return false;
+        }
         WindowCustomMenuCommand.prototype.drawItemSub = function (item, rect, index) {
             try {
                 const runtime = getRuntime();
@@ -175,6 +178,7 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
                 return text;
             }
         };
+        return true;
     }
 
     async prepareTranslator() {

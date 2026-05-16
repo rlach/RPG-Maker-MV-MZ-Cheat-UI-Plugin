@@ -33,9 +33,7 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
             return text;
         }
 
-        if (
-            !runtime
-        ) {
+        if (!runtime) {
             return text;
         }
 
@@ -53,7 +51,7 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
-            return;
+            return true;
         }
 
         const notifyWindowClass = window.Torigoya?.NotifyMessage?.Window;
@@ -62,7 +60,7 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
             !notifyWindowClass?.prototype ||
             typeof notifyWindowClass.prototype.setup !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const originalSetup = notifyWindowClass.prototype.setup;
@@ -86,6 +84,7 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
         };
 
         window[RUNTIME_HOOK_GUARD] = true;
+        return true;
     }
 
     async prepareTranslator() {

@@ -81,9 +81,7 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
     }
 
     resolveRuntimeTranslation(runtime, dataObject, field) {
-        if (
-            !runtime
-        ) {
+        if (!runtime) {
             return null;
         }
 
@@ -113,15 +111,14 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
-            return;
+            return true;
         }
 
         if (
-            !window.Window_Base ||
-            !Window_Base.prototype ||
+            !window.Window_Base?.prototype ||
             typeof Window_Base.prototype.drawItemName !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const translator = this;
@@ -162,7 +159,11 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
                         'description'
                     );
 
-                    if (translator.isUsableText(translatedDescription) && item && typeof item === 'object') {
+                    if (
+                        translator.isUsableText(translatedDescription) &&
+                        item &&
+                        typeof item === 'object'
+                    ) {
                         arguments[0] = {
                             ...item,
                             description: translatedDescription,
@@ -180,6 +181,7 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
         }
 
         window[RUNTIME_HOOK_GUARD] = true;
+        return true;
     }
 
     async prepareTranslator() {

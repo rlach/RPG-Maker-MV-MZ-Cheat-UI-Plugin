@@ -54,6 +54,9 @@ export class BasePluginTranslator extends BasePhase {
 
     enablePluginTranslation() {
         // Optional hook point for plugin-specific runtime integration.
+        // Return false if integration is not yet ready and should be retried after a delay.
+        // Never fail silently, either throw or return false to trigger retry, to ensure issues are visible in logs.
+        return true;
     }
 
     /**
@@ -133,8 +136,31 @@ export class BasePluginTranslator extends BasePhase {
                 if (!shouldApplyHook(this._getPluginHookName())) {
                     return this._pluginDetected;
                 }
+                const maxRetries = 20;
+                const retryDelayMs = 100;
+                let retries = 0;
 
-                this.enablePluginTranslation();
+                const tryEnable = () => {
+                    const result = this.enablePluginTranslation();
+                    if (result !== false) {
+                        console.log(
+                            `[PluginTranslator] Plugin translation mounted for ${this.getPluginName()} after ${retries} retries.`
+                        );
+                        return;
+                    }
+
+                    if (retries >= maxRetries) {
+                        console.info(
+                            `[PluginTranslator] Plugin translation never mounted for ${this.getPluginName()} after ${maxRetries} retries.`
+                        );
+                        return;
+                    }
+
+                    retries += 1;
+                    setTimeout(tryEnable, retryDelayMs);
+                };
+
+                tryEnable();
             } catch (error) {
                 console.warn(
                     `[PluginTranslator] Failed to enable plugin translation for ${this.getPluginName()}`,

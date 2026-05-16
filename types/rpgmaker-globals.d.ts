@@ -62,6 +62,7 @@ declare const Window_Selectable: any;
 declare const Window_SavefileList: any;
 declare const Window_Message: any;
 declare const Window_Command: any;
+declare const Game_Party: any;
 
 /** Saba_Tachie plugin namespace (立ち絵プラグイン by Sabakan). */
 declare const Saba:
@@ -159,6 +160,7 @@ declare interface Window {
     Game_Message?: any;
     Game_Screen?: any;
     Game_System?: any;
+    Game_Party?: any;
     Game_Picture?: any;
     Game_Event?: any;
     Game_CharacterBase?: any;

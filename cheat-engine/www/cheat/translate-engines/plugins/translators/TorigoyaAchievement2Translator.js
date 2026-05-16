@@ -81,9 +81,7 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
 
             runtime.trackCacheKeyUsage(cacheKey);
 
-            if (
-                !runtime.hasUsableCacheValue(cacheKey)
-            ) {
+            if (!runtime.hasUsableCacheValue(cacheKey)) {
                 continue;
             }
 
@@ -275,38 +273,36 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        const namespace = window.Torigoya && window.Torigoya.Achievement2;
+        const namespace = window.Torigoya?.Achievement2;
         if (!namespace) {
-            return;
+            return false;
         }
 
         const translator = this;
         const popupWindowClass = namespace.Window_AchievementPopup;
-        if (
-            popupWindowClass &&
-            popupWindowClass.prototype &&
-            typeof popupWindowClass.prototype.drawTitle === 'function'
-        ) {
+        if (!popupWindowClass?.prototype) {
+            return false;
+        }
+
+        if (typeof popupWindowClass.prototype.drawTitle === 'function') {
             popupWindowClass.prototype.drawTitle = function () {
                 this.resetFontSettings();
                 const runtime = translator.getRuntime();
                 const title = translator.translateRuntimeText(
-                    this._item &&
-                        this._item.achievement &&
-                        typeof this._item.achievement.title === 'string'
+                    this._item?.achievement && typeof this._item.achievement.title === 'string'
                         ? this._item.achievement.title
                         : '',
                     runtime
                 );
-                this.drawTextEx(`\\c[${namespace.parameter.popupTitleColor}]${title}`, 40, 0);
+                this.drawTextEx(
+                    String.raw`\c[${namespace.parameter.popupTitleColor}]${title}`,
+                    40,
+                    0
+                );
             };
         }
 
-        if (
-            popupWindowClass &&
-            popupWindowClass.prototype &&
-            typeof popupWindowClass.prototype.drawMessage === 'function'
-        ) {
+        if (typeof popupWindowClass.prototype.drawMessage === 'function') {
             popupWindowClass.prototype.drawMessage = function () {
                 const textWidth = this.windowWidth() - this.standardPadding() * 2 - 40;
                 const titleFontSize = this.titleFontSize?.() ?? this.standardFontSize();
@@ -332,8 +328,7 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
 
         const listWindowClass = namespace.Window_AchievementList;
         if (
-            listWindowClass &&
-            listWindowClass.prototype &&
+            listWindowClass?.prototype &&
             typeof listWindowClass.prototype.drawItem === 'function'
         ) {
             listWindowClass.prototype.drawItem = function (index) {
@@ -389,8 +384,7 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
         }
 
         if (
-            listWindowClass &&
-            listWindowClass.prototype &&
+            listWindowClass?.prototype &&
             typeof listWindowClass.prototype.updateHelp === 'function'
         ) {
             listWindowClass.prototype.updateHelp = function () {
@@ -421,8 +415,7 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
         }
 
         if (
-            window.Window_TitleCommand &&
-            Window_TitleCommand.prototype &&
+            window.Window_TitleCommand?.prototype &&
             typeof Window_TitleCommand.prototype.makeCommandList === 'function'
         ) {
             const originalMakeCommandList = Window_TitleCommand.prototype.makeCommandList;
@@ -434,8 +427,7 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
         }
 
         if (
-            window.Window_MenuCommand &&
-            Window_MenuCommand.prototype &&
+            window.Window_MenuCommand?.prototype &&
             typeof Window_MenuCommand.prototype.addOriginalCommands === 'function'
         ) {
             const originalAddOriginalCommands = Window_MenuCommand.prototype.addOriginalCommands;
@@ -445,6 +437,8 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
                 return result;
             };
         }
+
+        return true;
     }
 
     async prepareTranslator() {

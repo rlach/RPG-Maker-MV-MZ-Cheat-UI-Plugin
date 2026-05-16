@@ -46,6 +46,7 @@ export class ExternMessageTranslator extends ExternBaseTranslator {
     enablePluginTranslation() {
         // No runtime hook required. ExternMessage ultimately feeds standard
         // Show Text commands, so the base text translation runtime applies cache.
+        return true;
     }
 
     buildScanEntries() {

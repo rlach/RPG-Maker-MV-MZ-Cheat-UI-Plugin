@@ -10,10 +10,7 @@ function getTranslatedMessageTextForPopupSizing(runtime, originalText, options =
         return null;
     }
 
-    if (
-        !runtime ||
-        typeof runtime.getPreferredMessageCacheEntry !== 'function'
-    ) {
+    if (!runtime || typeof runtime.getPreferredMessageCacheEntry !== 'function') {
         return null;
     }
 
@@ -116,7 +113,7 @@ export class MessageWindowPopupTranslator extends BasePluginTranslator {
         const translator = this;
 
         if (window[RUNTIME_HOOK_GUARD]) {
-            return;
+            return true;
         }
 
         if (
@@ -125,7 +122,7 @@ export class MessageWindowPopupTranslator extends BasePluginTranslator {
             typeof Window_Message.prototype.resizeForPopup !== 'function'
         ) {
             debugLog('Skipped hook install: Window_Message.resizeForPopup is missing');
-            return;
+            return false;
         }
 
         debugLog('Installing hooks');
@@ -319,6 +316,7 @@ export class MessageWindowPopupTranslator extends BasePluginTranslator {
         }
 
         window[RUNTIME_HOOK_GUARD] = true;
+        return true;
     }
 
     async prepareTranslator() {

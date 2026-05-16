@@ -54,9 +54,13 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        this.installEarlyWindowCommandHook();
-        this.installSceneMessageHooks();
-        this.installLegacyScenePushHooks();
+        if (
+            !this.installEarlyWindowCommandHook() ||
+            !this.installSceneMessageHooks() ||
+            !this.installLegacyScenePushHooks()
+        ) {
+            return false;
+        }
 
         try {
             const currentScene = SceneManager?._scene;
@@ -73,6 +77,7 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
                 error
             );
         }
+        return true;
     }
 
     installSceneMessageHooks() {
@@ -81,7 +86,7 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
             !SceneMessageClass?.prototype ||
             typeof SceneMessageClass.prototype.createGalgeChoiceListWindow !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const installWindowHooks = this.installGalgeWindowHooks.bind(this);
@@ -102,6 +107,7 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
 
             return result;
         };
+        return true;
     }
 
     installEarlyWindowCommandHook() {
@@ -109,12 +115,12 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
             !Window_Command?.prototype ||
             typeof Window_Command.prototype.initialize !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const commandProto = Window_Command.prototype;
         if (commandProto.__CHEAT_LL_GALGE_WINDOW_COMMAND_INIT_HOOKED__) {
-            return;
+            return true;
         }
 
         const installGalgeWindowHooks = this.installGalgeWindowHooks.bind(this);
@@ -150,6 +156,7 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
             enumerable: false,
             writable: false,
         });
+        return true;
     }
 
     isLikelyGalgeChoiceWindow(windowInstance) {
@@ -172,11 +179,11 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
 
     installLegacyScenePushHooks() {
         if (!SceneManager || typeof SceneManager.push !== 'function') {
-            return;
+            return false;
         }
 
         if (SceneManager.__CHEAT_LL_GALGE_SCENE_PUSH_HOOKED__) {
-            return;
+            return true;
         }
 
         const installLegacySceneHooks = this.installLegacySceneHooks.bind(this);
@@ -200,6 +207,7 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
             enumerable: false,
             writable: false,
         });
+        return true;
     }
 
     installLegacySceneHooks(sceneClass) {

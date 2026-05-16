@@ -95,11 +95,10 @@ export class ExtraWindowTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (
-            !window.Window_SceneExtra ||
-            !Window_SceneExtra.prototype ||
+            !window.Window_SceneExtra?.prototype ||
             typeof Window_SceneExtra.prototype.drawAllText !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const cacheType = this.getCacheType();
@@ -147,6 +146,7 @@ export class ExtraWindowTranslator extends BasePluginTranslator {
                 return original.apply(this, arguments);
             }
         };
+        return true;
     }
 
     async prepareTranslator() {

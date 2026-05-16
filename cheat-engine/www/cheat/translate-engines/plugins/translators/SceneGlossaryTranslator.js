@@ -57,11 +57,7 @@ const SCENE_GLOSSARY_PLUGIN_TAGS = (() => {
                 `SGCommonDescription${index}`,
                 false
             ),
-            xmlCustom(
-                `SG not-yet description page${index} (ja)`,
-                `SG未入手説明${index}`,
-                false
-            ),
+            xmlCustom(`SG not-yet description page${index} (ja)`, `SG未入手説明${index}`, false),
             xmlCustom(
                 `SG not-yet description page${index} (en)`,
                 `SGNotYetDescription${index}`,
@@ -237,7 +233,7 @@ function getOriginalItemNote(item) {
         return originalMap.note;
     }
 
-    return (typeof item.note === 'string' && item.note.trim() !== '') ? item.note : '';
+    return typeof item.note === 'string' && item.note.trim() !== '' ? item.note : '';
 }
 
 function getOriginalItemMeta(item) {
@@ -263,7 +259,10 @@ function buildMetaPatchFromNoteText(noteText) {
 
     for (const tagEntry of tagEntries) {
         const tagName = String(tagEntry.tag || '').trim();
-        if (!tagName.startsWith('SG') || !(typeof tagEntry.value === 'string' && tagEntry.value.trim() !== '')) {
+        if (
+            !tagName.startsWith('SG') ||
+            !(typeof tagEntry.value === 'string' && tagEntry.value.trim() !== '')
+        ) {
             continue;
         }
 
@@ -344,7 +343,9 @@ function extractDescriptionFromNoteText(noteText, pageIndex) {
     );
     const tagEntries = parseNoteTagEntries(noteText);
     for (const tagEntry of tagEntries) {
-        const tagName = String(tagEntry.tag || '').trim().toLowerCase();
+        const tagName = String(tagEntry.tag || '')
+            .trim()
+            .toLowerCase();
         if (!wanted.has(tagName)) {
             continue;
         }
@@ -425,10 +426,13 @@ function patchGlossaryDescription(translator) {
         !Window_Glossary.prototype ||
         typeof Window_Glossary.prototype.getDescription !== 'function'
     ) {
-        return;
+        return false;
     }
 
     const originalGetDescription = Window_Glossary.prototype.getDescription;
+    if (!originalGetDescription || typeof originalGetDescription !== 'function') {
+        return false;
+    }
     Window_Glossary.prototype.getDescription = function (index) {
         applyTranslatedGlossaryMeta(translator, this._itemData);
         const description = originalGetDescription.apply(this, arguments);
@@ -453,6 +457,8 @@ function patchGlossaryDescription(translator) {
             return originalGetMetaContents.apply(this, arguments);
         };
     }
+
+    return true;
 }
 
 function patchGlossaryCategoryWindow(translator) {
@@ -467,7 +473,8 @@ function patchGlossaryCategoryWindow(translator) {
     const originalDrawItem = Window_GlossaryCategory.prototype.drawItem;
     Window_GlossaryCategory.prototype.drawItem = function (index) {
         const hasData = Array.isArray(this._data) && index >= 0 && index < this._data.length;
-        const originalText = hasData && typeof this._data[index] === 'string' ? this._data[index] : '';
+        const originalText =
+            hasData && typeof this._data[index] === 'string' ? this._data[index] : '';
 
         try {
             if (hasData && translator.isUsableText(originalText)) {
@@ -598,7 +605,11 @@ function patchGlossaryMenuCommand(translator) {
         try {
             const list = Array.isArray(this._list) ? this._list : [];
             for (const command of list) {
-                if (!command || !translator.isUsableText(command.symbol) || !translator.isUsableText(command.name)) {
+                if (
+                    !command ||
+                    !translator.isUsableText(command.symbol) ||
+                    !translator.isUsableText(command.name)
+                ) {
                     continue;
                 }
 
@@ -644,15 +655,18 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
-            return;
+            return true;
         }
 
-        this.registerPluginCustomTags(SCENE_GLOSSARY_PLUGIN_TAGS);
-        patchGlossaryDescription(this);
+        if (!patchGlossaryDescription(this)) {
+            return false;
+        }
         patchGlossaryCategoryWindow(this);
         patchGlossaryPartyMessages(this);
         patchGlossaryMenuCommand(this);
+        this.registerPluginCustomTags(SCENE_GLOSSARY_PLUGIN_TAGS);
         window[RUNTIME_HOOK_GUARD] = true;
+        return true;
     }
 
     async prepareTranslator() {
@@ -712,7 +726,9 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            const cacheType = this.isUsableText(entry.cacheType) ? entry.cacheType : this.getCacheType();
+            const cacheType = this.isUsableText(entry.cacheType)
+                ? entry.cacheType
+                : this.getCacheType();
             const cacheKey = runtime.getCacheKey(text, cacheType);
             if (!byCacheKey.has(cacheKey)) {
                 byCacheKey.set(cacheKey, {

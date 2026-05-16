@@ -31,12 +31,10 @@ export class DTextPictureTranslator extends BasePluginTranslator {
         const translator = this;
 
         if (
-            !window.Game_Screen ||
-            !window.Game_Screen ||
-            !Game_Screen.prototype ||
+            !window.Game_Screen?.prototype ||
             typeof Game_Screen.prototype.setDTextPicture !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const original = Game_Screen.prototype.setDTextPicture;
@@ -62,6 +60,7 @@ export class DTextPictureTranslator extends BasePluginTranslator {
 
             return original.apply(this, arguments);
         };
+        return true;
     }
 
     async prepareTranslator() {

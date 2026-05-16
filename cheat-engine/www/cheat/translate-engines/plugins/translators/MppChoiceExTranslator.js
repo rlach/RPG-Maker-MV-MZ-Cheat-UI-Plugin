@@ -20,7 +20,9 @@ function normalizeChoiceDisplayText(choiceText) {
 }
 
 function normalizeCommandName(value) {
-    return String(value || '').trim().toLowerCase();
+    return String(value || '')
+        .trim()
+        .toLowerCase();
 }
 
 function toStringArray(value) {
@@ -96,7 +98,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (runtimeGlobal[RUNTIME_HOOK_GUARD]) {
-            return;
+            return true;
         }
 
         if (
@@ -104,7 +106,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
             !Game_Interpreter.prototype ||
             typeof Game_Interpreter.prototype.setupChoices !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const originalSetupChoices = Game_Interpreter.prototype.setupChoices;
@@ -126,6 +128,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
         };
 
         runtimeGlobal[RUNTIME_HOOK_GUARD] = true;
+        return true;
     }
 
     applyRuntimeChoiceTranslations(data, startIndex) {
@@ -134,9 +137,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
         }
 
         const runtime = this.getRuntime();
-        if (
-            !runtime
-        ) {
+        if (!runtime) {
             return;
         }
 

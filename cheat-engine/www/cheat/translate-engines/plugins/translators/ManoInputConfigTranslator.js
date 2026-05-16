@@ -173,19 +173,26 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
-            return;
+            return true;
         }
 
-        this._hookOptionsCommandName();
+        if (!this._hookOptionsCommandName()) {
+            return false;
+        }
 
         if (this._isMvVersion()) {
-            this._hookMV();
+            if (!this._hookMV()) {
+                return false;
+            }
         } else {
-            this._hookKeyConfigDrawCommand();
+            if (!this._hookKeyConfigDrawCommand()) {
+                return false;
+            }
             this._hookGamepadConfigScene();
         }
 
         window[RUNTIME_HOOK_GUARD] = true;
+        return true;
     }
 
     /**
@@ -200,7 +207,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
             this.resolveFromCache(text, runtime);
         const manoNs = window['Mano_InputConfig'];
         if (!manoNs) {
-            return;
+            return false;
         }
 
         // ── Window_KeyConfig: drawCommand(commandName, rect) ─────────────────
@@ -208,7 +215,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
         // drawChangeLayoutCommand which call this.drawText(setting.commandText.*,…)
         // directly without going through drawCommand.
         const WindowKeyConfig = manoNs['Window_KeyConfig'];
-        if (WindowKeyConfig && WindowKeyConfig.prototype) {
+        if (WindowKeyConfig?.prototype) {
             const kcProto = WindowKeyConfig.prototype;
 
             if (typeof kcProto.drawCommand === 'function') {
@@ -257,12 +264,14 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
                     };
                 }
             }
+        } else {
+            return false;
         }
 
         // ── Window_GamepadConfig: symbolText(index) ──────────────────────────
         // drawItem calls this.symbolText(index) to get the action name string.
         const WindowGamepadConfig = manoNs['Window_GamepadConfig'];
-        if (WindowGamepadConfig && WindowGamepadConfig.prototype) {
+        if (WindowGamepadConfig?.prototype) {
             const proto = WindowGamepadConfig.prototype;
 
             if (typeof proto.symbolText === 'function') {
@@ -370,8 +379,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
         // drawItem calls this.symbolName(index) to get the display string.
         const WindowInputSymbolList = manoNs['Window_InputSymbolList'];
         if (
-            WindowInputSymbolList &&
-            WindowInputSymbolList.prototype &&
+            WindowInputSymbolList?.prototype &&
             typeof WindowInputSymbolList.prototype.symbolName === 'function'
         ) {
             const origSymbolName = WindowInputSymbolList.prototype.symbolName;
@@ -384,6 +392,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
                 }
             };
         }
+        return true;
     }
 
     /**
@@ -400,7 +409,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
             !Window_Options.prototype ||
             typeof Window_Options.prototype.commandName !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const original = Window_Options.prototype.commandName;
@@ -419,6 +428,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
 
             return name;
         };
+        return true;
     }
 
     /**
@@ -432,16 +442,15 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
             this.resolveFromCache(text, runtime);
         const manoNs = window['Mano_InputConfig'];
         if (!manoNs) {
-            return;
+            return false;
         }
 
         const WindowKeyConfig = manoNs['Window_KeyConfig'];
         if (
-            !WindowKeyConfig ||
-            !WindowKeyConfig.prototype ||
+            !WindowKeyConfig?.prototype ||
             typeof WindowKeyConfig.prototype.drawCommandXX !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const original = WindowKeyConfig.prototype.drawCommandXX;
@@ -460,6 +469,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
 
             return original.call(this, translated, rect);
         };
+        return true;
     }
 
     /**

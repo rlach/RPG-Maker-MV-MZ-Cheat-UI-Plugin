@@ -3,6 +3,9 @@ declare const Scene_SkillEquip: any;
 declare const Window_EroStatus: any;
 declare const Window_QuestData: any;
 declare const Window_SceneExtra: any;
+declare const Window_Glossary: any;
+declare const Window_GlossaryCategory: any;
+declare const Window_GlossaryList: any;
 declare const CBR_eroStatus: any;
 declare const Yanfly: any;
 
@@ -20,5 +23,8 @@ declare interface Window {
     Window_QuestCategories?: any;
     Window_QuestList?: any;
     Window_SceneExtra?: any;
+    Window_Glossary?: any;
+    Window_GlossaryCategory?: any;
+    Window_GlossaryList?: any;
     Game_Chronus?: any;
 }

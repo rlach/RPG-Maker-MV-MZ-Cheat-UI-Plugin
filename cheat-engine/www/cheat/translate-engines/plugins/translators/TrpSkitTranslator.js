@@ -56,8 +56,11 @@ export class TRPSkitTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
+        if (!this._installSpeakerNameRuntimeHook()) {
+            return false;
+        }
         this.registerPluginCustomTags(TRP_SKIT_PLUGIN_TAGS);
-        this._installSpeakerNameRuntimeHook();
+        return true;
     }
 
     _toTrimmedString(value) {
@@ -98,7 +101,7 @@ export class TRPSkitTranslator extends BasePluginTranslator {
 
     _installSpeakerNameRuntimeHook() {
         if (!window.Game_Message || !Game_Message.prototype) {
-            return;
+            return false;
         }
 
         const getRuntime = this.getRuntime.bind(this);
@@ -110,7 +113,7 @@ export class TRPSkitTranslator extends BasePluginTranslator {
         const originalSpeakerName = Game_Message.prototype.speakerName;
 
         if (typeof originalSpeakerName !== 'function') {
-            return;
+            return false;
         }
 
         Game_Message.prototype.speakerName = function () {
@@ -136,6 +139,7 @@ export class TRPSkitTranslator extends BasePluginTranslator {
 
             return resolved;
         };
+        return true;
     }
 
     // ---------------------------------------------------------------------------
@@ -194,13 +198,12 @@ export class TRPSkitTranslator extends BasePluginTranslator {
             return [];
         }
 
-        const configPlugin = window.$plugins.find(
-            (plugin) =>
-                TRP_SKIT_CONFIG_PLUGIN_NAMES.has(
-                    String(plugin?.name || '')
-                        .trim()
-                        .toLowerCase()
-                )
+        const configPlugin = window.$plugins.find((plugin) =>
+            TRP_SKIT_CONFIG_PLUGIN_NAMES.has(
+                String(plugin?.name || '')
+                    .trim()
+                    .toLowerCase()
+            )
         );
 
         const raw = configPlugin?.parameters?.SkitActorSettings;
