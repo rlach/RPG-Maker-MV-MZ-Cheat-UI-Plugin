@@ -137,4 +137,10 @@ export const DATA_CONTAINER_TRANSLATION_DEFINITIONS = Object.freeze([
         fields: ['name'],
         getContainer: () => buildMapsTranslationContainer(),
     },
+    {
+        kind: 'states',
+        cachePrefix: 'state',
+        fields: ['name', 'description', 'message1', 'message2', 'message3', 'message4', 'note'],
+        getContainer: () => window.$dataStates,
+    },
 ]);

@@ -61,6 +61,7 @@ const DEFAULT_OBJECT_TRANSLATION_TYPE_DEFS = Object.freeze([
     { id: 'actors', label: 'actors' },
     { id: 'systemMessages', label: 'system messages' },
     { id: 'systemCommands', label: 'system commands' },
+    { id: 'states', label: 'states' },
     { id: 'otherStrings', label: 'other strings' },
     { id: 'gameArrays', label: 'game arrays (terms, types, elements)' },
     { id: 'troops', label: 'Troops' },
