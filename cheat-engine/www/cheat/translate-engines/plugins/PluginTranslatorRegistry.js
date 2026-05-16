@@ -53,6 +53,7 @@ import { TorigoyaNotifyMessageTranslator } from './translators/TorigoyaNotifyMes
 import { TRPSkitTranslator } from './translators/TrpSkitTranslator.js';
 import { UoTesEventTranslator } from './translators/UoTesEventTranslator.js';
 import { YedWordWrapTranslator } from './translators/YedWordWrapTranslator.js';
+import { YkpItemCompositionTranslator } from './translators/YkpItemCompositionTranslator.js';
 import { YEPCoreEngineScriptTranslator } from './translators/YEPCoreEngineScriptTranslator.js';
 import { YepMessageCoreTranslator } from './translators/YepMessageCoreTranslator.js';
 import { YepQuestJournalTranslator } from './translators/YepQuestJournalTranslator.js';
@@ -122,6 +123,7 @@ class PluginTranslatorRegistry {
             TRPSkitTranslator,
             UoTesEventTranslator,
             YedWordWrapTranslator,
+            YkpItemCompositionTranslator,
             YEPCoreEngineScriptTranslator,
             YepGabWindowTranslator,
             YepEventMiniLabelTranslator,
