@@ -4,6 +4,7 @@ import { CategorySynthesisTranslator } from './translators/CategorySynthesisTran
 import { ChronusTranslator } from './translators/ChronusTranslator.js';
 import { CbrEroStatusTranslator } from './translators/CbrEroStatusTranslator.js';
 import { ExternMessageTranslator } from './translators/ExternMessageTranslator.js';
+import { FtkrItemCompositionSystemTranslator } from './translators/FtkrItemCompositionSystemTranslator.js';
 import { CbrEroStatusMvTranslator } from './translators/CbrEroStatusMvTranslator.js';
 import { DarkPlasmaCharacterTextTranslator } from './translators/DarkPlasmaCharacterTextTranslator.js';
 import { DTextPictureTranslator } from './translators/DTextPictureTranslator.js';
@@ -71,6 +72,7 @@ class PluginTranslatorRegistry {
             ChronusTranslator,
             CbrEroStatusTranslator,
             ExternMessageTranslator,
+            FtkrItemCompositionSystemTranslator,
             CbrEroStatusMvTranslator,
             DarkPlasmaCharacterTextTranslator,
             DTextPictureTranslator,
