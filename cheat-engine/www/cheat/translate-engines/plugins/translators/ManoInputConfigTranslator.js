@@ -165,10 +165,32 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
 
     // ─── Runtime hooks ────────────────────────────────────────────────────────
 
+    _getManoNamespace() {
+        const namespaceFromWindow = window['Mano_InputConfig'];
+        if (namespaceFromWindow && typeof namespaceFromWindow === 'object') {
+            return namespaceFromWindow;
+        }
+
+        // Some plugin builds declare global `const Mano_InputConfig` without
+        // attaching it to `window`. Resolve it from global script scope.
+        try {
+            const namespaceFromGlobalConst = window.eval(
+                'typeof Mano_InputConfig !== "undefined" ? Mano_InputConfig : null'
+            );
+            if (namespaceFromGlobalConst && typeof namespaceFromGlobalConst === 'object') {
+                return namespaceFromGlobalConst;
+            }
+        } catch (error) {
+            console.warn('[ManoInputConfigTranslator] Failed to resolve Mano_InputConfig', error);
+        }
+
+        return null;
+    }
+
     _isMvVersion() {
-        const manoNs = window['Mano_InputConfig'];
+        const manoNs = this._getManoNamespace();
         // MV exports Window_GamepadConfig directly; MZ does not.
-        return !!(manoNs && manoNs['Window_GamepadConfig']);
+        return !!manoNs?.['Window_GamepadConfig'];
     }
 
     enablePluginTranslation() {
@@ -185,7 +207,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
                 return false;
             }
         } else {
-            if (!this._hookKeyConfigDrawCommand()) {
+            if (!this._hookKeyConfigDrawCommand() && !this._hookKeyConfigScene()) {
                 return false;
             }
             this._hookGamepadConfigScene();
@@ -205,7 +227,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
         const isTranslatorUsableText = (text) => this.isUsableText(text);
         const resolveFromTranslatorCache = (text, runtime = getRuntimeFromTranslator()) =>
             this.resolveFromCache(text, runtime);
-        const manoNs = window['Mano_InputConfig'];
+        const manoNs = this._getManoNamespace();
         if (!manoNs) {
             return false;
         }
@@ -440,7 +462,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
         const getRuntimeFromTranslator = () => this.getRuntime();
         const resolveFromTranslatorCache = (text, runtime = getRuntimeFromTranslator()) =>
             this.resolveFromCache(text, runtime);
-        const manoNs = window['Mano_InputConfig'];
+        const manoNs = this._getManoNamespace();
         if (!manoNs) {
             return false;
         }
@@ -470,6 +492,81 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
             return original.call(this, translated, rect);
         };
         return true;
+    }
+
+    _hookKeyConfigScene() {
+        const manoNs = this._getManoNamespace();
+        if (!manoNs) {
+            return false;
+        }
+
+        const SceneKeyConfig = manoNs['Scene_KeyConfig'];
+        if (typeof SceneKeyConfig?.prototype?.createAllWindows !== 'function') {
+            return false;
+        }
+
+        const patchSceneWindowDrawText = (scene) => this._patchSceneWindowDrawText(scene);
+        const original = SceneKeyConfig.prototype.createAllWindows;
+
+        SceneKeyConfig.prototype.createAllWindows = function () {
+            original.call(this);
+
+            try {
+                patchSceneWindowDrawText(this);
+            } catch (error) {
+                console.warn(
+                    '[ManoInputConfigTranslator] Failed to patch key config scene windows',
+                    error
+                );
+            }
+        };
+
+        return true;
+    }
+
+    _patchSceneWindowDrawText(scene) {
+        if (!scene || typeof scene !== 'object') {
+            return;
+        }
+
+        const getRuntimeFromTranslator = () => this.getRuntime();
+        const resolveFromTranslatorCache = (text, runtime = getRuntimeFromTranslator()) =>
+            this.resolveFromCache(text, runtime);
+
+        for (const key of Object.keys(scene)) {
+            if (!key.endsWith('Window')) {
+                continue;
+            }
+
+            const windowInstance = scene[key];
+            if (!windowInstance || typeof windowInstance.drawText !== 'function') {
+                continue;
+            }
+
+            if (windowInstance['__CHEAT_MANO_DRAWTEXT_PATCHED__']) {
+                continue;
+            }
+
+            const originalDrawText = windowInstance.drawText;
+            windowInstance.drawText = function (text, ...rest) {
+                let translated = text;
+                try {
+                    const runtime = getRuntimeFromTranslator();
+                    translated = resolveFromTranslatorCache(text, runtime);
+                } catch (error) {
+                    console.warn('[ManoInputConfigTranslator] drawText translation failed', error);
+                }
+
+                return originalDrawText.call(this, translated, ...rest);
+            };
+
+            Object.defineProperty(windowInstance, '__CHEAT_MANO_DRAWTEXT_PATCHED__', {
+                value: true,
+                configurable: true,
+                enumerable: false,
+                writable: false,
+            });
+        }
     }
 
     /**
@@ -509,7 +606,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
      *    We patch `drawSymbolObject` on the prototype to translate the name.
      */
     _hookGamepadConfigScene() {
-        const manoNs = window['Mano_InputConfig'];
+        const manoNs = this._getManoNamespace();
         if (!manoNs) {
             return;
         }
