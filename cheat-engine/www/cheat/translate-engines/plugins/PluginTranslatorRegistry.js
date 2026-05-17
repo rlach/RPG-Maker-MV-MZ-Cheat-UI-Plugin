@@ -5,6 +5,7 @@ import { ChronusTranslator } from './translators/ChronusTranslator.js';
 import { CbrEroStatusTranslator } from './translators/CbrEroStatusTranslator.js';
 import { CustomizeConfigItemTranslator } from './translators/CustomizeConfigItemTranslator.js';
 import { ExternMessageTranslator } from './translators/ExternMessageTranslator.js';
+import { FtkrCustomSimpleActorStatusTranslator } from './translators/FtkrCustomSimpleActorStatusTranslator.js';
 import { FtkrItemCompositionSystemTranslator } from './translators/FtkrItemCompositionSystemTranslator.js';
 import { CbrEroStatusMvTranslator } from './translators/CbrEroStatusMvTranslator.js';
 import { DarkPlasmaCharacterTextTranslator } from './translators/DarkPlasmaCharacterTextTranslator.js';
@@ -65,6 +66,7 @@ import { SabaSimpleScenarioTranslator } from './translators/SabaSimpleScenarioTr
 import { SabaTachieTranslator } from './translators/SabaTachieTranslator.js';
 import { YepGabWindowTranslator } from './translators/YepGabWindowTranslator.js';
 import { PHQuestBookTranslator } from './translators/PHQuestBookTranslator.js';
+import { ProfileExtendTranslator } from './translators/ProfileExtendTranslator.js';
 
 class PluginTranslatorRegistry {
     constructor() {
@@ -75,6 +77,7 @@ class PluginTranslatorRegistry {
             CbrEroStatusTranslator,
             CustomizeConfigItemTranslator,
             ExternMessageTranslator,
+            FtkrCustomSimpleActorStatusTranslator,
             FtkrItemCompositionSystemTranslator,
             CbrEroStatusMvTranslator,
             DarkPlasmaCharacterTextTranslator,
@@ -111,6 +114,7 @@ class PluginTranslatorRegistry {
             OriginMenuStatusTranslator,
             PandaProgressTextWindowTranslator,
             PHQuestBookTranslator,
+            ProfileExtendTranslator,
             QuestSystemTranslator,
             SabaSimpleScenarioTranslator,
             SabaTachieTranslator,

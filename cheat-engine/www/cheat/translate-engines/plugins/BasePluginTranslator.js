@@ -324,6 +324,7 @@ export class BasePluginTranslator extends BasePhase {
      * @param {object} options - Optional resolver options
      * @param {boolean} [options.requireRuntimeTranslationActive=false] - Require runtime translation active state
      * @param {*} [options.missValue] - Value returned on cache miss/runtime unavailable (defaults to source text)
+     * @param {boolean} [options.harvestMissing=true] - Whether to track cache key usage for missing translations
      * @returns {*} Resolved translated text or fallback
      */
     resolveRuntimeTranslation(
@@ -351,7 +352,9 @@ export class BasePluginTranslator extends BasePhase {
             }
 
             const cacheKey = runtime.getCacheKey(text, currentCacheType);
-            runtime.trackCacheKeyUsage(cacheKey);
+            runtime.trackCacheKeyUsage(cacheKey, {
+                harvestMissing: options.harvestMissing ?? true,
+            });
 
             if (!runtime.hasUsableCacheValue(cacheKey)) {
                 continue;
