@@ -223,16 +223,29 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
-            return;
+            return true;
         }
 
         const translator = this;
 
-        if (
-            window.Game_Interpreter &&
-            Game_Interpreter.prototype &&
-            typeof Game_Interpreter.prototype.pluginCommand === 'function'
-        ) {
+        const canHookPluginCommand =
+            !!window.Game_Interpreter &&
+            !!Game_Interpreter.prototype &&
+            typeof Game_Interpreter.prototype.pluginCommand === 'function';
+        const canHookAddOriginalCommands =
+            !!window.Window_MenuCommand &&
+            !!Window_MenuCommand.prototype &&
+            typeof Window_MenuCommand.prototype.addOriginalCommands === 'function';
+        const canHookAddWindow =
+            !!window.Scene_Base &&
+            !!Scene_Base.prototype &&
+            typeof Scene_Base.prototype.addWindow === 'function';
+
+        if (!canHookPluginCommand && !canHookAddOriginalCommands && !canHookAddWindow) {
+            return false;
+        }
+
+        if (canHookPluginCommand) {
             const originalPluginCommand = Game_Interpreter.prototype.pluginCommand;
 
             Game_Interpreter.prototype.pluginCommand = function (command, args) {
@@ -267,11 +280,7 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
             };
         }
 
-        if (
-            window.Window_MenuCommand &&
-            Window_MenuCommand.prototype &&
-            typeof Window_MenuCommand.prototype.addOriginalCommands === 'function'
-        ) {
+        if (canHookAddOriginalCommands) {
             const originalAddOriginalCommands = Window_MenuCommand.prototype.addOriginalCommands;
 
             Window_MenuCommand.prototype.addOriginalCommands = function () {
@@ -303,11 +312,7 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
             };
         }
 
-        if (
-            window.Scene_Base &&
-            Scene_Base.prototype &&
-            typeof Scene_Base.prototype.addWindow === 'function'
-        ) {
+        if (canHookAddWindow) {
             const originalAddWindow = Scene_Base.prototype.addWindow;
 
             Scene_Base.prototype.addWindow = function (windowInstance) {
@@ -327,9 +332,10 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
         }
 
         window[RUNTIME_HOOK_GUARD] = true;
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -508,7 +514,7 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

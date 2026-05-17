@@ -164,6 +164,7 @@ declare interface Window {
     Game_Picture?: any;
     Game_Event?: any;
     Game_CharacterBase?: any;
+    ImageManager?: any;
     Game_Interpreter?: any;
     Spriteset_Map?: any;
     DataManager?: any;

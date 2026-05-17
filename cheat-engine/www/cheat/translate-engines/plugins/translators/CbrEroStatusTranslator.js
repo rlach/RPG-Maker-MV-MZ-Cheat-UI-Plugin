@@ -1,5 +1,6 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
+import { isRpgMakerMv } from '../../../js/RpgMakerRuntime.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_CBR_ERO_STATUS_TRANSLATOR_HOOKED__';
 const PLUGIN_SCRIPT_HEADER = 'CBR-エロステータス';
@@ -57,12 +58,19 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
         this._scanPromise = null;
     }
 
+    detectPlugin() {
+        if (isRpgMakerMv()) {
+            return false;
+        }
+        return super.detectPlugin();
+    }
+
     getPluginName() {
         return 'CBR_EroStatus';
     }
 
     getPluginLabel() {
-        return 'CBR EroStatus';
+        return 'CBR EroStatus (MZ)';
     }
 
     getCacheType() {
@@ -71,7 +79,7 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
-            return;
+            return true;
         }
 
         if (
@@ -79,7 +87,7 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
             typeof window.CBR !== 'object' ||
             typeof window.CBR['エロステータス'] !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const original = window.CBR['エロステータス'];
@@ -105,9 +113,10 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
         };
 
         window[RUNTIME_HOOK_GUARD] = true;
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -301,7 +310,7 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

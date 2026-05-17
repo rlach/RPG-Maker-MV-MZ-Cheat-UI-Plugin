@@ -351,7 +351,7 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
         return output;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -653,6 +653,22 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
+        const canHookQuestCategories =
+            !!window.Window_QuestCategories?.prototype &&
+            typeof window.Window_QuestCategories.prototype.addQuestCommand === 'function';
+        const canHookQuestList =
+            !!window.Window_QuestList?.prototype &&
+            typeof window.Window_QuestList.prototype.addQuestCommand === 'function';
+        const canHookQuestData =
+            !!window.Window_QuestData?.prototype || !!window.Yanfly?.Quest?.Window_QuestData?.prototype;
+        const canHookMenuCommand =
+            !!window.Window_MenuCommand?.prototype &&
+            typeof window.Window_MenuCommand.prototype.addOriginalCommands === 'function';
+
+        if (!canHookQuestCategories && !canHookQuestList && !canHookQuestData && !canHookMenuCommand) {
+            return false;
+        }
+
         this.installCommandListHook(
             window.Window_QuestCategories,
             '__CHEAT_YEP_QUEST_JOURNAL_CATEGORY_COMMAND_LIST_HOOKED__'
@@ -664,6 +680,7 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
         this.installQuestTitleHook();
         this.installQuestDataHooks();
         this.installMenuCommandHook();
+        return true;
     }
 
     buildUniquePendingItems(runtime) {
@@ -700,7 +717,7 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

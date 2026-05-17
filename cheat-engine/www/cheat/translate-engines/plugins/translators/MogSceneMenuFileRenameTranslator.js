@@ -127,11 +127,22 @@ export class MogSceneMenuFileRenameTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
+        if (!window.ImageManager) {
+            return false;
+        }
+
+        const canHookMenusMainCommands =
+            typeof window.ImageManager.loadMenusMainCommands === 'function';
+        const canHookBcom = typeof window.ImageManager.loadBcom === 'function';
+        if (!canHookMenusMainCommands && !canHookBcom) {
+            return false;
+        }
+
         const getRuntime = this.getRuntime.bind(this);
         const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
         const resolveTranslatedLoadFile = this.resolveTranslatedLoadFile.bind(this);
 
-        if (window.ImageManager?.loadMenusMainCommands) {
+        if (canHookMenusMainCommands) {
             const originalLoadMenusMainCommands = window.ImageManager.loadMenusMainCommands;
             window.ImageManager.loadMenusMainCommands = function (filename) {
                 try {
@@ -150,7 +161,7 @@ export class MogSceneMenuFileRenameTranslator extends BasePluginTranslator {
             };
         }
 
-        if (window.ImageManager?.loadBcom) {
+        if (canHookBcom) {
             const originalLoadBcom = window.ImageManager.loadBcom;
             window.ImageManager.loadBcom = function (filename) {
                 try {
@@ -168,9 +179,11 @@ export class MogSceneMenuFileRenameTranslator extends BasePluginTranslator {
                 return originalLoadBcom.apply(this, arguments);
             };
         }
+
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -204,15 +217,15 @@ export class MogSceneMenuFileRenameTranslator extends BasePluginTranslator {
         return entries;
     }
 
-    buildUniquePendingItems(runtime) {
+    buildUniquePendingItems() {
         return [];
     }
 
-    collectUntranslated({ runtime } = {}) {
+    collectUntranslated() {
         return [];
     }
 
-    countPluginAmountSync({ runtime } = {}) {
+    getCachedCountsSync() {
         return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
     }
 }

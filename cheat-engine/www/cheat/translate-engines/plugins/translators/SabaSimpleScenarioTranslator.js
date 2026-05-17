@@ -31,7 +31,7 @@ export class SabaSimpleScenarioTranslator extends BasePluginTranslator {
             !Game_Interpreter.prototype ||
             typeof Game_Interpreter.prototype.command101 !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const original = Game_Interpreter.prototype.command101;
@@ -49,6 +49,8 @@ export class SabaSimpleScenarioTranslator extends BasePluginTranslator {
 
             return original.apply(this, arguments);
         };
+
+        return true;
     }
 
     observeScenarioMessage(interpreter) {
@@ -99,7 +101,7 @@ export class SabaSimpleScenarioTranslator extends BasePluginTranslator {
         return this._scenarioCommandLists.has(commandList);
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -342,7 +344,7 @@ export class SabaSimpleScenarioTranslator extends BasePluginTranslator {
         return items.filter((item) => !panel.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ panel }) {
+    getCachedCountsSync({ panel }) {
         if (!panel || typeof panel.getCacheKey !== 'function') {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

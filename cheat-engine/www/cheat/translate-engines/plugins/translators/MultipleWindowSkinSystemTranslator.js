@@ -205,7 +205,7 @@ export class MultipleWindowSkinSystemTranslator extends BasePluginTranslator {
             !Window_Message.prototype ||
             typeof Window_Message.prototype.startMessage !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const originalStartMessage = Window_Message.prototype.startMessage;
@@ -234,9 +234,11 @@ export class MultipleWindowSkinSystemTranslator extends BasePluginTranslator {
 
             return originalStartMessage.apply(this, arguments);
         };
+
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -363,7 +365,7 @@ export class MultipleWindowSkinSystemTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

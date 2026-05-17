@@ -142,6 +142,8 @@ async function bootstrapCheatUi() {
     ensureTranslateOnTheFlyRuntimeWithRetry({ maxAttempts: 30, delayMs: 500 });
     ensureHacksRuntime();
 
+    // Detection must start at bootstrap so runtime hooks mount early.
+    // Count precompute stays lazy and is still triggered only by modal/phase flow.
     setTimeout(() => {
         const runtime = ensureTranslateOnTheFlyRuntimeWithRetry({ maxAttempts: 10, delayMs: 500 });
         PLUGIN_TRANSLATOR_REGISTRY.ensureDetectionStarted({ runtime });

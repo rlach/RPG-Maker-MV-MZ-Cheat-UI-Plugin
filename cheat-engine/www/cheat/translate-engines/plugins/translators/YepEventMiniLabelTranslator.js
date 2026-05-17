@@ -37,7 +37,7 @@ export class YepEventMiniLabelTranslator extends BasePluginTranslator {
     enablePluginTranslation() {
         const WindowEventMiniLabel = window.Window_EventMiniLabel;
         if (typeof WindowEventMiniLabel?.prototype?.setText !== 'function') {
-            return;
+            return false;
         }
 
         const getRuntime = this.getRuntime.bind(this);
@@ -78,9 +78,11 @@ export class YepEventMiniLabelTranslator extends BasePluginTranslator {
                 return originalSetText.call(this, text);
             }
         };
+
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -238,7 +240,7 @@ export class YepEventMiniLabelTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

@@ -140,7 +140,7 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
         return entries;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -200,7 +200,7 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
@@ -264,14 +264,14 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
     enablePluginTranslation() {
         const WindowStatusCtor = window['Window_Status'];
         if (!WindowStatusCtor?.prototype) {
-            return;
+            return false;
         }
 
         if (
             typeof WindowStatusCtor.prototype.drawXparams !== 'function' &&
             typeof WindowStatusCtor.prototype.drawSparams !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const getRuntime = () => this.getRuntime();
@@ -323,5 +323,7 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
                 originalDrawSparams.call(this, y);
             };
         }
+
+        return true;
     }
 }

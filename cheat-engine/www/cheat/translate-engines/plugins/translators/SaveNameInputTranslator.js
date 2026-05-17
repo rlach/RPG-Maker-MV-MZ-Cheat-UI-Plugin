@@ -27,11 +27,12 @@ export class SaveNameInputTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (!window.DataManager || typeof DataManager.makeSavefileInfo !== 'function') {
-            return;
+            return false;
         }
 
         this.installSavefileIdCapturePatch();
         this.installMakeSavefileInfoCompatibilityPatch();
+        return true;
     }
 
     installSavefileIdCapturePatch() {
@@ -133,7 +134,7 @@ export class SaveNameInputTranslator extends BasePluginTranslator {
         return /index/.test(message);
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         return;
     }
 
@@ -145,7 +146,7 @@ export class SaveNameInputTranslator extends BasePluginTranslator {
         return [];
     }
 
-    countPluginAmountSync() {
+    getCachedCountsSync() {
         return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
     }
 }

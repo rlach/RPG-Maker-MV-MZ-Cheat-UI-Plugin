@@ -79,17 +79,24 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
-            return;
+            return true;
         }
 
         const sceneMenuCtor = window.Scene_Menu;
         if (!sceneMenuCtor?.prototype) {
-            return;
+            return false;
         }
 
         const sceneMenuPrototype = sceneMenuCtor.prototype;
         const originalCreateMenuLabelWindow = sceneMenuPrototype.createMenuLabelWindow;
         const originalCreate = sceneMenuPrototype.create;
+
+        if (
+            typeof originalCreateMenuLabelWindow !== 'function' ||
+            typeof originalCreate !== 'function'
+        ) {
+            return false;
+        }
 
         const getRuntime = this.getRuntime.bind(this);
         const resolveRuntimeTranslation = this.resolveRuntimeTranslation.bind(this);
@@ -185,9 +192,10 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
         }
 
         window[RUNTIME_HOOK_GUARD] = true;
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -272,7 +280,7 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

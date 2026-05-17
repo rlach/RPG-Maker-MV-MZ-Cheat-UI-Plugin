@@ -178,7 +178,7 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
         }
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -274,11 +274,38 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
         const applyTranslatedParamFields = this.applyTranslatedParamFields.bind(this);
         const resolveRuntimeTextWithOptions = this.resolveRuntimeTextWithOptions.bind(this);
 
+        const canHookStatusBase =
+            !!window.Window_StatusBase &&
+            !!Window_StatusBase.prototype &&
+            typeof Window_StatusBase.prototype.nuunMenu_drawContentsBase === 'function';
+        const canHookInfoDrawContents =
+            !!window.Window_InfoMenu &&
+            !!Window_InfoMenu.prototype &&
+            typeof Window_InfoMenu.prototype.nuun_DrawContents === 'function';
+        const canHookInfoSetText =
+            !!window.Window_InfoMenu &&
+            !!Window_InfoMenu.prototype &&
+            typeof Window_InfoMenu.prototype.setText === 'function';
+        const canHookDrawText =
+            !!window.Window_Base &&
+            !!Window_Base.prototype &&
+            typeof Window_Base.prototype.drawText === 'function';
+        const canHookDrawTextEx =
+            !!window.Window_Base &&
+            !!Window_Base.prototype &&
+            typeof Window_Base.prototype.drawTextEx === 'function';
+
         if (
-            window.Window_StatusBase &&
-            Window_StatusBase.prototype &&
-            typeof Window_StatusBase.prototype.nuunMenu_drawContentsBase === 'function'
+            !canHookStatusBase &&
+            !canHookInfoDrawContents &&
+            !canHookInfoSetText &&
+            !canHookDrawText &&
+            !canHookDrawTextEx
         ) {
+            return false;
+        }
+
+        if (canHookStatusBase) {
             const originalDrawContentsBase = Window_StatusBase.prototype.nuunMenu_drawContentsBase;
 
             Window_StatusBase.prototype.nuunMenu_drawContentsBase = function (data, x, y, width, battler) {
@@ -298,11 +325,7 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
             };
         }
 
-        if (
-            window.Window_InfoMenu &&
-            Window_InfoMenu.prototype &&
-            typeof Window_InfoMenu.prototype.nuun_DrawContents === 'function'
-        ) {
+        if (canHookInfoDrawContents) {
             const originalDrawInfoContents = Window_InfoMenu.prototype.nuun_DrawContents;
 
             Window_InfoMenu.prototype.nuun_DrawContents = function (data, x, y, width, battler) {
@@ -322,11 +345,7 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
             };
         }
 
-        if (
-            window.Window_InfoMenu &&
-            Window_InfoMenu.prototype &&
-            typeof Window_InfoMenu.prototype.setText === 'function'
-        ) {
+        if (canHookInfoSetText) {
             const originalSetText = Window_InfoMenu.prototype.setText;
 
             Window_InfoMenu.prototype.setText = function (str) {
@@ -348,11 +367,7 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
             };
         }
 
-        if (
-            window.Window_Base &&
-            Window_Base.prototype &&
-            typeof Window_Base.prototype.drawText === 'function'
-        ) {
+        if (canHookDrawText) {
             const originalDrawText = Window_Base.prototype.drawText;
 
             Window_Base.prototype.drawText = function (text, x, y, maxWidth, align) {
@@ -374,11 +389,7 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
             };
         }
 
-        if (
-            window.Window_Base &&
-            Window_Base.prototype &&
-            typeof Window_Base.prototype.drawTextEx === 'function'
-        ) {
+        if (canHookDrawTextEx) {
             const originalDrawTextEx = Window_Base.prototype.drawTextEx;
 
             Window_Base.prototype.drawTextEx = function (text, x, y, width) {
@@ -399,6 +410,8 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
                 return originalDrawTextEx.apply(this, arguments);
             };
         }
+
+        return true;
     }
 
     buildUniquePendingItems(runtime) {
@@ -433,7 +446,7 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

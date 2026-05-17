@@ -455,11 +455,23 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
             hasSceneBase: !!ANY_WINDOW.Scene_Base,
         });
 
-        if (
-            ANY_WINDOW.Window_MenuCommand &&
-            ANY_WINDOW.Window_MenuCommand.prototype &&
-            typeof ANY_WINDOW.Window_MenuCommand.prototype.makeCommandList === 'function'
-        ) {
+        const canHookMakeCommandList =
+            !!ANY_WINDOW.Window_MenuCommand &&
+            !!ANY_WINDOW.Window_MenuCommand.prototype &&
+            typeof ANY_WINDOW.Window_MenuCommand.prototype.makeCommandList === 'function';
+        const canHookAddWindow =
+            !!ANY_WINDOW.Scene_Base &&
+            !!ANY_WINDOW.Scene_Base.prototype &&
+            typeof ANY_WINDOW.Scene_Base.prototype.addWindow === 'function';
+        const canHookUpdateScene =
+            !!ANY_WINDOW.SceneManager &&
+            typeof ANY_WINDOW.SceneManager.updateScene === 'function';
+
+        if (!canHookMakeCommandList && !canHookAddWindow && !canHookUpdateScene) {
+            return false;
+        }
+
+        if (canHookMakeCommandList) {
             const menuCommandCtor = ANY_WINDOW.Window_MenuCommand;
             const originalMakeCommandList = menuCommandCtor.prototype.makeCommandList;
 
@@ -512,11 +524,7 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
             };
         }
 
-        if (
-            ANY_WINDOW.Scene_Base &&
-            ANY_WINDOW.Scene_Base.prototype &&
-            typeof ANY_WINDOW.Scene_Base.prototype.addWindow === 'function'
-        ) {
+        if (canHookAddWindow) {
             const sceneBaseCtor = ANY_WINDOW.Scene_Base;
             const originalAddWindow = sceneBaseCtor.prototype.addWindow;
 
@@ -546,7 +554,7 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
             debugLog('hook installed: Scene_Base.addWindow');
         }
 
-        if (ANY_WINDOW.SceneManager && typeof ANY_WINDOW.SceneManager.updateScene === 'function') {
+        if (canHookUpdateScene) {
             const originalUpdateScene = ANY_WINDOW.SceneManager.updateScene;
 
             ANY_WINDOW.SceneManager.updateScene = function () {
@@ -566,9 +574,11 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
 
             debugLog('hook installed: SceneManager.updateScene');
         }
+
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -653,7 +663,7 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

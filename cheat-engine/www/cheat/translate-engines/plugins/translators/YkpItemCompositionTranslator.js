@@ -251,7 +251,21 @@ export class YkpItemCompositionTranslator extends BasePluginTranslator {
         const translateKnownText = this.translateKnownText.bind(this);
         const translateHelpText = this.translateHelpText.bind(this);
 
-        if (window.Window_MenuCommand?.prototype) {
+        const canHookMenuCommands =
+            !!window.Window_MenuCommand?.prototype &&
+            typeof Window_MenuCommand.prototype.addOriginalCommands === 'function';
+        const canHookDrawText =
+            !!window.Window_Base?.prototype &&
+            typeof Window_Base.prototype.drawText === 'function';
+        const canHookHelpSetText =
+            !!window.Window_Help?.prototype &&
+            typeof Window_Help.prototype.setText === 'function';
+
+        if (!canHookMenuCommands && !canHookDrawText && !canHookHelpSetText) {
+            return false;
+        }
+
+        if (canHookMenuCommands) {
             const originalAddOriginalCommands = Window_MenuCommand.prototype.addOriginalCommands;
 
             Window_MenuCommand.prototype.addOriginalCommands = function () {
@@ -281,7 +295,7 @@ export class YkpItemCompositionTranslator extends BasePluginTranslator {
             };
         }
 
-        if (window.Window_Base?.prototype && typeof Window_Base.prototype.drawText === 'function') {
+        if (canHookDrawText) {
             const originalDrawText = Window_Base.prototype.drawText;
 
             Window_Base.prototype.drawText = function () {
@@ -305,7 +319,7 @@ export class YkpItemCompositionTranslator extends BasePluginTranslator {
             };
         }
 
-        if (window.Window_Help?.prototype && typeof Window_Help.prototype.setText === 'function') {
+        if (canHookHelpSetText) {
             const originalSetText = Window_Help.prototype.setText;
 
             Window_Help.prototype.setText = function (text) {
@@ -324,9 +338,11 @@ export class YkpItemCompositionTranslator extends BasePluginTranslator {
                 return originalSetText.apply(this, arguments);
             };
         }
+
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -405,7 +421,7 @@ export class YkpItemCompositionTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

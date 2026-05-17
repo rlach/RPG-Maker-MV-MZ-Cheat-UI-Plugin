@@ -37,12 +37,29 @@ export class SHMessageWindowBgTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
-            return;
+            return true;
+        }
+
+        const canHookAllText =
+            typeof Game_Message !== 'undefined' &&
+            !!Game_Message.prototype &&
+            typeof Game_Message.prototype.allText === 'function';
+        const canHookCommand101 =
+            typeof Game_Interpreter !== 'undefined' &&
+            !!Game_Interpreter.prototype &&
+            typeof Game_Interpreter.prototype.command101 === 'function';
+        const canHookClear =
+            typeof Game_Message !== 'undefined' &&
+            !!Game_Message.prototype &&
+            typeof Game_Message.prototype.clear === 'function';
+
+        if (!canHookAllText && !canHookCommand101 && !canHookClear) {
+            return false;
         }
 
         this.registerPluginCustomTags(SH_MESSAGE_WINDOW_BG_PLUGIN_TAGS);
 
-        if (typeof Game_Message !== 'undefined' && Game_Message.prototype) {
+        if (canHookAllText) {
             const originalAllText = Game_Message.prototype.allText;
 
             Game_Message.prototype.allText = function () {
@@ -56,11 +73,7 @@ export class SHMessageWindowBgTranslator extends BasePluginTranslator {
             };
         }
 
-        if (
-            typeof Game_Interpreter !== 'undefined' &&
-            Game_Interpreter.prototype &&
-            typeof Game_Interpreter.prototype.command101 === 'function'
-        ) {
+        if (canHookCommand101) {
             const originalCommand101 = Game_Interpreter.prototype.command101;
 
             Game_Interpreter.prototype.command101 = function () {
@@ -87,7 +100,7 @@ export class SHMessageWindowBgTranslator extends BasePluginTranslator {
             };
         }
 
-        if (typeof Game_Message !== 'undefined' && Game_Message.prototype) {
+        if (canHookClear) {
             const originalClear = Game_Message.prototype.clear;
             Game_Message.prototype.clear = function () {
                 originalClear.apply(this, arguments);
@@ -96,6 +109,7 @@ export class SHMessageWindowBgTranslator extends BasePluginTranslator {
         }
 
         window[RUNTIME_HOOK_GUARD] = true;
+        return true;
     }
 
     collectUntranslated({ runtime }) {
@@ -103,7 +117,7 @@ export class SHMessageWindowBgTranslator extends BasePluginTranslator {
         return [];
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         void runtime;
         return {
             total: 0,

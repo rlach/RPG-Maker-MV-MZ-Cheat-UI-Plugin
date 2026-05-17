@@ -1,3 +1,4 @@
+import { isRpgMakerMv } from '../../../js/RpgMakerRuntime.js';
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_CBR_ERO_STATUS_MV_TRANSLATOR_HOOKED__';
@@ -32,6 +33,13 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
         this._scanPromise = null;
         this._lastScanKey = '';
         this._originalSubjectMap = new WeakMap();
+    }
+
+    detectPlugin() {
+        if (!isRpgMakerMv()) {
+            return false;
+        }
+        return super.detectPlugin();
     }
 
     getPluginName() {
@@ -268,7 +276,7 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
-            return;
+            return true;
         }
 
         if (
@@ -276,7 +284,7 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
             !Window_EroStatus.prototype ||
             typeof Window_EroStatus.prototype.update !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const original = Window_EroStatus.prototype.update;
@@ -296,9 +304,10 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
         };
 
         window[RUNTIME_HOOK_GUARD] = true;
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -368,7 +377,7 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

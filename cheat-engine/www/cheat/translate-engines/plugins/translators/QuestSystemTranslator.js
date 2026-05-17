@@ -336,7 +336,7 @@ export class QuestSystemTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
-            return;
+            return true;
         }
 
         const translateRuntimeText = (text, runtime, cacheTypes) =>
@@ -508,11 +508,38 @@ export class QuestSystemTranslator extends BasePluginTranslator {
             installQuestUiHooks();
         };
 
+        const canHookDrawText =
+            !!window.Window_Base &&
+            !!Window_Base.prototype &&
+            typeof Window_Base.prototype.drawText === 'function';
+        const canHookDrawTextEx =
+            !!window.Window_Base &&
+            !!Window_Base.prototype &&
+            typeof Window_Base.prototype.drawTextEx === 'function';
+        const canHookCreateTextState =
+            !!window.Window_Base &&
+            !!Window_Base.prototype &&
+            typeof Window_Base.prototype.createTextState === 'function';
+        const canHookBitmapDrawText =
+            !!window.Bitmap &&
+            !!Bitmap.prototype &&
+            typeof Bitmap.prototype.drawText === 'function';
+        const canHookMenuCommands =
+            !!window.Window_MenuCommand &&
+            !!Window_MenuCommand.prototype &&
+            typeof Window_MenuCommand.prototype.addOriginalCommands === 'function';
+
         if (
-            window.Window_Base &&
-            Window_Base.prototype &&
-            typeof Window_Base.prototype.drawText === 'function'
+            !canHookDrawText &&
+            !canHookDrawTextEx &&
+            !canHookCreateTextState &&
+            !canHookBitmapDrawText &&
+            !canHookMenuCommands
         ) {
+            return false;
+        }
+
+        if (canHookDrawText) {
             const originalDrawText = Window_Base.prototype.drawText;
 
             Window_Base.prototype.drawText = function (text, x, y, maxWidth, align) {
@@ -553,11 +580,7 @@ export class QuestSystemTranslator extends BasePluginTranslator {
             };
         }
 
-        if (
-            window.Window_Base &&
-            Window_Base.prototype &&
-            typeof Window_Base.prototype.drawTextEx === 'function'
-        ) {
+        if (canHookDrawTextEx) {
             const originalDrawTextEx = Window_Base.prototype.drawTextEx;
 
             Window_Base.prototype.drawTextEx = function (text, x, y, width) {
@@ -598,11 +621,7 @@ export class QuestSystemTranslator extends BasePluginTranslator {
             };
         }
 
-        if (
-            window.Window_Base &&
-            Window_Base.prototype &&
-            typeof Window_Base.prototype.createTextState === 'function'
-        ) {
+        if (canHookCreateTextState) {
             const originalCreateTextState = Window_Base.prototype.createTextState;
 
             Window_Base.prototype.createTextState = function (text, x, y, width) {
@@ -638,7 +657,7 @@ export class QuestSystemTranslator extends BasePluginTranslator {
             };
         }
 
-        if (window.Bitmap && Bitmap.prototype && typeof Bitmap.prototype.drawText === 'function') {
+        if (canHookBitmapDrawText) {
             const originalBitmapDrawText = Bitmap.prototype.drawText;
 
             Bitmap.prototype.drawText = function (text, x, y, maxWidth, lineHeight, align) {
@@ -682,11 +701,7 @@ export class QuestSystemTranslator extends BasePluginTranslator {
             };
         }
 
-        if (
-            window.Window_MenuCommand &&
-            Window_MenuCommand.prototype &&
-            typeof Window_MenuCommand.prototype.addOriginalCommands === 'function'
-        ) {
+        if (canHookMenuCommands) {
             const originalAddOriginalCommands = Window_MenuCommand.prototype.addOriginalCommands;
 
             Window_MenuCommand.prototype.addOriginalCommands = function () {
@@ -730,9 +745,10 @@ export class QuestSystemTranslator extends BasePluginTranslator {
         ensureQuestSpecificHooks();
 
         window[RUNTIME_HOOK_GUARD] = true;
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -819,7 +835,7 @@ export class QuestSystemTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

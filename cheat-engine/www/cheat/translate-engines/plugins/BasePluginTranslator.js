@@ -1,5 +1,6 @@
 import { BasePhase } from '../translation-phases/BasePhase.js';
 import { shouldApplyHook } from '../../js/HookGuardHelper.js';
+import { Alert } from '../../js/AlertHelper.js';
 
 export class BasePluginTranslator extends BasePhase {
     constructor() {
@@ -20,6 +21,10 @@ export class BasePluginTranslator extends BasePhase {
      */
     getPluginLabel() {
         return this.getPluginName();
+    }
+
+    getCacheType() {
+        return 'plugin';
     }
 
     getKind() {
@@ -108,8 +113,8 @@ export class BasePluginTranslator extends BasePhase {
         runtime.engine.addPluginTags(this.getPluginName(), tagConfigs);
     }
 
-    prepareTranslator(_context = {}) {
-        // Optional hook point for plugin-specific one-time async preparation.
+    precomputeCounts(_context = {}) {
+        // Optional hook point for plugin-specific one-time async precompute.
         return Promise.resolve();
     }
 
@@ -152,6 +157,11 @@ export class BasePluginTranslator extends BasePhase {
                     if (retries >= maxRetries) {
                         console.info(
                             `[PluginTranslator] Plugin translation never mounted for ${this.getPluginName()} after ${maxRetries} retries.`
+                        );
+                        Alert.infoHtml(
+                            `Plugin ${this.getPluginLabel()} failed to initialize.`,
+                            null,
+                            5000
                         );
                         return;
                     }
@@ -209,7 +219,7 @@ export class BasePluginTranslator extends BasePhase {
         }
 
         return (
-            this.countPluginAmountSync(context) || {
+            this.getCachedCountsSync(context) || {
                 total: 0,
                 left: 0,
                 totalStrings: 0,
@@ -218,7 +228,7 @@ export class BasePluginTranslator extends BasePhase {
         );
     }
 
-    countPluginAmountSync(_context = {}) {
+    getCachedCountsSync(_context = {}) {
         return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
     }
 

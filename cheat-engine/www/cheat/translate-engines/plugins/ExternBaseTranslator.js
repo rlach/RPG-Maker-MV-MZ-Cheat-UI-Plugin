@@ -40,7 +40,7 @@ export class ExternBaseTranslator extends BasePluginTranslator {
 
     // ── Scan lifecycle ────────────────────────────────────────────────────
 
-    async prepareTranslator() {
+    precomputeCounts(_context = {}) {
         if (!this.ensureDetection()) {
             return;
         }
@@ -72,25 +72,9 @@ export class ExternBaseTranslator extends BasePluginTranslator {
         return this._scanPromise;
     }
 
-    ensureScanEntriesSync() {
-        if (this._scanPrepared && this._scanEntries.length > 0) {
-            return;
-        }
-
-        const entries = this.buildScanEntries();
-        if (!Array.isArray(entries)) {
-            return;
-        }
-
-        this._scanEntries = entries;
-        this._scanPrepared = true;
-    }
-
     // ── Translation pipeline ──────────────────────────────────────────────
 
     buildUniquePendingItems(runtime) {
-        this.ensureScanEntriesSync();
-
         const byCacheKey = new Map();
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
@@ -121,7 +105,7 @@ export class ExternBaseTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

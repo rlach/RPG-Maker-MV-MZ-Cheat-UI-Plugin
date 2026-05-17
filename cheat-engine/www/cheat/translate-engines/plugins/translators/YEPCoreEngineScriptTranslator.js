@@ -105,7 +105,7 @@ export class YEPCoreEngineScriptTranslator extends BasePluginTranslator {
             !Game_Interpreter.prototype ||
             typeof Game_Interpreter.prototype.command355 !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const cacheType = this.getCacheType();
@@ -148,7 +148,7 @@ export class YEPCoreEngineScriptTranslator extends BasePluginTranslator {
                 );
             }
 
-            return original.call(this);
+            return original.apply(this, arguments);
         };
 
         const applyGameVariableRefresh = (reason) => {
@@ -196,6 +196,8 @@ export class YEPCoreEngineScriptTranslator extends BasePluginTranslator {
                 applyGameVariableRefresh('sceneMap.onMapLoaded');
             };
         }
+
+        return true;
     }
 
     /**
@@ -405,7 +407,7 @@ export class YEPCoreEngineScriptTranslator extends BasePluginTranslator {
     // Scanning
     // -------------------------------------------------------------------------
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -577,7 +579,7 @@ export class YEPCoreEngineScriptTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

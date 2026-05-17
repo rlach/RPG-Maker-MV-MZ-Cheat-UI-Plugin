@@ -428,12 +428,12 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
-            return;
+            return true;
         }
 
         const namespace = window.Torigoya && window.Torigoya.Achievement;
         if (!namespace || !namespace.settings) {
-            return;
+            return false;
         }
 
         const translator = this;
@@ -562,9 +562,10 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
         }
 
         window[RUNTIME_HOOK_GUARD] = true;
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -652,7 +653,7 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

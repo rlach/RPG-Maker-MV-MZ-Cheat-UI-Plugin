@@ -53,7 +53,7 @@ export class MogSceneItemTranslator extends BasePluginTranslator {
         return CACHE_TYPE;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         return;
     }
 
@@ -65,7 +65,7 @@ export class MogSceneItemTranslator extends BasePluginTranslator {
         return [];
     }
 
-    countPluginAmountSync() {
+    getCachedCountsSync() {
         return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
     }
 

@@ -27,7 +27,7 @@ export class TextPictureTranslator extends BasePluginTranslator {
             !Game_Picture.prototype ||
             typeof Game_Picture.prototype.show !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const original = Game_Picture.prototype.show;
@@ -75,9 +75,11 @@ export class TextPictureTranslator extends BasePluginTranslator {
 
             return result;
         };
+
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -301,7 +303,7 @@ export class TextPictureTranslator extends BasePluginTranslator {
         }
 
         if (!this._scanPrepared) {
-            this.prepareTranslator();
+            this.precomputeCounts();
             return;
         }
 
@@ -314,7 +316,7 @@ export class TextPictureTranslator extends BasePluginTranslator {
         }
 
         this._scanPrepared = false;
-        this.prepareTranslator();
+        this.precomputeCounts();
     }
 
     buildUniquePendingItems(runtime) {
@@ -351,7 +353,7 @@ export class TextPictureTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         this.scheduleScanRefreshIfNeeded();
 
         if (!runtime) {
