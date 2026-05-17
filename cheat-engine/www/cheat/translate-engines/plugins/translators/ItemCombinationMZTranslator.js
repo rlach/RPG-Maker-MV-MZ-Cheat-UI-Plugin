@@ -261,7 +261,7 @@ export class ItemCombinationMZTranslator extends BasePluginTranslator {
     enablePluginTranslation() {
         const sceneCtor = window['Scene_CraftingMenu'];
         if (!sceneCtor?.prototype) {
-            return;
+            return false;
         }
 
         const getRuntime = this.getRuntime.bind(this);
@@ -281,6 +281,8 @@ export class ItemCombinationMZTranslator extends BasePluginTranslator {
 
                 return resolveOriginalRecipeKeyName(result, runtime);
             };
+        } else {
+            return false;
         }
 
         if (window.Window_Base?.prototype && typeof Window_Base.prototype.drawText === 'function') {
@@ -290,12 +292,18 @@ export class ItemCombinationMZTranslator extends BasePluginTranslator {
                 const runtime = getRuntime();
                 const isCraftingScene = window.SceneManager?._scene instanceof sceneCtor;
 
-                if (isCraftingScene && isRuntimeTranslationActive(runtime) && arguments.length > 0) {
+                if (
+                    isCraftingScene &&
+                    isRuntimeTranslationActive(runtime) &&
+                    arguments.length > 0
+                ) {
                     arguments[0] = translateItemCombinationSceneText(arguments[0], runtime);
                 }
 
                 return originalDrawText.apply(this, arguments);
             };
         }
+
+        return true;
     }
 }

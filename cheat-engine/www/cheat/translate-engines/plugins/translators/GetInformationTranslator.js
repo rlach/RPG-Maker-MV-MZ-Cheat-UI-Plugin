@@ -338,10 +338,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
     }
 
     tryResolveCachedText(sourceText, cacheType, runtime) {
-        if (
-            !this.isUsableText(sourceText) ||
-            !runtime
-        ) {
+        if (!this.isUsableText(sourceText) || !runtime) {
             return { cacheKey: '', translatedText: sourceText };
         }
 
@@ -492,16 +489,14 @@ export class GetInformationTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
-            return;
+            return true;
         }
-
-        this.registerPluginCustomTags(GET_INFORMATION_PLUGIN_TAGS);
 
         const commonPopupManager = window.CommonPopupManager;
         if (!commonPopupManager || typeof commonPopupManager.showInfo !== 'function') {
-            window[RUNTIME_HOOK_GUARD] = true;
-            return;
+            return false;
         }
+        this.registerPluginCustomTags(GET_INFORMATION_PLUGIN_TAGS);
 
         const originalShowInfo = commonPopupManager.showInfo;
         const isUsableTranslatedTemplate = (text) => this.isUsableText(text);
@@ -530,6 +525,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
         };
 
         window[RUNTIME_HOOK_GUARD] = true;
+        return true;
     }
 
     async prepareTranslator() {

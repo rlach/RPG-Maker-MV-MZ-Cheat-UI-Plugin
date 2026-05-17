@@ -75,8 +75,12 @@ export class LLMenuScreenTranslator extends BasePluginTranslator {
             }
 
             const lower = plugin.name.trim().toLowerCase();
-            return lower === lowerCustom || lower === lowerBase ||
-                   lower === lowerCustomMV || lower === lowerBaseMV;
+            return (
+                lower === lowerCustom ||
+                lower === lowerBase ||
+                lower === lowerCustomMV ||
+                lower === lowerBaseMV
+            );
         });
     }
 
@@ -247,7 +251,7 @@ export class LLMenuScreenTranslator extends BasePluginTranslator {
     enablePluginTranslation() {
         const plugin = this._findCustomPluginEntry();
         if (!plugin?.parameters) {
-            return;
+            return false;
         }
 
         const menuHelpTexts = this._parseMenuHelpTexts(plugin.parameters);
@@ -454,5 +458,6 @@ export class LLMenuScreenTranslator extends BasePluginTranslator {
                 }
             };
         }
+        return true;
     }
 }

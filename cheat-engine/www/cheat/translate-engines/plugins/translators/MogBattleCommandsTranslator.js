@@ -87,10 +87,14 @@ export class MogBattleCommandsTranslator extends BasePluginTranslator {
             !Window_ActorCommand ||
             typeof Window_ActorCommand.prototype.load_com_images !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const originalLoadComImages = Window_ActorCommand.prototype.load_com_images;
+
+        if (!originalLoadComImages || typeof originalLoadComImages !== 'function') {
+            return false;
+        }
 
         // MOG_BattleCommands looks up command names to find matching icon images.
         // Since our makeCommandList hook translates names in-place, we temporarily
@@ -115,6 +119,7 @@ export class MogBattleCommandsTranslator extends BasePluginTranslator {
                 restoreCommandNames(replacedEntries);
             }
         };
+        return true;
     }
 
     async prepareTranslator() {

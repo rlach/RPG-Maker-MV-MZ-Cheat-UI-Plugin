@@ -74,12 +74,12 @@ export class GirlsWindowTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (!window.Scene_Map || !Scene_Map.prototype) {
-            return;
+            return false;
         }
 
         const originalCreateGirlsStatusWindow = Scene_Map.prototype.createGirlsStatusWindow;
         if (typeof originalCreateGirlsStatusWindow !== 'function') {
-            return;
+            return false;
         }
 
         const cacheType = this.getCacheType();
@@ -142,17 +142,23 @@ export class GirlsWindowTranslator extends BasePluginTranslator {
                         return originalDrawText.apply(this, arguments);
                     };
 
-                    Object.defineProperty(statusWindow, '__CHEAT_GIRLS_WINDOW_TRANSLATION_HOOKED__', {
-                        value: true,
-                        configurable: true,
-                        enumerable: false,
-                        writable: false,
-                    });
+                    Object.defineProperty(
+                        statusWindow,
+                        '__CHEAT_GIRLS_WINDOW_TRANSLATION_HOOKED__',
+                        {
+                            value: true,
+                            configurable: true,
+                            enumerable: false,
+                            writable: false,
+                        }
+                    );
                 }
             }
 
             return result;
         };
+
+        return true;
     }
 
     async prepareTranslator() {

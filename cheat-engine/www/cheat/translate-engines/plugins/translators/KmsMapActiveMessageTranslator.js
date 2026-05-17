@@ -81,14 +81,14 @@ export class KmsMapActiveMessageTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (!window.Game_Event || !Game_Event.prototype) {
-            return;
+            return false;
         }
 
         const hasNewApi = typeof Game_Event.prototype.getMapActiveMessages === 'function';
         const hasLegacyApi = typeof Game_Event.prototype.getMapActiveMessage === 'function';
 
         if (!hasNewApi && !hasLegacyApi) {
-            return;
+            return false;
         }
 
         const cacheType = this.getCacheType();
@@ -101,9 +101,7 @@ export class KmsMapActiveMessageTranslator extends BasePluginTranslator {
             }
 
             const runtime = resolveRuntime();
-            if (
-                !runtime
-            ) {
+            if (!runtime) {
                 return text;
             }
 
@@ -173,6 +171,7 @@ export class KmsMapActiveMessageTranslator extends BasePluginTranslator {
                 }
             };
         }
+        return true;
     }
 
     async prepareTranslator() {

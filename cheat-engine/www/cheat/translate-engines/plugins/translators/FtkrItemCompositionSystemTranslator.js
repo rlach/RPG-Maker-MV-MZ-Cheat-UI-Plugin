@@ -182,7 +182,11 @@ export class FtkrItemCompositionSystemTranslator extends BasePluginTranslator {
             this.appendJsonArrayEntries(parameters[key], { scope, field: key }, output);
         }
 
-        this.appendMenuCommandEntries(parameters['Menu Command'], { scope, field: 'Menu Command' }, output);
+        this.appendMenuCommandEntries(
+            parameters['Menu Command'],
+            { scope, field: 'Menu Command' },
+            output
+        );
         this.appendRecipeMaterialNumberFormatEntries(
             parameters['Recipe Material Number Format'],
             { scope, field: 'Recipe Material Number Format' },
@@ -253,7 +257,9 @@ export class FtkrItemCompositionSystemTranslator extends BasePluginTranslator {
     }
 
     collectCommonEventEntries(output) {
-        const commonEvents = Array.isArray(window.$dataCommonEvents) ? window.$dataCommonEvents : [];
+        const commonEvents = Array.isArray(window.$dataCommonEvents)
+            ? window.$dataCommonEvents
+            : [];
         for (let commonEventId = 0; commonEventId < commonEvents.length; commonEventId++) {
             const commonEvent = commonEvents[commonEventId];
             if (!commonEvent || !Array.isArray(commonEvent.list)) {
@@ -310,7 +316,10 @@ export class FtkrItemCompositionSystemTranslator extends BasePluginTranslator {
                     }
                 }
             } catch (error) {
-                console.warn(`[FtkrItemCompositionSystemTranslator] Failed to scan map ${mapId}`, error);
+                console.warn(
+                    `[FtkrItemCompositionSystemTranslator] Failed to scan map ${mapId}`,
+                    error
+                );
             }
         }
     }
@@ -355,7 +364,9 @@ export class FtkrItemCompositionSystemTranslator extends BasePluginTranslator {
 
         const sourceText = String(text);
         for (const templateSourceText of this.getTemplateSourceTexts()) {
-            const pattern = new RegExp(`^${escapeRegex(templateSourceText).replace(/%\d+/g, '(.+?)')}$`);
+            const pattern = new RegExp(
+                `^${escapeRegex(templateSourceText).replace(/%\d+/g, '(.+?)')}$`
+            );
             const match = pattern.exec(sourceText);
             if (!match) {
                 continue;
@@ -370,13 +381,19 @@ export class FtkrItemCompositionSystemTranslator extends BasePluginTranslator {
                 }
             );
 
-            if (!this.isUsableText(translatedTemplate) || translatedTemplate === templateSourceText) {
+            if (
+                !this.isUsableText(translatedTemplate) ||
+                translatedTemplate === templateSourceText
+            ) {
                 continue;
             }
 
             let translated = String(translatedTemplate);
             for (let captureIndex = 1; captureIndex < match.length; captureIndex++) {
-                translated = translated.replaceAll(`%${captureIndex}`, String(match[captureIndex] || ''));
+                translated = translated.replaceAll(
+                    `%${captureIndex}`,
+                    String(match[captureIndex] || '')
+                );
             }
             return translated;
         }
@@ -403,6 +420,10 @@ export class FtkrItemCompositionSystemTranslator extends BasePluginTranslator {
         const getRuntime = this.getRuntime.bind(this);
         const translateIcsText = this.translateIcsText.bind(this);
         const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
+
+        if (!window.Window_MenuCommand?.prototype?.addOriginalCommands) {
+            return false;
+        }
 
         if (window.Window_MenuCommand?.prototype?.addOriginalCommands) {
             const originalAddOriginalCommands = Window_MenuCommand.prototype.addOriginalCommands;
@@ -481,6 +502,8 @@ export class FtkrItemCompositionSystemTranslator extends BasePluginTranslator {
                 return originalDrawTextEx.apply(this, arguments);
             };
         }
+
+        return true;
     }
 
     async prepareTranslator() {
@@ -523,7 +546,11 @@ export class FtkrItemCompositionSystemTranslator extends BasePluginTranslator {
 
         const runtimeParameters = this.getRuntimeParameters();
         if (runtimeParameters) {
-            this.appendParameterEntries(runtimeParameters, 'runtimePluginManagerParameter', entries);
+            this.appendParameterEntries(
+                runtimeParameters,
+                'runtimePluginManagerParameter',
+                entries
+            );
         }
 
         this.collectCommonEventEntries(entries);

@@ -29,6 +29,7 @@ export class LunatlazurActorNameWindowTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         this.registerPluginCustomTags(LUNATLAZUR_ACTOR_NAME_WINDOW_PLUGIN_TAGS);
+        return true;
     }
 
     async prepareTranslator() {

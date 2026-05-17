@@ -120,7 +120,7 @@ export class MogSceneItemTranslator extends BasePluginTranslator {
     enablePluginTranslation() {
         const itemListCtor = window.Window_ItemListM;
         if (!itemListCtor?.prototype) {
-            return;
+            return false;
         }
 
         const getRuntime = this.getRuntime.bind(this);
@@ -129,7 +129,10 @@ export class MogSceneItemTranslator extends BasePluginTranslator {
         const resolveTranslatedCommandName = this.resolveTranslatedCommandName.bind(this);
 
         const itemCategoryCtor = window.Window_ItemCategory;
-        if (itemCategoryCtor?.prototype && typeof itemCategoryCtor.prototype.commandName === 'function') {
+        if (
+            itemCategoryCtor?.prototype &&
+            typeof itemCategoryCtor.prototype.commandName === 'function'
+        ) {
             const originalCommandName = itemCategoryCtor.prototype.commandName;
 
             itemCategoryCtor.prototype.commandName = function (index) {
@@ -195,5 +198,6 @@ export class MogSceneItemTranslator extends BasePluginTranslator {
                 return originalSetHelpWindowItem.apply(this, arguments);
             };
         }
+        return true;
     }
 }

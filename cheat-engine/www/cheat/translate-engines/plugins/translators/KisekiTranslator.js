@@ -85,7 +85,7 @@ export class KisekiTranslator extends BasePluginTranslator {
     enablePluginTranslation() {
         const sabaNamespace = globalThis.Saba;
         if (!sabaNamespace || sabaNamespace[KISEKI_PATCH_FLAG]) {
-            return;
+            return false;
         }
 
         const originalGetSystemBaseTexture = sabaNamespace.getSystemBaseTexture;
@@ -94,7 +94,7 @@ export class KisekiTranslator extends BasePluginTranslator {
             typeof originalGetSystemBaseTexture !== 'function' ||
             typeof originalGetSystemImage !== 'function'
         ) {
-            return;
+            return false;
         }
 
         sabaNamespace.getSystemBaseTexture = function (file) {
@@ -131,5 +131,6 @@ export class KisekiTranslator extends BasePluginTranslator {
 
         sabaNamespace[KISEKI_PATCH_FLAG] = true;
         console.log('[KisekiTranslator] Installed compatibility patch for system images');
+        return true;
     }
 }

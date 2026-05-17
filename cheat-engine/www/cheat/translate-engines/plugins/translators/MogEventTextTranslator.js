@@ -25,7 +25,11 @@ export class MogEventTextTranslator extends BasePluginTranslator {
     }
 
     _applyTranslationToCharText(eventInstance, runtime) {
-        if (!runtime || !Array.isArray(eventInstance._char_text) || eventInstance._char_text.length < 2) {
+        if (
+            !runtime ||
+            !Array.isArray(eventInstance._char_text) ||
+            eventInstance._char_text.length < 2
+        ) {
             return;
         }
 
@@ -40,10 +44,7 @@ export class MogEventTextTranslator extends BasePluginTranslator {
         runtime.trackCacheKeyUsage(cacheKey);
 
         // Apply cached translation if runtime translation is active
-        if (
-            this.isRuntimeTranslationActive(runtime) &&
-            runtime.hasUsableCacheValue(cacheKey)
-        ) {
+        if (this.isRuntimeTranslationActive(runtime) && runtime.hasUsableCacheValue(cacheKey)) {
             const cached = runtime.translationCache.get(cacheKey);
             if (typeof cached === 'string' && cached.trim()) {
                 eventInstance._char_text[1] = cached;
@@ -59,7 +60,7 @@ export class MogEventTextTranslator extends BasePluginTranslator {
             !Game_Event.prototype ||
             typeof Game_Event.prototype.check_event_text !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const original = Game_Event.prototype.check_event_text;
@@ -77,6 +78,7 @@ export class MogEventTextTranslator extends BasePluginTranslator {
                 );
             }
         };
+        return true;
     }
 
     async prepareTranslator() {

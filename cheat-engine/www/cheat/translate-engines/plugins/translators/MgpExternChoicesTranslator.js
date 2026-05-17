@@ -16,6 +16,7 @@ export class MgpExternChoicesTranslator extends ExternBaseTranslator {
     enablePluginTranslation() {
         // No runtime hook required. The plugin copies CSV values into game
         // variables, and normal choice translation handles rendered choices.
+        return true;
     }
 
     getCsvFilePath() {

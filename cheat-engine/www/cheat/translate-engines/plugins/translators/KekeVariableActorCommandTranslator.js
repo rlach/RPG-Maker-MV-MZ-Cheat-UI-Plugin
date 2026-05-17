@@ -15,7 +15,7 @@ export class KekeVariableActorCommandTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (!window.Window_ActorCommand || !Window_ActorCommand.prototype) {
-            return;
+            return false;
         }
 
         const getRuntime = this.getRuntime.bind(this);
@@ -72,6 +72,7 @@ export class KekeVariableActorCommandTranslator extends BasePluginTranslator {
                 return withOriginalSkillTypeIndexOf(() => original.apply(this, arguments));
             };
         }
+        return true;
     }
 
     async prepareTranslator() {

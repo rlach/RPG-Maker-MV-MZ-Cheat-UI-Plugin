@@ -93,6 +93,7 @@ export class LLStandingPictureTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         this.registerPluginCustomTags(LL_STANDING_PICTURE_PLUGIN_TAGS);
+        return true;
     }
 
     async prepareTranslator() {

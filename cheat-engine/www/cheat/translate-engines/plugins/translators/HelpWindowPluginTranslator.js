@@ -36,11 +36,15 @@ export class HelpWindowPluginTranslator extends BasePluginTranslator {
         // breaking addHelpPage(), which calls helpPages().push() — mutating a mapped
         // copy would silently discard pages, leaving the window blank.
         if (typeof Scene_HelpWindow === 'undefined' || !Scene_HelpWindow.prototype) {
-            return;
+            return false;
         }
 
         const translator = this;
         const original = Scene_HelpWindow.prototype._refreshPage;
+
+        if (!original || typeof original !== 'function') {
+            return false;
+        }
 
         Scene_HelpWindow.prototype._refreshPage = function () {
             original.call(this);
@@ -52,7 +56,8 @@ export class HelpWindowPluginTranslator extends BasePluginTranslator {
                 }
 
                 const pages =
-                    typeof $gameSystem !== 'undefined' && typeof $gameSystem.helpPages === 'function'
+                    typeof $gameSystem !== 'undefined' &&
+                    typeof $gameSystem.helpPages === 'function'
                         ? $gameSystem.helpPages()
                         : null;
 
@@ -97,6 +102,8 @@ export class HelpWindowPluginTranslator extends BasePluginTranslator {
                 );
             }
         };
+
+        return true;
     }
 
     // -----------------------------------------------------------------------
@@ -229,10 +236,7 @@ export class HelpWindowPluginTranslator extends BasePluginTranslator {
                     }
                 }
             } catch (error) {
-                console.warn(
-                    `[HelpWindowPluginTranslator] Failed to scan map ${mapId}`,
-                    error
-                );
+                console.warn(`[HelpWindowPluginTranslator] Failed to scan map ${mapId}`, error);
             }
         }
 
@@ -286,7 +290,7 @@ export class HelpWindowPluginTranslator extends BasePluginTranslator {
         }
 
         const commandName = String(params[1] || '').trim();
-        const args = (params[3] && typeof params[3] === 'object') ? params[3] : {};
+        const args = params[3] && typeof params[3] === 'object' ? params[3] : {};
 
         if (commandName === SET_PAGES_COMMAND) {
             return this.extractFromSetPages(args);

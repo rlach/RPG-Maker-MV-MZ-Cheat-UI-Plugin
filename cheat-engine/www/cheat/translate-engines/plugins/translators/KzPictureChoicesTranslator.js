@@ -19,10 +19,14 @@ export class KzPictureChoicesTranslator extends BasePluginTranslator {
             !Window_ChoiceList.prototype ||
             typeof Window_ChoiceList.prototype.populateChoiceSprites !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const originalPopulateChoiceSprites = Window_ChoiceList.prototype.populateChoiceSprites;
+
+        if (!originalPopulateChoiceSprites || typeof originalPopulateChoiceSprites !== 'function') {
+            return false;
+        }
 
         Window_ChoiceList.prototype.populateChoiceSprites = function () {
             const gameMessage = window.$gameMessage;
@@ -47,6 +51,7 @@ export class KzPictureChoicesTranslator extends BasePluginTranslator {
                 gameMessage.choices = originalChoicesMethod;
             }
         };
+        return true;
     }
 
     async prepareTranslator() {
