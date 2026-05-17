@@ -5,6 +5,7 @@ const RUNTIME_HOOK_GUARD = '__CHEAT_GET_INFORMATION_TRANSLATOR_HOOKED__';
 const CACHE_TYPE = 'plugin_get_information';
 const COMMAND_CACHE_TYPE = 'plugin_get_information_command';
 const DIRECT_TEMPLATE_TYPE = '__CHEAT_GET_INFORMATION_DIRECT_TEMPLATE__';
+const COMMON_POPUP_PLUGIN_NAMES = new Set(['commonpopupcore']);
 
 const PARAM_TEXT_FIELDS = [
     'Get Gold Text',
@@ -85,6 +86,24 @@ export class GetInformationTranslator extends BasePluginTranslator {
 
     getCacheType() {
         return CACHE_TYPE;
+    }
+
+    detectPlugin() {
+        if (!super.detectPlugin()) {
+            return false;
+        }
+
+        if (!Array.isArray(window.$plugins)) {
+            return false;
+        }
+
+        return window.$plugins.some((plugin) => {
+            if (!plugin || typeof plugin.name !== 'string') {
+                return false;
+            }
+
+            return COMMON_POPUP_PLUGIN_NAMES.has(plugin.name.trim().toLowerCase());
+        });
     }
 
     findPluginEntry() {
@@ -494,6 +513,9 @@ export class GetInformationTranslator extends BasePluginTranslator {
 
         const commonPopupManager = window.CommonPopupManager;
         if (!commonPopupManager || typeof commonPopupManager.showInfo !== 'function') {
+            console.log(
+                '[GetInformationTranslator] CommonPopupManager.showInfo not found, cannot apply translation'
+            );
             return false;
         }
         this.registerPluginCustomTags(GET_INFORMATION_PLUGIN_TAGS);
