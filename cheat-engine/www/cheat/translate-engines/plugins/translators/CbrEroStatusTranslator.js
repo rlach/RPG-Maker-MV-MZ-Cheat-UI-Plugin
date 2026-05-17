@@ -1,5 +1,6 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
+import { isRpgMakerMv } from '../../../js/RpgMakerRuntime.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_CBR_ERO_STATUS_TRANSLATOR_HOOKED__';
 const PLUGIN_SCRIPT_HEADER = 'CBR-エロステータス';
@@ -57,12 +58,19 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
         this._scanPromise = null;
     }
 
+    detectPlugin() {
+        if (isRpgMakerMv()) {
+            return false;
+        }
+        return super.detectPlugin();
+    }
+
     getPluginName() {
         return 'CBR_EroStatus';
     }
 
     getPluginLabel() {
-        return 'CBR EroStatus';
+        return 'CBR EroStatus (MZ)';
     }
 
     getCacheType() {

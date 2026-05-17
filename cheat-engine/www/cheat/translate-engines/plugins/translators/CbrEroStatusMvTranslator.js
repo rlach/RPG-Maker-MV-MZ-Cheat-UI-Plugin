@@ -1,3 +1,4 @@
+import { isRpgMakerMv } from '../../../js/RpgMakerRuntime.js';
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_CBR_ERO_STATUS_MV_TRANSLATOR_HOOKED__';
@@ -32,6 +33,13 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
         this._scanPromise = null;
         this._lastScanKey = '';
         this._originalSubjectMap = new WeakMap();
+    }
+
+    detectPlugin() {
+        if (!isRpgMakerMv()) {
+            return false;
+        }
+        return super.detectPlugin();
     }
 
     getPluginName() {
