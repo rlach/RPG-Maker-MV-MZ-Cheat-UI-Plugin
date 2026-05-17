@@ -22,6 +22,10 @@ export class BasePluginTranslator extends BasePhase {
         return this.getPluginName();
     }
 
+    getCacheType() {
+        return 'plugin';
+    }
+
     getKind() {
         const normalized = String(this.getPluginName() || 'plugin')
             .trim()
@@ -108,8 +112,8 @@ export class BasePluginTranslator extends BasePhase {
         runtime.engine.addPluginTags(this.getPluginName(), tagConfigs);
     }
 
-    prepareTranslator(_context = {}) {
-        // Optional hook point for plugin-specific one-time async preparation.
+    precomputeCounts(_context = {}) {
+        // Optional hook point for plugin-specific one-time async precompute.
         return Promise.resolve();
     }
 
@@ -209,7 +213,7 @@ export class BasePluginTranslator extends BasePhase {
         }
 
         return (
-            this.countPluginAmountSync(context) || {
+            this.getCachedCountsSync(context) || {
                 total: 0,
                 left: 0,
                 totalStrings: 0,
@@ -218,7 +222,7 @@ export class BasePluginTranslator extends BasePhase {
         );
     }
 
-    countPluginAmountSync(_context = {}) {
+    getCachedCountsSync(_context = {}) {
         return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
     }
 

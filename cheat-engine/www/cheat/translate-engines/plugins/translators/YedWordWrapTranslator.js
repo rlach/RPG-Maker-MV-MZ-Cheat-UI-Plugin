@@ -60,22 +60,22 @@ export class YedWordWrapTranslator extends BasePluginTranslator {
         const translator = this;
 
         if (window[RUNTIME_HOOK_GUARD]) {
-            return;
+            return true;
         }
 
         const runtime = translator.getRuntime();
         if (!runtime || typeof runtime.wrapText !== 'function') {
-            return;
+            return false;
         }
 
         const runtimeProto = Object.getPrototypeOf(runtime);
         if (!runtimeProto || typeof runtimeProto.wrapText !== 'function') {
-            return;
+            return false;
         }
 
         if (runtimeProto[WRAP_TEXT_PATCH_GUARD]) {
             window[RUNTIME_HOOK_GUARD] = true;
-            return;
+            return true;
         }
 
         const originalWrapText = runtimeProto.wrapText;
@@ -124,9 +124,10 @@ export class YedWordWrapTranslator extends BasePluginTranslator {
 
         runtimeProto[WRAP_TEXT_PATCH_GUARD] = true;
         window[RUNTIME_HOOK_GUARD] = true;
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         return;
     }
 
@@ -138,7 +139,7 @@ export class YedWordWrapTranslator extends BasePluginTranslator {
         return [];
     }
 
-    countPluginAmountSync() {
+    getCachedCountsSync() {
         return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
     }
 }

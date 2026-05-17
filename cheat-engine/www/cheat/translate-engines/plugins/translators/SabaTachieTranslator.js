@@ -119,29 +119,11 @@ export class SabaTachieTranslator extends BasePluginTranslator {
     enablePluginTranslation() {
         const TachieMessageClass = this._resolveTachieMessageClass();
         if (!TachieMessageClass?.prototype) {
-            console.warn('[SabaTachieTranslator] Window_TachieMessage not found at enablePluginTranslation time, deferring hook');
-            this._deferHookInstallation();
-            return;
+            return false;
         }
 
         this._installHooks(TachieMessageClass);
-    }
-
-    _deferHookInstallation() {
-        let attempts = 0;
-        const maxAttempts = 20;
-        const interval = setInterval(() => {
-            attempts++;
-            const TachieMessageClass = this._resolveTachieMessageClass();
-            if (TachieMessageClass?.prototype) {
-                clearInterval(interval);
-                console.log('[SabaTachieTranslator] Deferred hook: class found after', attempts, 'attempts');
-                this._installHooks(TachieMessageClass);
-            } else if (attempts >= maxAttempts) {
-                clearInterval(interval);
-                console.warn('[SabaTachieTranslator] Deferred hook: gave up after', maxAttempts, 'attempts');
-            }
-        }, 500);
+        return true;
     }
 
     _installHooks(TachieMessageClass) {
@@ -360,7 +342,7 @@ export class SabaTachieTranslator extends BasePluginTranslator {
     // Scanning — collect speaker names from "Tachie showName" plugin commands
     // ========================================================================
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -455,7 +437,7 @@ export class SabaTachieTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

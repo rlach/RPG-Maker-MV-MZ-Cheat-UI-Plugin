@@ -130,63 +130,64 @@ export class PHQuestBookTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (!window.Window_Base || !Window_Base.prototype) {
-            return;
+            return false;
+        }
+
+        if (
+            typeof Window_Base.prototype.drawText !== 'function' ||
+            typeof Window_Base.prototype.convertEscapeCharacters !== 'function'
+        ) {
+            return false;
         }
 
         const originalDrawText = Window_Base.prototype.drawText;
-        if (typeof originalDrawText === 'function') {
-            const isQuestBookSceneActive = this.isQuestBookSceneActive.bind(this);
-            const isDrawTextTargetWindow = this.isDrawTextTargetWindow.bind(this);
-            const getRuntime = this.getRuntime.bind(this);
-            const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
-            const translateQuestBookText = this.translateQuestBookText.bind(this);
-            Window_Base.prototype.drawText = function () {
-                try {
-                    if (isQuestBookSceneActive() && isDrawTextTargetWindow(this)) {
-                        const runtime = getRuntime();
-                        if (isRuntimeTranslationActive(runtime)) {
-                            arguments[0] = translateQuestBookText(arguments[0], runtime);
-                        }
+        const isQuestBookSceneActive = this.isQuestBookSceneActive.bind(this);
+        const isDrawTextTargetWindow = this.isDrawTextTargetWindow.bind(this);
+        const getRuntime = this.getRuntime.bind(this);
+        const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
+        const translateQuestBookText = this.translateQuestBookText.bind(this);
+        Window_Base.prototype.drawText = function () {
+            try {
+                if (isQuestBookSceneActive() && isDrawTextTargetWindow(this)) {
+                    const runtime = getRuntime();
+                    if (isRuntimeTranslationActive(runtime)) {
+                        arguments[0] = translateQuestBookText(arguments[0], runtime);
                     }
-                } catch (error) {
-                    console.warn(
-                        '[PHQuestBookTranslator] Failed to apply quest book drawText translation',
-                        error
-                    );
                 }
+            } catch (error) {
+                console.warn(
+                    '[PHQuestBookTranslator] Failed to apply quest book drawText translation',
+                    error
+                );
+            }
 
-                return originalDrawText.apply(this, arguments);
-            };
-        }
+            return originalDrawText.apply(this, arguments);
+        };
 
         const originalConvertEscapeCharacters = Window_Base.prototype.convertEscapeCharacters;
-        if (typeof originalConvertEscapeCharacters === 'function') {
-            const isQuestBookSceneActive = this.isQuestBookSceneActive.bind(this);
-            const isDetailsTargetWindow = this.isDetailsTargetWindow.bind(this);
-            const getRuntime = this.getRuntime.bind(this);
-            const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
-            const translateQuestBookText = this.translateQuestBookText.bind(this);
-            Window_Base.prototype.convertEscapeCharacters = function (text) {
-                try {
-                    if (isQuestBookSceneActive() && isDetailsTargetWindow(this)) {
-                        const runtime = getRuntime();
-                        if (isRuntimeTranslationActive(runtime)) {
-                            text = translateQuestBookText(text, runtime);
-                        }
+        const isDetailsTargetWindow = this.isDetailsTargetWindow.bind(this);
+        Window_Base.prototype.convertEscapeCharacters = function (text) {
+            try {
+                if (isQuestBookSceneActive() && isDetailsTargetWindow(this)) {
+                    const runtime = getRuntime();
+                    if (isRuntimeTranslationActive(runtime)) {
+                        text = translateQuestBookText(text, runtime);
                     }
-                } catch (error) {
-                    console.warn(
-                        '[PHQuestBookTranslator] Failed to apply quest book detail translation',
-                        error
-                    );
                 }
+            } catch (error) {
+                console.warn(
+                    '[PHQuestBookTranslator] Failed to apply quest book detail translation',
+                    error
+                );
+            }
 
-                return originalConvertEscapeCharacters.call(this, text);
-            };
-        }
+            return originalConvertEscapeCharacters.call(this, text);
+        };
+
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -448,7 +449,7 @@ export class PHQuestBookTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

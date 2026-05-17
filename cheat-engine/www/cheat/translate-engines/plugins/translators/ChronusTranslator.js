@@ -39,7 +39,7 @@ export class ChronusTranslator extends BasePluginTranslator {
         return 'plugin_chronus';
     }
 
-    prepareTranslator() {
+    precomputeCounts() {
         if (!this.ensureDetection()) {
             return Promise.resolve();
         }
@@ -118,7 +118,7 @@ export class ChronusTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
@@ -137,12 +137,13 @@ export class ChronusTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (!window.Game_Chronus || !Game_Chronus.prototype) {
-            return;
+            return false;
         }
 
         this._hookGetDateFormat();
         this._hookGetWeekName();
         this._hookGetTimeZoneName();
+        return true;
     }
 
     _hookGetDateFormat() {

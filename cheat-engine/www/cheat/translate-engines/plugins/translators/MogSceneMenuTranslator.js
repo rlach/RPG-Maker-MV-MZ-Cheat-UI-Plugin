@@ -93,14 +93,15 @@ export class MogSceneMenuTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (!window.Scene_Menu || !Scene_Menu.prototype) {
-            return;
+        if (
+            !window.Scene_Menu ||
+            !Scene_Menu.prototype ||
+            typeof Scene_Menu.prototype.loadBitmapsMain !== 'function'
+        ) {
+            return false;
         }
 
         const originalLoadBitmapsMain = Scene_Menu.prototype.loadBitmapsMain;
-        if (typeof originalLoadBitmapsMain !== 'function') {
-            return;
-        }
 
         const getRuntime = this.getRuntime.bind(this);
         const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
@@ -132,9 +133,11 @@ export class MogSceneMenuTranslator extends BasePluginTranslator {
                 restoreCommandNames(replacedEntries);
             }
         };
+
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         return;
     }
 
@@ -142,7 +145,7 @@ export class MogSceneMenuTranslator extends BasePluginTranslator {
         return [];
     }
 
-    countPluginAmountSync() {
+    getCachedCountsSync() {
         return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
     }
 }

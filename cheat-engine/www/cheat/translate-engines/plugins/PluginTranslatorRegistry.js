@@ -138,6 +138,7 @@ class PluginTranslatorRegistry {
         this.detectedPluginNames = new Set();
         this.detectionPromise = null;
         this.detectionCompleted = false;
+        this.countsPrecomputePromise = null;
     }
 
     ensureDetectionStarted(context = {}) {
@@ -165,12 +166,53 @@ class PluginTranslatorRegistry {
         }
     }
 
+    ensureCountsPrecomputeStarted(context = {}) {
+        if (this.countsPrecomputePromise !== null) {
+            return this.countsPrecomputePromise;
+        }
+
+        this.countsPrecomputePromise = this.precomputeDetectedTranslatorCounts(context)
+            .catch((error) => {
+                console.warn('[PluginTranslatorRegistry] Plugin count precompute failed', error);
+            })
+            .finally(() => {
+                this.countsPrecomputePromise = null;
+            });
+
+        return this.countsPrecomputePromise;
+    }
+
+    async ensureCountsPrecomputed(context = {}) {
+        await this.ensureDetectionCompleted(context);
+        const promise = this.ensureCountsPrecomputeStarted(context);
+        if (typeof promise?.then === 'function') {
+            await promise;
+        }
+    }
+
+    async precomputeDetectedTranslatorCounts(context = {}) {
+        const runtime = context?.runtime;
+        const translators = this.getDetectedTranslatorInstances();
+
+        await Promise.all(
+            translators.map(async (translator) => {
+                try {
+                    await translator.precomputeCounts({ runtime });
+                } catch (error) {
+                    console.warn(
+                        `[PluginTranslatorRegistry] Failed to precompute counts for ${translator.getPluginName()}`,
+                        error
+                    );
+                }
+            })
+        );
+    }
+
     async runDetection(context = {}) {
         // Phase 1 (sync): instantiate all translators and run detection immediately.
         // This ensures translatorInstances + detectedPluginNames are populated before
         // any async work begins, so resolveMessageCacheSourceText never misses a
-        // translator due to a slow prepareTranslator() call on an earlier entry.
-        const detectedTranslators = [];
+        // translator due to a slow precomputeCounts() call on an earlier entry.
         for (const TranslatorClass of this.translatorClasses) {
             const translator = new TranslatorClass();
             const pluginName = String(translator.getPluginName() || '').trim();
@@ -186,20 +228,10 @@ class PluginTranslatorRegistry {
             }
 
             this.detectedPluginNames.add(pluginName);
-            detectedTranslators.push({ pluginName, translator });
         }
 
-        // Phase 2 (async): prepare detected translators sequentially.
-        for (const { pluginName, translator } of detectedTranslators) {
-            try {
-                await translator.prepareTranslator();
-            } catch (error) {
-                console.warn(
-                    `[PluginTranslatorRegistry] Failed to prepare translator ${pluginName}`,
-                    error
-                );
-            }
-        }
+        // Detection no longer runs count precompute during startup.
+        // Count data is precomputed lazily via ensureCountsPrecomputed().
     }
 
     isPluginDetected(pluginName) {
@@ -221,7 +253,7 @@ class PluginTranslatorRegistry {
     getDetectedPluginSummaries(runtime) {
         return this.getDetectedTranslatorInstances().map((translator) => {
             const pluginName = translator.getPluginName();
-            const counts = translator.countAmountSync({ runtime });
+            const counts = translator.getCachedCountsSync({ runtime });
 
             return {
                 pluginName,

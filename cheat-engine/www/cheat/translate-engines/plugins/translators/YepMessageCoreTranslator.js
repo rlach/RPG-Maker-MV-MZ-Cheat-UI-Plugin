@@ -254,9 +254,10 @@ export class YepMessageCoreTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         this.registerPluginCustomTags(YEP_MESSAGE_CORE_PLUGIN_TAGS);
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         return;
     }
 
@@ -268,7 +269,7 @@ export class YepMessageCoreTranslator extends BasePluginTranslator {
         return [];
     }
 
-    countPluginAmountSync() {
+    getCachedCountsSync() {
         return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
     }
 }

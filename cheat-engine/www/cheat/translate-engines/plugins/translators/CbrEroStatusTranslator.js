@@ -71,7 +71,7 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
-            return;
+            return true;
         }
 
         if (
@@ -79,7 +79,7 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
             typeof window.CBR !== 'object' ||
             typeof window.CBR['エロステータス'] !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const original = window.CBR['エロステータス'];
@@ -105,9 +105,10 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
         };
 
         window[RUNTIME_HOOK_GUARD] = true;
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -301,7 +302,7 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

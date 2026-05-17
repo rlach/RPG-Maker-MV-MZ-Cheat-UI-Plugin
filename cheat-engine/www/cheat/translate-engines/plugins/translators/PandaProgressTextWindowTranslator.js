@@ -131,7 +131,7 @@ export class PandaProgressTextWindowTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
-            return;
+            return true;
         }
 
         if (
@@ -139,7 +139,7 @@ export class PandaProgressTextWindowTranslator extends BasePluginTranslator {
             !Window_Help.prototype ||
             typeof Window_Help.prototype.setText !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const originalSetText = Window_Help.prototype.setText;
@@ -165,9 +165,10 @@ export class PandaProgressTextWindowTranslator extends BasePluginTranslator {
         };
 
         window[RUNTIME_HOOK_GUARD] = true;
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -251,7 +252,7 @@ export class PandaProgressTextWindowTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

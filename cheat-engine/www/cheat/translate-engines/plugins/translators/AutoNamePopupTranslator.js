@@ -39,8 +39,13 @@ export class AutoNamePopupTranslator extends BasePluginTranslator {
     enablePluginTranslation() {
         const translator = this;
 
-        if (!window.Game_Message || !Game_Message.prototype) {
-            return;
+        if (
+            !window.Game_Message ||
+            !Game_Message.prototype ||
+            typeof Game_Message.prototype.allText !== 'function' ||
+            typeof Game_Message.prototype.setSpeakerName !== 'function'
+        ) {
+            return false;
         }
 
         const originalAllText = Game_Message.prototype.allText;
@@ -138,6 +143,8 @@ export class AutoNamePopupTranslator extends BasePluginTranslator {
                 console.warn('[AutoNamePopupTranslator] Speaker name translation failed', error);
             }
         };
+
+        return true;
     }
 
     collectUntranslated() {
@@ -146,7 +153,7 @@ export class AutoNamePopupTranslator extends BasePluginTranslator {
         return [];
     }
 
-    countPluginAmountSync() {
+    getCachedCountsSync() {
         return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
     }
 }

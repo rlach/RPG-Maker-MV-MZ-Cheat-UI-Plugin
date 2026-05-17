@@ -292,14 +292,15 @@ export class MppMessageExTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
-            return;
+            return true;
         }
 
         this.registerPluginCustomTags(MPP_MESSAGE_EX_PLUGIN_TAGS);
         window[RUNTIME_HOOK_GUARD] = true;
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         return;
     }
 
@@ -311,7 +312,7 @@ export class MppMessageExTranslator extends BasePluginTranslator {
         return [];
     }
 
-    countPluginAmountSync() {
+    getCachedCountsSync() {
         return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
     }
 }

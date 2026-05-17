@@ -7,7 +7,6 @@ import MainComponent from '../MainComponent.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
 import { Alert } from '../js/AlertHelper.js';
 import { MessageCheat } from '../js/CheatHelper.js';
-import { PLUGIN_TRANSLATOR_REGISTRY } from '../translate-engines/plugins/PluginTranslatorRegistry.js';
 import { ensureHacksRuntime } from '../js/HacksRuntime.js';
 import { getRpgMakerName } from '../js/RpgMakerRuntime.js';
 
@@ -142,10 +141,6 @@ async function bootstrapCheatUi() {
     ensureTranslateOnTheFlyRuntimeWithRetry({ maxAttempts: 30, delayMs: 500 });
     ensureHacksRuntime();
 
-    setTimeout(() => {
-        const runtime = ensureTranslateOnTheFlyRuntimeWithRetry({ maxAttempts: 10, delayMs: 500 });
-        PLUGIN_TRANSLATOR_REGISTRY.ensureDetectionStarted({ runtime });
-    }, 0);
 }
 
 bootstrapCheatUi();

@@ -44,7 +44,7 @@ export class NameBoxNoUseTranslator extends BasePluginTranslator {
         return 'plugin_name_box_no_use';
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         return;
     }
 
@@ -56,7 +56,7 @@ export class NameBoxNoUseTranslator extends BasePluginTranslator {
         return [];
     }
 
-    countPluginAmountSync() {
+    getCachedCountsSync() {
         return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
     }
 

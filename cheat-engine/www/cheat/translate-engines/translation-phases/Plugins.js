@@ -8,6 +8,7 @@ export class Plugins extends BasePhase {
 
     async createEntries({ runtime }) {
         await PLUGIN_TRANSLATOR_REGISTRY.ensureDetectionCompleted({ runtime: runtime });
+        await PLUGIN_TRANSLATOR_REGISTRY.ensureCountsPrecomputed({ runtime: runtime });
 
         const translators = PLUGIN_TRANSLATOR_REGISTRY.getDetectedTranslatorInstances();
         const entries = [];

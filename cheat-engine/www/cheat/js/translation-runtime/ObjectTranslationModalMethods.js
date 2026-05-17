@@ -477,6 +477,7 @@ export const objectTranslationRuntimeMethods = {
 
     async buildObjectTranslationPluginDetails() {
         await PLUGIN_TRANSLATOR_REGISTRY.ensureDetectionCompleted({ runtime: this });
+        await PLUGIN_TRANSLATOR_REGISTRY.ensureCountsPrecomputed({ runtime: this });
 
         const summaries = PLUGIN_TRANSLATOR_REGISTRY.getDetectedPluginSummaries(this);
         const details = summaries

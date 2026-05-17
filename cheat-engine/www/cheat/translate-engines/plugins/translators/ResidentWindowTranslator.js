@@ -46,8 +46,12 @@ export class ResidentWindowTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (!window.Window_ResidentStatus || !Window_ResidentStatus.prototype) {
-            return;
+        if (
+            !window.Window_ResidentStatus ||
+            !Window_ResidentStatus.prototype ||
+            typeof Window_ResidentStatus.prototype.drawText !== 'function'
+        ) {
+            return false;
         }
 
         const cacheType = this.getCacheType();
@@ -55,10 +59,6 @@ export class ResidentWindowTranslator extends BasePluginTranslator {
         const isUsableText = this.isUsableText.bind(this);
         const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
         const originalDrawText = Window_ResidentStatus.prototype.drawText;
-
-        if (typeof originalDrawText !== 'function') {
-            return;
-        }
 
         Window_ResidentStatus.prototype.drawText = function (text) {
             try {
@@ -90,9 +90,11 @@ export class ResidentWindowTranslator extends BasePluginTranslator {
 
             return originalDrawText.apply(this, arguments);
         };
+
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -162,7 +164,7 @@ export class ResidentWindowTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

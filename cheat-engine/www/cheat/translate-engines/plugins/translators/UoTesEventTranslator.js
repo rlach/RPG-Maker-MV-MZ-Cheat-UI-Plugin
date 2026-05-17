@@ -140,11 +140,12 @@ export class UoTesEventTranslator extends BasePluginTranslator {
         // The base cheat runtime intercepts Show Text and Show Choices commands
         // that TES events produce during gameplay, so translations stored in the
         // message / choice caches are applied automatically.
+        return true;
     }
 
     // ── Scan pipeline ─────────────────────────────────────────────────────
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -268,7 +269,7 @@ export class UoTesEventTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

@@ -245,32 +245,36 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (!window.Game_System || !Game_System.prototype) {
-            return;
+        if (
+            !window.Game_System ||
+            !Game_System.prototype ||
+            typeof Game_System.prototype.getDestination !== 'function'
+        ) {
+            return false;
         }
 
         const getRuntime = this.getRuntime.bind(this);
         const translateRuntimeDestinationValue = this.translateRuntimeDestinationValue.bind(this);
         const originalGetDestination = Game_System.prototype.getDestination;
 
-        if (typeof originalGetDestination === 'function') {
-            Game_System.prototype.getDestination = function () {
-                const destinationText = originalGetDestination.apply(this, arguments);
+        Game_System.prototype.getDestination = function () {
+            const destinationText = originalGetDestination.apply(this, arguments);
 
-                try {
-                    return translateRuntimeDestinationValue(destinationText, getRuntime());
-                } catch (error) {
-                    console.warn(
-                        '[DestinationWindowTranslator] Failed to apply runtime destination translation',
-                        error
-                    );
-                    return destinationText;
-                }
-            };
-        }
+            try {
+                return translateRuntimeDestinationValue(destinationText, getRuntime());
+            } catch (error) {
+                console.warn(
+                    '[DestinationWindowTranslator] Failed to apply runtime destination translation',
+                    error
+                );
+                return destinationText;
+            }
+        };
+
+        return true;
     }
 
-    async prepareTranslator() {
+    async precomputeCounts() {
         if (!this.ensureDetection()) {
             return;
         }
@@ -471,7 +475,7 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    countPluginAmountSync({ runtime }) {
+    getCachedCountsSync({ runtime }) {
         if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }

@@ -44,11 +44,23 @@ Implementation workflow:
 - getPluginName()
 - getPluginLabel()
 - getCacheType() with a dedicated plugin\_\* cache type
-- prepareTranslator() + buildScanEntries()
-- collectUntranslated({ panel })
-- countPluginAmountSync({ panel })
+- precomputeCounts() + buildScanEntries()
+- collectUntranslated({ runtime })
+- getCachedCountsSync({ runtime })
 - runtime integration in enablePluginTranslation() when applicable - be sure to return false when required objects/methods are not yet available to trigger retry logic, and return true at the end of the method when hooks are successfully applied. This ensures robust integration that waits for the right conditions and surfaces issues in logs instead of failing silently. Also, do not eat errors that can't be recovered from - either throw or return false to trigger retry, to ensure visibility of issues in logs.
 - at the top of the file, add a comment block with a brief description of the plugin and any important notes about its translation (e.g. if it has special parsing requirements, where text is stored, etc.). Also include plugin version, whenever it was target for MV or MZ (if no MZ/target is mentioned it means MV). When updating existing translator to support new plugin version or another engine (For example adding MZ support to an existing MV translator), add a version note in the comment block with the new version and any important differences in translation approach for that version. We want all supported versions listed.
+
+2.1 Lifecycle and invocation model (CRITICAL)
+
+- `PluginTranslatorRegistry.runDetection()` only instantiates translators and runs `ensureDetection()`.
+- `ensureDetection()` is where runtime hook mounting is triggered (with built-in retry via `enablePluginTranslation()`).
+- Count precompute is lazy: registry calls `translator.precomputeCounts({ runtime })` only through `ensureCountsPrecomputed()`.
+- `ensureCountsPrecomputed()` is invoked from:
+    - object modal plugin details (`buildObjectTranslationPluginDetails`), and
+    - plugin translation phase entry creation (`Plugins.createEntries`).
+- `precomputeCounts()` must be idempotent and safe to call multiple times; dedupe in-flight work with a promise when scanning is expensive.
+- `getCachedCountsSync()` must be synchronous and must not trigger async scans.
+- Do not use or introduce `prepareTranslator()` in new translators; the canonical precompute hook is `precomputeCounts()`.
 
 3. Scanning rules:
 
@@ -75,7 +87,7 @@ Implementation workflow:
 - Always use `this.isRuntimeTranslationActive(runtime)` for translation state checks. Never implement locally.
 - If you need a helper function, keep it focused on plugin-domain logic, NOT duplicating base infrastructure.
 
-4. Runtime hook rules:
+5. Runtime hook rules:
 
 - Hook the narrowest stable method that observes displayed text for this plugin.
 - Do not break original plugin behavior.
@@ -88,7 +100,7 @@ Implementation workflow:
 - If both flags are false/disabled, plugin-specific runtime patches must early-return without applying any hook logic (preserve original behavior).
 - To check at hook time, call `this.isRuntimeTranslationActive(runtime)` (preferred canonical helper from `BasePluginTranslator`).
 
-5. Seen/cache-usage tracking rules:
+6. Seen/cache-usage tracking rules:
 
 - ALWAYS prefer use of BasePluginTranslator resolveRuntimeTranslation. DO NOT REIMPLEMENT EXISTING FUNCTIONS WITH SLIGHT CHANGES.
 - If runtime provides getCacheKey, call trackCacheKeyUsage(cacheKey) at the observation point.
@@ -96,11 +108,11 @@ Implementation workflow:
 - Do not introduce wrapper helpers for tracking unless truly necessary.
 - Respect existing runtime guard behavior (shouldTrackRealtimeCacheUsage is handled by trackCacheKeyUsage).
 
-6. Registry wiring:
+7. Registry wiring:
 
 - Add import and class entry to PluginTranslatorRegistry translatorClasses.
 
-7. Validation:
+8. Validation:
 
 - Run error check on changed files.
 - Ensure no references remain to removed/deprecated helper methods.
@@ -114,6 +126,6 @@ Output requirements in final response:
 - Confirm whether seen tracking was added and where.
 - Mention any assumptions or unresolved ambiguity.
 
-8. Image handling
+9. Image handling
 
 If user complains some of the text is not translated and code analysis shows the text is part of an image/texture do not make random solutions like overlaying text over the image. Inform user about the situation and ask for clarification on how they want to proceed. Remind user there's image extractor tools available in cheat engine that can be used to extract the text from the image, which can then be translated and re-inserted as a new image. Do not automate this process beyond existing tools.
