@@ -1,5 +1,6 @@
 import { BasePhase } from '../translation-phases/BasePhase.js';
 import { shouldApplyHook } from '../../js/HookGuardHelper.js';
+import { Alert } from '../../js/AlertHelper.js';
 
 export class BasePluginTranslator extends BasePhase {
     constructor() {
@@ -156,6 +157,11 @@ export class BasePluginTranslator extends BasePhase {
                     if (retries >= maxRetries) {
                         console.info(
                             `[PluginTranslator] Plugin translation never mounted for ${this.getPluginName()} after ${maxRetries} retries.`
+                        );
+                        Alert.infoHtml(
+                            `Plugin ${this.getPluginLabel()} failed to initialize.`,
+                            null,
+                            5000
                         );
                         return;
                     }

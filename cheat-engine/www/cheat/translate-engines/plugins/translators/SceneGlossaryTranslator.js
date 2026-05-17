@@ -420,20 +420,17 @@ function resolveRuntimeTranslation(translator, text, cacheTypes) {
     });
 }
 
-function patchGlossaryDescription(translator) {
-    if (
-        !window.Window_Glossary ||
-        !Window_Glossary.prototype ||
-        typeof Window_Glossary.prototype.getDescription !== 'function'
-    ) {
+function installGlossaryDescriptionHooks(translator, glossaryWindowPrototype) {
+    if (!glossaryWindowPrototype || typeof glossaryWindowPrototype.getDescription !== 'function') {
         return false;
     }
 
-    const originalGetDescription = Window_Glossary.prototype.getDescription;
-    if (!originalGetDescription || typeof originalGetDescription !== 'function') {
-        return false;
+    if (glossaryWindowPrototype.__CHEAT_SCENE_GLOSSARY_DESCRIPTION_PATCHED__) {
+        return true;
     }
-    Window_Glossary.prototype.getDescription = function (index) {
+
+    const originalGetDescription = glossaryWindowPrototype.getDescription;
+    glossaryWindowPrototype.getDescription = function (index) {
         applyTranslatedGlossaryMeta(translator, this._itemData);
         const description = originalGetDescription.apply(this, arguments);
 
@@ -450,28 +447,59 @@ function patchGlossaryDescription(translator) {
         }
     };
 
-    if (typeof Window_Glossary.prototype.getMetaContents === 'function') {
-        const originalGetMetaContents = Window_Glossary.prototype.getMetaContents;
-        Window_Glossary.prototype.getMetaContents = function () {
+    if (typeof glossaryWindowPrototype.getMetaContents === 'function') {
+        const originalGetMetaContents = glossaryWindowPrototype.getMetaContents;
+        glossaryWindowPrototype.getMetaContents = function () {
             applyTranslatedGlossaryMeta(translator, this._itemData);
             return originalGetMetaContents.apply(this, arguments);
         };
     }
 
+    glossaryWindowPrototype.__CHEAT_SCENE_GLOSSARY_DESCRIPTION_PATCHED__ = true;
     return true;
 }
 
-function patchGlossaryCategoryWindow(translator) {
-    if (
-        !window.Window_GlossaryCategory ||
-        !Window_GlossaryCategory.prototype ||
-        typeof Window_GlossaryCategory.prototype.drawItem !== 'function'
-    ) {
-        return;
+function patchGlossaryDescriptionViaSceneCreate(translator) {
+    if (!window.Scene_Glossary?.prototype?.createGlossaryWindow) {
+        return false;
     }
 
-    const originalDrawItem = Window_GlossaryCategory.prototype.drawItem;
-    Window_GlossaryCategory.prototype.drawItem = function (index) {
+    const scenePrototype = window.Scene_Glossary.prototype;
+    if (scenePrototype.__CHEAT_SCENE_GLOSSARY_CREATE_WINDOW_PATCHED__) {
+        return true;
+    }
+
+    const originalCreateGlossaryWindow = scenePrototype.createGlossaryWindow;
+    scenePrototype.createGlossaryWindow = function () {
+        const result = originalCreateGlossaryWindow.apply(this, arguments);
+        const glossaryWindowPrototype = Object.getPrototypeOf(this._glossaryWindow);
+        installGlossaryDescriptionHooks(translator, glossaryWindowPrototype);
+        return result;
+    };
+
+    scenePrototype.__CHEAT_SCENE_GLOSSARY_CREATE_WINDOW_PATCHED__ = true;
+    return true;
+}
+
+function patchGlossaryDescription(translator) {
+    if (window.Window_Glossary?.prototype) {
+        return installGlossaryDescriptionHooks(translator, window.Window_Glossary.prototype);
+    }
+
+    return patchGlossaryDescriptionViaSceneCreate(translator);
+}
+
+function installGlossaryCategoryHooks(translator, categoryWindowPrototype) {
+    if (!categoryWindowPrototype || typeof categoryWindowPrototype.drawItem !== 'function') {
+        return false;
+    }
+
+    if (categoryWindowPrototype.__CHEAT_SCENE_GLOSSARY_CATEGORY_PATCHED__) {
+        return true;
+    }
+
+    const originalDrawItem = categoryWindowPrototype.drawItem;
+    categoryWindowPrototype.drawItem = function (index) {
         const hasData = Array.isArray(this._data) && index >= 0 && index < this._data.length;
         const originalText =
             hasData && typeof this._data[index] === 'string' ? this._data[index] : '';
@@ -497,6 +525,40 @@ function patchGlossaryCategoryWindow(translator) {
 
         return originalDrawItem.apply(this, arguments);
     };
+
+    categoryWindowPrototype.__CHEAT_SCENE_GLOSSARY_CATEGORY_PATCHED__ = true;
+    return true;
+}
+
+function patchGlossaryCategoryViaSceneCreate(translator) {
+    if (!window.Scene_Glossary?.prototype?.createGlossaryCategoryWindow) {
+        return false;
+    }
+
+    const scenePrototype = window.Scene_Glossary.prototype;
+    if (scenePrototype.__CHEAT_SCENE_GLOSSARY_CREATE_CATEGORY_PATCHED__) {
+        return true;
+    }
+
+    const originalCreateGlossaryCategoryWindow = scenePrototype.createGlossaryCategoryWindow;
+    scenePrototype.createGlossaryCategoryWindow = function () {
+        const result = originalCreateGlossaryCategoryWindow.apply(this, arguments);
+        const categoryWindowPrototype = Object.getPrototypeOf(this._glossaryCategoryWindow);
+        installGlossaryCategoryHooks(translator, categoryWindowPrototype);
+        return result;
+    };
+
+    scenePrototype.__CHEAT_SCENE_GLOSSARY_CREATE_CATEGORY_PATCHED__ = true;
+    return true;
+}
+
+function patchGlossaryCategoryWindow(translator) {
+    if (window.Window_GlossaryCategory?.prototype) {
+        installGlossaryCategoryHooks(translator, window.Window_GlossaryCategory.prototype);
+        return;
+    }
+
+    patchGlossaryCategoryViaSceneCreate(translator);
 }
 
 function patchGlossaryPartyMessages(translator) {
