@@ -128,10 +128,22 @@ export class CustomizeConfigItemTranslator extends BasePluginTranslator {
             return;
         }
 
-        const numberOptions = this.readOptionArrayByAlias(parameters, ['NumberOptions', '数値項目']);
-        const stringOptions = this.readOptionArrayByAlias(parameters, ['StringOptions', '文字項目']);
-        const switchOptions = this.readOptionArrayByAlias(parameters, ['SwitchOptions', 'スイッチ項目']);
-        const volumeOptions = this.readOptionArrayByAlias(parameters, ['VolumeOptions', '音量項目']);
+        const numberOptions = this.readOptionArrayByAlias(parameters, [
+            'NumberOptions',
+            '数値項目',
+        ]);
+        const stringOptions = this.readOptionArrayByAlias(parameters, [
+            'StringOptions',
+            '文字項目',
+        ]);
+        const switchOptions = this.readOptionArrayByAlias(parameters, [
+            'SwitchOptions',
+            'スイッチ項目',
+        ]);
+        const volumeOptions = this.readOptionArrayByAlias(parameters, [
+            'VolumeOptions',
+            '音量項目',
+        ]);
 
         const appendNameEntries = (options, group) => {
             for (let optionIndex = 0; optionIndex < options.length; optionIndex++) {
@@ -259,8 +271,13 @@ export class CustomizeConfigItemTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (!window.Window_Options || !Window_Options.prototype) {
-            return;
+        if (
+            !window.Window_Options ||
+            !Window_Options.prototype ||
+            typeof Window_Options.prototype.commandName !== 'function' ||
+            typeof Window_Options.prototype.statusText !== 'function'
+        ) {
+            return false;
         }
 
         const findRuntimeCustomOption = this.findRuntimeCustomOption.bind(this);
@@ -269,68 +286,65 @@ export class CustomizeConfigItemTranslator extends BasePluginTranslator {
         const isCustomizeConfigValueSymbol = this.isCustomizeConfigValueSymbol.bind(this);
         const getCacheType = this.getCacheType.bind(this);
 
-        if (typeof Window_Options.prototype.commandName === 'function') {
-            const originalCommandName = Window_Options.prototype.commandName;
+        const originalCommandName = Window_Options.prototype.commandName;
 
-            Window_Options.prototype.commandName = function (index) {
-                const name = originalCommandName.call(this, index);
+        Window_Options.prototype.commandName = function (index) {
+            const name = originalCommandName.call(this, index);
 
-                try {
-                    const symbol = this.commandSymbol(index);
-                    const customOption = findRuntimeCustomOption(symbol);
-                    if (!customOption) {
-                        return name;
-                    }
-
-                    const runtime = getRuntime();
-                    const resolvedTranslation = resolveRuntimeTranslation(name, runtime, 'command', {
-                        requireRuntimeTranslationActive: true,
-                    });
-                    if (resolvedTranslation !== name) {
-                        customOption._translationApplied = true;
-                    }
-
-                    return resolvedTranslation;
-                } catch (error) {
-                    console.warn(
-                        '[CustomizeConfigItemTranslator] Failed to translate option label',
-                        error
-                    );
+            try {
+                const symbol = this.commandSymbol(index);
+                const customOption = findRuntimeCustomOption(symbol);
+                if (!customOption) {
                     return name;
                 }
-            };
-        }
 
-        if (typeof Window_Options.prototype.statusText === 'function') {
-            const originalStatusText = Window_Options.prototype.statusText;
+                const runtime = getRuntime();
+                const resolvedTranslation = resolveRuntimeTranslation(name, runtime, 'command', {
+                    requireRuntimeTranslationActive: true,
+                });
+                if (resolvedTranslation !== name) {
+                    customOption._translationApplied = true;
+                }
 
-            Window_Options.prototype.statusText = function (index) {
-                const status = originalStatusText.call(this, index);
+                return resolvedTranslation;
+            } catch (error) {
+                console.warn(
+                    '[CustomizeConfigItemTranslator] Failed to translate option label',
+                    error
+                );
+                return name;
+            }
+        };
 
-                try {
-                    const symbol = this.commandSymbol(index);
-                    if (!isCustomizeConfigValueSymbol(symbol)) {
-                        return status;
-                    }
+        const originalStatusText = Window_Options.prototype.statusText;
 
-                    const customOption = findRuntimeCustomOption(symbol);
-                    if (!customOption) {
-                        return status;
-                    }
+        Window_Options.prototype.statusText = function (index) {
+            const status = originalStatusText.call(this, index);
 
-                    const runtime = getRuntime();
-                    return resolveRuntimeTranslation(status, runtime, getCacheType(), {
-                        requireRuntimeTranslationActive: true,
-                    });
-                } catch (error) {
-                    console.warn(
-                        '[CustomizeConfigItemTranslator] Failed to translate option value text',
-                        error
-                    );
+            try {
+                const symbol = this.commandSymbol(index);
+                if (!isCustomizeConfigValueSymbol(symbol)) {
                     return status;
                 }
-            };
-        }
+
+                const customOption = findRuntimeCustomOption(symbol);
+                if (!customOption) {
+                    return status;
+                }
+
+                const runtime = getRuntime();
+                return resolveRuntimeTranslation(status, runtime, getCacheType(), {
+                    requireRuntimeTranslationActive: true,
+                });
+            } catch (error) {
+                console.warn(
+                    '[CustomizeConfigItemTranslator] Failed to translate option value text',
+                    error
+                );
+                return status;
+            }
+        };
+        return true;
     }
 
     async prepareTranslator() {

@@ -3,6 +3,7 @@ import { BasePluginTranslator } from './BasePluginTranslator.js';
 import { CategorySynthesisTranslator } from './translators/CategorySynthesisTranslator.js';
 import { ChronusTranslator } from './translators/ChronusTranslator.js';
 import { CbrEroStatusTranslator } from './translators/CbrEroStatusTranslator.js';
+import { CustomizeConfigItemTranslator } from './translators/CustomizeConfigItemTranslator.js';
 import { ExternMessageTranslator } from './translators/ExternMessageTranslator.js';
 import { FtkrItemCompositionSystemTranslator } from './translators/FtkrItemCompositionSystemTranslator.js';
 import { CbrEroStatusMvTranslator } from './translators/CbrEroStatusMvTranslator.js';
@@ -71,6 +72,7 @@ class PluginTranslatorRegistry {
             CategorySynthesisTranslator,
             ChronusTranslator,
             CbrEroStatusTranslator,
+            CustomizeConfigItemTranslator,
             ExternMessageTranslator,
             FtkrItemCompositionSystemTranslator,
             CbrEroStatusMvTranslator,
