@@ -135,9 +135,17 @@ export default class BaseTranslationEngine {
 
     postprocessTranslatedItem(item, translated) {
         const itemType = item?.type;
-        const value = typeof translated === 'string' ? translated : '';
+        let value = typeof translated === 'string' ? translated : '';
         const { isDescription, isMessage, maxWidth, wrapOptions } =
             this.getWrapConfigForType(itemType);
+
+        if (isMessage && !isDescription) {
+            const maxCount = Number(this.runtime?.removeNewlinesBeforeWrappingMaxCount);
+            if (Number.isFinite(maxCount) && maxCount > 0) {
+                const regex = new RegExp(`(?<!\\n)\\n{1,${maxCount}}(?!\\n)`, 'g');
+                value = value.replace(regex, ' ');
+            }
+        }
 
         if (isMessage || isDescription) {
             return this.wrapText(this.cleanTranslatedText(value), maxWidth, wrapOptions);

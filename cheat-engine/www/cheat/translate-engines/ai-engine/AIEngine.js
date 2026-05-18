@@ -948,12 +948,41 @@ class AIEngine extends BaseTranslationEngine {
                     ? ` Additional tag info: ${additionalTagInfos.join('; ')}.`
                     : '';
 
+            const isBoxingMode = !!(options && options.boxingMode);
+
             const payload = {
                 model: this.selectedModel,
                 messages: [
                     {
                         role: 'system',
-                        content: `Translate video game text from ${sourceName} to ${targetName}. ${this.systemPrompt}${additionalTagInfoPart} Official name translations, they HAVE to be used for consistency with existing material, don't make up your own translations: ${nameHints}.${knowledgePromptPart} The names might contain additional info, like gender, in brackets. Use it for additional context.${alwaysTranslatePart}${kbaseInstructionPart}${alwaysKbasePart}`,
+                        content: isBoxingMode
+                            ? (options.boxingSystemMessage || '')
+                            : (() => {
+                                  // Check if batch contains description keys and addBoxWidthInfoToLlmPrompt is on
+                                  let descBoxingPart = '';
+                                  if (this.runtime && this.runtime.addBoxWidthInfoToLlmPrompt) {
+                                      const hasDescriptionKey = Object.keys(jsonMap).some((k) =>
+                                          k.endsWith('d')
+                                      );
+                                      if (hasDescriptionKey) {
+                                          const widthInChars =
+                                              this.runtime.descriptionMaxLineWidth || 59;
+                                          const maxRows = this.runtime.descriptionMaxRows || 2;
+                                          // Build tag exceptions list
+                                          const tagExceptions = TAG_CONFIGS.filter(
+                                              (t) =>
+                                                  typeof t.reservedWidth === 'number' &&
+                                                  t.reservedWidth > 0
+                                          );
+                                          const exceptionsStr =
+                                              tagExceptions.length > 0
+                                                  ? `, with exception of: ${tagExceptions.map((t) => `[b=${t.tagSymbol}] (${t.reservedWidth} chars)`).join(', ')}`
+                                                  : '';
+                                          descBoxingPart = ` Keys ending with d are descriptions. They need to fit into ${maxRows} lines, each with up to ${widthInChars} chars. Tag [b=sn] represents newlines, and doesn't count to limit. Other tags have 0 width${exceptionsStr}.`;
+                                      }
+                                  }
+                                  return `Translate video game text from ${sourceName} to ${targetName}. ${this.systemPrompt}${additionalTagInfoPart} Official name translations, they HAVE to be used for consistency with existing material, don't make up your own translations: ${nameHints}.${knowledgePromptPart} The names might contain additional info, like gender, in brackets. Use it for additional context.${alwaysTranslatePart}${kbaseInstructionPart}${alwaysKbasePart}${descBoxingPart}`;
+                              })(),
                     },
                     // {
                     //     role: 'user',
@@ -965,7 +994,9 @@ class AIEngine extends BaseTranslationEngine {
                     // },
                     {
                         role: 'user',
-                        content: `Good. Keep this one-line JSON style and exact keys! Now translate this: ${content}`,
+                        content: isBoxingMode
+                            ? `Keep this one-line JSON style and exact keys! Now reformat this: ${content}`
+                            : `Good. Keep this one-line JSON style and exact keys! Now translate this: ${content}`,
                     },
                 ],
                 ...buildRequestSettingsForContent(content),

@@ -8,6 +8,7 @@ import { GameArrays } from '../translation-phases/GameArrays.js';
 import { CurrentEvent } from '../translation-phases/CurrentEvent.js';
 import { DataObjects } from '../translation-phases/DataObjects.js';
 import { CacheEmptyStrings } from '../translation-phases/CacheEmptyStrings.js';
+import { DescriptionsCleanup } from '../translation-phases/DescriptionsCleanup.js';
 import { EmptyStrings } from '../translation-phases/EmptyStrings.js';
 import { Koharu } from '../translation-phases/Koharu.js';
 import { MapEvents } from '../translation-phases/MapEvents.js';
@@ -37,6 +38,7 @@ function registerDefaultStrategies(manager) {
     manager.register(new DirectItems());
     manager.register(EmptyStrings.getInstance());
     manager.register(CacheEmptyStrings.getInstance());
+    manager.register(DescriptionsCleanup.getInstance());
     manager.register(SystemMessages.getInstance());
     manager.register(SystemCommands.getInstance());
     manager.register(OtherStrings.getInstance());

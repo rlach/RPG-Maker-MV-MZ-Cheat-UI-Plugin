@@ -237,6 +237,21 @@ export const translateOnTheFlySettingsMethods = {
         this.saveSettings();
     },
 
+    onChangeDescriptionMaxRows() {
+        this.saveSettings();
+    },
+
+    onChangeAddBoxWidthInfoToLlmPrompt() {
+        this.saveSettings();
+    },
+
+    onChangeRemoveNewlinesBeforeWrappingMaxCount() {
+        const parsed = Number(this.removeNewlinesBeforeWrappingMaxCount);
+        this.removeNewlinesBeforeWrappingMaxCount =
+            Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : 0;
+        this.saveSettings();
+    },
+
     onChangeTextWrapFontScaleMultiplier() {
         const parsedMultiplier = Number(
             typeof this.textWrapFontScaleMultiplier === 'string'

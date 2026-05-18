@@ -259,20 +259,66 @@ export default {
             </v-text-field>
         </div>
 
-        <v-text-field
-            v-model.number="descriptionMaxLineWidth"
-            label="Maximum line width for descriptions (items, skills etc.)"
-            outlined
+        <div class="d-flex align-center" style="gap: 8px;">
+            <v-text-field
+                v-model.number="descriptionMaxLineWidth"
+                label="Maximum line width for descriptions (items, skills etc.)"
+                outlined
+                dense
+                type="number"
+                min="20"
+                max="200"
+                hide-details
+                :disabled="!enableTextWrapping"
+                @keydown.self.stop
+                @change="onChangeDescriptionMaxWidth"
+                @focus="$event.target.select()"
+                style="flex: 1 1 auto;">
+            </v-text-field>
+            <v-text-field
+                v-model.number="descriptionMaxRows"
+                label="Max rows"
+                outlined
+                dense
+                type="number"
+                min="1"
+                max="20"
+                hide-details
+                :disabled="!enableTextWrapping"
+                @keydown.self.stop
+                @change="onChangeDescriptionMaxRows"
+                @focus="$event.target.select()"
+                style="flex: 0 0 110px; max-width: 110px;">
+            </v-text-field>
+        </div>
+
+        <v-checkbox
+            v-model="addBoxWidthInfoToLlmPrompt"
+            label="Add box width info to LLM prompt with descriptions"
             dense
-            type="number"
-            min="20"
-            max="200"
             hide-details
-            :disabled="!enableTextWrapping"
-            @keydown.self.stop
-            @change="onChangeDescriptionMaxWidth"
-            @focus="$event.target.select()">
-        </v-text-field>
+            class="mt-1 mb-1"
+            @change="onChangeAddBoxWidthInfoToLlmPrompt">
+        </v-checkbox>
+
+        <div class="d-flex align-center mt-2" style="gap: 8px;">
+            <v-text-field
+                v-model.number="removeNewlinesBeforeWrappingMaxCount"
+                label="Remove existing newlines before wrapping if there are"
+                outlined
+                dense
+                type="number"
+                min="0"
+                max="20"
+                hide-details
+                :disabled="!enableTextWrapping"
+                @keydown.self.stop
+                @change="onChangeRemoveNewlinesBeforeWrappingMaxCount"
+                @focus="$event.target.select()"
+                style="flex: 0 0 auto; width: 80px;">
+            </v-text-field>
+            <span class="caption grey--text text--lighten-1" style="white-space: nowrap;">or less in a row</span>
+        </div>
 
         <v-text-field
             v-model="textWrapFontScaleMultiplier"
@@ -596,6 +642,18 @@ export default {
 
         onChangeDescriptionMaxWidth() {
             return this.callRuntime('onChangeDescriptionMaxWidth');
+        },
+
+        onChangeDescriptionMaxRows() {
+            return this.callRuntime('onChangeDescriptionMaxRows');
+        },
+
+        onChangeAddBoxWidthInfoToLlmPrompt() {
+            return this.callRuntime('onChangeAddBoxWidthInfoToLlmPrompt');
+        },
+
+        onChangeRemoveNewlinesBeforeWrappingMaxCount() {
+            return this.callRuntime('onChangeRemoveNewlinesBeforeWrappingMaxCount');
         },
 
         onChangeTextWrapFontScaleMultiplier() {

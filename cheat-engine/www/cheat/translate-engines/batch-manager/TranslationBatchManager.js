@@ -320,6 +320,16 @@ export class TranslationBatchManager {
                     : typeof options.onTranslationBatchCompleted === 'function'
                       ? options.onTranslationBatchCompleted
                       : null,
+            boxingMode: hasOwn(request, 'boxingMode')
+                ? !!request.boxingMode
+                : hasOwn(options, 'boxingMode')
+                  ? !!options.boxingMode
+                  : false,
+            boxingSystemMessage: hasOwn(request, 'boxingSystemMessage')
+                ? request.boxingSystemMessage
+                : hasOwn(options, 'boxingSystemMessage')
+                  ? options.boxingSystemMessage
+                  : '',
         };
     }
 
@@ -519,6 +529,8 @@ export class TranslationBatchManager {
                               )
                             : await this.runtime.engine.batchTranslate(batch, {
                                   backgroundJob: false,
+                                  boxingMode: !!entryOptions.boxingMode,
+                                  boxingSystemMessage: entryOptions.boxingSystemMessage || '',
                               });
 
                         if (result && result.recoveryStrategyUsed === true) {

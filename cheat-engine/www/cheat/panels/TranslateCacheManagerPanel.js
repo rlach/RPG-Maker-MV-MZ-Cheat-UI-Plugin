@@ -9,6 +9,7 @@ import {
 import { computeLangPairCompletionByKeyLength } from '../js/TranslationCompletionMetrics.js';
 import { ConfirmDialog } from '../js/DialogHelper.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
+import { BOXING_SERVICE } from '../components/BoxingModal.js';
 
 const cacheManagerTableStateMemory = {
     sortBy: 'seenSort',
@@ -33,15 +34,24 @@ export default {
             <div class="caption grey--text text--lighten-1">
           {{ activeLanguagePairLabel }}
             </div>
-            <v-btn
-                small
-                text
-                color="primary"
-                :loading="isTranslatingEmptyStrings"
-                :disabled="isTranslatingEmptyStrings"
-                @click="translateEmptyStrings">
-                Translate empty strings
-            </v-btn>
+            <div class="d-flex align-center" style="gap: 4px;">
+                <v-btn
+                    small
+                    text
+                    color="primary"
+                    :loading="isTranslatingEmptyStrings"
+                    :disabled="isTranslatingEmptyStrings"
+                    @click="translateEmptyStrings">
+                    Translate empty
+                </v-btn>
+                <v-btn
+                    small
+                    text
+                    color="secondary"
+                    @click="openBoxingModal">
+                    Boxing...
+                </v-btn>
+            </div>
         </div>
     </v-card-text>
 
@@ -811,6 +821,10 @@ export default {
             runtime.notifyCacheRuntime('cache-manager-clear-filtered');
 
             this.refreshEntries();
+        },
+
+        openBoxingModal() {
+            BOXING_SERVICE.openModal();
         },
 
         async translateEmptyStrings() {
