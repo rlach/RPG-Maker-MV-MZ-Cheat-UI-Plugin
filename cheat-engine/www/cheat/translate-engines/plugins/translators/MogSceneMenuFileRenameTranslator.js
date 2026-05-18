@@ -15,12 +15,6 @@ import { parseJsonSafely } from './TranslatorHelpers.js';
 const PLUGIN_NAME = 'MOG_SceneMenu_FileRename';
 const CACHE_TYPE = 'command';
 
-function normalizePluginName(value) {
-    return String(value || '')
-        .trim()
-        .toLowerCase();
-}
-
 function normalizeText(value) {
     return String(value || '').trim();
 }
@@ -43,17 +37,6 @@ export class MogSceneMenuFileRenameTranslator extends BasePluginTranslator {
 
     getCacheType() {
         return CACHE_TYPE;
-    }
-
-    findPluginEntry() {
-        const plugins = Array.isArray(window.$plugins) ? window.$plugins : [];
-        const targetName = normalizePluginName(PLUGIN_NAME);
-
-        return (
-            plugins.find((plugin) => {
-                return normalizePluginName(plugin?.name) === targetName;
-            }) || null
-        );
     }
 
     collectRenameEntries(output) {

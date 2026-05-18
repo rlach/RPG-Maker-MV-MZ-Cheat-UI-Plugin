@@ -32,10 +32,6 @@ const SIMPLE_PARAMETER_KEYS = Object.freeze([
     'Format EDIFFAOP Minus',
 ]);
 
-function normalizeText(value) {
-    return String(value || '').trim();
-}
-
 export class FtkrCustomSimpleActorStatusTranslator extends BasePluginTranslator {
     constructor() {
         super();
@@ -54,20 +50,6 @@ export class FtkrCustomSimpleActorStatusTranslator extends BasePluginTranslator 
 
     getCacheType() {
         return CACHE_TYPE;
-    }
-
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const pluginName = normalizeText(this.getPluginName()).toLowerCase();
-        return (
-            window.$plugins.find((plugin) => {
-                const name = normalizeText(plugin?.name).toLowerCase();
-                return !!name && name === pluginName;
-            }) || null
-        );
     }
 
     getRuntimeParameters() {

@@ -55,26 +55,6 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
         return 'plugin_nuun_menu_screen_ex';
     }
 
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const pluginName = String(this.getPluginName() || '')
-            .trim()
-            .toLowerCase();
-
-        return (
-            window.$plugins.find((plugin) => {
-                if (!plugin || typeof plugin.name !== 'string') {
-                    return false;
-                }
-
-                return plugin.name.trim().toLowerCase() === pluginName;
-            }) || null
-        );
-    }
-
     appendEntry(output, text, source) {
         if (!this.isUsableText(text) || !Array.isArray(output)) {
             return;
@@ -308,7 +288,13 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
         if (canHookStatusBase) {
             const originalDrawContentsBase = Window_StatusBase.prototype.nuunMenu_drawContentsBase;
 
-            Window_StatusBase.prototype.nuunMenu_drawContentsBase = function (data, x, y, width, battler) {
+            Window_StatusBase.prototype.nuunMenu_drawContentsBase = function (
+                data,
+                x,
+                y,
+                width,
+                battler
+            ) {
                 try {
                     const runtime = getRuntime();
                     if (runtime) {

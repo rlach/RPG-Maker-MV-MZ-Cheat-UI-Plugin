@@ -196,29 +196,6 @@ function extractCategoryKnowledge(originalText, translatedText, output) {
     }
 }
 
-function findPluginEntry(pluginName) {
-    if (!Array.isArray(window.$plugins)) {
-        return null;
-    }
-
-    const needle = String(pluginName || '')
-        .trim()
-        .toLowerCase();
-    if (!needle) {
-        return null;
-    }
-
-    return (
-        window.$plugins.find((entry) => {
-            if (!entry || typeof entry.name !== 'string') {
-                return false;
-            }
-
-            return entry.name.trim().toLowerCase() === needle;
-        }) || null
-    );
-}
-
 function getOriginalItemNote(item) {
     if (!item || typeof item !== 'object') {
         return '';
@@ -762,7 +739,7 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
     buildScanEntries() {
         const entries = [];
 
-        const pluginEntry = findPluginEntry(this.getPluginName());
+        const pluginEntry = this.findPluginEntry();
         if (pluginEntry?.parameters) {
             appendEntriesFromParameters(pluginEntry.parameters, 'pluginEntryParameter', entries);
         }
@@ -834,7 +811,7 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
     }
 
     manageKnowledgeBase(_query, response) {
-        const successes = response && response.successes;
+        const successes = response?.successes;
         if (!Array.isArray(successes) || successes.length === 0) {
             return;
         }

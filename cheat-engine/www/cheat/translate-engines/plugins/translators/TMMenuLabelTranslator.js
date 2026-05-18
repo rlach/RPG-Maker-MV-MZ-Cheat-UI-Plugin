@@ -33,29 +33,6 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
         return 'plugin_tm_menu_label';
     }
 
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const pluginName = String(this.getPluginName() || '')
-            .trim()
-            .toLowerCase();
-        if (!pluginName) {
-            return null;
-        }
-
-        return (
-            window.$plugins.find((plugin) => {
-                if (!plugin || typeof plugin.name !== 'string') {
-                    return false;
-                }
-
-                return plugin.name.trim().toLowerCase() === pluginName;
-            }) || null
-        );
-    }
-
     appendEntriesFromParameters(parameters, scope, output) {
         if (!parameters || typeof parameters !== 'object' || !Array.isArray(output)) {
             return;
@@ -122,10 +99,7 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
                     if (label && typeof label === 'object') {
                         const runtime = getRuntime();
                         const translatedName = resolveRuntimeTranslation(label.name, runtime);
-                        const translatedFooter = resolveRuntimeTranslation(
-                            label.footer,
-                            runtime
-                        );
+                        const translatedFooter = resolveRuntimeTranslation(label.footer, runtime);
 
                         if (translatedName !== label.name || translatedFooter !== label.footer) {
                             arguments[2] = {

@@ -35,29 +35,6 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
         return this.getCacheType();
     }
 
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const pluginName = String(this.getPluginName() || '')
-            .trim()
-            .toLowerCase();
-        if (!pluginName) {
-            return null;
-        }
-
-        return (
-            window.$plugins.find((plugin) => {
-                if (!plugin || typeof plugin.name !== 'string') {
-                    return false;
-                }
-
-                return plugin.name.trim().toLowerCase() === pluginName;
-            }) || null
-        );
-    }
-
     getRuntimeParameters() {
         const pluginManager = window.PluginManager;
         if (!pluginManager || typeof pluginManager.parameters !== 'function') {
@@ -93,7 +70,7 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
         const result = new Map();
 
         const pluginEntry = this.findPluginEntry();
-        if (pluginEntry && pluginEntry.parameters && typeof pluginEntry.parameters === 'object') {
+        if (pluginEntry?.parameters && typeof pluginEntry.parameters === 'object') {
             for (const field of PARAM_FIELDS) {
                 const value = pluginEntry.parameters[field];
                 if (!result.has(field) && this.isUsableText(value)) {
@@ -140,7 +117,7 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
             !Window_MenuCommand.prototype ||
             typeof Window_MenuCommand.prototype.addOriginalCommands !== 'function'
         ) {
-            return;
+            return false;
         }
 
         const translator = this;
@@ -155,7 +132,7 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
                 }
 
                 for (const entry of this._list) {
-                    if (!entry || entry.symbol !== 'skillSetting') {
+                    if (entry?.symbol !== 'skillSetting') {
                         continue;
                     }
 
@@ -176,6 +153,7 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
 
             return result;
         };
+        return true;
     }
 
     patchWindowInstanceDrawText(windowInstance, guardProp, fields, warningLabel) {
@@ -274,7 +252,9 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
             return true;
         }
 
-        this.patchMenuCommandRuntime();
+        if (!this.patchMenuCommandRuntime()) {
+            return false;
+        }
         this.patchSkillEquipSceneRuntime();
 
         window[RUNTIME_HOOK_GUARD] = true;
@@ -313,7 +293,7 @@ export class SkillCPSystemTranslator extends BasePluginTranslator {
         const entries = [];
 
         const pluginEntry = this.findPluginEntry();
-        if (pluginEntry && pluginEntry.parameters) {
+        if (pluginEntry?.parameters) {
             this.appendEntriesFromParameters(
                 pluginEntry.parameters,
                 'pluginEntryParameter',

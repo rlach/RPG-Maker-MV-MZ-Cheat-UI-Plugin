@@ -75,29 +75,6 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
         return CACHE_TYPE;
     }
 
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const pluginName = String(this.getPluginName() || '')
-            .trim()
-            .toLowerCase();
-        if (!pluginName) {
-            return null;
-        }
-
-        return (
-            window.$plugins.find((plugin) => {
-                if (!plugin || typeof plugin.name !== 'string') {
-                    return false;
-                }
-
-                return plugin.name.trim().toLowerCase() === pluginName;
-            }) || null
-        );
-    }
-
     resolveMenuSymbol(parameters) {
         if (!parameters || typeof parameters !== 'object') {
             return DEFAULT_MENU_SYMBOL;
@@ -123,7 +100,7 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
         }
 
         const pluginEntry = this.findPluginEntry();
-        if (pluginEntry && pluginEntry.parameters) {
+        if (pluginEntry?.parameters) {
             return this.resolveMenuSymbol(pluginEntry.parameters);
         }
 
@@ -442,7 +419,7 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
         }
 
         const layer = scene._windowLayer;
-        const children = Array.isArray(layer && layer.children) ? layer.children : [];
+        const children = Array.isArray(layer?.children) ? layer.children : [];
         for (const child of children) {
             this.patchSelectWindowInstance(child);
         }
@@ -464,8 +441,7 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
             !!ANY_WINDOW.Scene_Base.prototype &&
             typeof ANY_WINDOW.Scene_Base.prototype.addWindow === 'function';
         const canHookUpdateScene =
-            !!ANY_WINDOW.SceneManager &&
-            typeof ANY_WINDOW.SceneManager.updateScene === 'function';
+            !!ANY_WINDOW.SceneManager && typeof ANY_WINDOW.SceneManager.updateScene === 'function';
 
         if (!canHookMakeCommandList && !canHookAddWindow && !canHookUpdateScene) {
             return false;
@@ -495,7 +471,7 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
                     const travelSymbol = translator.getConfiguredMenuSymbol();
                     debugLog('resolving menu command by symbol', { travelSymbol });
                     for (const command of this._list) {
-                        if (!command || command.symbol !== travelSymbol) {
+                        if (command?.symbol !== travelSymbol) {
                             continue;
                         }
 
@@ -534,8 +510,7 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
                 try {
                     debugLog('hook addWindow called', {
                         ctorName:
-                            windowInstance &&
-                            windowInstance.constructor &&
+                            windowInstance?.constructor &&
                             typeof windowInstance.constructor.name === 'string'
                                 ? windowInstance.constructor.name
                                 : '(unknown)',
@@ -639,7 +614,9 @@ export class NrpMapTravelTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            const cacheType = this.isUsableText(entry.cacheType) ? entry.cacheType : this.getCacheType();
+            const cacheType = this.isUsableText(entry.cacheType)
+                ? entry.cacheType
+                : this.getCacheType();
             const cacheKey = runtime.getCacheKey(text, cacheType);
             if (!byCacheKey.has(cacheKey)) {
                 byCacheKey.set(cacheKey, {

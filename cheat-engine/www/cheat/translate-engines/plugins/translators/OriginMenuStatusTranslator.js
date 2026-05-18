@@ -37,7 +37,7 @@ function parseOriginSetParamCommandLine(commandLine) {
     const paramKey = String(parts.shift() || '').trim();
     const value = String(parts.shift() || '');
 
-    if (!command || command.toLowerCase() !== ORIGIN_PLUGIN_NAME.toLowerCase()) {
+    if (command?.toLowerCase() !== ORIGIN_PLUGIN_NAME.toLowerCase()) {
         return null;
     }
 
@@ -79,29 +79,6 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
 
     getCacheType() {
         return CACHE_TYPE;
-    }
-
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const pluginName = String(this.getPluginName() || '')
-            .trim()
-            .toLowerCase();
-        if (!pluginName) {
-            return null;
-        }
-
-        return (
-            window.$plugins.find((plugin) => {
-                if (!plugin || typeof plugin.name !== 'string') {
-                    return false;
-                }
-
-                return plugin.name.trim().toLowerCase() === pluginName;
-            }) || null
-        );
     }
 
     appendPluginParameterEntries(parameters, scope, output) {
@@ -291,7 +268,7 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
                         const runtime = translator.getRuntime();
 
                         for (const command of this._list) {
-                            if (!command || command.symbol !== ORIGIN_MENU_SYMBOL) {
+                            if (command?.symbol !== ORIGIN_MENU_SYMBOL) {
                                 continue;
                             }
 
@@ -367,7 +344,7 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
         const entries = [];
 
         const pluginEntry = this.findPluginEntry();
-        if (pluginEntry && pluginEntry.parameters) {
+        if (pluginEntry?.parameters) {
             this.appendPluginParameterEntries(
                 pluginEntry.parameters,
                 'pluginEntryParameter',
@@ -405,7 +382,7 @@ export class OriginMenuStatusTranslator extends BasePluginTranslator {
 
         const mapInfos = Array.isArray(window.$dataMapInfos) ? window.$dataMapInfos : [];
         for (const mapInfo of mapInfos) {
-            const mapId = Number(mapInfo && mapInfo.id);
+            const mapId = Number(mapInfo?.id);
             if (!mapId) {
                 continue;
             }

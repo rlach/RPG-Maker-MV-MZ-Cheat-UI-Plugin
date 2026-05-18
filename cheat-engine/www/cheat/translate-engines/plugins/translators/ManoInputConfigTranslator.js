@@ -825,24 +825,6 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
 
     // ─── Scanning ─────────────────────────────────────────────────────────────
 
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const pluginName = this.getPluginName().trim().toLowerCase();
-
-        return (
-            window.$plugins.find((plugin) => {
-                if (!plugin || typeof plugin.name !== 'string') {
-                    return false;
-                }
-
-                return plugin.name.trim().toLowerCase() === pluginName;
-            }) || null
-        );
-    }
-
     /**
      * Returns true if the parameters look like the old MV-era flat-string format
      * (pre-2022, before the MZ rewrite that introduced struct<MultiLangString>).
@@ -1051,7 +1033,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
 
         // Collect from $plugins entry (persisted parameters in plugins.js)
         const pluginEntry = this.findPluginEntry();
-        if (pluginEntry && pluginEntry.parameters) {
+        if (pluginEntry?.parameters) {
             this.appendEntriesFromParameters(
                 pluginEntry.parameters,
                 'pluginEntryParameter',

@@ -1,6 +1,6 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
-import { parseJsonSafely } from './TranslatorHelpers.js';
+import { normalizeText, parseJsonSafely } from './TranslatorHelpers.js';
 
 /**
  * FTKR_ItemCompositionSystem translator
@@ -65,10 +65,6 @@ const JSON_ARRAY_TEXT_PARAMETER_KEYS = Object.freeze([
     'End Cancel Format',
 ]);
 
-function normalizeText(value) {
-    return String(value || '').trim();
-}
-
 function getSceneName() {
     const scene = window.SceneManager?._scene;
     return normalizeText(scene?.constructor?.name);
@@ -102,20 +98,6 @@ export class FtkrItemCompositionSystemTranslator extends BasePluginTranslator {
 
     getCacheType() {
         return CACHE_TYPE;
-    }
-
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const pluginName = normalizeText(this.getPluginName()).toLowerCase();
-        return (
-            window.$plugins.find((plugin) => {
-                const name = normalizeText(plugin?.name).toLowerCase();
-                return !!name && name === pluginName;
-            }) || null
-        );
     }
 
     getRuntimeParameters() {

@@ -52,29 +52,6 @@ export class EventLabelTranslator extends BasePluginTranslator {
         return CACHE_TYPE;
     }
 
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const pluginName = String(this.getPluginName() || '')
-            .trim()
-            .toLowerCase();
-        if (!pluginName) {
-            return null;
-        }
-
-        return (
-            window.$plugins.find((plugin) => {
-                if (!plugin || typeof plugin.name !== 'string') {
-                    return false;
-                }
-
-                return plugin.name.trim().toLowerCase() === pluginName;
-            }) || null
-        );
-    }
-
     getPluginParameters() {
         if (this._pluginParametersResolved) {
             return this._pluginParameters;
@@ -84,8 +61,7 @@ export class EventLabelTranslator extends BasePluginTranslator {
         const pluginEntry = this.findPluginEntry();
 
         if (
-            pluginEntry &&
-            pluginEntry.parameters &&
+            pluginEntry?.parameters &&
             typeof pluginEntry.parameters === 'object' &&
             !Array.isArray(pluginEntry.parameters)
         ) {

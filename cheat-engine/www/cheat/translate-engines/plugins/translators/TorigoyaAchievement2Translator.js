@@ -114,33 +114,6 @@ export class TorigoyaAchievement2Translator extends BasePluginTranslator {
         });
     }
 
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const pluginNames = this.getPluginNameAliases()
-            .map((name) =>
-                String(name || '')
-                    .trim()
-                    .toLowerCase()
-            )
-            .filter(Boolean);
-        if (pluginNames.length <= 0) {
-            return null;
-        }
-
-        return (
-            window.$plugins.find((plugin) => {
-                if (!plugin || typeof plugin.name !== 'string') {
-                    return false;
-                }
-
-                return pluginNames.includes(plugin.name.trim().toLowerCase());
-            }) || null
-        );
-    }
-
     detectPlugin() {
         if (!Array.isArray(window.$plugins)) {
             return false;

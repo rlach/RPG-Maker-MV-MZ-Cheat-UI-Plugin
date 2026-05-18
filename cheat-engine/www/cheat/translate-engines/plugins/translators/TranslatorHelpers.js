@@ -21,3 +21,7 @@ export function parseJsonSafely(value, fallback = null) {
         return fallback;
     }
 }
+
+export function normalizeText(value) {
+    return String(value || '').trim();
+}

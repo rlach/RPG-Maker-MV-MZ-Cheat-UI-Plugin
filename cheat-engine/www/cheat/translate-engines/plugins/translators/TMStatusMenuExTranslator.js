@@ -59,26 +59,6 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
     }
 
     /**
-     * Finds the $plugins entry for this plugin.
-     * @returns {object|null}
-     */
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const pluginNameLower = PLUGIN_NAME.toLowerCase();
-        return (
-            window.$plugins.find((plugin) => {
-                if (!plugin || typeof plugin.name !== 'string' || plugin.status === false) {
-                    return false;
-                }
-                return plugin.name.trim().toLowerCase() === pluginNameLower;
-            }) || null
-        );
-    }
-
-    /**
      * Appends scan entries from the given parameters object.
      * xparamText and sparamText are comma-separated lists; each non-empty item is a translatable entry.
      * @param {object} parameters
@@ -119,7 +99,7 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
         const entries = [];
 
         const pluginEntry = this.findPluginEntry();
-        if (pluginEntry && pluginEntry.parameters) {
+        if (pluginEntry?.parameters) {
             this.appendEntriesFromParameters(
                 pluginEntry.parameters,
                 'pluginEntryParameter',

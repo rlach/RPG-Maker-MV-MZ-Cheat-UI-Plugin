@@ -128,26 +128,6 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
         return 'plugin_yep_quest_journal';
     }
 
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const normalizedName = String(this.getPluginName() || '')
-            .trim()
-            .toLowerCase();
-
-        return (
-            window.$plugins.find((plugin) => {
-                if (!plugin || typeof plugin.name !== 'string') {
-                    return false;
-                }
-
-                return plugin.name.trim().toLowerCase() === normalizedName;
-            }) || null
-        );
-    }
-
     getRuntimeParameters() {
         const pluginManager = window.PluginManager;
         if (!pluginManager || typeof pluginManager.parameters !== 'function') {
@@ -660,12 +640,18 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
             !!window.Window_QuestList?.prototype &&
             typeof window.Window_QuestList.prototype.addQuestCommand === 'function';
         const canHookQuestData =
-            !!window.Window_QuestData?.prototype || !!window.Yanfly?.Quest?.Window_QuestData?.prototype;
+            !!window.Window_QuestData?.prototype ||
+            !!window.Yanfly?.Quest?.Window_QuestData?.prototype;
         const canHookMenuCommand =
             !!window.Window_MenuCommand?.prototype &&
             typeof window.Window_MenuCommand.prototype.addOriginalCommands === 'function';
 
-        if (!canHookQuestCategories && !canHookQuestList && !canHookQuestData && !canHookMenuCommand) {
+        if (
+            !canHookQuestCategories &&
+            !canHookQuestList &&
+            !canHookQuestData &&
+            !canHookMenuCommand
+        ) {
             return false;
         }
 
@@ -692,7 +678,9 @@ export class YepQuestJournalTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            const cacheType = this.isUsableText(entry.cacheType) ? entry.cacheType : this.getCacheType();
+            const cacheType = this.isUsableText(entry.cacheType)
+                ? entry.cacheType
+                : this.getCacheType();
             const cacheKey = runtime.getCacheKey(text, cacheType);
 
             if (!byCacheKey.has(cacheKey)) {

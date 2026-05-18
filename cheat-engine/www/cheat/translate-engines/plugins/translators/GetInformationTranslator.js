@@ -106,29 +106,6 @@ export class GetInformationTranslator extends BasePluginTranslator {
         });
     }
 
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const pluginName = String(this.getPluginName() || '')
-            .trim()
-            .toLowerCase();
-        if (!pluginName) {
-            return null;
-        }
-
-        return (
-            window.$plugins.find((plugin) => {
-                if (!plugin || typeof plugin.name !== 'string') {
-                    return false;
-                }
-
-                return plugin.name.trim().toLowerCase() === pluginName;
-            }) || null
-        );
-    }
-
     getRuntimeParameters() {
         const pluginManager = window.PluginManager;
         if (!pluginManager || typeof pluginManager.parameters !== 'function') {

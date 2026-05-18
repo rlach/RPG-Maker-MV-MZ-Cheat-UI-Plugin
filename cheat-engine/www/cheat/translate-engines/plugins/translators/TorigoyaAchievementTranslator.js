@@ -32,29 +32,6 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
         return 'plugin_torigoya_achievement_mv';
     }
 
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const pluginName = String(this.getPluginName() || '')
-            .trim()
-            .toLowerCase();
-        if (!pluginName) {
-            return null;
-        }
-
-        return (
-            window.$plugins.find((plugin) => {
-                if (!plugin || typeof plugin.name !== 'string') {
-                    return false;
-                }
-
-                return plugin.name.trim().toLowerCase() === pluginName;
-            }) || null
-        );
-    }
-
     appendTextEntry(output, text, source) {
         const normalized = typeof text === 'string' ? text : '';
         if (!normalized.trim()) {
@@ -91,18 +68,17 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
         const result = [];
         let isRouting = false;
 
-        for (let i = 0; i < list.length; i++) {
-            const command = list[i];
-            const code = Number(command && command.code);
+        for (const element of list) {
+            const command = element;
+            const code = Number(command?.code);
             const firstParameter =
-                Array.isArray(command && command.parameters) &&
-                typeof command.parameters[0] === 'string'
+                Array.isArray(command?.parameters) && typeof command.parameters[0] === 'string'
                     ? command.parameters[0]
                     : '';
 
             if (isRouting && code === 408) {
                 result[result.length - 1].push(firstParameter);
-            } else if (code === 108 && firstParameter.indexOf('id:') === 0) {
+            } else if (code === 108 && firstParameter.startsWith('id:')) {
                 result.push([firstParameter]);
                 isRouting = true;
             } else {
@@ -177,7 +153,7 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
         const merged = [];
 
         for (const item of items) {
-            if (!item || !item.id) {
+            if (!item?.id) {
                 continue;
             }
 
@@ -308,8 +284,8 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
     }
 
     appendEntriesFromRuntimeManager(output) {
-        const namespace = window.Torigoya && window.Torigoya.Achievement;
-        const manager = namespace && namespace.Manager;
+        const namespace = window.Torigoya?.Achievement;
+        const manager = namespace?.Manager;
 
         if (!manager || typeof manager.allData !== 'function') {
             return;
@@ -376,9 +352,7 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
 
         runtime.trackCacheKeyUsage(cacheKey);
 
-        if (
-            !runtime.hasUsableCacheValue(cacheKey)
-        ) {
+        if (!runtime.hasUsableCacheValue(cacheKey)) {
             return text;
         }
 
@@ -414,7 +388,7 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
         }
 
         for (const command of commandWindow._list) {
-            if (!command || command.symbol !== 'achievement') {
+            if (command?.symbol !== 'achievement') {
                 continue;
             }
 
@@ -431,8 +405,8 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
             return true;
         }
 
-        const namespace = window.Torigoya && window.Torigoya.Achievement;
-        if (!namespace || !namespace.settings) {
+        const namespace = window.Torigoya?.Achievement;
+        if (!namespace?.settings) {
             return false;
         }
 
@@ -440,8 +414,7 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
 
         const popupWindowClass = namespace.Window_AchievementPopup;
         if (
-            popupWindowClass &&
-            popupWindowClass.prototype &&
+            popupWindowClass?.prototype &&
             typeof popupWindowClass.prototype.drawTitle === 'function'
         ) {
             popupWindowClass.prototype.drawTitle = function () {
@@ -450,13 +423,12 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
                     this.item && typeof this.item.title === 'string' ? this.item.title : '',
                     runtime
                 );
-                this.drawTextEx(`\\c[1]${title}`, 50, 5);
+                this.drawTextEx(String.raw`\c[1]${title}`, 50, 5);
             };
         }
 
         if (
-            popupWindowClass &&
-            popupWindowClass.prototype &&
+            popupWindowClass?.prototype &&
             typeof popupWindowClass.prototype.drawMessage === 'function'
         ) {
             popupWindowClass.prototype.drawMessage = function () {
@@ -475,8 +447,7 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
 
         const listWindowClass = namespace.Window_AchievementList;
         if (
-            listWindowClass &&
-            listWindowClass.prototype &&
+            listWindowClass?.prototype &&
             typeof listWindowClass.prototype.drawItem === 'function'
         ) {
             listWindowClass.prototype.drawItem = function (index) {
@@ -510,8 +481,7 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
         }
 
         if (
-            listWindowClass &&
-            listWindowClass.prototype &&
+            listWindowClass?.prototype &&
             typeof listWindowClass.prototype.updateHelp === 'function'
         ) {
             listWindowClass.prototype.updateHelp = function () {
@@ -598,7 +568,7 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
 
         const pluginEntry = this.findPluginEntry();
         const pluginParameters =
-            pluginEntry && pluginEntry.parameters && typeof pluginEntry.parameters === 'object'
+            pluginEntry?.parameters && typeof pluginEntry.parameters === 'object'
                 ? pluginEntry.parameters
                 : null;
 
@@ -607,10 +577,7 @@ export class TorigoyaAchievementTranslator extends BasePluginTranslator {
         }
 
         if (entries.length <= 0) {
-            const runtimeSettings =
-                window.Torigoya &&
-                window.Torigoya.Achievement &&
-                window.Torigoya.Achievement.settings;
+            const runtimeSettings = window.Torigoya?.Achievement?.settings;
             this.appendEntriesFromRuntimeSettings(runtimeSettings, entries);
         }
 

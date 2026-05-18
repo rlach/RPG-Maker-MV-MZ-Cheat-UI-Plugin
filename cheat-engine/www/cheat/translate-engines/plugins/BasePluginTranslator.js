@@ -1,6 +1,7 @@
 import { BasePhase } from '../translation-phases/BasePhase.js';
 import { shouldApplyHook } from '../../js/HookGuardHelper.js';
 import { Alert } from '../../js/AlertHelper.js';
+import { normalizeText } from './translators/TranslatorHelpers.js';
 
 export class BasePluginTranslator extends BasePhase {
     constructor() {
@@ -55,6 +56,28 @@ export class BasePluginTranslator extends BasePhase {
 
             return plugin.name.trim().toLowerCase() === pluginName;
         });
+    }
+
+    findPluginEntry(pluginName) {
+        if (!Array.isArray(window.$plugins)) {
+            return null;
+        }
+
+        let needle = String(pluginName || '')
+            .trim()
+            .toLowerCase();
+        if (!needle) {
+            return null;
+        }
+
+        needle = normalizeText(this.getPluginName()).toLowerCase();
+
+        return (
+            window.$plugins.find((plugin) => {
+                const name = normalizeText(plugin?.name).toLowerCase();
+                return !!name && name === needle;
+            }) || null
+        );
     }
 
     enablePluginTranslation() {

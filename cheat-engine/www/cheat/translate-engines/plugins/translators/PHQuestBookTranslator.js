@@ -66,29 +66,6 @@ export class PHQuestBookTranslator extends BasePluginTranslator {
         return 'plugin_ph_quest_book';
     }
 
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const pluginName = String(this.getPluginName() || '')
-            .trim()
-            .toLowerCase();
-        if (!pluginName) {
-            return null;
-        }
-
-        return (
-            window.$plugins.find((plugin) => {
-                if (!plugin || typeof plugin.name !== 'string') {
-                    return false;
-                }
-
-                return plugin.name.trim().toLowerCase() === pluginName;
-            }) || null
-        );
-    }
-
     getRuntimeParameters() {
         if (window.PluginManager && typeof PluginManager.parameters === 'function') {
             return PluginManager.parameters(this.getPluginName()) || null;
@@ -341,7 +318,9 @@ export class PHQuestBookTranslator extends BasePluginTranslator {
     }
 
     normalizeDescriptionLine(line) {
-        return String(line || '').replaceAll(BREAK_ON_UPDATE_TAG, '').trim();
+        return String(line || '')
+            .replaceAll(BREAK_ON_UPDATE_TAG, '')
+            .trim();
     }
 
     appendQuestCommonEventEntries(output) {

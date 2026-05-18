@@ -81,20 +81,6 @@ export class YkpItemCompositionTranslator extends BasePluginTranslator {
         return CACHE_TYPE;
     }
 
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const pluginName = normalizeText(this.getPluginName()).toLowerCase();
-        return (
-            window.$plugins.find((plugin) => {
-                const name = normalizeText(plugin?.name).toLowerCase();
-                return !!name && name === pluginName;
-            }) || null
-        );
-    }
-
     getRuntimeParameters() {
         const pluginManager = window.PluginManager;
         if (!pluginManager || typeof pluginManager.parameters !== 'function') {
@@ -182,7 +168,11 @@ export class YkpItemCompositionTranslator extends BasePluginTranslator {
 
         const runtimeParameters = this.getRuntimeParameters();
         if (runtimeParameters) {
-            this.appendParameterEntries(runtimeParameters, 'runtimePluginManagerParameter', entries);
+            this.appendParameterEntries(
+                runtimeParameters,
+                'runtimePluginManagerParameter',
+                entries
+            );
         }
 
         this.appendHardcodedEntries(entries);
@@ -233,9 +223,14 @@ export class YkpItemCompositionTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            const translatedPrefix = this.resolveRuntimeTranslation(prefix, runtime, this.getCacheType(), {
-                requireRuntimeTranslationActive: true,
-            });
+            const translatedPrefix = this.resolveRuntimeTranslation(
+                prefix,
+                runtime,
+                this.getCacheType(),
+                {
+                    requireRuntimeTranslationActive: true,
+                }
+            );
 
             if (translatedPrefix !== prefix) {
                 return translatedPrefix + sourceText.slice(prefix.length);
@@ -255,11 +250,9 @@ export class YkpItemCompositionTranslator extends BasePluginTranslator {
             !!window.Window_MenuCommand?.prototype &&
             typeof Window_MenuCommand.prototype.addOriginalCommands === 'function';
         const canHookDrawText =
-            !!window.Window_Base?.prototype &&
-            typeof Window_Base.prototype.drawText === 'function';
+            !!window.Window_Base?.prototype && typeof Window_Base.prototype.drawText === 'function';
         const canHookHelpSetText =
-            !!window.Window_Help?.prototype &&
-            typeof Window_Help.prototype.setText === 'function';
+            !!window.Window_Help?.prototype && typeof Window_Help.prototype.setText === 'function';
 
         if (!canHookMenuCommands && !canHookDrawText && !canHookHelpSetText) {
             return false;
@@ -380,7 +373,11 @@ export class YkpItemCompositionTranslator extends BasePluginTranslator {
 
         const runtimeParameters = this.getRuntimeParameters();
         if (runtimeParameters) {
-            this.appendParameterEntries(runtimeParameters, 'runtimePluginManagerParameter', entries);
+            this.appendParameterEntries(
+                runtimeParameters,
+                'runtimePluginManagerParameter',
+                entries
+            );
         }
 
         this.appendHardcodedEntries(entries);

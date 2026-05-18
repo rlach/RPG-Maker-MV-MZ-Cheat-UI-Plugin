@@ -23,29 +23,6 @@ export class PandaProgressTextWindowTranslator extends BasePluginTranslator {
         return 'plugin_panda_progress_text_window';
     }
 
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const pluginName = String(this.getPluginName() || '')
-            .trim()
-            .toLowerCase();
-        if (!pluginName) {
-            return null;
-        }
-
-        return (
-            window.$plugins.find((plugin) => {
-                if (!plugin || typeof plugin.name !== 'string') {
-                    return false;
-                }
-
-                return plugin.name.trim().toLowerCase() === pluginName;
-            }) || null
-        );
-    }
-
     parseProgressTextParameter(rawValue) {
         if (typeof rawValue !== 'string') {
             return [];
@@ -56,7 +33,7 @@ export class PandaProgressTextWindowTranslator extends BasePluginTranslator {
             return [];
         }
 
-        const parsed = parseJsonSafely(normalized.replace(/\\\\n/g, '\\n'), []);
+        const parsed = parseJsonSafely(normalized.replaceAll(String.raw`\\n`, String.raw`\n`), []);
         if (!Array.isArray(parsed)) {
             return [];
         }
@@ -111,9 +88,7 @@ export class PandaProgressTextWindowTranslator extends BasePluginTranslator {
             return text;
         }
 
-        if (
-            !runtime
-        ) {
+        if (!runtime) {
             return text;
         }
 
@@ -200,7 +175,7 @@ export class PandaProgressTextWindowTranslator extends BasePluginTranslator {
         const entries = [];
 
         const pluginEntry = this.findPluginEntry();
-        if (pluginEntry && pluginEntry.parameters) {
+        if (pluginEntry?.parameters) {
             this.appendEntriesFromParameters(
                 pluginEntry.parameters,
                 'pluginEntryParameter',

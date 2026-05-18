@@ -101,29 +101,6 @@ export class QuestSystemTranslator extends BasePluginTranslator {
         return 'plugin_quest_system';
     }
 
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const pluginName = String(this.getPluginName() || '')
-            .trim()
-            .toLowerCase();
-        if (!pluginName) {
-            return null;
-        }
-
-        return (
-            window.$plugins.find((plugin) => {
-                if (!plugin || typeof plugin.name !== 'string') {
-                    return false;
-                }
-
-                return plugin.name.trim().toLowerCase() === pluginName;
-            }) || null
-        );
-    }
-
     appendTextStructEntries(rawTextStruct, scope, output) {
         const parsed = parseJsonSafely(rawTextStruct, null);
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {

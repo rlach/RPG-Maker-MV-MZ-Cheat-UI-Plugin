@@ -170,12 +170,6 @@ const CATEGORY_SYNTHESIS_PLUGIN_TAGS = Object.freeze([
     },
 ]);
 
-function normalizePluginName(value) {
-    return String(value || '')
-        .trim()
-        .toLowerCase();
-}
-
 function isCategorySynthesisSceneActive() {
     const scene = ANY_WINDOW.SceneManager?._scene;
     if (!scene || typeof scene !== 'object') {
@@ -237,7 +231,10 @@ function getCurrentSynthesisCategoryState() {
             : '';
 
     let selectedCategory = '';
-    if (typeof scene?._recipeWindow?._category === 'string' && scene._recipeWindow._category.trim() !== '') {
+    if (
+        typeof scene?._recipeWindow?._category === 'string' &&
+        scene._recipeWindow._category.trim() !== ''
+    ) {
         selectedCategory = String(scene._recipeWindow._category);
     } else if (typeof scene?._categoryWindow?.category === 'function') {
         const value = scene._categoryWindow.category();
@@ -447,27 +444,6 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
 
     getCacheType() {
         return CACHE_TYPE;
-    }
-
-    findPluginEntry() {
-        if (!Array.isArray(ANY_WINDOW.$plugins)) {
-            return null;
-        }
-
-        const pluginName = normalizePluginName(this.getPluginName());
-        if (!pluginName) {
-            return null;
-        }
-
-        return (
-            ANY_WINDOW.$plugins.find((plugin) => {
-                if (!plugin || typeof plugin.name !== 'string') {
-                    return false;
-                }
-
-                return normalizePluginName(plugin.name) === pluginName;
-            }) || null
-        );
     }
 
     getRuntimeParameters() {
@@ -701,9 +677,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
             return text;
         }
 
-        if (
-            !runtime
-        ) {
+        if (!runtime) {
             return text;
         }
 

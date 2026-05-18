@@ -32,4 +32,5 @@ declare interface Window {
     Yanfly?: any;
     $dataScenario?: any;
     Window_EventMiniLabel?: any;
+    Scene_Glossary?: any;
 }

@@ -60,24 +60,6 @@ export class NameBoxNoUseTranslator extends BasePluginTranslator {
         return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
     }
 
-    findPluginEntry() {
-        if (!Array.isArray(window.$plugins)) {
-            return null;
-        }
-
-        const pluginName = this.getPluginName().toLowerCase();
-
-        return (
-            window.$plugins.find((plugin) => {
-                if (!plugin || typeof plugin.name !== 'string') {
-                    return false;
-                }
-
-                return plugin.name.trim().toLowerCase() === pluginName;
-            }) || null
-        );
-    }
-
     resolveSpeakerName(gameMessage) {
         if (!gameMessage || typeof gameMessage !== 'object') {
             return '';
