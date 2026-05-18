@@ -1,6 +1,6 @@
 import { getRowsPerPage, setRowsPerPage as setTableRowsPerPage } from '../js/TableSettings.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
-import { TAG_CONFIGS } from '../translate-engines/ai-engine/constants.js';
+import { TAG_CONFIGS, TAG_OVERRIDABLE_FIELDS } from '../translate-engines/ai-engine/constants.js';
 
 const tagManagerTableStateMemory = {
     sortBy: 'description',
@@ -123,7 +123,7 @@ export default {
                     outlined
                     dense
                     hide-details
-                    :disabled="customTagReadOnlyMode"
+                    :disabled="isFieldDisabled('description')"
                     @keydown.stop
                     class="mb-2"
                 ></v-text-field>
@@ -134,7 +134,7 @@ export default {
                     outlined
                     dense
                     hide-details
-                    :disabled="customTagReadOnlyMode"
+                    :disabled="isFieldDisabled('tagSymbol')"
                     @keydown.stop
                     class="mb-2"
                 ></v-text-field>
@@ -146,7 +146,7 @@ export default {
                     outlined
                     dense
                     hide-details
-                    :disabled="customTagReadOnlyMode"
+                    :disabled="isFieldDisabled('style')"
                     @keydown.stop
                     class="mb-2"
                 ></v-select>
@@ -158,7 +158,7 @@ export default {
                     outlined
                     dense
                     hide-details
-                    :disabled="customTagReadOnlyMode"
+                    :disabled="isFieldDisabled('type')"
                     @keydown.stop
                     class="mb-2"
                 ></v-select>
@@ -167,7 +167,7 @@ export default {
                     v-model="customTagForm.requiredConsistency"
                     label="Required consistency"
                     hide-details
-                    :disabled="customTagReadOnlyMode"
+                    :disabled="isFieldDisabled('requiredConsistency')"
                     class="mt-0 mb-2"
                 ></v-checkbox>
 
@@ -207,7 +207,7 @@ export default {
                         outlined
                         dense
                         hide-details
-                        :disabled="customTagReadOnlyMode"
+                        :disabled="isFieldDisabled('bracket')"
                         @keydown.stop
                         class="mb-2"
                     ></v-select>
@@ -216,13 +216,13 @@ export default {
                         v-model="customTagForm.maskValue"
                         label="Mask value (preserve exact value, LLM cannot change it)"
                         hide-details
-                        :disabled="customTagReadOnlyMode"
+                        :disabled="isFieldDisabled('maskValue')"
                         class="mt-0 mb-2"
                     ></v-checkbox>
 
                     <v-checkbox
                         v-model="customTagForm.alwaysTranslate"
-                        :disabled="customTagForm.maskValue || customTagReadOnlyMode"
+                        :disabled="customTagForm.maskValue || isFieldDisabled('alwaysTranslate')"
                         label="Prompt LLM to always translate"
                         hide-details
                         class="mt-0 mb-2"
@@ -230,7 +230,7 @@ export default {
 
                     <v-checkbox
                         v-model="customTagForm.alwaysAddToKnowledgeBase"
-                        :disabled="customTagForm.maskValue || customTagReadOnlyMode"
+                        :disabled="customTagForm.maskValue || isFieldDisabled('alwaysAddToKnowledgeBase')"
                         label="Ask LLM to always add translations to knowledge base"
                         hide-details
                         class="mt-0 mb-2"
@@ -354,7 +354,7 @@ export default {
 
             // Static options (populated from runtime engine or fallback defaults)
             tagStyleOptions: [
-                { text: 'Escape style (\\Symbol)', value: 'escape' },
+                { text: String.raw`Escape style (\Symbol)`, value: 'escape' },
                 { text: 'XML style (<Symbol>)', value: 'xml' },
             ],
             tagTypeOptions: [
@@ -465,6 +465,7 @@ export default {
             const entries = [];
 
             // 1. Default tags from TAG_CONFIGS
+            const engine = this._runtime?.engine;
             for (const tag of TAG_CONFIGS) {
                 entries.push({
                     tagDisplay: this.formatTagDisplay(tag),
@@ -472,8 +473,7 @@ export default {
                     description: tag.description,
                     tag: {
                         ...tag,
-                        reservedWidth: this.resolveEffectiveReservedWidth(tag, 'default', ''),
-                        extraPromptForLlm: this.resolveEffectiveExtraPrompt(tag, 'default', ''),
+                        ...engine.getOverrides(tag, 'default', ''),
                     },
                     pluginName: '',
                     customIndex: -1,
@@ -481,7 +481,6 @@ export default {
             }
 
             // 2. Plugin tags (only exist on AI engine)
-            const engine = this._runtime && this._runtime.engine;
             if (engine && Array.isArray(engine.pluginTags)) {
                 for (const tag of engine.pluginTags) {
                     const pluginName = tag._pluginName || 'unknown';
@@ -491,16 +490,7 @@ export default {
                         description: `${pluginName}: ${tag.description}`,
                         tag: {
                             ...tag,
-                            reservedWidth: this.resolveEffectiveReservedWidth(
-                                tag,
-                                'plugin',
-                                pluginName
-                            ),
-                            extraPromptForLlm: this.resolveEffectiveExtraPrompt(
-                                tag,
-                                'plugin',
-                                pluginName
-                            ),
+                            ...engine.getOverrides(tag, 'plugin', pluginName),
                         },
                         pluginName,
                         customIndex: -1,
@@ -518,11 +508,8 @@ export default {
                     tagDisplay: this.formatTagDisplay(tag),
                     tagSource: 'custom',
                     description: tag.description,
-                    tag: {
-                        ...tag,
-                        reservedWidth: this.resolveEffectiveReservedWidth(tag, 'custom', ''),
-                        extraPromptForLlm: this.resolveEffectiveExtraPrompt(tag, 'custom', ''),
-                    },
+                    // Custom tags don't have overrides, because they are fully custom
+                    tag,
                     pluginName: '',
                     customIndex: idx,
                 });
@@ -563,22 +550,12 @@ export default {
             return `\\${sym}`;
         },
 
-        resolveEffectiveReservedWidth(tag, source, pluginName) {
-            const engine = this._runtime && this._runtime.engine;
-            if (engine && typeof engine.resolveTagReservedWidth === 'function') {
-                return engine.resolveTagReservedWidth(tag, source, pluginName || '');
-            }
-
-            return this.normalizeReservedWidthInput(tag && tag.reservedWidth);
+        isFieldOverridable(fieldName) {
+            return TAG_OVERRIDABLE_FIELDS.includes(fieldName);
         },
 
-        resolveEffectiveExtraPrompt(tag, source, pluginName) {
-            const engine = this._runtime && this._runtime.engine;
-            if (engine && typeof engine.resolveTagExtraPrompt === 'function') {
-                return engine.resolveTagExtraPrompt(tag, source, pluginName || '');
-            }
-
-            return String((tag && tag.extraPromptForLlm) || '').trim();
+        isFieldDisabled(fieldName) {
+            return this.customTagReadOnlyMode && !this.isFieldOverridable(fieldName);
         },
 
         callRuntime(methodName, ...args) {
@@ -635,7 +612,7 @@ export default {
         // ---- Custom Tag CRUD ----
 
         openEditTagDialog(item) {
-            if (!item || !item.tag) {
+            if (!item?.tag) {
                 return;
             }
 
@@ -727,26 +704,25 @@ export default {
 
         saveTagDialog() {
             if (this.customTagReadOnlyMode) {
-                this.saveFixedTagReservedWidth();
+                this.saveFixedTagOverrides();
                 return;
             }
             this.saveCustomTag();
         },
 
-        saveFixedTagReservedWidth() {
+        saveFixedTagOverrides() {
             const { tagSource, pluginName, tagConfig } = this.fixedTagEditContext;
             this.callRuntime(
-                'updateAiTagReservedWidth',
+                'updateAiTagOverrides',
                 tagSource,
                 tagConfig,
-                this.normalizeReservedWidthInput(this.customTagForm.reservedWidth),
-                pluginName || ''
-            );
-            this.callRuntime(
-                'updateAiTagExtraPrompt',
-                tagSource,
-                tagConfig,
-                String(this.customTagForm.extraPromptForLlm || '').trim(),
+                {
+                    reservedWidth: this.normalizeReservedWidthInput(
+                        this.customTagForm.reservedWidth
+                    ),
+                    extraPromptForLlm: String(this.customTagForm.extraPromptForLlm || '').trim(),
+                    requiredConsistency: !!this.customTagForm.requiredConsistency,
+                },
                 pluginName || ''
             );
             this.callRuntime('bindEngineConfigTo', this._runtime);
@@ -885,7 +861,7 @@ export default {
                 const sym = escMatch[1];
                 const rest = escMatch[2] || '';
                 let type = 'withoutParameter';
-                let bracket = '<';
+                let bracket = '';
                 if (rest === '[N]') {
                     type = 'withNumericParameter';
                 } else if (rest === '[…]') {

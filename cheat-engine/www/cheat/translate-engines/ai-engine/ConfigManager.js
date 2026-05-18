@@ -284,8 +284,7 @@ export class ConfigManager {
             aiFixRecursionMaxDepth: this.aiEngine._aiFixRecursionMaxDepth,
             useJsonFixer: this.aiEngine.useJsonFixer,
             aiCustomTags: this.aiEngine.customTags,
-            aiTagReservedWidthOverrides: this.aiEngine.tagReservedWidthOverrides,
-            aiTagExtraPromptOverrides: this.aiEngine.tagExtraPromptOverrides,
+            aiTagOverrides: this.aiEngine.tagOverrides,
             aiCustomTagTypeOptions: this.aiEngine.customTagTypeOptions,
             aiCustomTagBracketOptions: this.aiEngine.customTagBracketOptions,
             aiCustomTagStyleOptions: this.aiEngine.customTagStyleOptions,
@@ -366,27 +365,9 @@ export class ConfigManager {
                     syncPanel: true,
                 }
             ),
-            updateAiTagReservedWidth: this._createPersistedHandler(
-                (source, tagConfig, reservedWidth, pluginName = '') => {
-                    this.aiEngine.setTagReservedWidthOverride(
-                        tagConfig,
-                        source,
-                        pluginName,
-                        reservedWidth
-                    );
-                },
-                {
-                    syncPanel: true,
-                }
-            ),
-            updateAiTagExtraPrompt: this._createPersistedHandler(
-                (source, tagConfig, extraPromptForLlm, pluginName = '') => {
-                    this.aiEngine.setTagExtraPromptOverride(
-                        tagConfig,
-                        source,
-                        pluginName,
-                        extraPromptForLlm
-                    );
+            updateAiTagOverrides: this._createPersistedHandler(
+                (source, tagConfig, overrides, pluginName = '') => {
+                    this.aiEngine.setOverrides(tagConfig, source, pluginName, overrides);
                 },
                 {
                     syncPanel: true,

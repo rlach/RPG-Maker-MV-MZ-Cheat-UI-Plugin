@@ -48,6 +48,12 @@ export const TAG_TYPE_OPTIONS = Object.freeze([
     // TAG_TYPE.XML is omitted — create xml-style tags via style: TAG_STYLE.XML instead
 ]);
 
+export const TAG_OVERRIDABLE_FIELDS = Object.freeze([
+    'reservedWidth',
+    'extraPromptForLlm',
+    'requiredConsistency',
+]);
+
 // Base tag configuration. Regex patterns are generated once in TagManager initialization.
 export const TAG_CONFIGS = [
     {

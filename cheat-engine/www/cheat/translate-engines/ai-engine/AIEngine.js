@@ -21,6 +21,7 @@ import {
     TAG_BRACKET_OPTIONS,
     TAG_TYPE_OPTIONS,
     TAG_STYLE_OPTIONS,
+    TAG_OVERRIDABLE_FIELDS,
     buildRequestSettingsForContent,
     REQUEST_CANCEL_REASON,
 } from './constants.js';
@@ -61,8 +62,7 @@ class AIEngine extends BaseTranslationEngine {
         this._aiFixRecursionMaxDepth = 0;
         this.customTags = [];
         this.pluginTags = []; // auto-registered by plugin translators, not user-editable
-        this.tagReservedWidthOverrides = {};
-        this.tagExtraPromptOverrides = {};
+        this.tagOverrides = {};
         this.customTagTypeOptions = [...TAG_TYPE_OPTIONS];
         this.customTagBracketOptions = [...TAG_BRACKET_OPTIONS];
         this.customTagStyleOptions = [...TAG_STYLE_OPTIONS];
@@ -190,16 +190,10 @@ class AIEngine extends BaseTranslationEngine {
                     this.setCustomTags(v);
                 },
             },
-            aiTagReservedWidthOverrides: {
-                get: () => this.tagReservedWidthOverrides,
+            aiTagOverrides: {
+                get: () => this.tagOverrides,
                 set: (v) => {
-                    this.setTagReservedWidthOverrides(v);
-                },
-            },
-            aiTagExtraPromptOverrides: {
-                get: () => this.tagExtraPromptOverrides,
-                set: (v) => {
-                    this.setTagExtraPromptOverrides(v);
+                    this.setTagOverrides(v);
                 },
             },
             aiCustomTagTypeOptions: {
@@ -305,51 +299,59 @@ class AIEngine extends BaseTranslationEngine {
         return normalized;
     }
 
-    normalizeTagReservedWidthOverrides(overrides = {}) {
+    normalizeTagOverrides(overrides = {}) {
         if (!overrides || typeof overrides !== 'object') {
             return {};
         }
 
         const normalized = {};
-        Object.entries(overrides).forEach(([key, value]) => {
+        Object.entries(overrides).forEach(([key, value = {}]) => {
             const trimmedKey = String(key || '').trim();
             if (!trimmedKey) {
                 return;
             }
-            const parsedReservedWidth = Number(value);
-            const reservedWidth =
-                Number.isFinite(parsedReservedWidth) && parsedReservedWidth > 0
-                    ? Math.floor(parsedReservedWidth)
-                    : 0;
-            if (reservedWidth > 0) {
-                normalized[trimmedKey] = reservedWidth;
+
+            const normalizedOverride = {};
+            TAG_OVERRIDABLE_FIELDS.forEach((fieldName) => {
+                if (!Object.prototype.hasOwnProperty.call(value, fieldName)) {
+                    return;
+                }
+
+                if (fieldName === 'reservedWidth') {
+                    const parsedReservedWidth = Number(value[fieldName]);
+                    const reservedWidth =
+                        Number.isFinite(parsedReservedWidth) && parsedReservedWidth > 0
+                            ? Math.floor(parsedReservedWidth)
+                            : 0;
+                    if (reservedWidth > 0) {
+                        normalizedOverride[fieldName] = reservedWidth;
+                    }
+                    return;
+                }
+
+                if (fieldName === 'extraPromptForLlm') {
+                    const normalizedValue =
+                        typeof value[fieldName] === 'string' ? value[fieldName].trim() : '';
+                    if (normalizedValue) {
+                        normalizedOverride[fieldName] = normalizedValue;
+                    }
+                    return;
+                }
+
+                if (fieldName === 'requiredConsistency') {
+                    normalizedOverride[fieldName] = !!value[fieldName];
+                }
+            });
+
+            if (Object.keys(normalizedOverride).length > 0) {
+                normalized[trimmedKey] = normalizedOverride;
             }
         });
 
         return normalized;
     }
 
-    normalizeTagExtraPromptOverrides(overrides = {}) {
-        if (!overrides || typeof overrides !== 'object') {
-            return {};
-        }
-
-        const normalized = {};
-        Object.entries(overrides).forEach(([key, value]) => {
-            const trimmedKey = String(key || '').trim();
-            if (!trimmedKey) {
-                return;
-            }
-            const normalizedValue = typeof value === 'string' ? value.trim() : '';
-            if (normalizedValue) {
-                normalized[trimmedKey] = normalizedValue;
-            }
-        });
-
-        return normalized;
-    }
-
-    buildTagReservedWidthOverrideKey(tagConfig = {}, source = 'default', pluginName = '') {
+    buildTagOverrideKey(tagConfig = {}, source = 'default', pluginName = '') {
         const safeSource = String(source || 'default')
             .trim()
             .toLowerCase();
@@ -370,98 +372,53 @@ class AIEngine extends BaseTranslationEngine {
         return `${sourcePart}|${safeStyle}|${safeType}|${safeSymbol}|${safeBracket}`;
     }
 
-    resolveTagReservedWidth(tagConfig = {}, source = 'default', pluginName = '') {
-        const baseReservedWidth = this.normalizeCustomTagConfig(tagConfig).reservedWidth;
-        const key = this.buildTagReservedWidthOverrideKey(tagConfig, source, pluginName);
-        const overrideValue = this.tagReservedWidthOverrides[key];
-        const parsedOverride = Number(overrideValue);
-        const hasOverride = Number.isFinite(parsedOverride) && parsedOverride > 0;
-        return hasOverride ? Math.floor(parsedOverride) : baseReservedWidth;
+    getOverrides(tagConfig = {}, source = 'default', pluginName = '') {
+        const key = this.buildTagOverrideKey(tagConfig, source, pluginName);
+        return this.tagOverrides[key] || {};
     }
 
-    setTagReservedWidthOverride(
-        tagConfig = {},
-        source = 'default',
-        pluginName = '',
-        reservedWidth = 0
-    ) {
-        const key = this.buildTagReservedWidthOverrideKey(tagConfig, source, pluginName);
-        const nextReservedWidth = this.normalizeCustomTagConfig({ reservedWidth }).reservedWidth;
-        const baseReservedWidth = this.normalizeCustomTagConfig(tagConfig).reservedWidth;
-        const nextOverrides = { ...this.tagReservedWidthOverrides };
+    setOverrides(tagConfig = {}, source = 'default', pluginName = '', overrides = {}) {
+        const key = this.buildTagOverrideKey(tagConfig, source, pluginName);
+        const normalizedOverrides = this.normalizeTagOverrides({ [key]: overrides })[key];
+        const nextTagOverrides = { ...this.tagOverrides };
 
-        if (nextReservedWidth === baseReservedWidth) {
-            delete nextOverrides[key];
+        if (!normalizedOverrides || Object.keys(normalizedOverrides).length === 0) {
+            delete nextTagOverrides[key];
         } else {
-            nextOverrides[key] = nextReservedWidth;
+            nextTagOverrides[key] = normalizedOverrides;
         }
 
-        this.tagReservedWidthOverrides = this.normalizeTagReservedWidthOverrides(nextOverrides);
+        this.tagOverrides = nextTagOverrides;
         this._refreshTagManager();
     }
 
-    applyTagReservedWidth(tagConfig, source, pluginName) {
-        return {
-            ...tagConfig,
-            reservedWidth: this.resolveTagReservedWidth(tagConfig, source, pluginName),
-        };
-    }
-
-    resolveTagExtraPrompt(tagConfig = {}, source = 'default', pluginName = '') {
-        const baseExtraPrompt = this.normalizeCustomTagConfig(tagConfig).extraPromptForLlm;
-        const key = this.buildTagReservedWidthOverrideKey(tagConfig, source, pluginName);
-        const overrideValue = this.tagExtraPromptOverrides[key];
-        const normalizedOverride = typeof overrideValue === 'string' ? overrideValue.trim() : '';
-        return normalizedOverride || baseExtraPrompt;
-    }
-
-    setTagExtraPromptOverride(
-        tagConfig = {},
-        source = 'default',
-        pluginName = '',
-        extraPromptForLlm = ''
-    ) {
-        const key = this.buildTagReservedWidthOverrideKey(tagConfig, source, pluginName);
-        const nextExtraPrompt =
-            typeof extraPromptForLlm === 'string' ? extraPromptForLlm.trim() : '';
-        const baseExtraPrompt = this.normalizeCustomTagConfig(tagConfig).extraPromptForLlm;
-        const nextOverrides = { ...this.tagExtraPromptOverrides };
-
-        if (nextExtraPrompt === baseExtraPrompt || !nextExtraPrompt) {
-            delete nextOverrides[key];
-        } else {
-            nextOverrides[key] = nextExtraPrompt;
+    resolveTagFieldValue(tagConfig = {}, source = 'default', pluginName = '', fieldName = '') {
+        const normalizedTagConfig = this.normalizeCustomTagConfig(tagConfig);
+        const overrides = this.getOverrides(tagConfig, source, pluginName);
+        if (Object.prototype.hasOwnProperty.call(overrides, fieldName)) {
+            return overrides[fieldName];
         }
-
-        this.tagExtraPromptOverrides = this.normalizeTagExtraPromptOverrides(nextOverrides);
-        this._refreshTagManager();
+        return normalizedTagConfig[fieldName];
     }
 
-    applyTagExtraPrompt(tagConfig, source, pluginName) {
+    applyTagOverrides(tagConfig = {}, source = 'default', pluginName = '') {
+        const normalizedTagConfig = this.normalizeCustomTagConfig(tagConfig);
         return {
             ...tagConfig,
-            extraPromptForLlm: this.resolveTagExtraPrompt(tagConfig, source, pluginName),
+            ...normalizedTagConfig,
+            ...this.getOverrides(tagConfig, source, pluginName),
         };
     }
 
     /** Merge plugin + user custom tags and push to TagManager. */
     _refreshTagManager() {
-        const defaultTags = TAG_CONFIGS.map((tag) => {
-            const withReservedWidth = this.applyTagReservedWidth(tag, 'default', '');
-            return this.applyTagExtraPrompt(withReservedWidth, 'default', '');
-        });
+        const defaultTags = TAG_CONFIGS.map((tag) => this.applyTagOverrides(tag, 'default', ''));
         const pluginTags = (this.pluginTags || []).map((tag) => {
-            const withReservedWidth = this.applyTagReservedWidth(
-                tag,
-                'plugin',
-                tag._pluginName || ''
-            );
-            return this.applyTagExtraPrompt(withReservedWidth, 'plugin', tag._pluginName || '');
+            return this.applyTagOverrides(tag, 'plugin', tag._pluginName || '');
         });
-        const customTags = (this.customTags || []).map((tag) => {
-            const withReservedWidth = this.applyTagReservedWidth(tag, 'custom', '');
-            return this.applyTagExtraPrompt(withReservedWidth, 'custom', '');
-        });
+        const customTags = (this.customTags || []).map((tag) =>
+            this.applyTagOverrides(tag, 'custom', '')
+        );
         this.tagManager.setBaseTagConfigs(defaultTags);
         this.tagManager.setCustomTagConfigs([...pluginTags, ...customTags]);
     }
@@ -472,13 +429,8 @@ class AIEngine extends BaseTranslationEngine {
         this._refreshTagManager();
     }
 
-    setTagReservedWidthOverrides(overrides) {
-        this.tagReservedWidthOverrides = this.normalizeTagReservedWidthOverrides(overrides);
-        this._refreshTagManager();
-    }
-
-    setTagExtraPromptOverrides(overrides) {
-        this.tagExtraPromptOverrides = this.normalizeTagExtraPromptOverrides(overrides);
+    setTagOverrides(overrides) {
+        this.tagOverrides = this.normalizeTagOverrides(overrides);
         this._refreshTagManager();
     }
 
