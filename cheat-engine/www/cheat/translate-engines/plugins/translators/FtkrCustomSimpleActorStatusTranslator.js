@@ -19,7 +19,8 @@ import { parseJsonSafely } from './TranslatorHelpers.js';
 
 const CACHE_TYPE = 'plugin_ftkr_custom_simple_actor_status';
 
-const SIMPLE_PARAMETER_KEYS = Object.freeze([
+// Parameter keys for new and old versions
+const SIMPLE_PARAMETER_KEYS_NEW = [
     'Display LevelUp Message',
     'Equip Right Arrow',
     'Format PDIFF Plus',
@@ -30,7 +31,23 @@ const SIMPLE_PARAMETER_KEYS = Object.freeze([
     'Format AOPDIFF Minus',
     'Format EDIFFAOP Plus',
     'Format EDIFFAOP Minus',
-]);
+];
+const SIMPLE_PARAMETER_KEYS_OLD = ['Display LevelUp Message', 'Equip Right Arrow'];
+
+// Old versions have fewer custom/gauge slots and no XPARAM/SPARAM Name fields
+const CUSTOM_PARAM_COUNT_NEW = 20;
+const CUSTOM_PARAM_COUNT_OLD = 10;
+const GAUGE_PARAM_COUNT_NEW = 10;
+const GAUGE_PARAM_COUNT_OLD = 10;
+
+function isOldFtkrCssParams(parameters) {
+    // Heuristic: old versions lack Format PDIFF Plus, XPARAM Name, SPARAM Name
+    return (
+        !('Format PDIFF Plus' in parameters) &&
+        !('XPARAM Name' in parameters) &&
+        !('SPARAM Name' in parameters)
+    );
+}
 
 export class FtkrCustomSimpleActorStatusTranslator extends BasePluginTranslator {
     constructor() {
@@ -74,13 +91,17 @@ export class FtkrCustomSimpleActorStatusTranslator extends BasePluginTranslator 
     }
 
     collectSimpleParameterEntries(parameters, scope, output) {
-        for (const key of SIMPLE_PARAMETER_KEYS) {
+        const isOld = isOldFtkrCssParams(parameters);
+        const keys = isOld ? SIMPLE_PARAMETER_KEYS_OLD : SIMPLE_PARAMETER_KEYS_NEW;
+        for (const key of keys) {
             this.appendTextEntry(parameters[key], { scope, field: key }, output);
         }
     }
 
     collectCustomParameterEntries(parameters, scope, output) {
-        for (let index = 0; index < 20; index++) {
+        const isOld = isOldFtkrCssParams(parameters);
+        const count = isOld ? CUSTOM_PARAM_COUNT_OLD : CUSTOM_PARAM_COUNT_NEW;
+        for (let index = 0; index < count; index++) {
             this.appendTextEntry(
                 parameters[`Custom ${index} Display Name`],
                 { scope, field: `Custom ${index} Display Name`, index },
@@ -95,7 +116,9 @@ export class FtkrCustomSimpleActorStatusTranslator extends BasePluginTranslator 
     }
 
     collectGaugeParameterEntries(parameters, scope, output) {
-        for (let index = 0; index < 10; index++) {
+        const isOld = isOldFtkrCssParams(parameters);
+        const count = isOld ? GAUGE_PARAM_COUNT_OLD : GAUGE_PARAM_COUNT_NEW;
+        for (let index = 0; index < count; index++) {
             this.appendTextEntry(
                 parameters[`Gauge ${index} Display Name`],
                 { scope, field: `Gauge ${index} Display Name`, index },
@@ -105,11 +128,12 @@ export class FtkrCustomSimpleActorStatusTranslator extends BasePluginTranslator 
     }
 
     collectStructLabelEntries(parameters, fieldName, scope, output) {
+        // Only present in newer versions
+        if (!(fieldName in parameters)) return;
         const parsed = parseJsonSafely(parameters[fieldName], null);
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
             return;
         }
-
         for (const [key, value] of Object.entries(parsed)) {
             this.appendTextEntry(value, { scope, field: fieldName, key }, output);
         }
@@ -119,12 +143,16 @@ export class FtkrCustomSimpleActorStatusTranslator extends BasePluginTranslator 
         if (!parameters || typeof parameters !== 'object') {
             return;
         }
-
         this.collectSimpleParameterEntries(parameters, scope, output);
         this.collectCustomParameterEntries(parameters, scope, output);
         this.collectGaugeParameterEntries(parameters, scope, output);
-        this.collectStructLabelEntries(parameters, 'XPARAM Name', scope, output);
-        this.collectStructLabelEntries(parameters, 'SPARAM Name', scope, output);
+        // Only scan XPARAM/SPARAM Name if present (newer versions)
+        if ('XPARAM Name' in parameters) {
+            this.collectStructLabelEntries(parameters, 'XPARAM Name', scope, output);
+        }
+        if ('SPARAM Name' in parameters) {
+            this.collectStructLabelEntries(parameters, 'SPARAM Name', scope, output);
+        }
     }
 
     collectCssGaugeNameEntries(databaseObjects, scope, output) {
@@ -165,14 +193,15 @@ export class FtkrCustomSimpleActorStatusTranslator extends BasePluginTranslator 
     enablePluginTranslation() {
         const windowBasePrototype = window.Window_Base?.prototype;
         if (!windowBasePrototype) {
+            console.log(
+                '[FtkrCustomSimpleActorStatusTranslator] Window_Base not found, cannot enable translation'
+            );
             return false;
         }
 
         const requiredMethods = [
             'drawCssActorCustom',
             'drawCssActorGauge',
-            'drawCssActorXParam',
-            'drawCssActorSParam',
             'drawCssActorMessage',
             'drawCssActorStatusBase',
             'drawText',
@@ -183,6 +212,12 @@ export class FtkrCustomSimpleActorStatusTranslator extends BasePluginTranslator 
                 (methodName) => typeof windowBasePrototype[methodName] !== 'function'
             )
         ) {
+            console.log(
+                '[FtkrCustomSimpleActorStatusTranslator] Not all required Window_Base methods found, cannot enable translation',
+                requiredMethods.find(
+                    (methodName) => typeof windowBasePrototype[methodName] !== 'function'
+                )
+            );
             return false;
         }
 
@@ -296,86 +331,92 @@ export class FtkrCustomSimpleActorStatusTranslator extends BasePluginTranslator 
         };
 
         const originalDrawCssActorXParam = windowBasePrototype.drawCssActorXParam;
-        windowBasePrototype.drawCssActorXParam = function () {
-            const cssStatus = globalThis.FTKR?.CSS?.cssStatus;
-            const paramLabels = Array.isArray(cssStatus?.xparam) ? cssStatus.xparam : null;
+        if (originalDrawCssActorXParam) {
+            // doesn't exist in older versions, so only patch if present
+            windowBasePrototype.drawCssActorXParam = function () {
+                const cssStatus = globalThis.FTKR?.CSS?.cssStatus;
+                const paramLabels = Array.isArray(cssStatus?.xparam) ? cssStatus.xparam : null;
 
-            if (!paramLabels) {
-                return originalDrawCssActorXParam.apply(this, arguments);
-            }
-
-            const paramId = Number(arguments[4]);
-            if (!Number.isFinite(paramId) || paramId < 0 || paramId >= paramLabels.length) {
-                return originalDrawCssActorXParam.apply(this, arguments);
-            }
-
-            const sourceLabel = paramLabels[paramId];
-            let translatedLabel = sourceLabel;
-
-            try {
-                const runtime = getRuntime();
-                if (isRuntimeTranslationActive(runtime)) {
-                    translatedLabel = translateCssText(sourceLabel, runtime);
+                if (!paramLabels) {
+                    return originalDrawCssActorXParam.apply(this, arguments);
                 }
-            } catch (error) {
-                console.warn(
-                    '[FtkrCustomSimpleActorStatusTranslator] Failed to translate xparam label',
-                    error
-                );
-            }
 
-            if (translatedLabel === sourceLabel) {
-                return originalDrawCssActorXParam.apply(this, arguments);
-            }
+                const paramId = Number(arguments[4]);
+                if (!Number.isFinite(paramId) || paramId < 0 || paramId >= paramLabels.length) {
+                    return originalDrawCssActorXParam.apply(this, arguments);
+                }
 
-            paramLabels[paramId] = translatedLabel;
-            try {
-                return originalDrawCssActorXParam.apply(this, arguments);
-            } finally {
-                paramLabels[paramId] = sourceLabel;
-            }
-        };
+                const sourceLabel = paramLabels[paramId];
+                let translatedLabel = sourceLabel;
+
+                try {
+                    const runtime = getRuntime();
+                    if (isRuntimeTranslationActive(runtime)) {
+                        translatedLabel = translateCssText(sourceLabel, runtime);
+                    }
+                } catch (error) {
+                    console.warn(
+                        '[FtkrCustomSimpleActorStatusTranslator] Failed to translate xparam label',
+                        error
+                    );
+                }
+
+                if (translatedLabel === sourceLabel) {
+                    return originalDrawCssActorXParam.apply(this, arguments);
+                }
+
+                paramLabels[paramId] = translatedLabel;
+                try {
+                    return originalDrawCssActorXParam.apply(this, arguments);
+                } finally {
+                    paramLabels[paramId] = sourceLabel;
+                }
+            };
+        }
 
         const originalDrawCssActorSParam = windowBasePrototype.drawCssActorSParam;
-        windowBasePrototype.drawCssActorSParam = function () {
-            const cssStatus = globalThis.FTKR?.CSS?.cssStatus;
-            const paramLabels = Array.isArray(cssStatus?.sparam) ? cssStatus.sparam : null;
+        if (originalDrawCssActorSParam) {
+            // doesn't exist in older versions, so only patch if present
+            windowBasePrototype.drawCssActorSParam = function () {
+                const cssStatus = globalThis.FTKR?.CSS?.cssStatus;
+                const paramLabels = Array.isArray(cssStatus?.sparam) ? cssStatus.sparam : null;
 
-            if (!paramLabels) {
-                return originalDrawCssActorSParam.apply(this, arguments);
-            }
-
-            const paramId = Number(arguments[4]);
-            if (!Number.isFinite(paramId) || paramId < 0 || paramId >= paramLabels.length) {
-                return originalDrawCssActorSParam.apply(this, arguments);
-            }
-
-            const sourceLabel = paramLabels[paramId];
-            let translatedLabel = sourceLabel;
-
-            try {
-                const runtime = getRuntime();
-                if (isRuntimeTranslationActive(runtime)) {
-                    translatedLabel = translateCssText(sourceLabel, runtime);
+                if (!paramLabels) {
+                    return originalDrawCssActorSParam.apply(this, arguments);
                 }
-            } catch (error) {
-                console.warn(
-                    '[FtkrCustomSimpleActorStatusTranslator] Failed to translate sparam label',
-                    error
-                );
-            }
 
-            if (translatedLabel === sourceLabel) {
-                return originalDrawCssActorSParam.apply(this, arguments);
-            }
+                const paramId = Number(arguments[4]);
+                if (!Number.isFinite(paramId) || paramId < 0 || paramId >= paramLabels.length) {
+                    return originalDrawCssActorSParam.apply(this, arguments);
+                }
 
-            paramLabels[paramId] = translatedLabel;
-            try {
-                return originalDrawCssActorSParam.apply(this, arguments);
-            } finally {
-                paramLabels[paramId] = sourceLabel;
-            }
-        };
+                const sourceLabel = paramLabels[paramId];
+                let translatedLabel = sourceLabel;
+
+                try {
+                    const runtime = getRuntime();
+                    if (isRuntimeTranslationActive(runtime)) {
+                        translatedLabel = translateCssText(sourceLabel, runtime);
+                    }
+                } catch (error) {
+                    console.warn(
+                        '[FtkrCustomSimpleActorStatusTranslator] Failed to translate sparam label',
+                        error
+                    );
+                }
+
+                if (translatedLabel === sourceLabel) {
+                    return originalDrawCssActorSParam.apply(this, arguments);
+                }
+
+                paramLabels[paramId] = translatedLabel;
+                try {
+                    return originalDrawCssActorSParam.apply(this, arguments);
+                } finally {
+                    paramLabels[paramId] = sourceLabel;
+                }
+            };
+        }
 
         const originalDrawCssActorMessage = windowBasePrototype.drawCssActorMessage;
         windowBasePrototype.drawCssActorMessage = function () {
