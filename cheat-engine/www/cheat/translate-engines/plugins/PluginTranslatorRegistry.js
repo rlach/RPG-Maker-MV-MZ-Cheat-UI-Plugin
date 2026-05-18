@@ -1,4 +1,5 @@
 import { AutoNamePopupTranslator } from './translators/AutoNamePopupTranslator.js';
+import { ABEnemyBookTranslator } from './translators/ABEnemyBookTranslator.js';
 import { BasePluginTranslator } from './BasePluginTranslator.js';
 import { CategorySynthesisTranslator } from './translators/CategorySynthesisTranslator.js';
 import { ChronusTranslator } from './translators/ChronusTranslator.js';
@@ -71,6 +72,7 @@ import { ProfileExtendTranslator } from './translators/ProfileExtendTranslator.j
 class PluginTranslatorRegistry {
     constructor() {
         this.translatorClasses = [
+            ABEnemyBookTranslator,
             AutoNamePopupTranslator,
             CategorySynthesisTranslator,
             ChronusTranslator,

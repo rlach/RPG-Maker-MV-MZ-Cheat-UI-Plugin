@@ -115,7 +115,7 @@ export const DATA_CONTAINER_TRANSLATION_DEFINITIONS = Object.freeze([
     {
         kind: 'enemies',
         cachePrefix: 'enemy',
-        fields: ['name'],
+        fields: ['name', 'note'],
         requiresReapplyOnLoad: true,
         getContainer: () => window.$dataEnemies,
     },
