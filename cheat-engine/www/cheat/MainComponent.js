@@ -325,7 +325,7 @@ export default {
             const shortcutLabel = toggleShortcut.asDisplayString();
 
             const highlightedShortcut = `<span style="color:#ffd54f">${this.escapeHtml(shortcutLabel)}</span>`;
-            Alert.infoHtml(
+            Alert.html(
                 `Cheat engine initialized, press ${highlightedShortcut} to open menu`,
                 null,
                 5000

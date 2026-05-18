@@ -25,9 +25,9 @@ export class Alert {
         this.alertInternal('info', msg, err, timeout);
     }
 
-    static infoHtml(msg, err = null, timeout = 1500) {
+    static html(msg, err = null, timeout = 1500, alertType = 'info') {
         this.alertInternal(
-            'info',
+            alertType,
             {
                 text: msg,
                 html: true,

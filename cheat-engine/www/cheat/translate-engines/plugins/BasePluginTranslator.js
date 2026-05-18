@@ -181,10 +181,11 @@ export class BasePluginTranslator extends BasePhase {
                         console.info(
                             `[PluginTranslator] Plugin translation never mounted for ${this.getPluginName()} after ${maxRetries} retries.`
                         );
-                        Alert.infoHtml(
+                        Alert.html(
                             `Plugin ${this.getPluginLabel()} failed to initialize.`,
                             null,
-                            5000
+                            5000,
+                            'warn'
                         );
                         return;
                     }
