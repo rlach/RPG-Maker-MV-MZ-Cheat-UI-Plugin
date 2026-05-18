@@ -129,15 +129,7 @@ export class ConfigManager {
                @change="onChangeAiModel"
                class="mb-2"
              ></v-select>
-
-             <v-checkbox
-               v-model="aiAllowNewlineMismatch"
-               label="Allow non-essential tag mismatches"
-               @change="onChangeAiAllowNewlineMismatch"
-               class="mt-2"
-               hide-details
-             ></v-checkbox>
-
+             
              <v-checkbox
                v-model="aiAskIfTextTranslated"
                label="ask AI if text is translated"
@@ -275,7 +267,6 @@ export class ConfigManager {
             aiModels: this.aiEngine.models,
             aiLoadingModels: this.aiEngine.loadingModels,
             aiModelsError: this.aiEngine.modelsError,
-            aiAllowNewlineMismatch: this.aiEngine.allowNewlineMismatch,
             aiAskIfTextTranslated: this.aiEngine.askAiIfTextTranslated,
             aiInvalidJsonHandlingStrategy: this.aiEngine.invalidJsonHandlingStrategy,
             aiInvalidJsonHandlingStrategyOptions: [
@@ -323,9 +314,6 @@ export class ConfigManager {
             }),
             onChangeAiModel: this._createPersistedHandler((v) => {
                 this.aiEngine.selectedModel = v;
-            }),
-            onChangeAiAllowNewlineMismatch: this._createPersistedHandler((v) => {
-                this.aiEngine.allowNewlineMismatch = v;
             }),
             onChangeAiAskIfTextTranslated: this._createPersistedHandler((v) => {
                 this.aiEngine.askAiIfTextTranslated = v;

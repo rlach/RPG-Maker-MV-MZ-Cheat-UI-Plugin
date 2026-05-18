@@ -21,7 +21,7 @@ const BRACKET_CLOSE_BY_OPEN = Object.freeze({
 });
 
 const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
-const ESCAPE_PREFIX_PATTERN = '(?:\\\\|\\u001b)';
+const ESCAPE_PREFIX_PATTERN = String.raw`(?:\\|\u001b)`;
 const SPACE_RUN_TRIGGER_THRESHOLD = LLM_MAX_CONSECUTIVE_IDENTICAL_CHARS + 1;
 const ESCAPE_TAG_SYMBOL_START_CLASS = 'A-Za-z${}|.!><^';
 const PROTECTED_B_TAG_PREFIX = '__protected_b_tag__';
@@ -30,7 +30,7 @@ const LONG_RUN_TAG_CONFIGS = Object.freeze([
     { tagId: 'sw', character: '　' },
 ]);
 
-const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 
 const makeTagIdSeed = (value) =>
     String(value || '')
@@ -42,7 +42,6 @@ const cloneTagConfig = (config) => ({ ...config });
 export class TagManager {
     constructor(runtime) {
         this.runtime = runtime;
-        this.allowNewlineMismatch = false;
         this.tagEntries = [];
         this.customParameterEntries = [];
         this.longRunEntries = [];
@@ -106,7 +105,7 @@ export class TagManager {
             character,
             requiredConsistency: true,
             prePattern: new RegExp(`${escapedCharacter}{${SPACE_RUN_TRIGGER_THRESHOLD},}`, 'g'),
-            postPattern: new RegExp(`\\[b=${tagId}(\\d+)\\]`, 'gi'),
+            postPattern: new RegExp(String.raw`\[b=${tagId}(\d+)\]`, 'gi'),
         };
     }
 
@@ -177,7 +176,7 @@ export class TagManager {
         const usedPatternSignatures = new Set();
 
         for (const config of longRunTagConfigs) {
-            if (config.tagId && config.tagId.length === 2) {
+            if (config.tagId?.length === 2) {
                 usedTagIds.add(config.tagId);
             }
         }
@@ -220,12 +219,12 @@ export class TagManager {
             requiredConsistency: false,
             addSpace: false,
             prePattern: /\n/g,
-            postPattern: new RegExp(`\\[b=${simpleNId}\\]`, 'g'),
+            postPattern: new RegExp(String.raw`\[b=${simpleNId}\]`, 'g'),
         };
 
         this.longRunEntries = longRunTagConfigs.map((config, index) => {
             let tagId = config.tagId;
-            if (!tagId || tagId.length !== 2 || usedLongRunTagIds.has(tagId)) {
+            if (tagId?.length !== 2 || usedLongRunTagIds.has(tagId)) {
                 tagId = this.generateUniqueTagId(
                     {
                         description: `longRun${index}`,
@@ -362,9 +361,9 @@ export class TagManager {
                 key,
                 tagId,
                 // Matches <Symbol:123>
-                prePattern: new RegExp(`<${escapedSymbol}:(\\d+)>`, 'gi'),
+                prePattern: new RegExp(String.raw`<${escapedSymbol}:(\d+)>`, 'gi'),
                 // Same encoded form as escape-style numeric: [b=idN]
-                postPattern: new RegExp(`\\[b=${tagId}(\\d+)\\]`, 'gi'),
+                postPattern: new RegExp(String.raw`\[b=${tagId}(\d+)\]`, 'gi'),
             };
         }
 
@@ -376,7 +375,7 @@ export class TagManager {
                 // Matches <Symbol>
                 prePattern: new RegExp(`<${escapedSymbol}>`, 'gi'),
                 // Same encoded form as escape-style no-param: [b=id]
-                postPattern: new RegExp(`\\[b=${tagId}\\]`, 'gi'),
+                postPattern: new RegExp(String.raw`\[b=${tagId}\]`, 'gi'),
             };
         }
 
@@ -390,7 +389,7 @@ export class TagManager {
                 bracketClose: '>', // encoding bracket close
                 // Matches <Symbol:anything-except-> >
                 prePattern: new RegExp(`<${escapedSymbol}:([^>]*)>`, 'gi'),
-                postPattern: new RegExp(`\\[b=${tagId}<([^>]*)>\\]`, 'gi'),
+                postPattern: new RegExp(String.raw`\[b=${tagId}<([^>]*)>\]`, 'gi'),
             };
         }
 
@@ -402,10 +401,10 @@ export class TagManager {
                 key,
                 tagId,
                 prePattern: new RegExp(
-                    `${ESCAPE_PREFIX_PATTERN}${escapedSymbol}\\[(\\d+)\\]`,
+                    String.raw`${ESCAPE_PREFIX_PATTERN}${escapedSymbol}\[(\d+)\]`,
                     'gi'
                 ),
-                postPattern: new RegExp(`\\[b=${tagId}(\\d+)\\]`, 'gi'),
+                postPattern: new RegExp(String.raw`\[b=${tagId}(\d+)\]`, 'gi'),
             };
         }
 
@@ -415,7 +414,7 @@ export class TagManager {
                 key,
                 tagId,
                 prePattern: new RegExp(`${ESCAPE_PREFIX_PATTERN}${escapedSymbol}`, 'gi'),
-                postPattern: new RegExp(`\\[b=${tagId}\\]`, 'gi'),
+                postPattern: new RegExp(String.raw`\[b=${tagId}\]`, 'gi'),
             };
         }
 
@@ -435,7 +434,7 @@ export class TagManager {
                     'gi'
                 ),
                 postPattern: new RegExp(
-                    `\\[b=${tagId}${escapedOpen}${valueCapture}${escapedClose}\\]`,
+                    String.raw`\[b=${tagId}${escapedOpen}${valueCapture}${escapedClose}\]`,
                     'gi'
                 ),
             };
@@ -504,15 +503,19 @@ export class TagManager {
                         }),
                     };
                 } else {
-                    replacementResult = this.replaceEscapeStyleCustomTags(result, entry, (paramValue) => {
-                        if (!entry.maskValue) {
-                            return `[b=${entry.tagId}${entry.bracket}${paramValue}${entry.bracketClose}]`;
-                        }
+                    replacementResult = this.replaceEscapeStyleCustomTags(
+                        result,
+                        entry,
+                        (paramValue) => {
+                            if (!entry.maskValue) {
+                                return `[b=${entry.tagId}${entry.bracket}${paramValue}${entry.bracketClose}]`;
+                            }
 
-                        const nextMaskId = maskedValues.length;
-                        maskedValues.push(paramValue);
-                        return `[b=${entry.tagId}${entry.bracket}${nextMaskId}${entry.bracketClose}]`;
-                    });
+                            const nextMaskId = maskedValues.length;
+                            maskedValues.push(paramValue);
+                            return `[b=${entry.tagId}${entry.bracket}${nextMaskId}${entry.bracketClose}]`;
+                        }
+                    );
                 }
 
                 result = replacementResult.text;
@@ -565,7 +568,7 @@ export class TagManager {
         let result = text;
         const actualCounts = {};
         const usedMaskedIdsByTagKey = {};
-        const maskedByTagKey = (caseMap && caseMap.maskedByTagKey) || {};
+        const maskedByTagKey = caseMap?.maskedByTagKey || {};
         const processingEntries = [
             ...this.tagEntries.filter((entry) => entry.type === TAG_TYPE.WITH_CUSTOM_PARAMETER),
             ...this.tagEntries.filter((entry) => entry.type !== TAG_TYPE.WITH_CUSTOM_PARAMETER),
@@ -657,8 +660,7 @@ export class TagManager {
         actualCounts[this.simpleNEntry.key] = simpleNMatches.length;
         result = result.replace(this.simpleNEntry.postPattern, () => '\n');
 
-        const expectedLongRunLengthsByTagKey =
-            (caseMap && caseMap.expectedLongRunLengthsByTagKey) || {};
+        const expectedLongRunLengthsByTagKey = caseMap?.expectedLongRunLengthsByTagKey || {};
         const actualLongRunLengthsByTagKey = {};
         for (const entry of this.longRunEntries) {
             const actualRunLengths = [];
@@ -677,7 +679,7 @@ export class TagManager {
             actualLongRunLengthsByTagKey[entry.key] = actualRunLengths;
         }
 
-        const originalHadClosingBTag = !!(caseMap && caseMap.hasLiteralClosingBTag);
+        const originalHadClosingBTag = !!caseMap?.hasLiteralClosingBTag;
         result = this.restoreProtectedEncodedTags(result, PROTECTED_B_TAG_PREFIX);
         if (!originalHadClosingBTag && /\[\/b\]/i.test(result)) {
             result = result.replace(/\[\/b\]/gi, '');
@@ -698,21 +700,9 @@ export class TagManager {
             };
         }
 
-        let valid;
-        if (this.allowNewlineMismatch) {
-            const requiredTypes = this.tagEntries
-                .filter((entry) => entry.requiredConsistency)
-                .map((entry) => entry.key);
-            valid = requiredTypes.every(
-                (typeKey) => actualCounts[typeKey] === (tagCounts[typeKey] || 0)
-            );
-        } else {
-            valid = Object.keys(tagCounts || {}).every((key) => {
-                return actualCounts[key] === ((tagCounts && tagCounts[key]) || 0);
-            });
-        }
+        let valid = this.areAllTagsWithRequiredConsistencyValid(tagCounts, actualCounts);
 
-        const expectedMaskedIdsByTagKey = (caseMap && caseMap.expectedMaskedIdsByTagKey) || {};
+        const expectedMaskedIdsByTagKey = caseMap?.expectedMaskedIdsByTagKey || {};
         const maskedIdsValid = Object.keys(expectedMaskedIdsByTagKey).every((key) => {
             const expected = expectedMaskedIdsByTagKey[key] || [];
             const seenSet = usedMaskedIdsByTagKey[key] || new Set();
@@ -747,8 +737,8 @@ export class TagManager {
             ]);
 
             for (const key of allKeys) {
-                const expected = Number((tagCounts && tagCounts[key]) || 0);
-                const got = Number((actualCounts && actualCounts[key]) || 0);
+                const expected = Number(tagCounts?.[key] || 0);
+                const got = Number(actualCounts?.[key] || 0);
                 if (expected === got) {
                     continue;
                 }
@@ -773,6 +763,16 @@ export class TagManager {
             expectedCounts: tagCounts,
             actualCounts,
         };
+    }
+
+    areAllTagsWithRequiredConsistencyValid(expectedCounts, actualCounts) {
+        const requiredTypes = this.tagEntries
+            .filter((entry) => entry.requiredConsistency)
+            .map((entry) => entry.key);
+
+        return requiredTypes.every(
+            (typeKey) => actualCounts[typeKey] === (expectedCounts[typeKey] || 0)
+        );
     }
 
     /**
@@ -993,7 +993,7 @@ export class TagManager {
             return text;
         }
 
-        const restorePattern = new RegExp(`\\[${escapeRegExp(marker)}=`, 'gi');
+        const restorePattern = new RegExp(String.raw`\[${escapeRegExp(marker)}=`, 'gi');
         return text.replace(restorePattern, '[b=');
     }
 
@@ -1072,14 +1072,14 @@ export class TagManager {
 
         // Case 1: line wrap between commands, e.g. "... ]\n\\FH[...]"
         const newlineBeforeEscapeCommand = new RegExp(
-            `\\r?\\n(?=\\\\[${ESCAPE_TAG_SYMBOL_START_CLASS}])`,
+            String.raw`\r?\n(?=\\[${ESCAPE_TAG_SYMBOL_START_CLASS}])`,
             'g'
         );
         let repaired = text.replace(newlineBeforeEscapeCommand, '');
 
         // Case 2: line wrap after backslash, e.g. "\\\nFH[...]"
         const newlineAfterEscapeSlash = new RegExp(
-            `\\\\\\r?\\n(?=[${ESCAPE_TAG_SYMBOL_START_CLASS}])`,
+            String.raw`\\\r?\n(?=[${ESCAPE_TAG_SYMBOL_START_CLASS}])`,
             'g'
         );
         repaired = repaired.replace(newlineAfterEscapeSlash, '\\');
@@ -1201,8 +1201,7 @@ export class TagManager {
         const targetLang = this.runtime.targetLang || 'en';
         const pairKey = `${sourceLang}-${targetLang}`;
         const prefix = `actor_name:${sourceLang}-${targetLang}-`;
-        const pairProfiles =
-            (this.runtime.nameProfilesByLangPair && this.runtime.nameProfilesByLangPair[pairKey]) || {};
+        const pairProfiles = this.runtime.nameProfilesByLangPair?.[pairKey] || {};
 
         const { cache } = ensureTranslateCacheRuntime();
         if (!(cache instanceof Map)) {
@@ -1212,7 +1211,7 @@ export class TagManager {
         const hints = [];
         for (const [key, value] of cache.entries()) {
             if (!key.startsWith(prefix)) continue;
-            if (!value || !value.trim()) continue;
+            if (!value?.trim()) continue;
             const originalName = key.slice(prefix.length);
             if (originalName) {
                 const profile = pairProfiles[originalName] || {};

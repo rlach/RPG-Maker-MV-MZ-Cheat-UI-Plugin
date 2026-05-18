@@ -50,7 +50,6 @@ class AIEngine extends BaseTranslationEngine {
         this.models = [];
         this.loadingModels = false;
         this.modelsError = '';
-        this.allowNewlineMismatch = false;
         this.askAiIfTextTranslated = true;
         this.invalidJsonHandlingStrategy = 'resendFirstHalf';
         this._aiInvalidJsonResendCount = 3;
@@ -126,13 +125,6 @@ class AIEngine extends BaseTranslationEngine {
                 get: () => this.modelsError,
                 set: (v) => {
                     this.modelsError = v || '';
-                },
-            },
-            aiAllowNewlineMismatch: {
-                get: () => this.allowNewlineMismatch,
-                set: (v) => {
-                    this.allowNewlineMismatch = !!v;
-                    this.tagManager.allowNewlineMismatch = this.allowNewlineMismatch;
                 },
             },
             aiAskIfTextTranslated: {
@@ -226,8 +218,6 @@ class AIEngine extends BaseTranslationEngine {
                 },
             },
         });
-
-        this.tagManager.allowNewlineMismatch = this.allowNewlineMismatch;
     }
 
     normalizeBannedPhrasesText(input) {
@@ -461,7 +451,11 @@ class AIEngine extends BaseTranslationEngine {
             return this.applyTagExtraPrompt(withReservedWidth, 'default', '');
         });
         const pluginTags = (this.pluginTags || []).map((tag) => {
-            const withReservedWidth = this.applyTagReservedWidth(tag, 'plugin', tag._pluginName || '');
+            const withReservedWidth = this.applyTagReservedWidth(
+                tag,
+                'plugin',
+                tag._pluginName || ''
+            );
             return this.applyTagExtraPrompt(withReservedWidth, 'plugin', tag._pluginName || '');
         });
         const customTags = (this.customTags || []).map((tag) => {
@@ -912,7 +906,6 @@ class AIEngine extends BaseTranslationEngine {
 
         try {
             // 1. PREPROCESS: Tags and payload
-            this.tagManager.allowNewlineMismatch = this.allowNewlineMismatch;
             this._jsonObjectIndexByType = new Map();
             this._jsonObjectSequenceByType = new Map();
             const itemData = items.map((item, i) => {
@@ -996,7 +989,8 @@ class AIEngine extends BaseTranslationEngine {
                     ? ` When translating following tags always put all translations into knowledge base: ${alwaysKbaseTagIds.join(', ')}.`
                     : '';
 
-            const additionalTagInfos = this.tagManager.getAdditionalTagPromptInfos(preprocessedTexts);
+            const additionalTagInfos =
+                this.tagManager.getAdditionalTagPromptInfos(preprocessedTexts);
             const additionalTagInfoPart =
                 additionalTagInfos.length > 0
                     ? ` Additional tag info: ${additionalTagInfos.join('; ')}.`

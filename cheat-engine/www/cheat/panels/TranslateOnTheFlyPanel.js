@@ -546,10 +546,6 @@ export default {
             return this.callRuntime('onChangeAiModel', v);
         },
 
-        onChangeAiAllowNewlineMismatch(v) {
-            return this.callRuntime('onChangeAiAllowNewlineMismatch', v);
-        },
-
         onChangeAiAskIfTextTranslated(v) {
             return this.callRuntime('onChangeAiAskIfTextTranslated', v);
         },
