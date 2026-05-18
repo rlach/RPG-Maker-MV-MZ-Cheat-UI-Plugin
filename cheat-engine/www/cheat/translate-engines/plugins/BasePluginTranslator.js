@@ -49,7 +49,7 @@ export class BasePluginTranslator extends BasePhase {
         }
 
         return window.$plugins.some((plugin) => {
-            if (!plugin || typeof plugin.name !== 'string') {
+            if (!plugin || typeof plugin.name !== 'string' || plugin.status !== true) {
                 return false;
             }
 
