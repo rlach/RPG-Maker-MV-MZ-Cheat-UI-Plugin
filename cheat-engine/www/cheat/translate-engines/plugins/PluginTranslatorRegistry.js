@@ -1,4 +1,5 @@
 import { AutoNamePopupTranslator } from './translators/AutoNamePopupTranslator.js';
+import { BBCustomSaveWindowTranslator } from './translators/BBCustomSaveWindowTranslator.js';
 import { BasePluginTranslator } from './BasePluginTranslator.js';
 import { CategorySynthesisTranslator } from './translators/CategorySynthesisTranslator.js';
 import { ChronusTranslator } from './translators/ChronusTranslator.js';
@@ -71,6 +72,7 @@ class PluginTranslatorRegistry {
     constructor() {
         this.translatorClasses = [
             AutoNamePopupTranslator,
+            BBCustomSaveWindowTranslator,
             CategorySynthesisTranslator,
             ChronusTranslator,
             CbrEroStatusTranslator,
