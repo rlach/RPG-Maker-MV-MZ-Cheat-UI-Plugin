@@ -43,6 +43,8 @@ import { NuunSaveScreen3Translator } from './translators/NuunSaveScreen3Translat
 import { OriginMenuStatusTranslator } from './translators/OriginMenuStatusTranslator.js';
 import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTextWindowTranslator.js';
 import { QuestSystemTranslator } from './translators/QuestSystemTranslator.js';
+import { RecollectionForMZTranslator } from './translators/RecollectionForMZTranslator.js';
+import { RecollectionModeMZTranslator } from './translators/RecollectionModeMZTranslator.js';
 import { SceneCustomMenuTranslator } from './translators/SceneCustomMenuTranslator.js';
 import { SceneGlossaryTranslator } from './translators/SceneGlossaryTranslator.js';
 import { SetMessageFontSizeTranslator } from './translators/SetMessageFontSizeTranslator.js';
@@ -117,6 +119,8 @@ class PluginTranslatorRegistry {
             PandaProgressTextWindowTranslator,
             PHQuestBookTranslator,
             QuestSystemTranslator,
+            RecollectionForMZTranslator,
+            RecollectionModeMZTranslator,
             SabaSimpleScenarioTranslator,
             SabaTachieTranslator,
             SceneCustomMenuTranslator,
