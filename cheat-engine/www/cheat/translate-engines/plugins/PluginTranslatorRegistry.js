@@ -3,7 +3,6 @@ import { BasePluginTranslator } from './BasePluginTranslator.js';
 import { CategorySynthesisTranslator } from './translators/CategorySynthesisTranslator.js';
 import { ChronusTranslator } from './translators/ChronusTranslator.js';
 import { CbrEroStatusTranslator } from './translators/CbrEroStatusTranslator.js';
-import { CommonPopupCoreTranslator } from './translators/CommonPopupCoreTranslator.js';
 import { CustomizeConfigItemTranslator } from './translators/CustomizeConfigItemTranslator.js';
 import { ExternMessageTranslator } from './translators/ExternMessageTranslator.js';
 import { FtkrItemCompositionSystemTranslator } from './translators/FtkrItemCompositionSystemTranslator.js';
@@ -25,7 +24,6 @@ import { LLGalgeChoiceWindowTranslator } from './translators/LLGalgeChoiceWindow
 import { ManoInputConfigTranslator } from './translators/ManoInputConfigTranslator.js';
 import { LLMenuScreenTranslator } from './translators/LLMenuScreenTranslator.js';
 import { LLStandingPictureTranslator } from './translators/LLStandingPictureTranslator.js';
-import { LiveCommentTranslator } from './translators/LiveCommentTranslator.js';
 import { MgpExternChoicesTranslator } from './translators/MgpExternChoicesTranslator.js';
 import { MogSceneMenuFileRenameTranslator } from './translators/MogSceneMenuFileRenameTranslator.js';
 import { MogSceneMenuTranslator } from './translators/MogSceneMenuTranslator.js';
@@ -33,7 +31,6 @@ import { MogSceneItemTranslator } from './translators/MogSceneItemTranslator.js'
 import { MogBattleCommandsTranslator } from './translators/MogBattleCommandsTranslator.js';
 import { MogEventTextTranslator } from './translators/MogEventTextTranslator.js';
 import { MessageWindowPopupTranslator } from './translators/MessageWindowPopupTranslator.js';
-import { MessagePExRiruTranslator } from './translators/MessagePExRiruTranslator.js';
 import { NameBoxNoUseTranslator } from './translators/NameBoxNoUseTranslator.js';
 import { MppChoiceExTranslator } from './translators/MppChoiceExTranslator.js';
 import { MppMessageExTranslator } from './translators/MppMessageExTranslator.js';
@@ -42,7 +39,6 @@ import { NrpMapTravelTranslator } from './translators/NrpMapTravelTranslator.js'
 import { NuunSaveScreenTranslator } from './translators/NuunSaveScreenTranslator.js';
 import { OriginMenuStatusTranslator } from './translators/OriginMenuStatusTranslator.js';
 import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTextWindowTranslator.js';
-import { PopupMessageTranslator } from './translators/PopupMessageTranslator.js';
 import { QuestSystemTranslator } from './translators/QuestSystemTranslator.js';
 import { SceneCustomMenuTranslator } from './translators/SceneCustomMenuTranslator.js';
 import { SceneGlossaryTranslator } from './translators/SceneGlossaryTranslator.js';
@@ -68,7 +64,7 @@ import { SabaSimpleScenarioTranslator } from './translators/SabaSimpleScenarioTr
 import { SabaTachieTranslator } from './translators/SabaTachieTranslator.js';
 import { YepGabWindowTranslator } from './translators/YepGabWindowTranslator.js';
 import { PHQuestBookTranslator } from './translators/PHQuestBookTranslator.js';
-import { ProfileExtendTranslator } from './translators/ProfileExtendTranslator.js';
+import { SaveFilePlusTranslator } from './translators/SaveFilePlusTranslator.js';
 
 class PluginTranslatorRegistry {
     constructor() {
@@ -77,7 +73,6 @@ class PluginTranslatorRegistry {
             CategorySynthesisTranslator,
             ChronusTranslator,
             CbrEroStatusTranslator,
-            CommonPopupCoreTranslator,
             CustomizeConfigItemTranslator,
             ExternMessageTranslator,
             FtkrItemCompositionSystemTranslator,
@@ -98,14 +93,12 @@ class PluginTranslatorRegistry {
             LLGalgeChoiceWindowTranslator,
             LLMenuScreenTranslator,
             LLStandingPictureTranslator,
-            LiveCommentTranslator,
             ManoInputConfigTranslator,
             MgpExternChoicesTranslator,
             MogSceneMenuFileRenameTranslator,
             MogSceneMenuTranslator,
             MogSceneItemTranslator,
             MessageWindowPopupTranslator,
-            MessagePExRiruTranslator,
             MogBattleCommandsTranslator,
             MogEventTextTranslator,
             NameBoxNoUseTranslator,
@@ -117,8 +110,6 @@ class PluginTranslatorRegistry {
             OriginMenuStatusTranslator,
             PandaProgressTextWindowTranslator,
             PHQuestBookTranslator,
-            ProfileExtendTranslator,
-            PopupMessageTranslator,
             QuestSystemTranslator,
             SabaSimpleScenarioTranslator,
             SabaTachieTranslator,
@@ -143,6 +134,7 @@ class PluginTranslatorRegistry {
             YepEventMiniLabelTranslator,
             YepMessageCoreTranslator,
             YepQuestJournalTranslator,
+            SaveFilePlusTranslator,
         ];
         this.translatorInstances = new Map();
         this.detectedPluginNames = new Set();
