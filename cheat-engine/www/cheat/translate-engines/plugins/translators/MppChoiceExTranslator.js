@@ -53,6 +53,16 @@ function normalizeAsDialogueText(text, runtime) {
     return cleaned;
 }
 
+/**
+ * MPP_ChoiceEX plugin translator.
+ * Translates choice items and per-choice help text messages.
+ *
+ * Supported versions:
+ *   - ver.3.7 (MV): Help text stored on $gameMessage._helpTexts (private property,
+ *     no public getter). setChoiceHelpTexts() is the only public mutator.
+ *   - Older versions (MV): May expose a helpTexts() getter method instead of
+ *     direct _helpTexts property access.
+ */
 export class MppChoiceExTranslator extends BasePluginTranslator {
     constructor() {
         super();
@@ -184,13 +194,17 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
         if (
             !runtime ||
             !gameMessage ||
-            typeof gameMessage.helpTexts !== 'function' ||
             typeof gameMessage.setChoiceHelpTexts !== 'function'
         ) {
             return;
         }
 
-        const helpTexts = gameMessage.helpTexts();
+        // Support both older versions (public helpTexts() getter) and v3.7+
+        // (private _helpTexts property, no getter defined).
+        const helpTexts =
+            typeof gameMessage.helpTexts === 'function'
+                ? gameMessage.helpTexts()
+                : gameMessage._helpTexts;
         if (!Array.isArray(helpTexts) || helpTexts.length === 0) {
             return;
         }
