@@ -1,12 +1,11 @@
 import { AutoNamePopupTranslator } from './translators/AutoNamePopupTranslator.js';
-import { ABEnemyBookTranslator } from './translators/ABEnemyBookTranslator.js';
 import { BasePluginTranslator } from './BasePluginTranslator.js';
 import { CategorySynthesisTranslator } from './translators/CategorySynthesisTranslator.js';
 import { ChronusTranslator } from './translators/ChronusTranslator.js';
 import { CbrEroStatusTranslator } from './translators/CbrEroStatusTranslator.js';
+import { CommonPopupCoreTranslator } from './translators/CommonPopupCoreTranslator.js';
 import { CustomizeConfigItemTranslator } from './translators/CustomizeConfigItemTranslator.js';
 import { ExternMessageTranslator } from './translators/ExternMessageTranslator.js';
-import { FtkrCustomSimpleActorStatusTranslator } from './translators/FtkrCustomSimpleActorStatusTranslator.js';
 import { FtkrItemCompositionSystemTranslator } from './translators/FtkrItemCompositionSystemTranslator.js';
 import { CbrEroStatusMvTranslator } from './translators/CbrEroStatusMvTranslator.js';
 import { DarkPlasmaCharacterTextTranslator } from './translators/DarkPlasmaCharacterTextTranslator.js';
@@ -42,6 +41,7 @@ import { NrpMapTravelTranslator } from './translators/NrpMapTravelTranslator.js'
 import { NuunSaveScreenTranslator } from './translators/NuunSaveScreenTranslator.js';
 import { OriginMenuStatusTranslator } from './translators/OriginMenuStatusTranslator.js';
 import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTextWindowTranslator.js';
+import { PopupMessageTranslator } from './translators/PopupMessageTranslator.js';
 import { QuestSystemTranslator } from './translators/QuestSystemTranslator.js';
 import { SceneCustomMenuTranslator } from './translators/SceneCustomMenuTranslator.js';
 import { SceneGlossaryTranslator } from './translators/SceneGlossaryTranslator.js';
@@ -72,14 +72,13 @@ import { ProfileExtendTranslator } from './translators/ProfileExtendTranslator.j
 class PluginTranslatorRegistry {
     constructor() {
         this.translatorClasses = [
-            ABEnemyBookTranslator,
             AutoNamePopupTranslator,
             CategorySynthesisTranslator,
             ChronusTranslator,
             CbrEroStatusTranslator,
+            CommonPopupCoreTranslator,
             CustomizeConfigItemTranslator,
             ExternMessageTranslator,
-            FtkrCustomSimpleActorStatusTranslator,
             FtkrItemCompositionSystemTranslator,
             CbrEroStatusMvTranslator,
             DarkPlasmaCharacterTextTranslator,
@@ -117,6 +116,7 @@ class PluginTranslatorRegistry {
             PandaProgressTextWindowTranslator,
             PHQuestBookTranslator,
             ProfileExtendTranslator,
+            PopupMessageTranslator,
             QuestSystemTranslator,
             SabaSimpleScenarioTranslator,
             SabaTachieTranslator,
