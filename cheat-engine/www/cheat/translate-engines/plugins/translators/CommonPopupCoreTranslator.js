@@ -1,5 +1,6 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
+import { TAG_BRACKET, TAG_TYPE } from '../../ai-engine/constants.js';
 
 /*
  * CommonPopupCore (Yana) translator.
@@ -21,14 +22,40 @@ const ACTION_ADD = 'add';
 const ACTION_ADD_JA = '表示';
 const COMMAND_COMMON_POPUP = 'commonpopup';
 const COMMAND_COMMON_POPUP_JA = 'ポップアップ';
+const PLUGIN_TAGS = [
+    {
+        description: 'Shows an icon as part of text, will match text size.',
+        type: TAG_TYPE.WITH_CUSTOM_PARAMETER,
+        tagSymbol: 'I',
+        bracket: TAG_BRACKET.SQUARE,
+        maskValue: true,
+        requiredConsistency: true,
+        alwaysTranslate: false,
+        alwaysAddToKnowledgeBase: false,
+    },
+    {
+        description: 'Shows an icon as part of text, will match text size.',
+        type: TAG_TYPE.WITH_CUSTOM_PARAMETER,
+        tagSymbol: 'FS',
+        bracket: TAG_BRACKET.SQUARE,
+        maskValue: false,
+        requiredConsistency: true,
+        alwaysTranslate: false,
+        alwaysAddToKnowledgeBase: false,
+    },
+];
 
 function isCommonPopupCommandName(value) {
-    const commandName = String(value || '').trim().toLowerCase();
+    const commandName = String(value || '')
+        .trim()
+        .toLowerCase();
     return commandName === COMMAND_COMMON_POPUP || commandName === COMMAND_COMMON_POPUP_JA;
 }
 
 function isAddAction(value) {
-    const action = String(value || '').trim().toLowerCase();
+    const action = String(value || '')
+        .trim()
+        .toLowerCase();
     return action === ACTION_ADD || action === ACTION_ADD_JA;
 }
 
@@ -151,6 +178,7 @@ export class CommonPopupCoreTranslator extends BasePluginTranslator {
         ) {
             return false;
         }
+        this.registerPluginCustomTags(PLUGIN_TAGS);
 
         const originalAddPopup = Game_Interpreter.prototype.addPopup;
 
