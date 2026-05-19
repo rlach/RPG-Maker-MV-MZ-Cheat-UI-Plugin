@@ -44,6 +44,7 @@ import { OriginMenuStatusTranslator } from './translators/OriginMenuStatusTransl
 import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTextWindowTranslator.js';
 import { QuestSystemTranslator } from './translators/QuestSystemTranslator.js';
 import { RecollectionForMZTranslator } from './translators/RecollectionForMZTranslator.js';
+import { RecollectionModeTranslator } from './translators/RecollectionModeTranslator.js';
 import { RecollectionModeMZTranslator } from './translators/RecollectionModeMZTranslator.js';
 import { SceneCustomMenuTranslator } from './translators/SceneCustomMenuTranslator.js';
 import { SceneGlossaryTranslator } from './translators/SceneGlossaryTranslator.js';
@@ -120,6 +121,7 @@ class PluginTranslatorRegistry {
             PHQuestBookTranslator,
             QuestSystemTranslator,
             RecollectionForMZTranslator,
+            RecollectionModeTranslator,
             RecollectionModeMZTranslator,
             SabaSimpleScenarioTranslator,
             SabaTachieTranslator,
