@@ -2,7 +2,6 @@ import { BasePluginTranslator } from '../BasePluginTranslator.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_MESSAGE_WINDOW_POPUP_TRANSLATOR_HOOKED__';
 const CACHE_TYPE = 'plugin_message_window_popup';
-const DEBUG_LOG = true;
 const WIDTH_OVERRIDE_EXTRA_PX = 10;
 
 function getTranslatedMessageTextForPopupSizing(runtime, originalText, options = {}) {
@@ -48,19 +47,6 @@ function resolveMeasuredPopupText(runtime, originalText, currentText, options = 
         measuredText: currentText,
         source: 'current',
     };
-}
-
-function debugLog(message, payload) {
-    if (!DEBUG_LOG) {
-        return;
-    }
-
-    if (payload !== undefined) {
-        console.warn(`[MessageWindowPopupTranslator] ${message}`, payload);
-        return;
-    }
-
-    console.warn(`[MessageWindowPopupTranslator] ${message}`);
 }
 
 function computeDesiredPopupWidth(windowMessage, measuredText) {
@@ -116,16 +102,19 @@ export class MessageWindowPopupTranslator extends BasePluginTranslator {
             return true;
         }
 
+        if (window.Window_Message && Window_Message.prototype.processVirtual) {
+            // Exists in v2.14.9 which calculates sizes properly with translated text, so no need to hook.
+            return true;
+        }
+
         if (
             !window.Window_Message ||
             !Window_Message.prototype ||
             typeof Window_Message.prototype.resizeForPopup !== 'function'
         ) {
-            debugLog('Skipped hook install: Window_Message.resizeForPopup is missing');
             return false;
         }
 
-        debugLog('Installing hooks');
         const originalResizeForPopup = Window_Message.prototype.resizeForPopup;
 
         Window_Message.prototype.resizeForPopup = function () {
@@ -143,11 +132,6 @@ export class MessageWindowPopupTranslator extends BasePluginTranslator {
             const popupSizingEnabled = translator.isRuntimeTranslationActive(runtime);
             if (!popupSizingEnabled) {
                 originalResizeForPopup.apply(this, arguments);
-                debugLog('resizeForPopup(skip-disabled)', {
-                    width: this.width,
-                    height: this.height,
-                    currentText,
-                });
                 return;
             }
 
@@ -155,7 +139,7 @@ export class MessageWindowPopupTranslator extends BasePluginTranslator {
                 typeof runtime?.hasCurrentMessagePortrait === 'function'
                     ? runtime.hasCurrentMessagePortrait($gameMessage)
                     : false;
-            const { measuredText, source } = resolveMeasuredPopupText(
+            const { measuredText } = resolveMeasuredPopupText(
                 runtime,
                 originalTextForCache,
                 currentText,
@@ -213,20 +197,6 @@ export class MessageWindowPopupTranslator extends BasePluginTranslator {
                     this._windowRect.width = this.width;
                 }
             }
-
-            debugLog('resizeForPopup', {
-                source,
-                originalTextForCache,
-                currentText,
-                measuredText,
-                width: this.width,
-                height: this.height,
-                outputWidth: probe.outputWidth,
-                startX: probe.startX,
-                outlineWidth,
-                safetyInnerPadding,
-                desiredWidth,
-            });
         };
 
         const originalResetLayout = Window_Message.prototype.resetLayout;
@@ -252,7 +222,7 @@ export class MessageWindowPopupTranslator extends BasePluginTranslator {
                     ? $gameMessage._translateOriginalText
                     : currentText;
             const hasPortrait = runtime?.hasCurrentMessagePortrait($gameMessage) || false;
-            const { measuredText, source } = resolveMeasuredPopupText(
+            const { measuredText } = resolveMeasuredPopupText(
                 runtime,
                 originalTextForCache,
                 currentText,
@@ -261,12 +231,6 @@ export class MessageWindowPopupTranslator extends BasePluginTranslator {
 
             const desiredWidth = computeDesiredPopupWidth(this, measuredText);
             if (!desiredWidth || desiredWidth <= this.width) {
-                debugLog('resetLayout(no-expand)', {
-                    source,
-                    currentWidth: this.width,
-                    desiredWidth,
-                    measuredText,
-                });
                 return;
             }
 
@@ -275,45 +239,7 @@ export class MessageWindowPopupTranslator extends BasePluginTranslator {
                 this._windowRect.width = this.width;
             }
             this.updatePlacement();
-
-            debugLog('resetLayout(expand)', {
-                source,
-                currentText,
-                originalTextForCache,
-                measuredText,
-                desiredWidth,
-                finalWidth: this.width,
-            });
         };
-
-        if (typeof Window_Base?.prototype?.setPopupBasePosition === 'function') {
-            const originalSetPopupBasePosition = Window_Base.prototype.setPopupBasePosition;
-
-            Window_Base.prototype.setPopupBasePosition = function () {
-                originalSetPopupBasePosition.apply(this, arguments);
-
-                if (!DEBUG_LOG) {
-                    return;
-                }
-
-                try {
-                    debugLog('setPopupBasePosition', {
-                        x: this.x,
-                        y: this.y,
-                        width: this.width,
-                        height: this.height,
-                        popupBaseX: this.getPopupBaseX?.() ?? null,
-                        popupBaseY: this.getPopupBaseY?.() ?? null,
-                        popupLeftX: this.findPopupLeftX?.() ?? null,
-                    });
-                } catch (error) {
-                    console.warn(
-                        '[MessageWindowPopupTranslator] Failed to log popup base position',
-                        error
-                    );
-                }
-            };
-        }
 
         window[RUNTIME_HOOK_GUARD] = true;
         return true;
