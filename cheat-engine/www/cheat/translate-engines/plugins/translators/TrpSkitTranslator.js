@@ -101,6 +101,9 @@ export class TRPSkitTranslator extends BasePluginTranslator {
 
     _installSpeakerNameRuntimeHook() {
         if (!window.Game_Message || !Game_Message.prototype) {
+            console.log(
+                '[TRP_Skit Translator] Game_Message not found, cannot install speakerName hook'
+            );
             return false;
         }
 
@@ -113,6 +116,9 @@ export class TRPSkitTranslator extends BasePluginTranslator {
         const originalSpeakerName = Game_Message.prototype.speakerName;
 
         if (typeof originalSpeakerName !== 'function') {
+            if (typeof TRP_CORE === 'object') {
+                return true; // On version 1.2.0 and earlier, there is no speakerName hook.
+            }
             return false;
         }
 
