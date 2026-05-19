@@ -1,6 +1,6 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
-import { normalizeText, parseJsonSafely } from './TranslatorHelpers.js';
+import { parseJsonSafely } from './TranslatorHelpers.js';
 
 /**
  * FTKR_ItemCompositionSystem translator
@@ -64,6 +64,10 @@ const JSON_ARRAY_TEXT_PARAMETER_KEYS = Object.freeze([
     'End Ok Format',
     'End Cancel Format',
 ]);
+
+function normalizeText(value) {
+    return String(value || '').trim();
+}
 
 function getSceneName() {
     const scene = window.SceneManager?._scene;

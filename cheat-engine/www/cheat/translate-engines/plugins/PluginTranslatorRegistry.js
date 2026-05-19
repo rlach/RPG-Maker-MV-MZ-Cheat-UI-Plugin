@@ -37,6 +37,7 @@ import { MppMessageExTranslator } from './translators/MppMessageExTranslator.js'
 import { MultipleWindowSkinSystemTranslator } from './translators/MultipleWindowSkinSystemTranslator.js';
 import { NrpMapTravelTranslator } from './translators/NrpMapTravelTranslator.js';
 import { NuunSaveScreenTranslator } from './translators/NuunSaveScreenTranslator.js';
+import { NuunSaveScreen3Translator } from './translators/NuunSaveScreen3Translator.js';
 import { OriginMenuStatusTranslator } from './translators/OriginMenuStatusTranslator.js';
 import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTextWindowTranslator.js';
 import { QuestSystemTranslator } from './translators/QuestSystemTranslator.js';
@@ -107,6 +108,7 @@ class PluginTranslatorRegistry {
             MultipleWindowSkinSystemTranslator,
             NrpMapTravelTranslator,
             NuunSaveScreenTranslator,
+            NuunSaveScreen3Translator,
             OriginMenuStatusTranslator,
             PandaProgressTextWindowTranslator,
             PHQuestBookTranslator,
