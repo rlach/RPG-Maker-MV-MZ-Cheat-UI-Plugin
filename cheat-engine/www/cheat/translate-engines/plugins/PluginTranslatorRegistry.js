@@ -25,6 +25,7 @@ import { LLGalgeChoiceWindowTranslator } from './translators/LLGalgeChoiceWindow
 import { ManoInputConfigTranslator } from './translators/ManoInputConfigTranslator.js';
 import { LLMenuScreenTranslator } from './translators/LLMenuScreenTranslator.js';
 import { LLStandingPictureTranslator } from './translators/LLStandingPictureTranslator.js';
+import { LiveCommentTranslator } from './translators/LiveCommentTranslator.js';
 import { MgpExternChoicesTranslator } from './translators/MgpExternChoicesTranslator.js';
 import { MogSceneMenuFileRenameTranslator } from './translators/MogSceneMenuFileRenameTranslator.js';
 import { MogSceneMenuTranslator } from './translators/MogSceneMenuTranslator.js';
@@ -97,6 +98,7 @@ class PluginTranslatorRegistry {
             LLGalgeChoiceWindowTranslator,
             LLMenuScreenTranslator,
             LLStandingPictureTranslator,
+            LiveCommentTranslator,
             ManoInputConfigTranslator,
             MgpExternChoicesTranslator,
             MogSceneMenuFileRenameTranslator,
