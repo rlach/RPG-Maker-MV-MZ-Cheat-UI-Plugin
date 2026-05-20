@@ -1,5 +1,35 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
+import { parseJsonSafely } from './TranslatorHelpers.js';
+
+/**
+ * NUUN_SaveScreen translator.
+ *
+ * Supported versions:
+ * - MZ v1.4.1 style: labels are rendered inside drawPlaytime/drawMapName/drawGold/
+ *   drawOriginal_1/drawOriginal_2, with source strings defined by plugin parameters.
+ * - Legacy style: ContentsList.ParamName + SetAnyName plugin command payloads.
+ *
+ * Notes:
+ * - Runtime hooks translate only visible label payloads and AnyName text.
+ * - Dynamic values are not targeted; label hooks intercept only the first drawText call
+ *   inside label renderer methods.
+ */
+
+const LEGACY_COMMAND_SET_ANY_NAME = 'SetAnyName';
+const PARAM_TEXT_FALLBACKS = {
+    PlaytimeName: 'プレイ時間',
+    LocationName: '現在地',
+    MoneyName: '所持金',
+};
+const PARAM_TEXT_KEYS = [
+    'PlaytimeName',
+    'LocationName',
+    'MoneyName',
+    'OriginalName1',
+    'OriginalName2',
+    'AnyDefaultName',
+];
 
 export class NuunSaveScreenTranslator extends BasePluginTranslator {
     constructor() {
@@ -22,26 +52,54 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (!this._hookDrawContentsBase()) {
+        const savefileListProto = window.Window_SavefileList?.prototype;
+        if (!savefileListProto) {
             return false;
         }
-        this._hookDrawAnyName();
-        return true;
-    }
 
-    _hookDrawContentsBase() {
+        const requiredMethods = [
+            'drawContentsBase',
+            'drawAnyName',
+            'drawPlaytime',
+            'drawMapName',
+            'drawGold',
+            'drawOriginal_1',
+            'drawOriginal_2',
+        ];
+
         if (
-            !window.Window_SavefileList ||
-            !Window_SavefileList.prototype ||
-            typeof Window_SavefileList.prototype.drawContentsBase !== 'function'
+            requiredMethods.some(
+                (methodName) => typeof savefileListProto[methodName] !== 'function'
+            )
         ) {
             return false;
         }
 
-        const cacheType = this.getCacheType();
-        const original = Window_SavefileList.prototype.drawContentsBase;
+        if (savefileListProto.__CHEAT_NUUN_SAVE_SCREEN_TRANSLATOR_HOOKED__) {
+            return true;
+        }
 
-        Window_SavefileList.prototype.drawContentsBase = function (
+        this._hookDrawContentsBase(savefileListProto);
+        this._hookDrawAnyName(savefileListProto);
+        this._hookFirstDrawTextOfMethod(savefileListProto, 'drawPlaytime');
+        this._hookFirstDrawTextOfMethod(savefileListProto, 'drawMapName');
+        this._hookFirstDrawTextOfMethod(savefileListProto, 'drawGold');
+        this._hookFirstDrawTextOfMethod(savefileListProto, 'drawOriginal_1');
+        this._hookFirstDrawTextOfMethod(savefileListProto, 'drawOriginal_2');
+
+        savefileListProto.__CHEAT_NUUN_SAVE_SCREEN_TRANSLATOR_HOOKED__ = true;
+        return true;
+    }
+
+    _hookDrawContentsBase(savefileListProto) {
+        const getRuntime = this.getRuntime.bind(this);
+        const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
+        const resolveRuntimeTranslation = this.resolveRuntimeTranslation.bind(this);
+        const isTranslatableCandidate = this._isTranslatableCandidate.bind(this);
+        const cacheType = this.getCacheType();
+        const original = savefileListProto.drawContentsBase;
+
+        savefileListProto.drawContentsBase = function (
             info,
             x,
             y,
@@ -52,26 +110,21 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
         ) {
             let effectiveData = data;
             try {
-                const runtime =
-                    window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
-                const isActive =
-                    runtime &&
-                    (!!(runtime.isTranslationEnabled?.() || runtime.enabled) ||
-                        !!runtime.translateCacheWhenDisabled);
-
+                const runtime = getRuntime();
                 if (
-                    isActive &&
-                    data &&
-                    typeof data.ParamName === 'string' &&
-                    data.ParamName.trim()
+                    isRuntimeTranslationActive(runtime) &&
+                    isTranslatableCandidate(data?.ParamName)
                 ) {
-                    const cacheKey = runtime.getCacheKey(data.ParamName, cacheType);
-                    runtime.trackCacheKeyUsage(cacheKey);
-                    if (runtime.hasUsableCacheValue(cacheKey)) {
-                        const cached = runtime.translationCache.get(cacheKey);
-                        if (typeof cached === 'string' && cached.trim()) {
-                            effectiveData = { ...data, ParamName: cached };
+                    const translated = resolveRuntimeTranslation(
+                        data.ParamName,
+                        runtime,
+                        cacheType,
+                        {
+                            requireRuntimeTranslationActive: true,
                         }
+                    );
+                    if (isTranslatableCandidate(translated)) {
+                        effectiveData = { ...data, ParamName: translated };
                     }
                 }
             } catch (error) {
@@ -83,39 +136,34 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
 
             return original.call(this, info, x, y, width, effectiveData, savefileId, r);
         };
-        return true;
     }
 
-    _hookDrawAnyName() {
-        if (
-            !window.Window_SavefileList ||
-            !Window_SavefileList.prototype ||
-            typeof Window_SavefileList.prototype.drawAnyName !== 'function'
-        ) {
-            return false;
-        }
-
+    _hookDrawAnyName(savefileListProto) {
+        const getRuntime = this.getRuntime.bind(this);
+        const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
+        const resolveRuntimeTranslation = this.resolveRuntimeTranslation.bind(this);
+        const isTranslatableCandidate = this._isTranslatableCandidate.bind(this);
         const cacheType = this.getCacheType();
-        const original = Window_SavefileList.prototype.drawAnyName;
+        const original = savefileListProto.drawAnyName;
 
-        Window_SavefileList.prototype.drawAnyName = function (info, x, y, width, data) {
+        savefileListProto.drawAnyName = function (info, x, y, width, data) {
             let effectiveInfo = info;
             try {
-                const runtime =
-                    window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
-                const isActive =
-                    runtime &&
-                    (!!(runtime.isTranslationEnabled?.() || runtime.enabled) ||
-                        !!runtime.translateCacheWhenDisabled);
-
-                if (isActive && info && typeof info.AnyName === 'string' && info.AnyName.trim()) {
-                    const cacheKey = runtime.getCacheKey(info.AnyName, cacheType);
-                    runtime.trackCacheKeyUsage(cacheKey);
-                    if (runtime.hasUsableCacheValue(cacheKey)) {
-                        const cached = runtime.translationCache.get(cacheKey);
-                        if (typeof cached === 'string' && cached.trim()) {
-                            effectiveInfo = { ...info, AnyName: cached };
+                const runtime = getRuntime();
+                if (
+                    isRuntimeTranslationActive(runtime) &&
+                    isTranslatableCandidate(info?.AnyName)
+                ) {
+                    const translated = resolveRuntimeTranslation(
+                        info.AnyName,
+                        runtime,
+                        cacheType,
+                        {
+                            requireRuntimeTranslationActive: true,
                         }
+                    );
+                    if (isTranslatableCandidate(translated)) {
+                        effectiveInfo = { ...info, AnyName: translated };
                     }
                 }
             } catch (error) {
@@ -127,14 +175,60 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
 
             return original.call(this, effectiveInfo, x, y, width, data);
         };
-        return true;
+    }
+
+    _hookFirstDrawTextOfMethod(savefileListProto, methodName) {
+        const getRuntime = this.getRuntime.bind(this);
+        const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
+        const resolveRuntimeTranslation = this.resolveRuntimeTranslation.bind(this);
+        const isTranslatableCandidate = this._isTranslatableCandidate.bind(this);
+        const cacheType = this.getCacheType();
+        const original = savefileListProto[methodName];
+
+        savefileListProto[methodName] = function (...args) {
+            const runtime = getRuntime();
+            if (!isRuntimeTranslationActive(runtime)) {
+                return original.apply(this, args);
+            }
+
+            const originalDrawText = this['drawText'];
+            if (typeof originalDrawText !== 'function') {
+                return original.apply(this, args);
+            }
+
+            let drawTextCallIndex = 0;
+
+            this.drawText = function (text, ...drawArgs) {
+                drawTextCallIndex += 1;
+                if (drawTextCallIndex === 1 && isTranslatableCandidate(text)) {
+                    const translated = resolveRuntimeTranslation(
+                        text,
+                        runtime,
+                        cacheType,
+                        {
+                            requireRuntimeTranslationActive: true,
+                        }
+                    );
+
+                    return Reflect.apply(originalDrawText, this, [translated, ...drawArgs]);
+                }
+
+                    return Reflect.apply(originalDrawText, this, [text, ...drawArgs]);
+            };
+
+            try {
+                return original.apply(this, args);
+            } finally {
+                this.drawText = originalDrawText;
+            }
+        };
+    }
+
+    _isTranslatableCandidate(value) {
+        return this.isUsableText(value);
     }
 
     async precomputeCounts() {
-        if (!this.ensureDetection()) {
-            return;
-        }
-
         if (this._scanPrepared) {
             return;
         }
@@ -161,11 +255,34 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
     async buildScanEntries() {
         const entries = [];
 
+        this.collectLabelsFromPluginParams(entries);
         this.collectParamNamesFromPluginParams(entries);
         this.collectSetAnyNameFromCommonEvents(entries);
         await this.collectSetAnyNameFromMaps(entries);
 
         return entries;
+    }
+
+    collectLabelsFromPluginParams(output) {
+        const pluginEntry = this.findPluginEntry(this.getPluginName());
+        const params = pluginEntry?.parameters;
+        if (!params || typeof params !== 'object') {
+            return;
+        }
+
+        for (const key of PARAM_TEXT_KEYS) {
+            const configuredText = String(params[key] || '').trim();
+            const fallbackText = String(PARAM_TEXT_FALLBACKS[key] || '').trim();
+            const text = this.isUsableText(configuredText) ? configuredText : fallbackText;
+            if (!this._isTranslatableCandidate(text)) {
+                continue;
+            }
+
+            output.push({
+                text,
+                source: { scope: 'pluginParam', param: key },
+            });
+        }
     }
 
     collectSetAnyNameFromCommonEvents(output) {
@@ -235,14 +352,7 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
     }
 
     collectParamNamesFromPluginParams(output) {
-        if (!Array.isArray(window.$plugins)) {
-            return;
-        }
-
-        const pluginEntry = window.$plugins.find(
-            (p) =>
-                p && typeof p.name === 'string' && p.name.trim().toLowerCase() === 'nuun_savescreen'
-        );
+        const pluginEntry = this.findPluginEntry(this.getPluginName());
 
         if (!pluginEntry?.parameters) {
             return;
@@ -253,17 +363,7 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
             return;
         }
 
-        let parsed;
-        try {
-            parsed = JSON.parse(rawContentsList);
-        } catch (error) {
-            console.warn(
-                '[NuunSaveScreenTranslator] Failed to parse ContentsList parameter',
-                error
-            );
-            return;
-        }
-
+        const parsed = parseJsonSafely(rawContentsList, []);
         if (!Array.isArray(parsed)) {
             return;
         }
@@ -273,20 +373,14 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            let entry;
-            try {
-                entry = JSON.parse(rawEntry);
-            } catch (parseError) {
-                console.warn(
-                    '[NuunSaveScreenTranslator] Failed to parse ContentsList entry',
-                    parseError
-                );
+            const entry = parseJsonSafely(rawEntry, null);
+            if (!entry || typeof entry !== 'object') {
                 continue;
             }
 
             const paramName =
                 entry && typeof entry.ParamName === 'string' ? entry.ParamName.trim() : '';
-            if (paramName) {
+            if (this._isTranslatableCandidate(paramName)) {
                 output.push({
                     text: paramName,
                     source: { scope: 'pluginParam', param: 'ContentsList.ParamName' },
@@ -331,8 +425,8 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
 
         if (
             pluginName.toLowerCase() !== 'nuun_savescreen' ||
-            commandName !== 'SetAnyName' ||
-            !text
+            commandName !== LEGACY_COMMAND_SET_ANY_NAME ||
+            !this._isTranslatableCandidate(text)
         ) {
             return null;
         }
@@ -345,7 +439,7 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!text.trim()) {
+            if (!this._isTranslatableCandidate(text)) {
                 continue;
             }
 
