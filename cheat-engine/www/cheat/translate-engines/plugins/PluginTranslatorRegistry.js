@@ -7,6 +7,7 @@ import { CbrEroStatusTranslator } from './translators/CbrEroStatusTranslator.js'
 import { CustomizeConfigItemTranslator } from './translators/CustomizeConfigItemTranslator.js';
 import { ExternMessageTranslator } from './translators/ExternMessageTranslator.js';
 import { FtkrItemCompositionSystemTranslator } from './translators/FtkrItemCompositionSystemTranslator.js';
+import { FtkrMessageWindowLinesTranslator } from './translators/FTKRMessageWindowLinesTranslator.js';
 import { CbrEroStatusMvTranslator } from './translators/CbrEroStatusMvTranslator.js';
 import { DarkPlasmaCharacterTextTranslator } from './translators/DarkPlasmaCharacterTextTranslator.js';
 import { DTextPictureTranslator } from './translators/DTextPictureTranslator.js';
@@ -83,6 +84,7 @@ class PluginTranslatorRegistry {
             CustomizeConfigItemTranslator,
             ExternMessageTranslator,
             FtkrItemCompositionSystemTranslator,
+            FtkrMessageWindowLinesTranslator,
             CbrEroStatusMvTranslator,
             DarkPlasmaCharacterTextTranslator,
             DTextPictureTranslator,
@@ -303,6 +305,38 @@ class PluginTranslatorRegistry {
         }
 
         return translator.isActive({ runtime });
+    }
+
+    getEventCommandTraversalExtensions(context = {}) {
+        const runtime = context?.runtime || null;
+        this.ensureDetectionStarted({ runtime });
+
+        const extensions = [];
+        for (const translator of this.getDetectedTranslatorInstances()) {
+            if (!translator || typeof translator.getEventCommandTraversalExtension !== 'function') {
+                continue;
+            }
+
+            if (!translator.isActive({ runtime })) {
+                continue;
+            }
+
+            const extension = translator.getEventCommandTraversalExtension(context);
+            if (extension && typeof extension.collectEntriesAt === 'function') {
+                extensions.push(extension);
+            }
+        }
+
+        return extensions;
+    }
+
+    buildEventCommandTraversalOptions(context = {}) {
+        const traversalExtensions = this.getEventCommandTraversalExtensions(context);
+        if (!traversalExtensions.length) {
+            return {};
+        }
+
+        return { traversalExtensions };
     }
 
     resolveMessageCacheSourceText(context = {}) {

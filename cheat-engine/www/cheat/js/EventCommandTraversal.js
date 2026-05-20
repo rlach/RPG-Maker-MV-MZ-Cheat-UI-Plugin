@@ -276,20 +276,104 @@ function applyEntryTransform(entry, transformEntry) {
     return transformed && typeof transformed === 'object' ? transformed : entry;
 }
 
+function buildTraversalExtensionState(extensions, list) {
+    return extensions.map((extension) => {
+        if (typeof extension?.createState !== 'function') {
+            return undefined;
+        }
+
+        return extension.createState({ list });
+    });
+}
+
+function collectWithTraversalExtensions({
+    extensions,
+    extensionStates,
+    list,
+    index,
+    command,
+    pushEntry,
+}) {
+    if (!Array.isArray(extensions) || extensions.length === 0) {
+        return null;
+    }
+
+    for (let extensionIndex = 0; extensionIndex < extensions.length; extensionIndex++) {
+        const extension = extensions[extensionIndex];
+        if (typeof extension?.collectEntriesAt !== 'function') {
+            continue;
+        }
+
+        const result = extension.collectEntriesAt({
+            list,
+            index,
+            command,
+            state: extensionStates[extensionIndex],
+            pushEntry,
+            helpers: {
+                extractMessageEntryAt,
+                extractScrollTextEntryAt,
+                isNonEmptyString,
+            },
+        });
+
+        if (!result || result.handled !== true) {
+            continue;
+        }
+
+        return result;
+    }
+
+    return null;
+}
+
 /**
  * @param {Array} list
- * @param {{ transformEntry?: (entry: any) => any }} [options]
+ * @param {{
+ *   transformEntry?: (entry: any) => any,
+ *   traversalExtensions?: Array<{ createState?: (context: any) => any, collectEntriesAt?: (context: any) => ({handled:boolean,nextIndex?:number}|null|undefined) }>
+ * }} [options]
  */
-export function collectEventCommandEntries(list, { transformEntry } = {}) {
+export function collectEventCommandEntries(
+    list,
+    { transformEntry, traversalExtensions = [] } = {}
+) {
     if (!Array.isArray(list)) {
         return [];
     }
 
     const entries = [];
+    const extensions = Array.isArray(traversalExtensions)
+        ? traversalExtensions.filter(Boolean)
+        : [];
+    const extensionStates = buildTraversalExtensionState(extensions, list);
+
+    const pushEntry = (entry) => {
+        const transformedEntry = applyEntryTransform(entry, transformEntry);
+        if (isNonEmptyString(transformedEntry?.value)) {
+            entries.push(transformedEntry);
+        }
+    };
 
     for (let i = 0; i < list.length; i++) {
         const cmd = list[i];
         if (!cmd || typeof cmd.code !== 'number') {
+            continue;
+        }
+
+        const extensionResult = collectWithTraversalExtensions({
+            extensions,
+            extensionStates,
+            list,
+            index: i,
+            command: cmd,
+            pushEntry,
+        });
+        if (extensionResult?.handled === true) {
+            const nextIndex = Number(extensionResult.nextIndex);
+            if (Number.isInteger(nextIndex) && nextIndex > i) {
+                i = nextIndex - 1;
+            }
             continue;
         }
 
@@ -313,9 +397,7 @@ export function collectEventCommandEntries(list, { transformEntry } = {}) {
                     transformEntry
                 );
 
-                if (isNonEmptyString(speakerEntry.value)) {
-                    entries.push(speakerEntry);
-                }
+                pushEntry(speakerEntry);
             }
 
             if (isNonEmptyString(messageEntry.text)) {
@@ -330,9 +412,7 @@ export function collectEventCommandEntries(list, { transformEntry } = {}) {
                     transformEntry
                 );
 
-                if (isNonEmptyString(textEntry.value)) {
-                    entries.push(textEntry);
-                }
+                pushEntry(textEntry);
             }
 
             continue;
@@ -361,9 +441,7 @@ export function collectEventCommandEntries(list, { transformEntry } = {}) {
                     transformEntry
                 );
 
-                if (isNonEmptyString(choiceEntry.value)) {
-                    entries.push(choiceEntry);
-                }
+                pushEntry(choiceEntry);
             }
 
             continue;
@@ -386,9 +464,7 @@ export function collectEventCommandEntries(list, { transformEntry } = {}) {
                 transformEntry
             );
 
-            if (isNonEmptyString(textEntry.value)) {
-                entries.push(textEntry);
-            }
+            pushEntry(textEntry);
 
             continue;
         }
@@ -411,9 +487,7 @@ export function collectEventCommandEntries(list, { transformEntry } = {}) {
                 transformEntry
             );
 
-            if (isNonEmptyString(nameEntry.value)) {
-                entries.push(nameEntry);
-            }
+            pushEntry(nameEntry);
         }
     }
 

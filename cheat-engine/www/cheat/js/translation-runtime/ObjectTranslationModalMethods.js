@@ -2,7 +2,7 @@ import { TRANSLATE_SETTINGS, TRANSLATOR } from '../TranslateHelper.js';
 import { countEventCommandEntries } from '../EventCommandTraversal.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../../translate-engines/plugins/PluginTranslatorRegistry.js';
-import { normalizeMessageEntryForPlugins } from '../../translate-engines/plugins/PluginMessageEntryNormalizer.js';
+import { buildPluginTraversalOptions } from '../../translate-engines/plugins/PluginMessageEntryNormalizer.js';
 import {
     getSystemMessageCacheKey,
     getSystemMessagesSource,
@@ -323,7 +323,7 @@ export const objectTranslationRuntimeMethods = {
             }
 
             const stats = countEventCommandEntries(entry.list, {
-                transformEntry: (item) => normalizeMessageEntryForPlugins(this, item),
+                ...buildPluginTraversalOptions(this),
                 isUntranslated: (item) =>
                     !this.hasUsableCacheValue(this.getCacheKey(item.value, item.type)),
             });
@@ -347,7 +347,7 @@ export const objectTranslationRuntimeMethods = {
 
     countEventCommandListStats(list = []) {
         return countEventCommandEntries(list, {
-            transformEntry: (item) => normalizeMessageEntryForPlugins(this, item),
+            ...buildPluginTraversalOptions(this),
             isUntranslated: (item) =>
                 !this.hasUsableCacheValue(this.getCacheKey(item.value, item.type)),
         });

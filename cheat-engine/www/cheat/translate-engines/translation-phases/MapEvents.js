@@ -4,7 +4,7 @@ import {
     countEventCommandEntries,
 } from '../../js/EventCommandTraversal.js';
 import { loadMapDataById } from '../../js/translation-runtime/ObjectTranslationModalMethods.js';
-import { normalizeMessageEntryForPlugins } from '../plugins/PluginMessageEntryNormalizer.js';
+import { buildPluginTraversalOptions } from '../plugins/PluginMessageEntryNormalizer.js';
 
 export class MapEvents extends BasePhase {
     static getInstance() {
@@ -29,9 +29,7 @@ export class MapEvents extends BasePhase {
 
     static countEventCommandListStats(runtime, list = []) {
         return countEventCommandEntries(list, {
-            transformEntry(entry) {
-                return normalizeMessageEntryForPlugins(runtime, entry);
-            },
+            ...buildPluginTraversalOptions(runtime),
             isUntranslated(entry) {
                 return !runtime.hasUsableCacheValue(runtime.getCacheKey(entry.value, entry.type));
             },
@@ -156,9 +154,7 @@ export class MapEvents extends BasePhase {
                 }
 
                 const entries = collectEventCommandEntries(page.list, {
-                    transformEntry(entry) {
-                        return normalizeMessageEntryForPlugins(runtime, entry);
-                    },
+                    ...buildPluginTraversalOptions(runtime),
                 });
                 for (const entry of entries) {
                     const cacheKey = runtime.getCacheKey(entry.value, entry.type);
