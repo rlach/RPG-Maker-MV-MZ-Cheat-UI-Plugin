@@ -1,7 +1,11 @@
 import { TAG_BRACKET, TAG_STYLE, TAG_TYPE } from '../../ai-engine/constants.js';
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
-import { extractMessageEntryAt } from '../../../js/EventCommandTraversal.js';
+import {
+    collectEventCommandEntries,
+    extractMessageEntryAt,
+    extractScrollTextEntryAt,
+} from '../../../js/EventCommandTraversal.js';
 
 /**
  * YEP_MessageCore translator.
@@ -10,16 +14,12 @@ import { extractMessageEntryAt } from '../../../js/EventCommandTraversal.js';
  * - MV v1.19 (Yanfly Message Core)
  *
  * Notes:
- * - Mass-translation scanning merges consecutive Show Text blocks (101/401) when
- *   MessageRows is configured above 4, matching YEP's command101 continuation flow.
+ * - Mass-translation scanning builds cumulative keys from contiguous message text
+ *   command runs (Show Text + Scroll Text payload lines), so runtime-combined
+ *   pages from line/window modifiers can match without per-plugin hardcoding.
  * - Runtime translation hooks Window_Message.convertMessageCharacters so final
  *   assembled YEP text can resolve against plugin cache entries.
  */
-
-const SHOW_TEXT_CODE = 101;
-const PLUGIN_COMMAND_CODE = 356;
-const DEFAULT_MESSAGE_ROWS = 4;
-const MESSAGE_ROWS_COMMAND_RE = /^MessageRows\s+(.+)$/i;
 
 const YEP_MESSAGE_CORE_PLUGIN_TAGS = [
     {
@@ -265,7 +265,6 @@ export class YepMessageCoreTranslator extends BasePluginTranslator {
         this._scanPrepared = false;
         this._scanEntries = [];
         this._scanPromise = null;
-        this._defaultMessageRows = null;
     }
 
     getPluginName() {
@@ -320,73 +319,175 @@ export class YepMessageCoreTranslator extends BasePluginTranslator {
         return entries;
     }
 
-    getDefaultMessageRows() {
-        const defaultRows = this._defaultMessageRows;
-        if (typeof defaultRows === 'number' && Number.isInteger(defaultRows) && defaultRows > 0) {
-            return defaultRows;
-        }
-
-        const pluginEntry = this.findPluginEntry(this.getPluginName());
-        const configured = String(pluginEntry?.parameters?.['Default Rows'] || '').trim();
-        const parsed = Number(configured);
-        const fallback = Number.isFinite(parsed) ? Math.floor(parsed) : DEFAULT_MESSAGE_ROWS;
-
-        this._defaultMessageRows = Math.max(1, fallback || DEFAULT_MESSAGE_ROWS);
-        return this._defaultMessageRows;
+    containsLsonTag(text) {
+        return String(text || '')
+            .toLowerCase()
+            .includes(String.raw`\lson`);
     }
 
-    resolveMessageRowsCommandValue(command) {
-        if (!command || Number(command.code) !== PLUGIN_COMMAND_CODE) {
-            return null;
-        }
-
-        const raw = String(command.parameters?.[0] || '').trim();
-        if (!raw) {
-            return null;
-        }
-
-        const match = MESSAGE_ROWS_COMMAND_RE.exec(raw);
-        if (!match) {
-            return null;
-        }
-
-        const parsed = Number(String(match[1] || '').trim());
-        if (!Number.isFinite(parsed)) {
-            return null;
-        }
-
-        return Math.max(1, Math.floor(parsed));
+    containsLsoffTag(text) {
+        return String(text || '')
+            .toLowerCase()
+            .includes(String.raw`\lsoff`);
     }
 
-    buildMergedMessageEntry(list, startIndex, currentRows) {
-        const first = extractMessageEntryAt(list, startIndex);
-        if (!first) {
-            return null;
+    readTextEntryAt(list, startIndex) {
+        const messageEntry = extractMessageEntryAt(list, startIndex);
+        if (messageEntry) {
+            return {
+                type: messageEntry.hasPortrait ? 'message_portrait' : 'message',
+                value: String(messageEntry.text || ''),
+                nextIndex: messageEntry.nextIndex,
+                command: messageEntry.command,
+            };
         }
 
-        let mergedText = String(first.text || '');
-        let nextIndex = first.nextIndex;
-        let mergedSegments = 1;
+        const scrollEntry = extractScrollTextEntryAt(list, startIndex);
+        if (scrollEntry) {
+            return {
+                type: 'message',
+                value: String(scrollEntry.text || ''),
+                nextIndex: scrollEntry.nextIndex,
+                command: scrollEntry.command,
+            };
+        }
 
-        if (currentRows > DEFAULT_MESSAGE_ROWS) {
-            while (nextIndex < list.length && list[nextIndex]?.code === SHOW_TEXT_CODE) {
-                const nextMessage = extractMessageEntryAt(list, nextIndex);
-                if (!nextMessage) {
-                    break;
-                }
+        return null;
+    }
 
-                const nextText = String(nextMessage.text || '');
-                mergedText = mergedText ? `${mergedText}\n${nextText}` : nextText;
-                nextIndex = nextMessage.nextIndex;
-                mergedSegments += 1;
+    hasAnotherTextCommandAhead(list, fromIndex) {
+        if (!Array.isArray(list)) {
+            return false;
+        }
+
+        for (let i = Math.max(0, Number(fromIndex) || 0); i < list.length; i++) {
+            const code = Number(list[i]?.code);
+            if (code === 101 || code === 105) {
+                return true;
+            }
+
+            if (code === 0) {
+                return false;
             }
         }
 
-        return {
-            text: mergedText,
-            hasPortrait: !!first.hasPortrait,
+        return false;
+    }
+
+    emitTextEntry({ pushEntry, type, value, cmdIndex, nextIndex, mergedSegments, command }) {
+        if (!this.isUsableText(value)) {
+            return;
+        }
+
+        pushEntry({
+            type,
+            value,
+            cmdIndex,
             nextIndex,
             mergedSegments,
+            command,
+        });
+    }
+
+    resetLsonState(state) {
+        state.active = false;
+        state.type = 'message';
+        state.value = '';
+        state.startIndex = -1;
+        state.startCommand = null;
+        state.mergedSegments = 0;
+    }
+
+    appendToLsonState(state, entry, startIndex) {
+        if (!state.active) {
+            state.active = true;
+            state.type = entry.type;
+            state.value = entry.value;
+            state.startIndex = startIndex;
+            state.startCommand = entry.command;
+            state.mergedSegments = 1;
+            return;
+        }
+
+        state.value = state.value ? `${state.value}\n${entry.value}` : entry.value;
+        state.mergedSegments += 1;
+    }
+
+    collectMessageCoreTextEntry(list, startIndex, state, pushEntry, command) {
+        const entry = this.readTextEntryAt(list, startIndex);
+        if (!entry) {
+            return null;
+        }
+
+        const startsLson = this.containsLsonTag(entry.value);
+        const endsLson = this.containsLsoffTag(entry.value);
+
+        if (state.active) {
+            this.appendToLsonState(state, entry, startIndex);
+
+            const shouldClose =
+                endsLson || !this.hasAnotherTextCommandAhead(list, Number(entry.nextIndex) || 0);
+            if (shouldClose) {
+                this.emitTextEntry({
+                    pushEntry,
+                    type: state.type,
+                    value: state.value,
+                    cmdIndex: state.startIndex,
+                    nextIndex: entry.nextIndex,
+                    mergedSegments: state.mergedSegments,
+                    command: state.startCommand || command,
+                });
+                this.resetLsonState(state);
+            }
+
+            return {
+                handled: true,
+                nextIndex: Math.max(startIndex + 1, Number(entry.nextIndex) || startIndex + 1),
+            };
+        }
+
+        if (startsLson && !endsLson) {
+            this.appendToLsonState(state, entry, startIndex);
+            return {
+                handled: true,
+                nextIndex: Math.max(startIndex + 1, Number(entry.nextIndex) || startIndex + 1),
+            };
+        }
+
+        this.emitTextEntry({
+            pushEntry,
+            type: entry.type,
+            value: entry.value,
+            cmdIndex: startIndex,
+            nextIndex: entry.nextIndex,
+            mergedSegments: 1,
+            command,
+        });
+
+        return {
+            handled: true,
+            nextIndex: Math.max(startIndex + 1, Number(entry.nextIndex) || startIndex + 1),
+        };
+    }
+
+    getEventCommandTraversalExtension() {
+        return {
+            createState: () => ({
+                active: false,
+                type: 'message',
+                value: '',
+                startIndex: -1,
+                startCommand: null,
+                mergedSegments: 0,
+            }),
+            collectEntriesAt: ({ list, index, state, pushEntry, command }) =>
+                this.collectMessageCoreTextEntry(list, index, state, pushEntry, command),
+        };
+    }
+
+    getScanTraversalOptions() {
+        return {
+            traversalExtensions: [this.getEventCommandTraversalExtension()],
         };
     }
 
@@ -395,47 +496,26 @@ export class YepMessageCoreTranslator extends BasePluginTranslator {
             return;
         }
 
-        let messageRows = this.getDefaultMessageRows();
-        let i = 0;
-        while (i < list.length) {
-            const command = list[i];
-            if (!command) {
-                i += 1;
+        const entries = collectEventCommandEntries(list, this.getScanTraversalOptions());
+        for (const entry of entries) {
+            if (entry.type !== 'message' && entry.type !== 'message_portrait') {
                 continue;
             }
 
-            const nextRows = this.resolveMessageRowsCommandValue(command);
-            if (nextRows !== null) {
-                messageRows = nextRows;
-                i += 1;
+            const text = String(entry.value || '');
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
-            if (Number(command.code) !== SHOW_TEXT_CODE) {
-                i += 1;
-                continue;
-            }
-
-            const merged = this.buildMergedMessageEntry(list, i, messageRows);
-            if (!merged) {
-                i += 1;
-                continue;
-            }
-
-            if (this.isUsableText(merged.text)) {
-                output.push({
-                    text: merged.text,
-                    cacheType: merged.hasPortrait ? 'message_portrait' : 'message',
-                    source: {
-                        ...baseSource,
-                        cmdIndex: i,
-                        mergedSegments: merged.mergedSegments,
-                        messageRows,
-                    },
-                });
-            }
-
-            i = Math.max(i + 1, merged.nextIndex);
+            output.push({
+                text,
+                cacheType: entry.type,
+                source: {
+                    ...baseSource,
+                    cmdIndex: entry.cmdIndex,
+                    mergedSegments: Number(entry.mergedSegments) || 1,
+                },
+            });
         }
     }
 

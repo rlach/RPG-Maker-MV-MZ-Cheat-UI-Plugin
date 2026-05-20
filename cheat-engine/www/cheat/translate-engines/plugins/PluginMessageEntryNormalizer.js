@@ -24,3 +24,15 @@ export function normalizeMessageEntryForPlugins(runtime, entry) {
 
     return { ...entry, value: normalized };
 }
+
+export function buildPluginTraversalOptions(runtime, context = {}) {
+    return {
+        ...PLUGIN_TRANSLATOR_REGISTRY.buildEventCommandTraversalOptions({
+            ...context,
+            runtime,
+        }),
+        transformEntry(entry) {
+            return normalizeMessageEntryForPlugins(runtime, entry);
+        },
+    };
+}

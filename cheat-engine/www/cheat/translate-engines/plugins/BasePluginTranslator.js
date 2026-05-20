@@ -142,6 +142,20 @@ export class BasePluginTranslator extends BasePhase {
     }
 
     /**
+     * Optional hook point for extending shared event-command traversal.
+     * Return an object with collectEntriesAt(context) and optional createState(context).
+     *
+     * collectEntriesAt return contract:
+     * - null/undefined: no handling, shared traversal continues normally.
+     * - { handled: true, nextIndex?: number }: traversal handled at current index.
+     *
+     * @returns {object|null}
+     */
+    getEventCommandTraversalExtension(_context = {}) {
+        return null;
+    }
+
+    /**
      * @param {object} _context
      * @returns {string|null}
      */

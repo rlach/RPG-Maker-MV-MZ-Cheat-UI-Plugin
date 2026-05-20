@@ -1,6 +1,6 @@
 import { BasePhase } from './BasePhase.js';
 import { collectEventCommandEntries } from '../../js/EventCommandTraversal.js';
-import { normalizeMessageEntryForPlugins } from '../plugins/PluginMessageEntryNormalizer.js';
+import { buildPluginTraversalOptions } from '../plugins/PluginMessageEntryNormalizer.js';
 
 function isMessageTextType(type) {
     return type === 'message' || type === 'message_portrait';
@@ -226,9 +226,7 @@ export class CurrentEvent extends BasePhase {
 
         const list = interpreter._list;
         const entries = collectEventCommandEntries(list, {
-            transformEntry(entry) {
-                return normalizeMessageEntryForPlugins(runtime, entry);
-            },
+            ...buildPluginTraversalOptions(runtime),
         });
 
         if (!entries.length) {
