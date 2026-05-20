@@ -38,6 +38,7 @@ import { NameBoxNoUseTranslator } from './translators/NameBoxNoUseTranslator.js'
 import { MppChoiceExTranslator } from './translators/MppChoiceExTranslator.js';
 import { MppMessageExTranslator } from './translators/MppMessageExTranslator.js';
 import { MultipleWindowSkinSystemTranslator } from './translators/MultipleWindowSkinSystemTranslator.js';
+import { NekoGakuenMulitLanguageTranslator } from './translators/NekoGakuenMulitLanguageTranslator.js';
 import { NrpMapTravelTranslator } from './translators/NrpMapTravelTranslator.js';
 import { NuunSaveScreenTranslator } from './translators/NuunSaveScreenTranslator.js';
 import { NuunSaveScreen3Translator } from './translators/NuunSaveScreen3Translator.js';
@@ -115,6 +116,7 @@ class PluginTranslatorRegistry {
             MppChoiceExTranslator,
             MppMessageExTranslator,
             MultipleWindowSkinSystemTranslator,
+            NekoGakuenMulitLanguageTranslator,
             NrpMapTravelTranslator,
             NuunSaveScreenTranslator,
             NuunSaveScreen3Translator,
