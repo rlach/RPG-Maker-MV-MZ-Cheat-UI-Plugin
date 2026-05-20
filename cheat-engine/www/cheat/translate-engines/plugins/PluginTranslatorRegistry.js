@@ -13,6 +13,7 @@ import { DarkPlasmaCharacterTextTranslator } from './translators/DarkPlasmaChara
 import { DTextPictureTranslator } from './translators/DTextPictureTranslator.js';
 import { DynamicDatabaseTranslator } from './translators/DynamicDatabaseTranslator.js';
 import { EventLabelTranslator } from './translators/EventLabelTranslator.js';
+import { EventInformationTranslator } from './translators/EventInformationTranslator.js';
 import { ExtraWindowTranslator } from './translators/ExtraWindowTranslator.js';
 import { GetInformationTranslator } from './translators/GetInformationTranslator.js';
 import { HelpWindowPluginTranslator } from './translators/HelpWindowPluginTranslator.js';
@@ -91,6 +92,7 @@ class PluginTranslatorRegistry {
             DTextPictureTranslator,
             DynamicDatabaseTranslator,
             EventLabelTranslator,
+            EventInformationTranslator,
             ExtraWindowTranslator,
             GetInformationTranslator,
             HelpWindowPluginTranslator,
