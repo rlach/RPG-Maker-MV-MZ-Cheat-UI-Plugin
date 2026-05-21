@@ -466,7 +466,11 @@ export default {
 
             // 1. Default tags from TAG_CONFIGS
             const engine = this._runtime?.engine;
-            for (const tag of TAG_CONFIGS) {
+            const defaultTagsForUi =
+                engine && typeof engine.getDefaultTagConfigsForUi === 'function'
+                    ? engine.getDefaultTagConfigsForUi()
+                    : TAG_CONFIGS;
+            for (const tag of defaultTagsForUi) {
                 entries.push({
                     tagDisplay: this.formatTagDisplay(tag),
                     tagSource: 'default',
@@ -532,6 +536,10 @@ export default {
         },
 
         formatTagDisplay(tag) {
+            if (tag?._isSimpleNTag) {
+                return '[b=sn]';
+            }
+
             const sym = tag.tagSymbol || '?';
             if (tag.style === 'xml') {
                 if (tag.type === 'withNumericParameter') return `<${sym}:N>`;

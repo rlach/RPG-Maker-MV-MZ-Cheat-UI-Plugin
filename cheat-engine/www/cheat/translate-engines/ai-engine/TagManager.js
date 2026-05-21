@@ -29,6 +29,8 @@ const LONG_RUN_TAG_CONFIGS = Object.freeze([
     { tagId: 'sp', character: ' ' },
     { tagId: 'sw', character: '　' },
 ]);
+const SIMPLE_NEWLINE_PROMPT_DEFAULT =
+    'This tag represents newline, put it in places where newline typically would appear';
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 
@@ -49,15 +51,41 @@ export class TagManager {
             key: 'simpleN',
             description: 'simpleN',
             tagId: 'sn',
-            requiredConsistency: false,
+            requiredConsistency: true,
             addSpace: false,
+            reservedWidth: 0,
+            extraPromptForLlm: SIMPLE_NEWLINE_PROMPT_DEFAULT,
             prePattern: /\n/g,
             postPattern: /\[b=sn\]/g,
+        };
+        this.simpleNConfig = {
+            requiredConsistency: true,
+            reservedWidth: 0,
+            extraPromptForLlm: SIMPLE_NEWLINE_PROMPT_DEFAULT,
         };
         this.spaceRunEntry = null;
         this.baseTagConfigs = TAG_CONFIGS.map(cloneTagConfig);
         this.customTagConfigs = [];
         this.initializeTagRegistry();
+    }
+
+    setSimpleNConfig(config = {}, options = {}) {
+        const parsedReservedWidth = Number(config?.reservedWidth);
+        const normalizedPrompt =
+            typeof config?.extraPromptForLlm === 'string' ? config.extraPromptForLlm.trim() : '';
+
+        this.simpleNConfig = {
+            requiredConsistency: config?.requiredConsistency === true,
+            reservedWidth:
+                Number.isFinite(parsedReservedWidth) && parsedReservedWidth > 0
+                    ? Math.floor(parsedReservedWidth)
+                    : 0,
+            extraPromptForLlm: normalizedPrompt || SIMPLE_NEWLINE_PROMPT_DEFAULT,
+        };
+
+        if (options?.reinitialize !== false) {
+            this.initializeTagRegistry();
+        }
     }
 
     buildNormalizedLongRunTagConfigs() {
@@ -212,8 +240,10 @@ export class TagManager {
             key: 'simpleN',
             description: 'simpleN',
             tagId: simpleNId,
-            requiredConsistency: false,
+            requiredConsistency: this.simpleNConfig.requiredConsistency === true,
             addSpace: false,
+            reservedWidth: this.simpleNConfig.reservedWidth,
+            extraPromptForLlm: this.simpleNConfig.extraPromptForLlm,
             prePattern: /\n/g,
             postPattern: new RegExp(String.raw`\[b=${simpleNId}\]`, 'g'),
         };
@@ -1177,6 +1207,18 @@ export class TagManager {
 
             const compactPrompt = extraPrompt.replace(/\s+/g, ' ').trim();
             result.push(`b=${entry.tagId} - ${compactPrompt}`);
+        }
+
+        const newlinePrompt =
+            typeof this.simpleNEntry?.extraPromptForLlm === 'string'
+                ? this.simpleNEntry.extraPromptForLlm.trim()
+                : '';
+        if (
+            newlinePrompt &&
+            texts.some((t) => typeof t === 'string' && t.includes(`[b=${this.simpleNEntry.tagId}]`))
+        ) {
+            const compactPrompt = newlinePrompt.replace(/\s+/g, ' ').trim();
+            result.push(`b=${this.simpleNEntry.tagId} - ${compactPrompt}`);
         }
 
         return result;

@@ -19,6 +19,7 @@ import {
     TYPE_TO_TAG,
     TAG_CONFIGS,
     TAG_BRACKET_OPTIONS,
+    SIMPLE_NEWLINE_TAG_CONFIG,
     TAG_TYPE_OPTIONS,
     TAG_STYLE_OPTIONS,
     TAG_OVERRIDABLE_FIELDS,
@@ -410,6 +411,14 @@ class AIEngine extends BaseTranslationEngine {
         };
     }
 
+    getSimpleNewlineTagConfig() {
+        return this.applyTagOverrides(SIMPLE_NEWLINE_TAG_CONFIG, 'default', '');
+    }
+
+    getDefaultTagConfigsForUi() {
+        return [...TAG_CONFIGS.map((tag) => this.applyTagOverrides(tag, 'default', '')), this.getSimpleNewlineTagConfig()];
+    }
+
     /** Merge plugin + user custom tags and push to TagManager. */
     _refreshTagManager() {
         const defaultTags = TAG_CONFIGS.map((tag) => this.applyTagOverrides(tag, 'default', ''));
@@ -421,6 +430,7 @@ class AIEngine extends BaseTranslationEngine {
         );
         this.tagManager.setBaseTagConfigs(defaultTags);
         this.tagManager.setCustomTagConfigs([...pluginTags, ...customTags]);
+        this.tagManager.setSimpleNConfig(this.getSimpleNewlineTagConfig());
     }
 
     setCustomTags(tags) {
@@ -1639,6 +1649,8 @@ class AIEngine extends BaseTranslationEngine {
     }
 
     validateNewlineCounts(item, postprocessResult) {
+        const newlineTagConfig = this.getSimpleNewlineTagConfig();
+        const shouldValidateConsistency = newlineTagConfig.requiredConsistency === true;
         const expectedNewlineCount = this.getNewlineCountFromTagCounts(item?.tagCounts);
         const actualNewlineCount = this.getNewlineCountFromTagCounts(postprocessResult?.actualCounts);
         const isDescription = this.isDescriptionType(item?.type);
@@ -1652,6 +1664,10 @@ class AIEngine extends BaseTranslationEngine {
                     errorReason: 'Newlines outside box',
                 };
             }
+            return { valid: true };
+        }
+
+        if (!shouldValidateConsistency) {
             return { valid: true };
         }
 

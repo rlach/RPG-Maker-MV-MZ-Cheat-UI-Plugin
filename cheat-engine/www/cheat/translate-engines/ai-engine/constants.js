@@ -54,6 +54,18 @@ export const TAG_OVERRIDABLE_FIELDS = Object.freeze([
     'requiredConsistency',
 ]);
 
+export const SIMPLE_NEWLINE_TAG_CONFIG = Object.freeze({
+    description: 'Represents a newline marker in encoded text.',
+    type: TAG_TYPE.WITHOUT_PARAMETER,
+    style: TAG_STYLE.ESCAPE,
+    tagSymbol: 'sn',
+    requiredConsistency: true,
+    reservedWidth: 0,
+    extraPromptForLlm:
+        'This tag represents newline, put it in places where newline typically would appear',
+    _isSimpleNTag: true,
+});
+
 // Base tag configuration. Regex patterns are generated once in TagManager initialization.
 export const TAG_CONFIGS = [
     {
