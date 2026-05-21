@@ -1301,6 +1301,16 @@ class AIEngine extends BaseTranslationEngine {
                     continue;
                 }
 
+                const newlineValidation = this.validateNewlineCounts(itemD, postprocessResult);
+                if (!newlineValidation.valid) {
+                    failures.push({
+                        ...itemD,
+                        rejectReason: newlineValidation.errorReason,
+                        cancelReason: shouldPreserveCancelReason ? cancelReason : null,
+                    });
+                    continue;
+                }
+
                 const finalTranslated = this.postprocessTranslatedItem(
                     itemD,
                     postprocessResult.text
@@ -1603,6 +1613,46 @@ class AIEngine extends BaseTranslationEngine {
         }
 
         return baseProcessed;
+    }
+
+    getNewlineCountFromTagCounts(counts) {
+        const parsed = Number(counts?.simpleN);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+    }
+
+    getDescriptionBoxMaxRows() {
+        const parsed = Number(this.runtime?.descriptionMaxRows);
+        if (!Number.isFinite(parsed) || parsed <= 0) {
+            return 2;
+        }
+        return Math.max(1, Math.floor(parsed));
+    }
+
+    validateNewlineCounts(item, postprocessResult) {
+        const expectedNewlineCount = this.getNewlineCountFromTagCounts(item?.tagCounts);
+        const actualNewlineCount = this.getNewlineCountFromTagCounts(postprocessResult?.actualCounts);
+        const isDescription = this.isDescriptionType(item?.type);
+        const hasDescriptionBoxPrompt = !!this.runtime?.addBoxWidthInfoToLlmPrompt;
+
+        if (isDescription && hasDescriptionBoxPrompt) {
+            const maxRows = this.getDescriptionBoxMaxRows();
+            if (actualNewlineCount >= maxRows) {
+                return {
+                    valid: false,
+                    errorReason: 'Newlines outside box',
+                };
+            }
+            return { valid: true };
+        }
+
+        if (actualNewlineCount !== expectedNewlineCount) {
+            return {
+                valid: false,
+                errorReason: 'Newline count mismatch',
+            };
+        }
+
+        return { valid: true };
     }
 
     getRequestHeaders() {
