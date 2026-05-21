@@ -230,9 +230,7 @@ export async function evaluateCustomTranslatorConsent() {
 
     if (userDecision === 'allow') {
         storeConsent('allow', fingerprint, files.length);
-        console.log(
-            `[CustomTranslatorConsent] User approved ${files.length} custom translator(s)`
-        );
+        console.log(`[CustomTranslatorConsent] User approved ${files.length} custom translator(s)`);
     } else if (userDecision === 'deny-permanent') {
         storeConsent('deny-permanent', fingerprint, files.length);
         console.log(
