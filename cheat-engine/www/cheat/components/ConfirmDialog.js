@@ -11,7 +11,7 @@ export default {
         content-class="cheat-confirm-dialog"
     >
     <v-card
-        dark 
+        dark
         class="pt-4">
       <v-card-text
         class="subtitle-1">

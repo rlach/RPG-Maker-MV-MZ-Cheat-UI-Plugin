@@ -154,9 +154,7 @@ export async function loadCustomTranslators(files, registry) {
                     registry.translatorClasses.push(cls);
                     existingPluginNames.add(pluginName);
                     loadedCount += 1;
-                    console.log(
-                        `[CustomTranslatorLoader] Loaded "${pluginName}" from ${filename}`
-                    );
+                    console.log(`[CustomTranslatorLoader] Loaded "${pluginName}" from ${filename}`);
                 } catch (error) {
                     console.warn(
                         `[CustomTranslatorLoader] Failed to validate ${filename}:${exportName}`,
