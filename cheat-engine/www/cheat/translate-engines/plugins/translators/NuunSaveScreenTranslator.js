@@ -6,6 +6,7 @@ import { parseJsonSafely } from './TranslatorHelpers.js';
  * NUUN_SaveScreen translator.
  *
  * Supported versions:
+ * - MZ v2.1.3
  * - MZ v1.4.1 style: labels are rendered inside drawPlaytime/drawMapName/drawGold/
  *   drawOriginal_1/drawOriginal_2, with source strings defined by plugin parameters.
  * - Legacy style: ContentsList.ParamName + SetAnyName plugin command payloads.
@@ -54,6 +55,7 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
     enablePluginTranslation() {
         const savefileListProto = window.Window_SavefileList?.prototype;
         if (!savefileListProto) {
+            console.log('[NuunSaveScreenTranslator] Window_SavefileList not found');
             return false;
         }
 
@@ -63,8 +65,6 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
             'drawPlaytime',
             'drawMapName',
             'drawGold',
-            'drawOriginal_1',
-            'drawOriginal_2',
         ];
 
         if (
@@ -72,6 +72,12 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
                 (methodName) => typeof savefileListProto[methodName] !== 'function'
             )
         ) {
+            console.log(
+                '[NuunSaveScreenTranslator] Required methods not found',
+                requiredMethods.filter(
+                    (methodName) => typeof savefileListProto[methodName] !== 'function'
+                )
+            );
             return false;
         }
 
@@ -99,15 +105,7 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
         const cacheType = this.getCacheType();
         const original = savefileListProto.drawContentsBase;
 
-        savefileListProto.drawContentsBase = function (
-            info,
-            x,
-            y,
-            width,
-            data,
-            savefileId,
-            r
-        ) {
+        savefileListProto.drawContentsBase = function (info, x, y, width, data, savefileId, r) {
             let effectiveData = data;
             try {
                 const runtime = getRuntime();
@@ -150,18 +148,10 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
             let effectiveInfo = info;
             try {
                 const runtime = getRuntime();
-                if (
-                    isRuntimeTranslationActive(runtime) &&
-                    isTranslatableCandidate(info?.AnyName)
-                ) {
-                    const translated = resolveRuntimeTranslation(
-                        info.AnyName,
-                        runtime,
-                        cacheType,
-                        {
-                            requireRuntimeTranslationActive: true,
-                        }
-                    );
+                if (isRuntimeTranslationActive(runtime) && isTranslatableCandidate(info?.AnyName)) {
+                    const translated = resolveRuntimeTranslation(info.AnyName, runtime, cacheType, {
+                        requireRuntimeTranslationActive: true,
+                    });
                     if (isTranslatableCandidate(translated)) {
                         effectiveInfo = { ...info, AnyName: translated };
                     }
@@ -185,6 +175,10 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
         const cacheType = this.getCacheType();
         const original = savefileListProto[methodName];
 
+        if (typeof original !== 'function') {
+            return;
+        }
+
         savefileListProto[methodName] = function (...args) {
             const runtime = getRuntime();
             if (!isRuntimeTranslationActive(runtime)) {
@@ -201,19 +195,14 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
             this.drawText = function (text, ...drawArgs) {
                 drawTextCallIndex += 1;
                 if (drawTextCallIndex === 1 && isTranslatableCandidate(text)) {
-                    const translated = resolveRuntimeTranslation(
-                        text,
-                        runtime,
-                        cacheType,
-                        {
-                            requireRuntimeTranslationActive: true,
-                        }
-                    );
+                    const translated = resolveRuntimeTranslation(text, runtime, cacheType, {
+                        requireRuntimeTranslationActive: true,
+                    });
 
                     return Reflect.apply(originalDrawText, this, [translated, ...drawArgs]);
                 }
 
-                    return Reflect.apply(originalDrawText, this, [text, ...drawArgs]);
+                return Reflect.apply(originalDrawText, this, [text, ...drawArgs]);
             };
 
             try {
