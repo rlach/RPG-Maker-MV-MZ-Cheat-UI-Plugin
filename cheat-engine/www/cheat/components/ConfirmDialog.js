@@ -7,6 +7,7 @@ export default {
         v-model="showDialog"
         v-if="options"
         :width="options.width"
+        :persistent="!!options.persistent"
         content-class="cheat-confirm-dialog"
     >
     <v-card
@@ -14,10 +15,21 @@ export default {
         class="pt-4">
       <v-card-text
         class="subtitle-1">
-        <template v-for="(msg, idx) in messageArray">
+        <template v-if="options.messageHtml">
+          <div v-html="options.messageHtml"></div>
+        </template>
+        <template v-else v-for="(msg, idx) in messageArray">
           <span :key="idx">{{msg}}</span>
           <br :key="-idx - 1"/>
         </template>
+        <v-checkbox
+          v-if="options.checkboxLabel"
+          v-model="checkboxChecked"
+          :label="options.checkboxLabel"
+          class="mt-3"
+          hide-details
+          dense
+        ></v-checkbox>
       </v-card-text>
 
       <v-card-actions>
@@ -28,6 +40,7 @@ export default {
           text
           class="font-weight-bold"
           :color="action.color"
+          :disabled="action.requiresCheckbox && !checkboxChecked"
           @click="action.action">
           <v-icon
             v-if="!action.iconRight"
@@ -48,7 +61,7 @@ export default {
 
     data: () => ({
         showDialog: false,
-
+        checkboxChecked: false,
         options: undefined,
     }),
 
@@ -87,6 +100,7 @@ export default {
             const opt = this.defaultSettings();
             this.copyObjectProps(options, opt);
             this.options = opt;
+            this.checkboxChecked = false;
             this.showDialog = true;
         },
 

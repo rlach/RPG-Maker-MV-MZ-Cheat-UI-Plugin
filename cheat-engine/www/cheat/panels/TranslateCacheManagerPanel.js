@@ -10,6 +10,10 @@ import { computeLangPairCompletionByKeyLength } from '../js/TranslationCompletio
 import { ConfirmDialog } from '../js/DialogHelper.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
 import { BOXING_SERVICE } from '../components/BoxingModal.js';
+import {
+    clearConsentForCurrentGame,
+    scanCustomScriptFiles,
+} from '../js/CustomTranslatorConsent.js';
 
 const cacheManagerTableStateMemory = {
     sortBy: 'seenSort',
@@ -50,6 +54,14 @@ export default {
                     color="secondary"
                     @click="openBoxingModal">
                     Boxing...
+                </v-btn>
+                <v-btn
+                    v-if="hasCustomTranslatorScripts"
+                    small
+                    text
+                    color="warning"
+                    @click="resetCustomTranslatorConsent">
+                    Reset script consent
                 </v-btn>
             </div>
         </div>
@@ -257,6 +269,7 @@ export default {
             refreshTimer: null,
             searchDebounceTimer: null,
             isTranslatingEmptyStrings: false,
+            hasCustomTranslatorScripts: scanCustomScriptFiles().length > 0,
             tableHeaders: [
                 {
                     text: 'Seen',
@@ -825,6 +838,15 @@ export default {
 
         openBoxingModal() {
             BOXING_SERVICE.openModal();
+        },
+
+        resetCustomTranslatorConsent() {
+            clearConsentForCurrentGame();
+            if (window.Alert && typeof window.Alert.info === 'function') {
+                window.Alert.info(
+                    'Custom translator consent has been reset. Restart the game to re-evaluate.'
+                );
+            }
         },
 
         async translateEmptyStrings() {

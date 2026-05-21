@@ -10,6 +10,8 @@ import { MessageCheat } from '../js/CheatHelper.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../translate-engines/plugins/PluginTranslatorRegistry.js';
 import { ensureHacksRuntime } from '../js/HacksRuntime.js';
 import { getRpgMakerName } from '../js/RpgMakerRuntime.js';
+import { evaluateCustomTranslatorConsent } from '../js/CustomTranslatorConsent.js';
+import { loadCustomTranslators } from '../js/CustomTranslatorLoader.js';
 
 function getMissingBootstrapDependencies() {
     const missing = [];
@@ -144,8 +146,18 @@ async function bootstrapCheatUi() {
 
     // Detection must start at bootstrap so runtime hooks mount early.
     // Count precompute stays lazy and is still triggered only by modal/phase flow.
-    setTimeout(() => {
+    setTimeout(async () => {
         const runtime = ensureTranslateOnTheFlyRuntimeWithRetry({ maxAttempts: 10, delayMs: 500 });
+
+        try {
+            const consent = await evaluateCustomTranslatorConsent();
+            if (consent.approved && consent.files.length > 0) {
+                await loadCustomTranslators(consent.files, PLUGIN_TRANSLATOR_REGISTRY);
+            }
+        } catch (error) {
+            console.warn('[Cheat] Custom translator consent/load failed', error);
+        }
+
         PLUGIN_TRANSLATOR_REGISTRY.ensureDetectionStarted({ runtime });
     }, 0);
 }
