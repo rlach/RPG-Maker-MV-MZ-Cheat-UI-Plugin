@@ -1325,6 +1325,16 @@ class AIEngine extends BaseTranslationEngine {
                 });
             }
 
+            if (failures.length > 0) {
+                console.warn(
+                    '[AIEngine] Batch item failures:',
+                    failures.map((failure) => ({
+                        key: failure.jsonKey || failure.id || failure.cacheKey || failure.type,
+                        reason: failure.rejectReason || 'unknown',
+                    }))
+                );
+            }
+
             if (successes.length === 0 && failures.length > 0 && shouldPreserveCancelReason) {
                 const retryResult = await this.retryHandler.handleJsonError({
                     strategy: this.invalidJsonHandlingStrategy,
