@@ -3,7 +3,7 @@ import { parseJsonSafely } from './TranslatorHelpers.js';
 
 const CACHE_TYPE = 'plugin_nrp_map_travel';
 const DEFAULT_MENU_SYMBOL = 'maptravel';
-const ANY_WINDOW = /** @type {any} */ (window);
+const ANY_WINDOW = /** @type {any} */ (globalThis);
 const DEBUG_FLAG_NAME = '__CHEAT_DEBUG_NRP_MAP_TRAVEL_TRANSLATOR';
 
 function isDebugEnabled() {
