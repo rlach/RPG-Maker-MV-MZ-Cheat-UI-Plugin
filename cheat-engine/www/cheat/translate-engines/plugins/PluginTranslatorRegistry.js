@@ -6,6 +6,7 @@ import { ChronusTranslator } from './translators/ChronusTranslator.js';
 import { CbrEroStatusTranslator } from './translators/CbrEroStatusTranslator.js';
 import { CustomizeConfigItemTranslator } from './translators/CustomizeConfigItemTranslator.js';
 import { ExternMessageTranslator } from './translators/ExternMessageTranslator.js';
+import { FtkrCssDetailedStatusTranslator } from './translators/FtkrCssDetailedStatusTranslator.js';
 import { FtkrItemCompositionSystemTranslator } from './translators/FtkrItemCompositionSystemTranslator.js';
 import { FtkrMessageWindowLinesTranslator } from './translators/FTKRMessageWindowLinesTranslator.js';
 import { CbrEroStatusMvTranslator } from './translators/CbrEroStatusMvTranslator.js';
@@ -85,6 +86,7 @@ class PluginTranslatorRegistry {
             CbrEroStatusTranslator,
             CustomizeConfigItemTranslator,
             ExternMessageTranslator,
+            FtkrCssDetailedStatusTranslator,
             FtkrItemCompositionSystemTranslator,
             FtkrMessageWindowLinesTranslator,
             CbrEroStatusMvTranslator,
