@@ -40,9 +40,50 @@ function extractTranslatorClasses(moduleExports) {
 }
 
 function toFileUrl(absolutePath) {
-    const sep = require('path').sep;
-    const normalized = absolutePath.split(sep).join('/');
-    return normalized.startsWith('/') ? `file://${normalized}` : `file:///${normalized}`;
+    const { pathToFileURL } = require('url');
+    return pathToFileURL(absolutePath).href;
+}
+
+async function importCustomModule(absolutePath) {
+    const fileUrl = toFileUrl(absolutePath);
+
+    try {
+        return await import(fileUrl);
+    } catch (fileImportError) {
+        const fs = require('fs');
+        const source = fs.readFileSync(absolutePath, 'utf-8');
+        const wrappedSource = `${source}\n//# sourceURL=${fileUrl}`;
+
+        // Try in-memory module import via data URL first.
+        // This avoids MIME/type handling on file:// in some NW.js builds.
+        try {
+            const dataUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(wrappedSource)}`;
+            return await import(dataUrl);
+        } catch (dataUrlImportError) {
+            // Final fallback: blob URL module import.
+            const blob = new Blob([wrappedSource], {
+                type: 'text/javascript',
+            });
+            const blobUrl = URL.createObjectURL(blob);
+
+            try {
+                return await import(blobUrl);
+            } catch (blobImportError) {
+                const combinedError = new Error(
+                    [
+                        'Custom translator module import failed for all strategies.',
+                        `file:// import error: ${String((fileImportError && fileImportError.message) || fileImportError || '')}`,
+                        `data: URL import error: ${String((dataUrlImportError && dataUrlImportError.message) || dataUrlImportError || '')}`,
+                        `blob: URL import error: ${String((blobImportError && blobImportError.message) || blobImportError || '')}`,
+                    ].join(' ')
+                );
+                combinedError.cause = blobImportError;
+                throw combinedError;
+            } finally {
+                URL.revokeObjectURL(blobUrl);
+            }
+        }
+    }
 }
 
 /**
@@ -74,10 +115,9 @@ export async function loadCustomTranslators(files, registry) {
 
     for (const filename of files) {
         const absolutePath = path.join(scriptsDir, filename);
-        const fileUrl = toFileUrl(absolutePath);
 
         try {
-            const mod = await import(fileUrl);
+            const mod = await importCustomModule(absolutePath);
             const translatorEntries = extractTranslatorClasses(mod);
 
             if (translatorEntries.length === 0) {
