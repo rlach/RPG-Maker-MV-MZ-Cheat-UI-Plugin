@@ -174,6 +174,10 @@ export class TagManager {
         const usedTagIds = new Set();
         const usedLongRunTagIds = new Set();
         const usedPatternSignatures = new Set();
+        const simpleNId = 'sn';
+
+        // Keep newline tag stable across sessions, prompts and LLM responses.
+        usedTagIds.add(simpleNId);
 
         for (const config of longRunTagConfigs) {
             if (config.tagId?.length === 2) {
@@ -203,14 +207,6 @@ export class TagManager {
             }
             usedTagIds.add(tagId);
         }
-
-        const simpleNId = this.generateUniqueTagId(
-            {
-                description: 'simpleN',
-            },
-            usedTagIds
-        );
-        usedTagIds.add(simpleNId);
 
         this.simpleNEntry = {
             key: 'simpleN',
