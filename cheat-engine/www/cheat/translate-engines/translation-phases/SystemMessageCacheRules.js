@@ -37,13 +37,13 @@ export function getSystemMessageCacheKey(runtime, messageKey, messageValue) {
         return null;
     }
 
-    if (isCommandCacheSystemMessageKey(messageKey)) {
-        if (typeof messageValue !== 'string' || messageValue.trim() === '') {
-            return null;
-        }
+    if (typeof messageValue !== 'string' || messageValue.trim() === '') {
+        return null;
+    }
 
+    if (isCommandCacheSystemMessageKey(messageKey)) {
         return runtime.getCacheKey(messageValue, 'command');
     }
 
-    return runtime.getCacheKey(messageKey, 'system_message');
+    return runtime.getCacheKey(messageValue, 'system_message');
 }
