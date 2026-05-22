@@ -8,6 +8,8 @@ function normalizeCommandName(value) {
 }
 
 export class DTextPictureTranslator extends BasePluginTranslator {
+    initialDelayBeforeEnablePluginTranslationMs = 1000;
+
     constructor() {
         super();
         this._scanPrepared = false;
