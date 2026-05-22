@@ -27,7 +27,6 @@ import { KekeVariableActorCommandTranslator } from './translators/KekeVariableAc
 import { LunatlazurActorNameWindowTranslator } from './translators/LunatlazurActorNameWindowTranslator.js';
 import { LLGalgeChoiceWindowTranslator } from './translators/LLGalgeChoiceWindowTranslator.js';
 import { ManoInputConfigTranslator } from './translators/ManoInputConfigTranslator.js';
-import { LLMenuScreenTranslator } from './translators/LLMenuScreenTranslator.js';
 import { LLStandingPictureTranslator } from './translators/LLStandingPictureTranslator.js';
 import { MgpExternChoicesTranslator } from './translators/MgpExternChoicesTranslator.js';
 import { MogSceneMenuFileRenameTranslator } from './translators/MogSceneMenuFileRenameTranslator.js';
@@ -75,6 +74,7 @@ import { SabaTachieTranslator } from './translators/SabaTachieTranslator.js';
 import { YepGabWindowTranslator } from './translators/YepGabWindowTranslator.js';
 import { PHQuestBookTranslator } from './translators/PHQuestBookTranslator.js';
 import { SaveFilePlusTranslator } from './translators/SaveFilePlusTranslator.js';
+import { LLMenuScreenCustomTranslator } from './translators/LLMenuScreenCustomTranslator.js';
 
 class PluginTranslatorRegistry {
     constructor() {
@@ -106,7 +106,7 @@ class PluginTranslatorRegistry {
             KekeVariableActorCommandTranslator,
             LunatlazurActorNameWindowTranslator,
             LLGalgeChoiceWindowTranslator,
-            LLMenuScreenTranslator,
+            LLMenuScreenCustomTranslator,
             LLStandingPictureTranslator,
             ManoInputConfigTranslator,
             MgpExternChoicesTranslator,
