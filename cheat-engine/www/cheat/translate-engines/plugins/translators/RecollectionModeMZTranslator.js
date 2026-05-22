@@ -5,12 +5,12 @@
  * Target engine: MZ
  *
  * RecollectionModeMZ stores most user-facing strings in plugin parameters,
- * including title command labels and recollection event descriptions.
+ * plus recollection entry titles loaded from the plugin's JSON data file.
  *
  * Runtime integration:
  * - Window_TitleCommand.addCommand: translates the recollection title command label.
  * - Window_RecollectionCommand.addCommand: translates selection command labels when present.
- * - Window_RecList.drawItem: translates event description/lockedDescription display text.
+ * - Window_RecList.drawItem: translates recollection title and locked display text.
  */
 
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
@@ -23,6 +23,7 @@ const PARAM_SELECT_RECOLLECTION = 'recModeSelectWindowSelectReco';
 const PARAM_SELECT_CG = 'recModeSelectWindowSelectCg';
 const PARAM_SELECT_BACK = 'recModeSelectWindowBackTitle';
 const PARAM_NEVER_WATCH_TEXT = 'recModeListNeverWatchTextName';
+const PARAM_RECO_DATA_FILE = 'recoCgSettingList';
 const PARAM_EVENTS = 'recollectionEvents';
 
 const TITLE_SYMBOL_RECOLLECTION = 'recollection';
@@ -76,10 +77,6 @@ export class RecollectionModeMZTranslator extends BasePluginTranslator {
     }
 
     async precomputeCounts() {
-        if (!this.ensureDetection()) {
-            return;
-        }
-
         if (this._scanPrepared) {
             return;
         }
@@ -103,7 +100,7 @@ export class RecollectionModeMZTranslator extends BasePluginTranslator {
         return this._scanPromise;
     }
 
-    buildScanEntries() {
+    async buildScanEntries() {
         const entries = [];
         const parameters = this._resolvePluginParameters();
 
@@ -123,6 +120,7 @@ export class RecollectionModeMZTranslator extends BasePluginTranslator {
         this._pushParameterEntry(parameters, PARAM_NEVER_WATCH_TEXT, 'lockedDefaultText', entries);
 
         this._collectEventDescriptionsFromParameters(parameters, entries);
+        await this._collectRuntimeRecollectionTitles(parameters, entries);
 
         return entries;
     }
@@ -233,6 +231,32 @@ export class RecollectionModeMZTranslator extends BasePluginTranslator {
                     },
                 });
             }
+        }
+    }
+
+    async _collectRuntimeRecollectionTitles(parameters, output) {
+        const recoDataList = await this._resolveRecollectionDataList(parameters);
+        if (!Array.isArray(recoDataList)) {
+            return;
+        }
+
+        for (let index = 0; index < recoDataList.length; index++) {
+            const entry = recoDataList[index];
+            const title = typeof entry?.title === 'string' ? entry.title : '';
+
+            if (!this.isUsableText(title)) {
+                continue;
+            }
+
+            output.push({
+                text: title,
+                cacheType: this.getCacheType(),
+                source: {
+                    scope: 'recollectionDataFile',
+                    field: 'title',
+                    index,
+                },
+            });
         }
     }
 
@@ -391,23 +415,35 @@ export class RecollectionModeMZTranslator extends BasePluginTranslator {
         const originalDrawItem = prototype.drawItem;
         const getRuntime = this.getRuntime.bind(this);
         const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
+        const isUsableText = this.isUsableText.bind(this);
         const translateRuntimeText = this._resolveRuntimeText.bind(this);
-        const applyRecListRuntimeTranslations = this._applyRecListRuntimeTranslations.bind(this);
-        const restoreRecListRuntimeTranslations = this._restoreRecListRuntimeTranslations.bind(this);
 
         prototype.drawItem = function (index) {
-            let restoreContext = null;
+            let originalDrawText = null;
+            let drawTarget = null;
+            let runtime = null;
 
             try {
-                const runtime = getRuntime();
+                runtime = getRuntime();
                 if (!isRuntimeTranslationActive(runtime)) {
                     return originalDrawItem.call(this, index);
                 }
 
-                restoreContext = applyRecListRuntimeTranslations(index, runtime, translateRuntimeText);
+                drawTarget = this?.contents;
+                originalDrawText = drawTarget?.drawText;
+                if (typeof originalDrawText !== 'function') {
+                    return originalDrawItem.call(this, index);
+                }
+
+                drawTarget.drawText = function (text, ...rest) {
+                    const rendered = isUsableText(text)
+                        ? translateRuntimeText(text, runtime)
+                        : text;
+                    return originalDrawText.call(this, rendered, ...rest);
+                };
             } catch (error) {
                 console.warn(
-                    '[RecollectionModeMZTranslator] Failed to apply list description translation',
+                    '[RecollectionModeMZTranslator] Failed to patch rec list drawText',
                     error
                 );
             }
@@ -415,7 +451,9 @@ export class RecollectionModeMZTranslator extends BasePluginTranslator {
             try {
                 return originalDrawItem.call(this, index);
             } finally {
-                restoreRecListRuntimeTranslations(restoreContext);
+                if (drawTarget && typeof originalDrawText === 'function') {
+                    drawTarget.drawText = originalDrawText;
+                }
             }
         };
 
@@ -441,66 +479,6 @@ export class RecollectionModeMZTranslator extends BasePluginTranslator {
         });
     }
 
-    _applyRecListRuntimeTranslations(index, runtime, translateRuntimeText) {
-        const settings = this._getRecollectionSettings();
-        if (!settings || typeof settings !== 'object') {
-            return null;
-        }
-
-        const event = Array.isArray(settings.recollectionEvents)
-            ? settings.recollectionEvents[index]
-            : null;
-
-        if (!event || typeof event !== 'object') {
-            return null;
-        }
-
-        const originalDescription = event.description;
-        const originalLockedDescription = event.lockedDescription;
-        const originalNeverWatchText = settings?.recModeList?.recModeListNeverWatchTextName;
-
-        if (this.isUsableText(originalDescription)) {
-            event.description = translateRuntimeText(originalDescription, runtime);
-        }
-
-        if (this.isUsableText(originalLockedDescription)) {
-            event.lockedDescription = translateRuntimeText(originalLockedDescription, runtime);
-        }
-
-        if (settings.recModeList && this.isUsableText(originalNeverWatchText)) {
-            settings.recModeList.recModeListNeverWatchTextName =
-                translateRuntimeText(originalNeverWatchText, runtime);
-        }
-
-        return {
-            event,
-            settings,
-            originalDescription,
-            originalLockedDescription,
-            originalNeverWatchText,
-        };
-    }
-
-    _restoreRecListRuntimeTranslations(context) {
-        if (!context) {
-            return;
-        }
-
-        if (context.event && typeof context.event === 'object') {
-            if (context.originalDescription !== undefined) {
-                context.event.description = context.originalDescription;
-            }
-            if (context.originalLockedDescription !== undefined) {
-                context.event.lockedDescription = context.originalLockedDescription;
-            }
-        }
-
-        if (context.settings?.recModeList && context.originalNeverWatchText !== undefined) {
-            context.settings.recModeList.recModeListNeverWatchTextName =
-                context.originalNeverWatchText;
-        }
-    }
-
     _resolvePrototype(globalName, methodName) {
         const ctor = this._resolveGlobalConstructor(globalName);
         const prototype = ctor?.prototype;
@@ -516,32 +494,94 @@ export class RecollectionModeMZTranslator extends BasePluginTranslator {
             return fromGlobalThis;
         }
 
-        if (globalName === 'Window_RecList' && typeof Window_RecList !== 'undefined') {
-            return Window_RecList;
-        }
-
-        if (
-            globalName === 'Window_RecollectionCommand' &&
-            typeof Window_RecollectionCommand !== 'undefined'
-        ) {
-            return Window_RecollectionCommand;
+        const fromWindow = typeof window === 'undefined' ? null : window?.[globalName];
+        if (typeof fromWindow === 'function') {
+            return fromWindow;
         }
 
         return null;
     }
 
-    _getRecollectionSettings() {
-        if (
-            globalThis?.rngdRecollectionModeMZSettings &&
-            typeof globalThis.rngdRecollectionModeMZSettings === 'object'
-        ) {
-            return globalThis.rngdRecollectionModeMZSettings;
+    async _resolveRecollectionDataList(parameters) {
+        const dataFileName = this._resolveRecoDataFileName(parameters);
+        if (!this.isUsableText(dataFileName)) {
+            return [];
         }
 
-        if (typeof rngdRecollectionModeMZSettings !== 'undefined') {
-            return rngdRecollectionModeMZSettings;
+        const fromRuntime = this._resolveRecollectionDataListFromGlobal(dataFileName);
+        if (Array.isArray(fromRuntime)) {
+            return fromRuntime;
+        }
+
+        const fromFile = await this._loadRecollectionDataListFromFile(dataFileName);
+        if (Array.isArray(fromFile)) {
+            return fromFile;
+        }
+
+        return [];
+    }
+
+    _resolveRecoDataFileName(parameters) {
+        const raw = typeof parameters?.[PARAM_RECO_DATA_FILE] === 'string'
+            ? parameters[PARAM_RECO_DATA_FILE]
+            : '';
+        return raw.trim();
+    }
+
+    _resolveRecollectionDataListFromGlobal(dataFileName) {
+        const runtimeData = globalThis?.[dataFileName];
+        if (Array.isArray(runtimeData)) {
+            return runtimeData;
+        }
+
+        const normalizedFileName = dataFileName.replace(/^img\/system\//i, '');
+        const runtimeDataNormalized = globalThis?.[normalizedFileName];
+        if (Array.isArray(runtimeDataNormalized)) {
+            return runtimeDataNormalized;
         }
 
         return null;
+    }
+
+    async _loadRecollectionDataListFromFile(dataFileName) {
+        const normalized = dataFileName.replace(/^\/+/, '').replace(/^img\/system\//i, '');
+        if (!this.isUsableText(normalized)) {
+            return [];
+        }
+
+        const url = `img/system/${normalized}`;
+
+        try {
+            const rawText = await this._loadTextViaXhr(url);
+            const parsed = parseJsonSafely(rawText, null);
+            if (!Array.isArray(parsed)) {
+                return [];
+            }
+
+            return parsed.filter((entry) => entry && typeof entry === 'object');
+        } catch (error) {
+            console.warn(
+                `[RecollectionModeMZTranslator] Failed to load recollection data file: ${url}`,
+                error
+            );
+            return [];
+        }
+    }
+
+    _loadTextViaXhr(url) {
+        return new Promise((resolve, reject) => {
+            const request = new XMLHttpRequest();
+            request.open('GET', url);
+            request.overrideMimeType('application/json');
+            request.onload = () => {
+                if (request.status >= 200 && request.status < 400) {
+                    resolve(request.responseText || '');
+                    return;
+                }
+                reject(new Error(`HTTP ${request.status}`));
+            };
+            request.onerror = () => reject(new Error('XMLHttpRequest failed'));
+            request.send();
+        });
     }
 }
