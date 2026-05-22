@@ -4,6 +4,9 @@ import { Alert } from '../../js/AlertHelper.js';
 import { normalizeText } from './translators/TranslatorHelpers.js';
 
 export class BasePluginTranslator extends BasePhase {
+    // Override this if your plugin can't be enabled too early or has race condition if enabled before certain game code is loaded.
+    initialDelayBeforeEnablePluginTranslationMs = 0;
+
     constructor() {
         super();
         this._pluginDetected = false;
@@ -208,7 +211,7 @@ export class BasePluginTranslator extends BasePhase {
                     setTimeout(tryEnable, retryDelayMs);
                 };
 
-                tryEnable();
+                setTimeout(tryEnable, this.initialDelayBeforeEnablePluginTranslationMs);
             } catch (error) {
                 console.warn(
                     `[PluginTranslator] Failed to enable plugin translation for ${this.getPluginName()}`,
