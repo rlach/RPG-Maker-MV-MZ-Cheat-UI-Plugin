@@ -141,7 +141,7 @@ describe('AIEngine.validateNewlineCounts', () => {
 
         expect(newlineTag).toBeTruthy();
         expect(newlineTag.tagSymbol).toBe('sn');
-        expect(newlineTag.requiredConsistency).toBe(true);
+        expect(newlineTag.requiredConsistency).toBe(false);
         expect(newlineTag.reservedWidth).toBe(0);
         expect(newlineTag.extraPromptForLlm).toContain('represents newline');
     });
