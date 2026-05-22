@@ -120,31 +120,38 @@ export class SystemMessages extends BasePhase {
             return;
         }
 
-        const messageKeyByCacheKey = new Map(
-            (pendingItems || [])
-                .filter((entry) => entry && entry.cacheKey && entry.messageKey)
-                .map((entry) => [entry.cacheKey, entry.messageKey])
-        );
+        const messageKeysByCacheKey = new Map();
+        for (const entry of pendingItems || []) {
+            if (!entry || !entry.cacheKey || !entry.messageKey) {
+                continue;
+            }
+
+            const keys = messageKeysByCacheKey.get(entry.cacheKey) || [];
+            keys.push(entry.messageKey);
+            messageKeysByCacheKey.set(entry.cacheKey, keys);
+        }
 
         for (const success of successes || []) {
             if (!success || !success.cacheKey) {
                 continue;
             }
 
-            const messageKey = messageKeyByCacheKey.get(success.cacheKey);
-            if (!messageKey) {
+            const messageKeys = messageKeysByCacheKey.get(success.cacheKey);
+            if (!messageKeys || messageKeys.length === 0) {
                 continue;
             }
 
-            if (isCommandCacheSystemMessageKey(messageKey)) {
-                continue;
-            }
+            for (const messageKey of messageKeys) {
+                if (isCommandCacheSystemMessageKey(messageKey)) {
+                    continue;
+                }
 
-            if (
-                $dataSystem.terms.messages &&
-                Object.prototype.hasOwnProperty.call($dataSystem.terms.messages, messageKey)
-            ) {
-                $dataSystem.terms.messages[messageKey] = success.translated;
+                if (
+                    $dataSystem.terms.messages &&
+                    Object.prototype.hasOwnProperty.call($dataSystem.terms.messages, messageKey)
+                ) {
+                    $dataSystem.terms.messages[messageKey] = success.translated;
+                }
             }
         }
     }
