@@ -1,15 +1,14 @@
-import { isRpgMakerMv } from '../../../js/RpgMakerRuntime.js';
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
+import { parseJsonSafely } from './TranslatorHelpers.js';
 
 const CACHE_TYPE = 'plugin_ll_menu_screen';
+const DEBUG_TAG = '[LLMenuScreenTranslator]';
 
 // Plugin names: the Base plugin holds the picture list; Custom holds the menu layout + help texts.
-// We detect by either, but read params from Custom.
+// Detection is keyed to Custom variants because translatable parameter surfaces live there.
 // MV variants use the same names with an 'MV' suffix; parameter structure is identical.
 const PLUGIN_NAME_CUSTOM = 'LL_MenuScreenCustom';
-const PLUGIN_NAME_BASE = 'LL_MenuScreenBase';
 const PLUGIN_NAME_CUSTOM_MV = 'LL_MenuScreenCustomMV';
-const PLUGIN_NAME_BASE_MV = 'LL_MenuScreenBaseMV';
 
 // Static label fields in LL_MenuScreenCustom that may contain Japanese text.
 const LABEL_PARAM_FIELDS = [
@@ -20,25 +19,21 @@ const LABEL_PARAM_FIELDS = [
 ];
 
 /**
- * Translator for the LL_MenuScreenBase + LL_MenuScreenCustom plugin pair.
+ * LLMenuScreenCustomTranslator
  *
- * Translatable strings:
- *   - menuHelpTexts[].helpText — descriptions shown when a menu command is selected.
- *   - leftBlockLabel, rightBlockLabel, rightBottomBlockLabel, leftBottomBlockLabel — UI labels.
+ * Translator for LL_MenuScreenBase + LL_MenuScreenCustom plugin pair.
  *
- * The main menu command list is already handled by the command translation system.
- * LL_MenuScreenCustom looks up help text by the *display name* of the currently selected
- * command (via Window_Command.prototype.currentName). When command names are translated,
- * this lookup fails because the menuHelpLists keys are the original Japanese names.
- * This translator patches Scene_Menu.prototype.update to fix that lookup using the
- * command translation cache for reverse resolution.
+ * Supported versions:
+ * - LL_MenuScreenCustom / LL_MenuScreenBase (MZ, version not specified in source)
+ * - LL_MenuScreenCustomMV v1.4.4 / LL_MenuScreenBaseMV v1.1.0 (MV)
  *
- * Label strings inside Window_MenuHelp are drawn via drawText calls inside the plugin's
- * IIFE closure. We patch drawText on the Window_MenuHelp instance level (via the
- * createMenuHelpWindow hook) to intercept and translate known label strings at draw time.
- * Layout positions based on measureTextWidth remain on the original label; the text is
- * translated within the measured slot. This may cause minor positional drift for labels
- * that differ significantly in length, which is acceptable.
+ * Translatable surfaces:
+ * - menuHelpTexts[].helpText in plugin parameters
+ * - leftBlockLabel, rightBlockLabel, rightBottomBlockLabel, leftBottomBlockLabel
+ *
+ * Runtime behavior:
+ * - Re-resolves menu help text when command display names are translated.
+ * - Hooks Window_MenuHelp instance drawText to translate known static labels.
  */
 export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
     constructor() {
@@ -66,29 +61,20 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
         }
 
         const lowerCustom = PLUGIN_NAME_CUSTOM.toLowerCase();
-        const lowerBase = PLUGIN_NAME_BASE.toLowerCase();
         const lowerCustomMV = PLUGIN_NAME_CUSTOM_MV.toLowerCase();
-        const lowerBaseMV = PLUGIN_NAME_BASE_MV.toLowerCase();
 
         return window.$plugins.some((plugin) => {
-            if (!plugin || typeof plugin.name !== 'string') {
+            if (!plugin || typeof plugin.name !== 'string' || plugin.status !== true) {
                 return false;
             }
 
             const lower = plugin.name.trim().toLowerCase();
-            return (
-                (lower === lowerCustom && lower === lowerBase) ||
-                (lower === lowerCustomMV && lower === lowerBaseMV)
-            );
+            return lower === lowerCustom || lower === lowerCustomMV;
         });
     }
 
     _findCustomPluginEntry() {
-        if (isRpgMakerMv()) {
-            return this.findPluginEntry(PLUGIN_NAME_CUSTOM_MV);
-        } else {
-            return this.findPluginEntry(PLUGIN_NAME_CUSTOM);
-        }
+        return this.findPluginEntry(PLUGIN_NAME_CUSTOM) || this.findPluginEntry(PLUGIN_NAME_CUSTOM_MV);
     }
 
     /**
@@ -96,14 +82,7 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
      * Each array element in the raw JSON is a serialized JSON string.
      */
     _parseMenuHelpTexts(parameters) {
-        const raw = typeof parameters.menuHelpTexts === 'string' ? parameters.menuHelpTexts : '[]';
-
-        let parsed;
-        try {
-            parsed = JSON.parse(raw);
-        } catch {
-            return [];
-        }
+        const parsed = parseJsonSafely(parameters?.menuHelpTexts, []);
 
         if (!Array.isArray(parsed)) {
             return [];
@@ -111,13 +90,9 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
 
         const result = [];
         for (const item of parsed) {
-            try {
-                const entry = typeof item === 'string' ? JSON.parse(item) : item;
-                if (entry && typeof entry === 'object') {
-                    result.push(entry);
-                }
-            } catch {
-                // skip malformed entry
+            const entry = parseJsonSafely(item, null);
+            if (entry && typeof entry === 'object') {
+                result.push(entry);
             }
         }
 
@@ -147,10 +122,6 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
     }
 
     async precomputeCounts() {
-        if (!this.ensureDetection()) {
-            return;
-        }
-
         if (this._scanPrepared) {
             return;
         }
@@ -159,7 +130,7 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
             return this._scanPromise;
         }
 
-        this._scanPromise = this._buildScanEntries()
+        this._scanPromise = Promise.resolve(this.buildScanEntries())
             .then((entries) => {
                 this._scanEntries = Array.isArray(entries) ? entries : [];
                 this._scanPrepared = true;
@@ -174,7 +145,7 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
         return this._scanPromise;
     }
 
-    async _buildScanEntries() {
+    buildScanEntries() {
         const entries = [];
         const plugin = this._findCustomPluginEntry();
         if (!plugin?.parameters) {
@@ -190,7 +161,7 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!text?.trim()) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
@@ -246,8 +217,31 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
             return false;
         }
 
+        const sceneMenuPrototype = window.Scene_Menu?.prototype;
+        if (!sceneMenuPrototype) {
+            return false;
+        }
+
+        if (typeof sceneMenuPrototype.update !== 'function') {
+            return false;
+        }
+
+        if (typeof sceneMenuPrototype.createMenuHelpWindow !== 'function') {
+            return false;
+        }
+
         const menuHelpTexts = this._parseMenuHelpTexts(customPlugin.parameters);
-        const knownSourceTexts = new Set();
+        const getRuntime = this.getRuntime.bind(this);
+        const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
+        const isUsableText = this.isUsableText.bind(this);
+        const resolveRuntimeTranslation = this.resolveRuntimeTranslation.bind(this);
+        const shouldLogLabelDebug = (text) => {
+            if (!isUsableText(text)) {
+                return false;
+            }
+
+            return text.includes('現在地') || text.includes('プレイ時間');
+        };
 
         // Build a map from original command display name (symbol) → original helpText.
         // This allows us to find the correct helpText when given a (possibly translated)
@@ -258,32 +252,7 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
             const helpText = typeof item.helpText === 'string' ? item.helpText.trim() : '';
             if (symbol && helpText) {
                 symbolToOriginalHelpText.set(symbol, helpText);
-                knownSourceTexts.add(helpText);
             }
-        }
-
-        for (const field of LABEL_PARAM_FIELDS) {
-            const text = customPlugin.parameters[field]?.trim() ?? '';
-            if (text) {
-                knownSourceTexts.add(text);
-            }
-        }
-
-        // Attach translator accessor callbacks on Scene_Menu.prototype via non-enumerable
-        // properties so that patched methods can reach translator APIs without capturing `this`.
-        if (window.Scene_Menu?.prototype) {
-            Object.defineProperty(Scene_Menu.prototype, '_llMenuScreenGetRuntime', {
-                value: () => this.getRuntime(),
-                configurable: true,
-                enumerable: false,
-                writable: true,
-            });
-            Object.defineProperty(Scene_Menu.prototype, '_llMenuScreenIsActive', {
-                value: (runtime) => this.isRuntimeTranslationActive(runtime),
-                configurable: true,
-                enumerable: false,
-                writable: true,
-            });
         }
 
         /**
@@ -291,19 +260,46 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
          * Marks the key as seen. Returns the original text if no cached translation exists.
          */
         const resolveFromCache = (originalText, runtime) => {
-            if (!originalText?.trim()) {
+            if (!isUsableText(originalText)) {
                 return originalText;
             }
 
-            const cacheKey = runtime.getCacheKey(originalText, CACHE_TYPE);
-            runtime.trackCacheKeyUsage(cacheKey);
+            const direct = resolveRuntimeTranslation(originalText, runtime, CACHE_TYPE, {
+                missValue: originalText,
+            });
+            if (shouldLogLabelDebug(originalText)) {
+                console.debug(
+                    `${DEBUG_TAG} cache resolve direct`,
+                    JSON.stringify({ originalText, direct })
+                );
+            }
 
-            if (!runtime.hasUsableCacheValue(cacheKey)) {
+            if (direct !== originalText) {
+                return direct;
+            }
+
+            const trimmed = originalText.trim();
+            if (!trimmed || trimmed === originalText) {
                 return originalText;
             }
 
-            const cached = runtime.translationCache.get(cacheKey);
-            return typeof cached === 'string' && cached.trim() ? cached : originalText;
+            const trimmedResolved = resolveRuntimeTranslation(trimmed, runtime, CACHE_TYPE, {
+                missValue: trimmed,
+                harvestMissing: false,
+            });
+            if (shouldLogLabelDebug(originalText)) {
+                console.debug(
+                    `${DEBUG_TAG} cache resolve trimmed`,
+                    JSON.stringify({ originalText, trimmed, trimmedResolved })
+                );
+            }
+            if (trimmedResolved === trimmed) {
+                return originalText;
+            }
+
+            const leading = originalText.match(/^\s*/)?.[0] || '';
+            const trailing = originalText.match(/\s*$/)?.[0] || '';
+            return `${leading}${trimmedResolved}${trailing}`;
         };
 
         /**
@@ -317,7 +313,7 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
          *   3. If no match is found, return null (let the existing LL result stand).
          */
         const resolveHelpText = (currentName, runtime) => {
-            if (!currentName?.trim()) {
+            if (!isUsableText(currentName)) {
                 return null;
             }
 
@@ -334,8 +330,15 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
                         ? runtime.getCanonicalSystemCommandName(originalSymbol)
                         : originalSymbol;
 
-                const commandCacheKey = runtime.getCacheKey(canonicalSymbol, 'command');
-                const translatedSymbol = runtime.translationCache.get(commandCacheKey);
+                const translatedSymbol = resolveRuntimeTranslation(
+                    canonicalSymbol,
+                    runtime,
+                    'command',
+                    {
+                        missValue: canonicalSymbol,
+                        harvestMissing: false,
+                    }
+                );
 
                 if (translatedSymbol === currentName) {
                     return resolveFromCache(originalHelpText, runtime);
@@ -355,39 +358,37 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
         // produces an empty string. We re-run the lookup via our own map and override
         // the Window_MenuHelp text after LL's update has run.
         // ---------------------------------------------------------------------------
-        if (window.Scene_Menu?.prototype) {
-            const originalUpdate = Scene_Menu.prototype.update;
+        const originalUpdate = sceneMenuPrototype.update;
 
-            Scene_Menu.prototype.update = function () {
-                originalUpdate.call(this);
+        sceneMenuPrototype.update = function () {
+            originalUpdate.call(this);
 
-                try {
-                    if (!this._menuHelpWindow || !this._commandWindow) {
-                        return;
-                    }
-
-                    const runtime = this._llMenuScreenGetRuntime?.();
-                    if (!runtime || !this._llMenuScreenIsActive?.(runtime)) {
-                        return;
-                    }
-
-                    const currentName = this._commandWindow.currentName();
-                    if (!currentName) {
-                        return;
-                    }
-
-                    const translatedHelpText = resolveHelpText(currentName, runtime);
-                    if (translatedHelpText !== null) {
-                        this._menuHelpWindow.setText(translatedHelpText);
-                    }
-                } catch (error) {
-                    console.warn(
-                        '[LLMenuScreenTranslator] Failed to apply help text translation',
-                        error
-                    );
+            try {
+                if (!this._menuHelpWindow || !this._commandWindow) {
+                    return;
                 }
-            };
-        }
+
+                const runtime = getRuntime();
+                if (!runtime || !isRuntimeTranslationActive(runtime)) {
+                    return;
+                }
+
+                const currentName = this._commandWindow.currentName();
+                if (!currentName) {
+                    return;
+                }
+
+                const translatedHelpText = resolveHelpText(currentName, runtime);
+                if (translatedHelpText !== null) {
+                    this._menuHelpWindow.setText(translatedHelpText);
+                }
+            } catch (error) {
+                console.warn(
+                    '[LLMenuScreenTranslator] Failed to apply help text translation',
+                    error
+                );
+            }
+        };
 
         // ---------------------------------------------------------------------------
         // Hook 2: Translate label strings in the Window_MenuHelp instance.
@@ -404,52 +405,110 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
         // text. If translated labels differ significantly in length, slight layout drift
         // may occur.
         // ---------------------------------------------------------------------------
-        const originalCreate = Scene_Menu.prototype.createMenuHelpWindow;
+        const originalCreate = sceneMenuPrototype.createMenuHelpWindow;
+        sceneMenuPrototype.createMenuHelpWindow = function () {
+            originalCreate.call(this);
 
-        if (typeof originalCreate === 'function') {
-            Scene_Menu.prototype.createMenuHelpWindow = function () {
-                originalCreate.call(this);
+            try {
+                const win = this._menuHelpWindow;
+                if (!win) {
+                    console.debug(`${DEBUG_TAG} createMenuHelpWindow: no _menuHelpWindow instance`);
+                    return;
+                }
 
-                try {
-                    const win = this._menuHelpWindow;
-                    if (!win) {
-                        return;
-                    }
+                const protoDrawText = Object.getPrototypeOf(win).drawText;
+                if (typeof protoDrawText !== 'function') {
+                    console.debug(`${DEBUG_TAG} createMenuHelpWindow: drawText missing on Window_MenuHelp prototype`);
+                    return;
+                }
 
-                    const protoDrawText = Object.getPrototypeOf(win).drawText;
-                    if (typeof protoDrawText !== 'function') {
-                        return;
-                    }
+                console.debug(`${DEBUG_TAG} createMenuHelpWindow: instance drawText hook installed`);
 
-                    const getRuntime = this._llMenuScreenGetRuntime;
-                    const isActive = this._llMenuScreenIsActive;
-
-                    win.drawText = function (text, x, y, maxWidth, align) {
-                        let resolved = text;
-                        try {
-                            if (typeof text === 'string' && text.trim()) {
-                                const runtime = getRuntime?.();
-                                if (runtime && isActive?.(runtime) && knownSourceTexts.has(text)) {
+                win.drawText = function (text, x, y, maxWidth, align) {
+                    let resolved = text;
+                    try {
+                        if (typeof text === 'string' && text.trim()) {
+                            const runtime = getRuntime();
+                            if (runtime && isRuntimeTranslationActive(runtime)) {
+                                // Resolve from plugin-specific cache only; keep misses unchanged.
+                                resolved = resolveRuntimeTranslation(text, runtime, CACHE_TYPE, {
+                                    missValue: text,
+                                    harvestMissing: false,
+                                });
+                                if (resolved === text) {
                                     resolved = resolveFromCache(text, runtime);
                                 }
+                                if (shouldLogLabelDebug(text)) {
+                                    console.debug(
+                                        `${DEBUG_TAG} instance drawText observed`,
+                                        JSON.stringify({ text, resolved })
+                                    );
+                                }
                             }
-                        } catch (error) {
-                            console.warn(
-                                '[LLMenuScreenTranslator] Failed to translate label text',
-                                error
-                            );
                         }
+                    } catch (error) {
+                        console.warn('[LLMenuScreenTranslator] Failed to translate label text', error);
+                    }
 
-                        return protoDrawText.call(this, resolved, x, y, maxWidth, align);
-                    };
-                } catch (error) {
-                    console.warn(
-                        '[LLMenuScreenTranslator] Failed to patch Window_MenuHelp instance',
-                        error
-                    );
-                }
-            };
+                    return protoDrawText.call(this, resolved, x, y, maxWidth, align);
+                };
+            } catch (error) {
+                console.warn(
+                    '[LLMenuScreenTranslator] Failed to patch Window_MenuHelp instance',
+                    error
+                );
+            }
+        };
+
+        // Fallback path for MV: intercept Window_MenuHelp label draws even when
+        // Scene_Menu instance patch does not execute in a particular flow.
+        const windowBasePrototype = window.Window_Base?.prototype;
+        if (!windowBasePrototype || typeof windowBasePrototype.drawText !== 'function') {
+            return false;
         }
+
+        if (!windowBasePrototype.__llMenuScreenWindowBaseLabelHookApplied) {
+            const originalWindowBaseDrawText = windowBasePrototype.drawText;
+            windowBasePrototype.drawText = function (text, x, y, maxWidth, align) {
+                let resolved = text;
+                try {
+                    const ctorName = this?.constructor?.name || '';
+                    if (ctorName === 'Window_MenuHelp' && typeof text === 'string' && text.trim()) {
+                        const runtime = getRuntime();
+                        if (runtime && isRuntimeTranslationActive(runtime)) {
+                            resolved = resolveRuntimeTranslation(text, runtime, CACHE_TYPE, {
+                                missValue: text,
+                                harvestMissing: false,
+                            });
+                            if (resolved === text) {
+                                resolved = resolveFromCache(text, runtime);
+                            }
+
+                            if (shouldLogLabelDebug(text)) {
+                                console.debug(
+                                    `${DEBUG_TAG} window-base drawText observed`,
+                                    JSON.stringify({ text, resolved, ctorName })
+                                );
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.warn('[LLMenuScreenTranslator] Window_Base drawText fallback failed', error);
+                }
+
+                return originalWindowBaseDrawText.call(this, resolved, x, y, maxWidth, align);
+            };
+
+            Object.defineProperty(windowBasePrototype, '__llMenuScreenWindowBaseLabelHookApplied', {
+                value: true,
+                configurable: true,
+                enumerable: false,
+                writable: false,
+            });
+
+            console.debug(`${DEBUG_TAG} Window_Base drawText fallback hook installed`);
+        }
+
         return true;
     }
 }

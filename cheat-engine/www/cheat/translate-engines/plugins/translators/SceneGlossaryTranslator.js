@@ -75,8 +75,8 @@ function hasOwn(object, key) {
         return false;
     }
 
-    return typeof Object.hasOwn === 'function'
-        ? Object.hasOwn(object, key)
+    return typeof Object.getOwnPropertyDescriptor === 'function'
+        ? !!Object.getOwnPropertyDescriptor(object, key)
         : HAS_OWN_PROPERTY.call(object, key);
 }
 
