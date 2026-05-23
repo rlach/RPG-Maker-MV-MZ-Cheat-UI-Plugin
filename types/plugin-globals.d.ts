@@ -33,4 +33,11 @@ declare interface Window {
     $dataScenario?: any;
     Window_EventMiniLabel?: any;
     Scene_Glossary?: any;
+    Torigoya?: any;
+    TRP_CORE?: {
+        skitParameters?: {
+            dataActors?: Record<string, { name?: string; inputName?: string; fileName?: string }>;
+            nameToInputList?: Record<string, string>;
+        };
+    };
 }
