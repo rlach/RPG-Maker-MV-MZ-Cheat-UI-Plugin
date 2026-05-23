@@ -64,6 +64,8 @@ declare const Window_Message: any;
 declare const Window_Command: any;
 declare const Game_Party: any;
 
+declare const Alert: any;
+
 /** Saba_Tachie plugin namespace (立ち絵プラグイン by Sabakan). */
 declare const Saba:
     | {
@@ -188,11 +190,5 @@ declare interface Window {
     Window_GalgeChoiceList?: any;
     PluginManager?: any;
     ConfigManager?: any;
-    Torigoya?: any;
-    TRP_CORE?: {
-        skitParameters?: {
-            dataActors?: Record<string, { name?: string; inputName?: string; fileName?: string }>;
-            nameToInputList?: Record<string, string>;
-        };
-    };
+    Alert?: any;
 }

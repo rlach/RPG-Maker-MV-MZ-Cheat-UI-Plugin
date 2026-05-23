@@ -274,7 +274,7 @@ export default {
             rowsPerPage: getRowsPerPage(),
             sortBy: 'lp',
             sortDesc: false,
-            namePattern: '\\\\n\\<([^<>]+)\\>',
+            namePattern: String.raw`\\n\<([^<>]+)\>`,
             officialNameEnforcementMode: 'none',
             officialNameEnforcementIncludeAllText: false,
             applyOnlyActorsWithOriginalNames: true,
@@ -295,15 +295,15 @@ export default {
             ],
             predefinedNamePatterns: [
                 {
-                    pattern: '\\\\n\\<([^<>]+)\\>',
+                    pattern: String.raw`\\n\<([^<>]+)\>`,
                     example: '\\N<Char Name>\nThe text being spoken.',
                 },
                 {
-                    pattern: '^([^\\[「]+)\\n「',
+                    pattern: String.raw`^([^\[「]+)\n「`,
                     example: 'Char Name\n「The text being spoken.',
                 },
                 {
-                    pattern: '\\\\nw\\[([^\\[\\]]+)\\]',
+                    pattern: String.raw`\\nw\[([^\[\]]+)\]`,
                     example: '\\nw[Char Name]\nThe text being spoken.',
                 },
                 {
@@ -432,13 +432,13 @@ export default {
             return this.entries.filter((entry) => {
                 return (
                     entry.originalName.toLowerCase().includes(term) ||
-                    (entry.translation && entry.translation.toLowerCase().includes(term))
+                    entry.translation?.toLowerCase().includes(term)
                 );
             });
         },
 
         untranslatedCount() {
-            return this.entries.filter((e) => !e.translation || !e.translation.trim()).length;
+            return this.entries.filter((e) => !e.translation?.trim()).length;
         },
 
         cacheOnlyCount() {
@@ -463,8 +463,9 @@ export default {
 
         getNameProfilesForCurrentPair() {
             const runtime = ensureTranslationRuntime();
-            const allProfiles =
-                runtime && runtime.nameProfilesByLangPair ? runtime.nameProfilesByLangPair : {};
+            const allProfiles = runtime?.nameProfilesByLangPair
+                ? runtime.nameProfilesByLangPair
+                : {};
             const pairKey = this.getCurrentPairKey();
             const pairProfiles = allProfiles[pairKey];
             if (!pairProfiles || typeof pairProfiles !== 'object') {
@@ -520,8 +521,8 @@ export default {
         getLanguagePair() {
             const runtime = ensureTranslationRuntime();
             return {
-                sourceLang: (runtime && runtime.sourceLang) || 'ja',
-                targetLang: (runtime && runtime.targetLang) || 'en',
+                sourceLang: runtime?.sourceLang || 'ja',
+                targetLang: runtime?.targetLang || 'en',
             };
         },
 
@@ -568,7 +569,7 @@ export default {
                 if (Array.isArray(dataActors)) {
                     for (let i = 1; i < dataActors.length; i++) {
                         const actor = dataActors[i];
-                        if (!actor || !actor.name) continue;
+                        if (!actor?.name) continue;
                         const originalName = actor._translateOriginal
                             ? actor._translateOriginal.name
                             : actor.name;
@@ -633,7 +634,7 @@ export default {
                 console.warn('[TranslateNamesPanel] Invalid regex:', this.namePattern, err);
                 if (window.Alert)
                     window.Alert.error(
-                        'Invalid regex pattern: ' + (err && err.message ? err.message : err)
+                        'Invalid regex pattern: ' + (err?.message ? err.message : err)
                     );
                 return;
             }
@@ -655,7 +656,7 @@ export default {
                 regex.lastIndex = 0;
                 let match;
                 while ((match = regex.exec(searchableContent)) !== null) {
-                    const trimmedName = match[1] && match[1].trim();
+                    const trimmedName = match[1]?.trim();
                     if (trimmedName) foundNames.add(trimmedName);
 
                     // Guard against zero-length regex matches causing infinite loops.
@@ -672,7 +673,11 @@ export default {
 
             const changedKeys = [];
             for (const name of foundNames) {
-                const cacheKey = this.buildCacheKey(name, sourceLang, targetLang);
+                const nameWithoutColor = name.replace(/\\c\[\d+\]/g, '').trim();
+                if (this.nameIsTag(nameWithoutColor)) {
+                    continue;
+                }
+                const cacheKey = this.buildCacheKey(nameWithoutColor, sourceLang, targetLang);
                 if (!cache.has(cacheKey)) {
                     cache.set(cacheKey, '');
                     changedKeys.push(cacheKey);
@@ -688,6 +693,11 @@ export default {
             this.refresh();
         },
 
+        nameIsTag(cacheKey) {
+            // Detect tags \N[\d+] or \V[\d+] patterns as they are used for dynamic content and not suitable for name translation.
+            return /^\\N\[\d+\]$/.test(cacheKey) || /^\\V\[\d+\]$/.test(cacheKey);
+        },
+
         async translateNames() {
             if (this.translating) return;
 
@@ -696,7 +706,7 @@ export default {
             let idCounter = 0;
 
             for (const entry of this.entries) {
-                if (entry.translation && entry.translation.trim()) continue;
+                if (entry.translation?.trim()) continue;
                 items.push({
                     type: 'actor_name',
                     id: `actor_name_${idCounter++}`,
@@ -741,8 +751,7 @@ export default {
                 console.error('[TranslateNamesPanel] Translate names failed', error);
                 if (window.Alert)
                     window.Alert.error(
-                        'Translate names failed: ' +
-                            (error && error.message ? error.message : error)
+                        'Translate names failed: ' + (error?.message ? error.message : error)
                     );
             } finally {
                 this.translating = false;
@@ -752,7 +761,7 @@ export default {
         },
 
         cycleGender(entry) {
-            if (!entry || !entry.originalName) {
+            if (!entry?.originalName) {
                 return;
             }
 
@@ -772,7 +781,7 @@ export default {
         },
 
         removeCacheOnlyEntry(entry) {
-            if (!entry || entry.source !== 'cache' || !entry.cacheKey) {
+            if (entry?.source !== 'cache' || !entry.cacheKey) {
                 return;
             }
 
@@ -790,7 +799,7 @@ export default {
 
         removeAllCacheOnlyEntries() {
             const cacheOnlyEntries = this.entries.filter(
-                (entry) => entry && entry.source === 'cache' && entry.cacheKey
+                (entry) => entry?.source === 'cache' && entry.cacheKey
             );
             if (cacheOnlyEntries.length === 0) {
                 return;
@@ -862,7 +871,7 @@ export default {
             const runtime = ensureTranslationRuntime();
             runtime.setCacheValue(entry.cacheKey, entry.translation);
 
-            const normalizedTranslation = entry.translation && entry.translation.trim();
+            const normalizedTranslation = entry.translation?.trim();
             if (normalizedTranslation) {
                 this.saveNameProfile(entry.originalName, { translation: normalizedTranslation });
             }
@@ -887,7 +896,7 @@ export default {
                     continue;
                 }
 
-                const translatedName = entry.translation && entry.translation.trim();
+                const translatedName = entry.translation?.trim();
                 if (!translatedName) {
                     continue;
                 }
@@ -922,10 +931,10 @@ export default {
         },
 
         async copyOriginal(entry) {
-            const text = entry && entry.originalName ? String(entry.originalName) : '';
+            const text = entry?.originalName ? String(entry.originalName) : '';
             if (!text) return;
             try {
-                if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+                if (navigator?.clipboard?.writeText) {
                     await navigator.clipboard.writeText(text);
                 } else {
                     const textarea = document.createElement('textarea');
