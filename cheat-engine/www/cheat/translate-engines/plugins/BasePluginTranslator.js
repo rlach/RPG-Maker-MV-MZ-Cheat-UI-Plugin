@@ -66,14 +66,12 @@ export class BasePluginTranslator extends BasePhase {
             return null;
         }
 
-        let needle = String(pluginName || '')
+        const needle = normalizeText(pluginName)
             .trim()
             .toLowerCase();
         if (!needle) {
             return null;
         }
-
-        needle = normalizeText(this.getPluginName()).toLowerCase();
 
         return (
             window.$plugins.find((plugin) => {
@@ -374,7 +372,7 @@ export class BasePluginTranslator extends BasePhase {
         cacheType = this.getCacheType(),
         options = {}
     ) {
-        const missValue = Object.prototype.hasOwnProperty.call(options, 'missValue')
+        const missValue = Object.getOwnPropertyDescriptor(options, 'missValue')
             ? options.missValue
             : text;
 
