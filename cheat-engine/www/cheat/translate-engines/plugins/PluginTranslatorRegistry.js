@@ -76,6 +76,7 @@ import { YepGabWindowTranslator } from './translators/YepGabWindowTranslator.js'
 import { PHQuestBookTranslator } from './translators/PHQuestBookTranslator.js';
 import { SaveFilePlusTranslator } from './translators/SaveFilePlusTranslator.js';
 import { LLMenuScreenCustomTranslator } from './translators/LLMenuScreenCustomTranslator.js';
+import { MessageAlignCenterTranslator } from './translators/MessageAlignCenterTranslator.js';
 
 class PluginTranslatorRegistry {
     constructor() {
@@ -110,6 +111,7 @@ class PluginTranslatorRegistry {
             LLMenuScreenCustomTranslator,
             LLStandingPictureTranslator,
             ManoInputConfigTranslator,
+            MessageAlignCenterTranslator,
             MgpExternChoicesTranslator,
             MogSceneMenuFileRenameTranslator,
             MogSceneMenuTranslator,
