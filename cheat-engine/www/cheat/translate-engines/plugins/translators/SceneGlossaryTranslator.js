@@ -1,6 +1,7 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { mergeKnowledgeEntries } from '../../../js/KnowledgeBaseRuntime.js';
 import { parseJsonSafely } from './TranslatorHelpers.js';
+import { TAG_TYPE } from '../../ai-engine/constants.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_SCENE_GLOSSARY_TRANSLATOR_HOOKED__';
 const NOTE_CACHE_TYPE = 'item_note';
@@ -16,6 +17,15 @@ const GLOSSARY_TEXT_FIELDS = [
     'ConfirmNoUse',
     'VisibleItemNotYet',
 ];
+
+function returnStatTag(statName, tagSymbol) {
+    return {
+        description: `Returns ${statName}`,
+        type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
+        tagSymbol: tagSymbol,
+        requiredConsistency: true,
+    };
+}
 
 const HAS_OWN_PROPERTY = Object.prototype.hasOwnProperty;
 
@@ -45,6 +55,30 @@ const SCENE_GLOSSARY_PLUGIN_TAGS = (() => {
         xmlCustom('SG not-yet description (en)', 'SGNotYetDescription', false),
         xmlCategoryTag('SG category (ja)', 'SGカテゴリ'),
         xmlCategoryTag('SG category (en)', 'SGCategory'),
+        {
+            description: 'Returns data from Glossary',
+            type: TAG_TYPE.WITH_CUSTOM_PARAMETER,
+            tagSymbol: 'DATA',
+            maskValue: true,
+            requiredConsistency: true,
+        },
+        {
+            description: 'Returns info from <CommonDescription>',
+            type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
+            tagSymbol: 'COMMON',
+            requiredConsistency: true,
+        },
+        returnStatTag('Enemy Max HP(Zero padding 3)', 'MHP'),
+        returnStatTag('Max MP', 'MMP'),
+        returnStatTag('Atk', 'ATK'),
+        returnStatTag('Def', 'DEF'),
+        returnStatTag('Mag', 'MAG'),
+        returnStatTag('Mdf', 'MDF'),
+        returnStatTag('Agi', 'AGI'),
+        returnStatTag('Luk', 'LUK'),
+        returnStatTag('Exp', 'EXP'),
+        returnStatTag('Gold', 'MONEY'),
+        returnStatTag('Drop item N', 'DROP'),
     ];
 
     for (let index = 2; index <= 5; index++) {

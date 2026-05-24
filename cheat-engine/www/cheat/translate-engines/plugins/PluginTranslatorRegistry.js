@@ -77,6 +77,8 @@ import { PHQuestBookTranslator } from './translators/PHQuestBookTranslator.js';
 import { SaveFilePlusTranslator } from './translators/SaveFilePlusTranslator.js';
 import { LLMenuScreenCustomTranslator } from './translators/LLMenuScreenCustomTranslator.js';
 import { MessageAlignCenterTranslator } from './translators/MessageAlignCenterTranslator.js';
+import { PlayMsgWndCharSeMZTranslator } from './translators/PlayMsgWndCharSeMZTranslator.js';
+import { LLInfoPopupWIndowTranslator } from './translators/LLInfoPopupWIndowTranslator.js';
 
 class PluginTranslatorRegistry {
     constructor() {
@@ -108,6 +110,7 @@ class PluginTranslatorRegistry {
             KekeVariableActorCommandTranslator,
             LunatlazurActorNameWindowTranslator,
             LLGalgeChoiceWindowTranslator,
+            LLInfoPopupWIndowTranslator,
             LLMenuScreenCustomTranslator,
             LLStandingPictureTranslator,
             ManoInputConfigTranslator,
@@ -130,6 +133,7 @@ class PluginTranslatorRegistry {
             OriginMenuStatusTranslator,
             PandaProgressTextWindowTranslator,
             PHQuestBookTranslator,
+            PlayMsgWndCharSeMZTranslator,
             QuestSystemTranslator,
             RecollectionForMZTranslator,
             RecollectionModeTranslator,
