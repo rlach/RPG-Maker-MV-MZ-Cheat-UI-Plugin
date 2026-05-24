@@ -50,11 +50,15 @@ function buildKnownEscapeTagRegex(tagEntries) {
     sortedEntries.forEach((entry) => {
         const escapedSymbol = escapeRegExp(entry.tagSymbol);
         const escapedPrefix = `\\\\${escapedSymbol}`;
+        const tagText = `\\${entry.tagSymbol}`;
 
         if (entry.type === 'withNumericParameter') {
             parameterized.push({
                 globalPattern: new RegExp(`${escapedPrefix}\\[(\\d+)\\]`, 'gi'),
                 exactPattern: new RegExp(`^${escapedPrefix}\\[(\\d+)\\]$`, 'i'),
+                consumePattern: new RegExp(`^${escapedPrefix}\\[(\\d+)\\]`, 'i'),
+                type: entry.type,
+                tagText,
                 reservedWidth: normalizeReservedWidth(entry.reservedWidth),
             });
             return;
@@ -69,19 +73,25 @@ function buildKnownEscapeTagRegex(tagEntries) {
             if (open && close) {
                 const escapedOpen = escapeRegExp(open);
                 const escapedClose = escapeRegExp(close);
-                parameterized.push(
-                    {
-                        globalPattern: new RegExp(
-                            `${escapedPrefix}${escapedOpen}[^${escapedClose}]*${escapedClose}`,
-                            'gi'
-                        ),
-                        exactPattern: new RegExp(
-                            `^${escapedPrefix}${escapedOpen}[^${escapedClose}]*${escapedClose}$`,
-                            'i'
-                        ),
-                        reservedWidth: normalizeReservedWidth(entry.reservedWidth),
-                    }
-                );
+                parameterized.push({
+                    globalPattern: new RegExp(
+                        `${escapedPrefix}${escapedOpen}[^${escapedClose}]*${escapedClose}`,
+                        'gi'
+                    ),
+                    exactPattern: new RegExp(
+                        `^${escapedPrefix}${escapedOpen}[^${escapedClose}]*${escapedClose}$`,
+                        'i'
+                    ),
+                    consumePattern: new RegExp(
+                        `^${escapedPrefix}${escapedOpen}[^${escapedClose}]*${escapedClose}`,
+                        'i'
+                    ),
+                    type: entry.type,
+                    tagText,
+                    bracket: open,
+                    bracketClose: close,
+                    reservedWidth: normalizeReservedWidth(entry.reservedWidth),
+                });
             }
             return;
         }
@@ -89,6 +99,9 @@ function buildKnownEscapeTagRegex(tagEntries) {
         withoutParameter.push({
             globalPattern: new RegExp(escapedPrefix, 'gi'),
             exactPattern: new RegExp(`^${escapedPrefix}$`, 'i'),
+            consumePattern: new RegExp(`^${escapedPrefix}`, 'i'),
+            type: entry.type,
+            tagText,
             reservedWidth: normalizeReservedWidth(entry.reservedWidth),
         });
     });
@@ -171,28 +184,49 @@ function computeVisibleCharWidthCost(fontLevel, multiplier) {
     return Math.pow(multiplier, 1 - fontLevel);
 }
 
-function resolveKnownEscapeTagReservedWidth(tagText, knownEscapeTagRegex) {
-    if (!knownEscapeTagRegex || typeof tagText !== 'string' || !tagText) {
-        return 0;
+function computeExtraWhitespaceWidth(text) {
+    let extraWidth = 0;
+    const sourceText = String(text || '');
+
+    for (const match of sourceText.match(/[ \t]{2,}/g) || []) {
+        extraWidth += match.length - 1;
     }
 
-    for (const matcher of knownEscapeTagRegex.parameterized) {
-        if (matcher.exactPattern.test(tagText)) {
-            return matcher.reservedWidth;
-        }
-    }
-
-    for (const matcher of knownEscapeTagRegex.withoutParameter) {
-        if (matcher.exactPattern.test(tagText)) {
-            return matcher.reservedWidth;
-        }
-    }
-
-    return 0;
+    return extraWidth;
 }
 
 function tryConsumeEscapeTag(sourceText, startIndex, knownEscapeTagRegex) {
     if (sourceText[startIndex] !== '\\') {
+        return null;
+    }
+
+    if (knownEscapeTagRegex) {
+        const remainingText = sourceText.slice(startIndex);
+
+        for (const matcher of knownEscapeTagRegex.parameterized) {
+            const matched = remainingText.match(matcher.consumePattern);
+            if (!matched) {
+                continue;
+            }
+
+            return {
+                endIndex: startIndex + matched[0].length,
+                reservedWidth: matcher.reservedWidth,
+            };
+        }
+
+        for (const matcher of knownEscapeTagRegex.withoutParameter) {
+            const matched = remainingText.match(matcher.consumePattern);
+            if (!matched) {
+                continue;
+            }
+
+            return {
+                endIndex: startIndex + matched[0].length,
+                reservedWidth: matcher.reservedWidth,
+            };
+        }
+
         return null;
     }
 
@@ -217,10 +251,7 @@ function tryConsumeEscapeTag(sourceText, startIndex, knownEscapeTagRegex) {
 
     return {
         endIndex: cursor,
-        reservedWidth: resolveKnownEscapeTagReservedWidth(
-            sourceText.slice(startIndex, cursor),
-            knownEscapeTagRegex
-        ),
+        reservedWidth: 0,
     };
 }
 
@@ -263,6 +294,10 @@ function measureTextWidthAndFontLevel(
         i += 1;
     }
 
+    weightedWidth += computeExtraWhitespaceWidth(
+        stripKnownEscapeTags(sourceText, knownEscapeTagRegex)
+    );
+
     return { weightedWidth, fontLevel };
 }
 
@@ -287,10 +322,6 @@ export function wrapTextByVisibleWidth(text, maxWidth, options = {}) {
             fontScaleWidthMultiplier,
             knownEscapeTagRegex
         );
-    const isFollowUp = (token) => {
-        const visible = stripKnownEscapeTags(token, knownEscapeTagRegex);
-        return visible.length === 0 || !/\w/.test(visible);
-    };
 
     const lines = sourceText.split('\n');
     const wrappedLines = [];
@@ -304,56 +335,57 @@ export function wrapTextByVisibleWidth(text, maxWidth, options = {}) {
             continue;
         }
 
-        const rawTokens = line.match(/\S+/g) || [];
-        const units = [];
-        for (const token of rawTokens) {
-            if (units.length > 0 && isFollowUp(token)) {
-                units[units.length - 1] += ' ' + token;
-            } else {
-                units.push(token);
-            }
-        }
-
         let currentLine = '';
         let currentLineStartFontLevel = lineStartFontLevel;
         let currentLineEndFontLevel = currentLineStartFontLevel;
 
-        for (const unit of units) {
-            const unitMetrics = getWeightedWidthAndFontLevel(unit, currentLineStartFontLevel);
-            const unitLen = unitMetrics.weightedWidth;
+        const rawTokens = line.match(/\s+|\S+/g) || [];
 
-            if (unitLen > maxWidth) {
-                if (currentLine) {
-                    wrappedLines.push(currentLine);
-                    currentLineStartFontLevel = currentLineEndFontLevel;
-                    currentLine = '';
-                }
-                wrappedLines.push(unit);
-                currentLineStartFontLevel = unitMetrics.fontLevel;
-                currentLineEndFontLevel = currentLineStartFontLevel;
-                continue;
+        const pushCurrentLine = () => {
+            const trimmedLine = currentLine.trimEnd();
+            if (trimmedLine) {
+                wrappedLines.push(trimmedLine);
             }
+            currentLineStartFontLevel = currentLineEndFontLevel;
+            currentLine = '';
+            currentLineEndFontLevel = currentLineStartFontLevel;
+        };
 
-            const testLine = currentLine ? currentLine + ' ' + unit : unit;
+        for (const token of rawTokens) {
+            const tokenMetrics = getWeightedWidthAndFontLevel(token, currentLineStartFontLevel);
+            const testLine = currentLine ? currentLine + token : token;
             const testLineMetrics = getWeightedWidthAndFontLevel(
                 testLine,
                 currentLineStartFontLevel
             );
+
             if (testLineMetrics.weightedWidth <= maxWidth) {
                 currentLine = testLine;
                 currentLineEndFontLevel = testLineMetrics.fontLevel;
-            } else {
-                if (currentLine) {
-                    wrappedLines.push(currentLine);
-                    currentLineStartFontLevel = currentLineEndFontLevel;
-                }
-                currentLine = unit;
-                currentLineEndFontLevel = unitMetrics.fontLevel;
+                continue;
             }
+
+            if (currentLine) {
+                pushCurrentLine();
+            }
+
+            if (/^\s+$/.test(token)) {
+                continue;
+            }
+
+            if (tokenMetrics.weightedWidth > maxWidth) {
+                wrappedLines.push(token);
+                currentLineStartFontLevel = tokenMetrics.fontLevel;
+                currentLineEndFontLevel = currentLineStartFontLevel;
+                continue;
+            }
+
+            currentLine = token;
+            currentLineEndFontLevel = tokenMetrics.fontLevel;
         }
 
         if (currentLine) {
-            wrappedLines.push(currentLine);
+            wrappedLines.push(currentLine.trimEnd());
             lineStartFontLevel = currentLineEndFontLevel;
         } else {
             lineStartFontLevel = currentLineStartFontLevel;
