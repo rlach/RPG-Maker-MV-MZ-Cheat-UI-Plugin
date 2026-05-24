@@ -1,6 +1,3 @@
-// Registers LL_StandingPicture control-character tags with the translation engine
-// so their command prefixes and bracketed values remain protected during translation.
-
 import { TAG_TYPE } from '../../ai-engine/constants.js';
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 
