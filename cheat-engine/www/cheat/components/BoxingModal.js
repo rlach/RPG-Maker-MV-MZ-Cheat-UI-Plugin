@@ -36,6 +36,37 @@ function getTypePrefix(cacheType) {
     return BASE_TYPE_TO_PREFIX[cacheType] || cacheType[0] || '?';
 }
 
+function createEmptyTypeStat(type) {
+    return { type, translatedCount: 0, untranslatedCount: 0 };
+}
+
+function shouldIncludeType(type, showAllTypes) {
+    return showAllTypes || DESCRIPTION_TYPES.includes(type);
+}
+
+function ensureTypeStat(statsMap, type) {
+    if (!statsMap[type]) {
+        statsMap[type] = createEmptyTypeStat(type);
+    }
+
+    return statsMap[type];
+}
+
+function tallyCacheEntry(statsMap, parsed, value) {
+    const typeStat = ensureTypeStat(statsMap, parsed.type);
+    const currentValue = typeof value === 'string' ? value : '';
+
+    if (currentValue === '') {
+        const original = typeof parsed.original === 'string' ? parsed.original.trim() : '';
+        if (original) {
+            typeStat.untranslatedCount++;
+        }
+        return;
+    }
+
+    typeStat.translatedCount++;
+}
+
 function makeObservable(value) {
     if (globalThis.Vue && typeof globalThis.Vue.observable === 'function') {
         return globalThis.Vue.observable(value);
@@ -90,38 +121,70 @@ class BoxingService {
             dialogVisible: false,
             typeStats: [], // [{ type, translatedCount, untranslatedCount }]
             selection: {}, // type -> boolean
+            showAllTypes: false,
             llmPrompt: DEFAULT_BOXING_PROMPT,
             isRunning: false,
         });
     }
 
-    _buildTypeStats(runtime) {
+    _buildTypeStats(runtime, showAllTypes = false) {
         const statsMap = {};
 
-        for (const type of DESCRIPTION_TYPES) {
-            statsMap[type] = { type, translatedCount: 0, untranslatedCount: 0 };
+        if (!showAllTypes) {
+            for (const type of DESCRIPTION_TYPES) {
+                statsMap[type] = createEmptyTypeStat(type);
+            }
         }
 
         for (const [cacheKey, value] of runtime.translationCache.entries()) {
-            const parsed = parseCacheKeyForLangPair(cacheKey, runtime.sourceLang, runtime.targetLang);
-            if (!parsed || !DESCRIPTION_TYPES.includes(parsed.type)) {
+            const parsed = parseCacheKeyForLangPair(
+                cacheKey,
+                runtime.sourceLang,
+                runtime.targetLang
+            );
+            if (!parsed || !shouldIncludeType(parsed.type, showAllTypes)) {
                 continue;
             }
 
-            const currentValue = typeof value === 'string' ? value : '';
-            if (currentValue === '') {
-                const original = typeof parsed.original === 'string' ? parsed.original.trim() : '';
-                if (original) {
-                    statsMap[parsed.type].untranslatedCount++;
-                }
-            } else {
-                statsMap[parsed.type].translatedCount++;
-            }
+            tallyCacheEntry(statsMap, parsed, value);
         }
 
         return Object.values(statsMap).filter(
             (s) => s.translatedCount > 0 || s.untranslatedCount > 0
         );
+    }
+
+    refreshTypeStats(runtime) {
+        const typeStats = this._buildTypeStats(runtime, this.state.showAllTypes);
+        const selection = { ...this.state.selection };
+
+        for (const stat of typeStats) {
+            if (!(stat.type in selection)) {
+                selection[stat.type] =
+                    stat.translatedCount > 0 && DESCRIPTION_TYPES.includes(stat.type);
+            }
+        }
+
+        this.state.typeStats = typeStats;
+        this.state.selection = selection;
+    }
+
+    setShowAllTypes(showAllTypes) {
+        const nextValue = !!showAllTypes;
+        if (this.state.showAllTypes === nextValue) {
+            return;
+        }
+
+        this.state.showAllTypes = nextValue;
+
+        let runtime;
+        try {
+            runtime = ensureTranslationRuntime();
+        } catch {
+            return;
+        }
+
+        this.refreshTypeStats(runtime);
     }
 
     openModal() {
@@ -144,15 +207,9 @@ class BoxingService {
             return;
         }
 
-        const typeStats = this._buildTypeStats(runtime);
-
-        const selection = {};
-        for (const s of typeStats) {
-            selection[s.type] = s.translatedCount > 0;
-        }
-
-        this.state.typeStats = typeStats;
-        this.state.selection = selection;
+        this.state.showAllTypes = false;
+        this.state.selection = {};
+        this.refreshTypeStats(runtime);
         this.state.llmPrompt = DEFAULT_BOXING_PROMPT;
         this.state.isRunning = false;
         this.state.dialogVisible = true;
@@ -177,9 +234,9 @@ class BoxingService {
             return;
         }
 
-        const selectedTypes = Object.entries(this.state.selection)
-            .filter(([, v]) => v)
-            .map(([k]) => k);
+        const selectedTypes = this.state.typeStats
+            .filter((stat) => this.state.selection[stat.type])
+            .map((stat) => stat.type);
 
         if (!selectedTypes.length) {
             runtime.notify('warn', 'No description types selected.');
@@ -220,7 +277,8 @@ class BoxingService {
             ]);
         } catch (error) {
             console.error('[BoxingService] Boxing failed', error);
-            runtime.notify('error', 'Boxing failed: ' + (error?.message || String(error)));
+            const message = error instanceof Error ? error.message : String(error);
+            runtime.notify('error', 'Boxing failed: ' + message);
         } finally {
             this.state.isRunning = false;
             runtime.endNonOtfTranslationProcess();
@@ -257,6 +315,15 @@ export default {
           <div class="caption grey--text">No translated description entries found for current language pair.</div>
         </template>
         <template v-else>
+                    <div class="d-flex align-center mb-2">
+                        <v-checkbox
+                            v-model="showAllTypes"
+                            label="Show all types"
+                            hide-details
+                            dense
+                            class="ma-0 pa-0"
+                        ></v-checkbox>
+                    </div>
           <div
             v-for="stat in typeStats"
             :key="stat.type"
@@ -347,41 +414,71 @@ export default {
 
     computed: {
         dialogVisible: {
-            get() { return BOXING_SERVICE.state.dialogVisible; },
-            set(v) { if (!v) BOXING_SERVICE.closeModal(); },
+            get() {
+                return BOXING_SERVICE.state.dialogVisible;
+            },
+            set(v) {
+                if (!v) BOXING_SERVICE.closeModal();
+            },
         },
-        typeStats() { return BOXING_SERVICE.state.typeStats; },
-        selection() { return BOXING_SERVICE.state.selection; },
+        typeStats() {
+            return BOXING_SERVICE.state.typeStats;
+        },
+        selection() {
+            return BOXING_SERVICE.state.selection;
+        },
+        showAllTypes: {
+            get() {
+                return BOXING_SERVICE.state.showAllTypes;
+            },
+            set(v) {
+                BOXING_SERVICE.setShowAllTypes(v);
+            },
+        },
         llmPrompt: {
-            get() { return BOXING_SERVICE.state.llmPrompt; },
-            set(v) { BOXING_SERVICE.state.llmPrompt = v; },
+            get() {
+                return BOXING_SERVICE.state.llmPrompt;
+            },
+            set(v) {
+                BOXING_SERVICE.state.llmPrompt = v;
+            },
         },
         descriptionMaxLineWidth: {
             get() {
                 try {
                     return ensureTranslationRuntime().descriptionMaxLineWidth;
-                } catch { return 59; }
+                } catch {
+                    return 59;
+                }
             },
             set(v) {
                 try {
                     ensureTranslationRuntime().descriptionMaxLineWidth = v;
-                } catch { /* ignore */ }
+                } catch {
+                    /* ignore */
+                }
             },
         },
         descriptionMaxRows: {
             get() {
                 try {
                     return ensureTranslationRuntime().descriptionMaxRows;
-                } catch { return 2; }
+                } catch {
+                    return 2;
+                }
             },
             set(v) {
                 try {
                     ensureTranslationRuntime().descriptionMaxRows = v;
-                } catch { /* ignore */ }
+                } catch {
+                    /* ignore */
+                }
             },
         },
         hasSelection() {
-            return Object.values(this.selection).some(Boolean);
+            return BOXING_SERVICE.state.typeStats.some(
+                (stat) => BOXING_SERVICE.state.selection[stat.type]
+            );
         },
     },
 

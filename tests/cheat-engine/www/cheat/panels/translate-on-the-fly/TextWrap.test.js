@@ -54,15 +54,14 @@ describe('wrapTextByVisibleWidth', () => {
     });
 
     it('splits when visible width exceeds limit while still treating known tags as zero-width', () => {
-        const input =
-            "\\AA[2]\\F1[1](I see, that's why she got lost on such a simple path. What a silly person, to make a mistake like that)";
+        const input = String.raw`\AA[2]\F1[1](I see, that's why she got lost on such a simple path. What a silly person, to make a mistake like that)`;
 
         const output = wrapTextByVisibleWidth(input, 60, {
             tagEntries: KNOWN_BACKSLASH_TAGS,
         });
 
         expect(output).toBe(
-            "\\AA[2]\\F1[1](I see, that's why she got lost on such a simple path.\nWhat a silly person, to make a mistake like that)"
+            "\\AA[2]\\F1[1](I see, that's why she got lost on such a simple path. What\na silly person, to make a mistake like that)"
         );
     });
 
@@ -163,5 +162,26 @@ describe('wrapTextByVisibleWidth', () => {
         });
 
         expect(output).toBe('\\X[foo] alpha\nbeta');
+    });
+
+    it('does not swallow visible text after a known one-character escape tag', () => {
+        const input = String.raw`"...That's true. Thank you for your concern. \> \<So, did you need something from me?"`;
+
+        const output = wrapTextByVisibleWidth(input, 60, {
+            tagEntries: [
+                {
+                    tagSymbol: '>',
+                    type: 'withoutParameter',
+                },
+                {
+                    tagSymbol: '<',
+                    type: 'withoutParameter',
+                },
+            ],
+        });
+
+        expect(output).toBe(
+            '"...That\'s true. Thank you for your concern. \\> \\<So, did you\nneed something from me?"'
+        );
     });
 });
