@@ -1340,6 +1340,10 @@ export const translateOnTheFlyRuntimeMethods = {
             DataManager._extractSaveContents = DataManager.extractSaveContents;
         }
 
+        if (!DataManager._onLoad) {
+            DataManager._onLoad = DataManager.onLoad;
+        }
+
         DataManager.extractSaveContents = function (contents) {
             DataManager._extractSaveContents(contents);
             console.log(
@@ -1411,7 +1415,8 @@ export const translateOnTheFlyRuntimeMethods = {
 
         if (typeof Scene_Map !== 'undefined') {
             const originalOnMapLoaded =
-                Scene_Map.prototype._translateOriginalOnMapLoaded || Scene_Map.prototype.onMapLoaded;
+                Scene_Map.prototype._translateOriginalOnMapLoaded ||
+                Scene_Map.prototype.onMapLoaded;
 
             if (!Scene_Map.prototype._translateOriginalOnMapLoaded) {
                 Scene_Map.prototype._translateOriginalOnMapLoaded = originalOnMapLoaded;
