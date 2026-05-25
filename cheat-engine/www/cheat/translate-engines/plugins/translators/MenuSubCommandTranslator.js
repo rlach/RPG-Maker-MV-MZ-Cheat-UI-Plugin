@@ -11,10 +11,11 @@ const INSTANCE_HOOK_FLAG = '__CHEAT_MENU_SUB_COMMAND_INSTANCE_PATCHED__';
  * Plugin: MenuSubCommand.js (Triacontane)
  * Supported versions:
  * - v4.1.1 (MZ; plugin header declares @target MZ)
+ * - v2.8.0 (MV)
  *
  * Translatable surfaces:
- * - Plugin parameter subCommands[].Name
- * - Plugin parameter subCommands[].ParentName
+ * - Plugin parameter subCommands/SubCommand/サブコマンド[].Name
+ * - Plugin parameter subCommands/SubCommand/サブコマンド[].ParentName
  *
  * Notes:
  * - Script payloads and command tokens are not translated to preserve command syntax.
@@ -41,7 +42,10 @@ export class MenuSubCommandTranslator extends BasePluginTranslator {
     }
 
     parseSubCommandArray(parameters) {
-        const parsed = parseJsonSafely(parameters?.subCommands, []);
+        const parsed = parseJsonSafely(
+            parameters?.subCommands ?? parameters?.SubCommand ?? parameters?.['サブコマンド'],
+            []
+        );
         if (!Array.isArray(parsed)) {
             return [];
         }
@@ -108,28 +112,18 @@ export class MenuSubCommandTranslator extends BasePluginTranslator {
 
         subCommand.getName = (...args) => {
             const originalText = originalGetName.apply(subCommand, args);
-            return this.resolveRuntimeTranslation(
-                originalText,
-                this.getRuntime(),
-                this.getCacheType(),
-                {
-                    requireRuntimeTranslationActive: true,
-                    missValue: originalText,
-                }
-            );
+            return this.resolveRuntimeTranslation(originalText, this.getRuntime(), this.getCacheType(), {
+                requireRuntimeTranslationActive: true,
+                missValue: originalText,
+            });
         };
 
         subCommand.getParentName = (...args) => {
             const originalText = originalGetParentName.apply(subCommand, args);
-            return this.resolveRuntimeTranslation(
-                originalText,
-                this.getRuntime(),
-                this.getCacheType(),
-                {
-                    requireRuntimeTranslationActive: true,
-                    missValue: originalText,
-                }
-            );
+            return this.resolveRuntimeTranslation(originalText, this.getRuntime(), this.getCacheType(), {
+                requireRuntimeTranslationActive: true,
+                missValue: originalText,
+            });
         };
 
         Object.defineProperty(subCommand, INSTANCE_HOOK_FLAG, {
@@ -153,7 +147,7 @@ export class MenuSubCommandTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        const gameTempPrototype = window.Game_Temp?.prototype;
+        const gameTempPrototype = window['Game_Temp']?.prototype;
         if (!gameTempPrototype || typeof gameTempPrototype.createMenuCommand !== 'function') {
             return false;
         }
@@ -224,11 +218,7 @@ export class MenuSubCommandTranslator extends BasePluginTranslator {
 
         const pluginEntry = this.findPluginEntry(this.getPluginName());
         if (pluginEntry?.parameters) {
-            this.appendEntriesFromParameters(
-                pluginEntry.parameters,
-                'pluginEntryParameter',
-                entries
-            );
+            this.appendEntriesFromParameters(pluginEntry.parameters, 'pluginEntryParameter', entries);
         }
 
         const runtimeParameters = window.PluginManager?.parameters?.(this.getPluginName());
