@@ -53,10 +53,10 @@ class AIEngine extends BaseTranslationEngine {
         this.loadingModels = false;
         this.modelsError = '';
         this.askAiIfTextTranslated = true;
-        this.invalidJsonHandlingStrategy = 'resendFirstHalf';
+        this.invalidJsonHandlingStrategy = 'resendXTimes';
         this._aiInvalidJsonResendCount = 3;
-        this.lengthMultiplierForMaxLength = 5;
-        this.minimumMaxLength = 30;
+        this.lengthMultiplierForMaxLength = 9;
+        this.minimumMaxLength = 100;
         this.systemPrompt = DEFAULT_SYSTEM_PROMPT;
         this.useJsonFixer = true;
         this.bannedPhrasesText = DEFAULT_BANNED_PHRASES_TEXT;
@@ -416,7 +416,10 @@ class AIEngine extends BaseTranslationEngine {
     }
 
     getDefaultTagConfigsForUi() {
-        return [...TAG_CONFIGS.map((tag) => this.applyTagOverrides(tag, 'default', '')), this.getSimpleNewlineTagConfig()];
+        return [
+            ...TAG_CONFIGS.map((tag) => this.applyTagOverrides(tag, 'default', '')),
+            this.getSimpleNewlineTagConfig(),
+        ];
     }
 
     /** Merge plugin + user custom tags and push to TagManager. */
@@ -966,7 +969,7 @@ class AIEngine extends BaseTranslationEngine {
                     {
                         role: 'system',
                         content: isBoxingMode
-                            ? (options.boxingSystemMessage || '')
+                            ? options.boxingSystemMessage || ''
                             : (() => {
                                   // Check if batch contains description keys and addBoxWidthInfoToLlmPrompt is on
                                   let descBoxingPart = '';
@@ -1652,7 +1655,9 @@ class AIEngine extends BaseTranslationEngine {
         const newlineTagConfig = this.getSimpleNewlineTagConfig();
         const shouldValidateConsistency = newlineTagConfig.requiredConsistency === true;
         const expectedNewlineCount = this.getNewlineCountFromTagCounts(item?.tagCounts);
-        const actualNewlineCount = this.getNewlineCountFromTagCounts(postprocessResult?.actualCounts);
+        const actualNewlineCount = this.getNewlineCountFromTagCounts(
+            postprocessResult?.actualCounts
+        );
         const isDescription = this.isDescriptionType(item?.type);
         const hasDescriptionBoxPrompt = !!this.runtime?.addBoxWidthInfoToLlmPrompt;
 

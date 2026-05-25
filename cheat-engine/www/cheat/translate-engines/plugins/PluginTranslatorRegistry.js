@@ -91,6 +91,7 @@ import { CommonPopupCoreTranslator } from './translators/CommonPopupCoreTranslat
 import { FtkrCustomSimpleActorStatusTranslator } from './translators/FtkrCustomSimpleActorStatusTranslator.js';
 import { GirlsWindowTranslator } from './translators/GirlsWindowTranslator.js';
 import { ItemCombinationMZTranslator } from './translators/ItemCombinationMZTranslator.js';
+import { ItemNameEscapeTranslator } from './translators/ItemNameEscapeTranslator.js';
 import { LiveCommentTranslator } from './translators/LiveCommentTranslator.js';
 import { MessagePExRiruTranslator } from './translators/MessagePExRiruTranslator.js';
 import { LLMenuScreenTranslator } from './translators/LLMenuScreenTranslator.js';
@@ -131,6 +132,7 @@ class PluginTranslatorRegistry {
             GirlsWindowTranslator,
             HelpWindowPluginTranslator,
             ItemCombinationMZTranslator,
+            ItemNameEscapeTranslator,
             DestinationWindowTranslator,
             KOriginalMenuScreenTranslator,
             KmsMapActiveMessageTranslator,
