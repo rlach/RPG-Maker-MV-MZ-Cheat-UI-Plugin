@@ -76,6 +76,7 @@ import { YEPCoreEngineScriptTranslator } from './translators/YEPCoreEngineScript
 import { YepMessageCoreTranslator } from './translators/YepMessageCoreTranslator.js';
 import { YepQuestJournalTranslator } from './translators/YepQuestJournalTranslator.js';
 import { YepEventMiniLabelTranslator } from './translators/YepEventMiniLabelTranslator.js';
+import { YepEquipCoreTranslator } from './translators/YepEquipCoreTranslator.js';
 import { SabaSimpleScenarioTranslator } from './translators/SabaSimpleScenarioTranslator.js';
 import { SabaTachieTranslator } from './translators/SabaTachieTranslator.js';
 import { YepGabWindowTranslator } from './translators/YepGabWindowTranslator.js';
@@ -200,6 +201,7 @@ class PluginTranslatorRegistry {
             YedWordWrapTranslator,
             YkpItemCompositionTranslator,
             YEPCoreEngineScriptTranslator,
+            YepEquipCoreTranslator,
             YepGabWindowTranslator,
             YepEventMiniLabelTranslator,
             YepMessageCoreTranslator,
