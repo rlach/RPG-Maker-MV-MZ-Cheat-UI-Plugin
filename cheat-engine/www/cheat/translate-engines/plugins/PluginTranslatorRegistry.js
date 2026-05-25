@@ -60,6 +60,7 @@ import { SetMessageFontSizeTranslator } from './translators/SetMessageFontSizeTr
 import { SHMessageWindowBgTranslator } from './translators/SHMessageWindowBgTranslator.js';
 import { SkillCPSystemTranslator } from './translators/SkillCPSystemTranslator.js';
 import { SkillTreeTranslator } from './translators/SkillTreeTranslator.js';
+import { SItemsceneKzTranslator } from './translators/SItemsceneKzTranslator.js';
 import { TextPictureTranslator } from './translators/TextPictureTranslator.js';
 import { TMMenuLabelTranslator } from './translators/TMMenuLabelTranslator.js';
 import { TMNamePopTranslator } from './translators/TMNamePopTranslator.js';
@@ -182,6 +183,7 @@ class PluginTranslatorRegistry {
             SceneGlossaryTranslator,
             SetMessageFontSizeTranslator,
             SHMessageWindowBgTranslator,
+            SItemsceneKzTranslator,
             SkillCPSystemTranslator,
             SkillTreeTranslator,
             TextPictureTranslator,
