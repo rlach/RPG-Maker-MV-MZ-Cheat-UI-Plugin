@@ -312,7 +312,8 @@ export const translateOnTheFlyCoreMethods = {
         }
 
         const parsed = this.parseCompositeCacheKey(cacheKey);
-        const sourceCommandName = parsed?.type === 'command' ? this.normalizeCommandLookupText(parsed.textKey) : '';
+        const sourceCommandName =
+            parsed?.type === 'command' ? this.normalizeCommandLookupText(parsed.textKey) : '';
         if (!sourceCommandName) {
             return cacheKey;
         }

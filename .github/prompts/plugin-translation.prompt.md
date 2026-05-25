@@ -58,6 +58,8 @@ Keep the implementation lean, focused and DRY. If you don't need to reimpement b
 - runtime integration in enablePluginTranslation() when applicable - be sure to return false when required objects/methods are not yet available to trigger retry logic, and return true at the end of the method when hooks are successfully applied. This ensures robust integration that waits for the right conditions and surfaces issues in logs instead of failing silently. Also, do not eat errors that can't be recovered from - either throw or return false to trigger retry, to ensure visibility of issues in logs.
 - at the top of the file, add a comment block with a brief description of the plugin and any important notes about its translation (e.g. if it has special parsing requirements, where text is stored, etc.). Also include plugin version, whenever it was target for MV or MZ (if no MZ/target is mentioned it means MV). When updating existing translator to support new plugin version or another engine (For example adding MZ support to an existing MV translator), add a version note in the comment block with the new version and any important differences in translation approach for that version. We want all supported versions listed.
 
+SINCE YOU ARE OVERRIDING EXISTING CLASS DO NOT IMPLEMENT FUNCTIONS THAT YOU DON'T NEED TO CHANGE. For example if the translator doesn't have to collect any untranslated strings for mass translation do not implement async precomputeCounts() AT ALL. This applies to many other functions. DRY!
+
     2.1 Lifecycle and invocation model (CRITICAL)
 
 Plugins are managed by orchestrator.

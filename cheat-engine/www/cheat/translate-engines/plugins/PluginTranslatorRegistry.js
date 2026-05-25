@@ -9,6 +9,7 @@ import { ExternMessageTranslator } from './translators/ExternMessageTranslator.j
 import { FtkrCssDetailedStatusTranslator } from './translators/FtkrCssDetailedStatusTranslator.js';
 import { FtkrGdmWindowEditorTranslator } from './translators/FtkrGdmWindowEditorTranslator.js';
 import { FtkrItemCompositionSystemTranslator } from './translators/FtkrItemCompositionSystemTranslator.js';
+import { FtkrSkillExpansionTranslator } from './translators/FTKRSkillExpansionTranslator.js';
 import { FtkrSkillTreeSystemTranslator } from './translators/FtkrSkillTreeSystemTranslator.js';
 import { FtkrMessageWindowLinesTranslator } from './translators/FTKRMessageWindowLinesTranslator.js';
 import { CbrEroStatusMvTranslator } from './translators/CbrEroStatusMvTranslator.js';
@@ -113,6 +114,7 @@ class PluginTranslatorRegistry {
             FtkrCustomSimpleActorStatusTranslator,
             FtkrGdmWindowEditorTranslator,
             FtkrItemCompositionSystemTranslator,
+            FtkrSkillExpansionTranslator,
             FtkrSkillTreeSystemTranslator,
             FtkrMessageWindowLinesTranslator,
             CbrEroStatusMvTranslator,
