@@ -1,11 +1,69 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
+import { TAG_BRACKET, TAG_TYPE } from '../../ai-engine/constants.js';
 
 function normalizeCommandName(value) {
     return String(value || '')
         .trim()
         .toUpperCase();
 }
+
+/*
+ * 専用制御文字
+ * \V[n,m](m桁分のパラメータで指定した文字で埋めた変数の値)
+
+
+
+ *
+ * */
+function addTagWithNumericParameter(tagSymbol, description) {
+    return {
+        description,
+        type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
+        tagSymbol,
+        bracket: TAG_BRACKET.SQUARE,
+        requiredConsistency: true,
+    };
+}
+
+function addTagWithCustomParameter(tagSymbol, description) {
+    return {
+        description,
+        type: TAG_TYPE.WITH_CUSTOM_PARAMETER,
+        tagSymbol,
+        bracket: TAG_BRACKET.SQUARE,
+        maskValue: true,
+        requiredConsistency: true,
+    };
+}
+
+const PLUGIN_TAGS = [
+    addTagWithNumericParameter('ITEM', 'Item information for item number (icon + name)'),
+    addTagWithNumericParameter('WEAPON', 'Weapon information for weapon number (icon + name)'),
+    addTagWithNumericParameter('ARMOR', 'Armor information for armor number (icon + name)'),
+    addTagWithNumericParameter('SKILL', 'Skill information for skill number (icon + name)'),
+    addTagWithNumericParameter('STATE', 'State information for state number (icon + name)'),
+    addTagWithNumericParameter(
+        'OC',
+        'Outline color information for outline color number (icon + name)'
+    ),
+    addTagWithNumericParameter(
+        'OW',
+        'Outline width information for outline width number (icon + name)'
+    ),
+    addTagWithCustomParameter(
+        'F',
+        'Change font to specified style (b: bold, i: italic, n: normal)'
+    ),
+    addTagWithCustomParameter(
+        'OC',
+        'Change outline color to specified color (color name, rgb(), or color number)'
+    ),
+    addTagWithCustomParameter(
+        'V',
+        'Parameters [n,m] - The value of a variable padded with characters specified by m-digit parameters'
+    ),
+];
 
 export class DTextPictureTranslator extends BasePluginTranslator {
     initialDelayBeforeEnablePluginTranslationMs = 1000;
@@ -38,6 +96,7 @@ export class DTextPictureTranslator extends BasePluginTranslator {
         ) {
             return false;
         }
+        this.registerPluginCustomTags(PLUGIN_TAGS);
 
         const original = Game_Screen.prototype.setDTextPicture;
         Game_Screen.prototype.setDTextPicture = function (value, size) {
