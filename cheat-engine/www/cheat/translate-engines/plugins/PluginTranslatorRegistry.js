@@ -81,6 +81,7 @@ import { LLMenuScreenCustomTranslator } from './translators/LLMenuScreenCustomTr
 import { MessageAlignCenterTranslator } from './translators/MessageAlignCenterTranslator.js';
 import { PlayMsgWndCharSeMZTranslator } from './translators/PlayMsgWndCharSeMZTranslator.js';
 import { LLInfoPopupWIndowTranslator } from './translators/LLInfoPopupWIndowTranslator.js';
+import { MkrMapItemSlotTranslator } from './translators/MkrMapItemSlotTranslator.js';
 
 class PluginTranslatorRegistry {
     constructor() {
@@ -129,6 +130,7 @@ class PluginTranslatorRegistry {
             MppChoiceExTranslator,
             MppMessageExTranslator,
             MenuSubCommandTranslator,
+            MkrMapItemSlotTranslator,
             MultipleWindowSkinSystemTranslator,
             NekoGakuenMulitLanguageTranslator,
             NrpMapTravelTranslator,
