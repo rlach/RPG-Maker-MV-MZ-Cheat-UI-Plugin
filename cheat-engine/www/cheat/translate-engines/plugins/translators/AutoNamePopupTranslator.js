@@ -42,9 +42,14 @@ export class AutoNamePopupTranslator extends BasePluginTranslator {
         if (
             !window.Game_Message ||
             !Game_Message.prototype ||
-            typeof Game_Message.prototype.allText !== 'function' ||
-            typeof Game_Message.prototype.setSpeakerName !== 'function'
+            (typeof Game_Message.prototype.allText !== 'function' &&
+                typeof Game_Message.prototype.setSpeakerName !== 'function')
         ) {
+            console.log(
+                '[AutoNamePopupTranslator] Required Game_Message methods not found, skipping plugin translation',
+                Game_Message.prototype.allText,
+                Game_Message.prototype.setSpeakerName
+            );
             return false;
         }
 
