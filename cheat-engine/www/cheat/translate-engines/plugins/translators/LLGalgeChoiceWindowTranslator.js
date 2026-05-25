@@ -8,11 +8,14 @@ import { parseJsonSafely } from './TranslatorHelpers.js';
  * Supported plugin versions:
  * - LL_GalgeChoiceWindow.js v1.0.5 (MZ)
  * - LL_GalgeChoiceWindow.js v2.0.1 (MZ)
+ * - LL_GalgeChoiceWindowMV.js v1.0.3 (MV)
  *
  * Notes:
- * - Extracts text from plugin command "showChoice" args:
+ * - MZ: Extracts text from plugin command "showChoice" args:
  *   - messageText (multi-line)
  *   - choices (JSON array of struct JSON strings, using each struct.label)
+ * - MV: Reconstructs displayed text from plugin-command flow:
+ *   - setMessageText / setChoices state before showChoice
  * - Runtime hooks patch the plugin's custom UI drawing flow
  *   (Window_GalgeChoiceList#setQuestionText / #drawItem), with support for:
  *   - v2.x Scene_Message#createGalgeChoiceListWindow path
@@ -21,7 +24,24 @@ import { parseJsonSafely } from './TranslatorHelpers.js';
  */
 
 const LL_GALGE_PLUGIN_NAME = 'll_galgechoicewindow';
+const LL_GALGE_PLUGIN_NAME_MV = 'll_galgechoicewindowmv';
 const LL_GALGE_SHOW_CHOICE_COMMAND = 'showChoice';
+const LL_GALGE_SET_MESSAGE_COMMAND = 'setMessageText';
+const LL_GALGE_SET_CHOICES_COMMAND = 'setChoices';
+
+function splitMvPluginCommandLine(commandLine) {
+    const normalized = String(commandLine || '').trim();
+    if (!normalized) {
+        return { pluginName: '', subCommand: '', tail: '' };
+    }
+
+    const [pluginName = '', subCommand = '', ...tailParts] = normalized.split(/\s+/);
+    return {
+        pluginName,
+        subCommand,
+        tail: tailParts.join(' '),
+    };
+}
 
 function toLowerSafe(value) {
     return String(value || '')
@@ -45,6 +65,10 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
         return 'LL_GalgeChoiceWindow';
     }
 
+    getPluginAliases() {
+        return ['LL_GalgeChoiceWindow', 'LL_GalgeChoiceWindowMV'];
+    }
+
     getPluginLabel() {
         return 'LL GalgeChoiceWindow';
     }
@@ -54,11 +78,14 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (
-            !this.installEarlyWindowCommandHook() ||
-            !this.installSceneMessageHooks() ||
-            !this.installLegacyScenePushHooks()
-        ) {
+        if (!this.installEarlyWindowCommandHook() || !this.installLegacyScenePushHooks()) {
+            return false;
+        }
+
+        const sceneMessageProto = window.Scene_Message?.prototype;
+        const canInstallSceneMessageHook =
+            sceneMessageProto && typeof sceneMessageProto.createGalgeChoiceListWindow === 'function';
+        if (canInstallSceneMessageHook && !this.installSceneMessageHooks()) {
             return false;
         }
 
@@ -276,11 +303,7 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
             const originalSetQuestionText = windowProto.setQuestionText;
             windowProto.setQuestionText = function () {
                 const runtime = getRuntime();
-                if (
-                    !runtime ||
-                    !isRuntimeTranslationActive(runtime) ||
-                    typeof this.drawText !== 'function'
-                ) {
+                if (!runtime || !isRuntimeTranslationActive(runtime) || !this.drawText) {
                     return originalSetQuestionText.apply(this, arguments);
                 }
 
@@ -313,11 +336,7 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
             const originalDrawItem = windowProto.drawItem;
             windowProto.drawItem = function () {
                 const runtime = getRuntime();
-                if (
-                    !runtime ||
-                    !isRuntimeTranslationActive(runtime) ||
-                    typeof this.commandName !== 'function'
-                ) {
+                if (!runtime || !isRuntimeTranslationActive(runtime) || !this.commandName) {
                     return originalDrawItem.apply(this, arguments);
                 }
 
@@ -353,7 +372,95 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
         const params = Array.isArray(parameters) ? parameters : [];
         const pluginName = toLowerSafe(params[0]);
         const commandName = String(params[1] || '').trim();
-        return pluginName === LL_GALGE_PLUGIN_NAME && commandName === LL_GALGE_SHOW_CHOICE_COMMAND;
+        return (
+            (pluginName === LL_GALGE_PLUGIN_NAME || pluginName === LL_GALGE_PLUGIN_NAME_MV) &&
+            commandName === LL_GALGE_SHOW_CHOICE_COMMAND
+        );
+    }
+
+    isMvGalgePluginCommand(pluginName) {
+        const normalizedPluginName = toLowerSafe(pluginName);
+        return (
+            normalizedPluginName === LL_GALGE_PLUGIN_NAME ||
+            normalizedPluginName === LL_GALGE_PLUGIN_NAME_MV
+        );
+    }
+
+    applyMvCommandToState(parsedCommand, state) {
+        if (parsedCommand.subCommand === LL_GALGE_SET_MESSAGE_COMMAND) {
+            state.messageText = parsedCommand.tail;
+            return false;
+        }
+
+        if (parsedCommand.subCommand === LL_GALGE_SET_CHOICES_COMMAND) {
+            state.choices = parsedCommand.tail
+                .split(',')
+                .map((choice) => String(choice || '').trim())
+                .filter((choice) => this.isUsableText(choice));
+            return false;
+        }
+
+        return parsedCommand.subCommand === LL_GALGE_SHOW_CHOICE_COMMAND;
+    }
+
+    buildMvShowChoiceEntry(state) {
+        const messageLines = splitMessageTextLines(state.messageText).filter((line) =>
+            this.isUsableText(line)
+        );
+        const choiceLabels = state.choices.slice();
+
+        if (messageLines.length === 0 && choiceLabels.length === 0) {
+            return null;
+        }
+
+        return {
+            messageLines,
+            choiceLabels,
+        };
+    }
+
+    extractShowChoiceEntryFromMvList(list, showChoiceIdx) {
+        if (!Array.isArray(list)) {
+            return null;
+        }
+
+        const showChoiceCommand = list[showChoiceIdx];
+        if (!showChoiceCommand || Number(showChoiceCommand.code) !== 356) {
+            return null;
+        }
+
+        const showChoiceCommandLine = Array.isArray(showChoiceCommand.parameters)
+            ? showChoiceCommand.parameters[0]
+            : '';
+        const showChoiceParsed = splitMvPluginCommandLine(showChoiceCommandLine);
+        if (
+            !this.isMvGalgePluginCommand(showChoiceParsed.pluginName) ||
+            showChoiceParsed.subCommand !== LL_GALGE_SHOW_CHOICE_COMMAND
+        ) {
+            return null;
+        }
+
+        const state = {
+            messageText: '',
+            choices: [],
+        };
+
+        for (let cmdIdx = 0; cmdIdx <= showChoiceIdx; cmdIdx++) {
+            const cmd = list[cmdIdx];
+            if (!cmd || Number(cmd.code) !== 356) {
+                continue;
+            }
+
+            const commandLine = Array.isArray(cmd.parameters) ? cmd.parameters[0] : '';
+            const parsed = splitMvPluginCommandLine(commandLine);
+            if (!this.isMvGalgePluginCommand(parsed.pluginName)) {
+                continue;
+            }
+
+            this.applyMvCommandToState(parsed, state);
+        }
+
+        return this.buildMvShowChoiceEntry(state);
     }
 
     translateShowChoiceArgs(args, runtime) {
@@ -451,10 +558,6 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
         return JSON.stringify(translatedChoices);
     }
     async precomputeCounts() {
-        if (!this.ensureDetection()) {
-            return;
-        }
-
         if (this._scanPrepared) {
             return;
         }
@@ -595,7 +698,7 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            const entry = this.extractShowChoiceEntry(cmd);
+            const entry = this.extractShowChoiceEntry(cmd) || this.extractShowChoiceEntryFromMvList(list, cmdIdx);
             if (!entry) {
                 continue;
             }

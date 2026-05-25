@@ -49,7 +49,7 @@ Keep the implementation lean, focused and DRY. If you don't need to reimpement b
 
 2. Create a new translator class that extends BasePluginTranslator and implement:
 
-- getPluginName()
+- getPluginName() (if the plugin has multiple versions/aliases, implement getPluginAliases() IN ADDITION to this to return an array of names)
 - getPluginLabel()
 - getCacheType() with a dedicated plugin\_\* cache type
 - precomputeCounts() + buildScanEntries()
