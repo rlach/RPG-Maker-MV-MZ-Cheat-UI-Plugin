@@ -39,7 +39,7 @@ const GET_INFORMATION_PLUGIN_TAGS = [
         tagSymbol: 'I',
         bracket: '[',
         maskValue: true,
-        requiredConsistency: false,
+        requiredConsistency: true,
     },
     {
         description: 'GetInformation SE control',
@@ -47,27 +47,52 @@ const GET_INFORMATION_PLUGIN_TAGS = [
         tagSymbol: 'SE',
         bracket: '[',
         maskValue: true,
-        requiredConsistency: false,
+        requiredConsistency: true,
     },
 ];
 
 function splitCommandLine(commandLine) {
-    const line = String(commandLine || '').trim();
-    if (!line) {
+    const line = String(commandLine || '');
+    if (!line.trim()) {
         return { command: '', payload: '' };
     }
 
-    const firstSpace = line.indexOf(' ');
-    if (firstSpace < 0) {
+    const leftTrimmed = line.trimStart();
+    if (!leftTrimmed) {
+        return { command: '', payload: '' };
+    }
+
+    const firstWhitespace = leftTrimmed.search(/\s/);
+    if (firstWhitespace < 0) {
+        return { command: leftTrimmed, payload: '' };
+    }
+
+    const command = leftTrimmed.slice(0, firstWhitespace);
+    const separatorAndPayload = leftTrimmed.slice(firstWhitespace);
+    if (!separatorAndPayload) {
         return { command: line, payload: '' };
     }
 
+    // Keep payload whitespace exactly as authored, except the single separator
+    // character that separates command token from payload.
+    const payload = separatorAndPayload.slice(1);
+
     return {
-        command: line.slice(0, firstSpace).trim(),
-        payload: line.slice(firstSpace + 1).trim(),
+        command,
+        payload,
     };
 }
 
+/**
+ * GetInformation plugin translator.
+ *
+ * Supported versions:
+ * - MV v1.171
+ *
+ * Notes:
+ * - Preserves leading whitespace in ShowInfo command payload text.
+ * - Only strips the single command separator character after ShowInfo/インフォ表示.
+ */
 export class GetInformationTranslator extends BasePluginTranslator {
     constructor() {
         super();
@@ -505,11 +530,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
         commonPopupManager.showInfo = function (object, value, type, actor, c) {
             try {
                 const result = resolveRuntimeTranslation(...arguments);
-                if (
-                    result?.shouldOverrideTemplate &&
-                    isUsableTranslatedTemplate(result.template) &&
-                    result.preSubstituted
-                ) {
+                if (result?.shouldOverrideTemplate && isUsableTranslatedTemplate(result.template)) {
                     arguments[1] = result.template;
                     arguments[2] = DIRECT_TEMPLATE_TYPE;
                 }
