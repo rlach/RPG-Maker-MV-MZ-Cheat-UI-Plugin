@@ -1,7 +1,7 @@
 {
     "name": "rpg-maker-mv-mz-cheat-ui-plugin",
     "private": true,
-    "version": "1.26.59",
+    "version": "1.26.60",
     "scripts": {
         "deploy": "python ./deploy/main.py",
         "format": "prettier --write \"./cheat-engine/www/**/*.{js,vue,css,html,json}\" \"./types/**/*.d.ts\" \"./.vscode/*.{json}\" \"./*.json\"",
