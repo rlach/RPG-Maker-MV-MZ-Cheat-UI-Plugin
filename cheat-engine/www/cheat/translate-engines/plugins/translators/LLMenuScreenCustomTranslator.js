@@ -74,7 +74,9 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
     }
 
     _findCustomPluginEntry() {
-        return this.findPluginEntry(PLUGIN_NAME_CUSTOM) || this.findPluginEntry(PLUGIN_NAME_CUSTOM_MV);
+        return (
+            this.findPluginEntry(PLUGIN_NAME_CUSTOM) || this.findPluginEntry(PLUGIN_NAME_CUSTOM_MV)
+        );
     }
 
     /**
@@ -207,6 +209,8 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
         };
     }
 
+    translatedValues = new Set();
+
     enablePluginTranslation() {
         const customPlugin = this._findCustomPluginEntry();
         if (!customPlugin?.parameters) {
@@ -235,13 +239,6 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
         const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
         const isUsableText = this.isUsableText.bind(this);
         const resolveRuntimeTranslation = this.resolveRuntimeTranslation.bind(this);
-        const shouldLogLabelDebug = (text) => {
-            if (!isUsableText(text)) {
-                return false;
-            }
-
-            return text.includes('現在地') || text.includes('プレイ時間');
-        };
 
         // Build a map from original command display name (symbol) → original helpText.
         // This allows us to find the correct helpText when given a (possibly translated)
@@ -264,17 +261,15 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
                 return originalText;
             }
 
+            if (this.translatedValues.has(originalText)) {
+                return originalText;
+            }
             const direct = resolveRuntimeTranslation(originalText, runtime, CACHE_TYPE, {
                 missValue: originalText,
             });
-            if (shouldLogLabelDebug(originalText)) {
-                console.debug(
-                    `${DEBUG_TAG} cache resolve direct`,
-                    JSON.stringify({ originalText, direct })
-                );
-            }
 
             if (direct !== originalText) {
+                this.translatedValues.add(direct);
                 return direct;
             }
 
@@ -283,17 +278,16 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
                 return originalText;
             }
 
+            if (this.translatedValues.has(trimmed)) {
+                return originalText;
+            }
+
             const trimmedResolved = resolveRuntimeTranslation(trimmed, runtime, CACHE_TYPE, {
                 missValue: trimmed,
                 harvestMissing: false,
             });
-            if (shouldLogLabelDebug(originalText)) {
-                console.debug(
-                    `${DEBUG_TAG} cache resolve trimmed`,
-                    JSON.stringify({ originalText, trimmed, trimmedResolved })
-                );
-            }
             if (trimmedResolved === trimmed) {
+                this.translatedValues.add(trimmed);
                 return originalText;
             }
 
@@ -418,11 +412,15 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
 
                 const protoDrawText = Object.getPrototypeOf(win).drawText;
                 if (typeof protoDrawText !== 'function') {
-                    console.debug(`${DEBUG_TAG} createMenuHelpWindow: drawText missing on Window_MenuHelp prototype`);
+                    console.debug(
+                        `${DEBUG_TAG} createMenuHelpWindow: drawText missing on Window_MenuHelp prototype`
+                    );
                     return;
                 }
 
-                console.debug(`${DEBUG_TAG} createMenuHelpWindow: instance drawText hook installed`);
+                console.debug(
+                    `${DEBUG_TAG} createMenuHelpWindow: instance drawText hook installed`
+                );
 
                 win.drawText = function (text, x, y, maxWidth, align) {
                     let resolved = text;
@@ -438,16 +436,13 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
                                 if (resolved === text) {
                                     resolved = resolveFromCache(text, runtime);
                                 }
-                                if (shouldLogLabelDebug(text)) {
-                                    console.debug(
-                                        `${DEBUG_TAG} instance drawText observed`,
-                                        JSON.stringify({ text, resolved })
-                                    );
-                                }
                             }
                         }
                     } catch (error) {
-                        console.warn('[LLMenuScreenTranslator] Failed to translate label text', error);
+                        console.warn(
+                            '[LLMenuScreenTranslator] Failed to translate label text',
+                            error
+                        );
                     }
 
                     return protoDrawText.call(this, resolved, x, y, maxWidth, align);
@@ -483,17 +478,13 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
                             if (resolved === text) {
                                 resolved = resolveFromCache(text, runtime);
                             }
-
-                            if (shouldLogLabelDebug(text)) {
-                                console.debug(
-                                    `${DEBUG_TAG} window-base drawText observed`,
-                                    JSON.stringify({ text, resolved, ctorName })
-                                );
-                            }
                         }
                     }
                 } catch (error) {
-                    console.warn('[LLMenuScreenTranslator] Window_Base drawText fallback failed', error);
+                    console.warn(
+                        '[LLMenuScreenTranslator] Window_Base drawText fallback failed',
+                        error
+                    );
                 }
 
                 return originalWindowBaseDrawText.call(this, resolved, x, y, maxWidth, align);

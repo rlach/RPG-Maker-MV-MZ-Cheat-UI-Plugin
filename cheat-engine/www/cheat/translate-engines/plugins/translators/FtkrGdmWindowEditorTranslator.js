@@ -103,7 +103,7 @@ function stripWrappingQuotes(text) {
     }
 
     const first = value[0];
-    const last = value.at(-1);
+    const last = value.slice(-1)[0];
     if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
         return value.slice(1, -1);
     }
@@ -236,7 +236,11 @@ export class FtkrGdmWindowEditorTranslator extends BasePluginTranslator {
 
         for (let index = 0; index < customList.length; index++) {
             const entry = customList[index];
-            this.appendTextEntry(entry?.name, { ...source, index, field: '_customList.name' }, output);
+            this.appendTextEntry(
+                entry?.name,
+                { ...source, index, field: '_customList.name' },
+                output
+            );
         }
     }
 
@@ -296,11 +300,15 @@ export class FtkrGdmWindowEditorTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            this.collectFromCustomList(child._customList, {
-                scope: 'liveWindowLayer',
-                windowIndex,
-                windowClass: child.constructor?.name || '',
-            }, output);
+            this.collectFromCustomList(
+                child._customList,
+                {
+                    scope: 'liveWindowLayer',
+                    windowIndex,
+                    windowClass: child.constructor?.name || '',
+                },
+                output
+            );
         }
     }
 
@@ -359,7 +367,9 @@ export class FtkrGdmWindowEditorTranslator extends BasePluginTranslator {
     }
 
     collectCommonEventEntries(output) {
-        const commonEvents = Array.isArray(window.$dataCommonEvents) ? window.$dataCommonEvents : [];
+        const commonEvents = Array.isArray(window.$dataCommonEvents)
+            ? window.$dataCommonEvents
+            : [];
         for (let commonEventId = 0; commonEventId < commonEvents.length; commonEventId++) {
             const commonEvent = commonEvents[commonEventId];
             if (!commonEvent || !Array.isArray(commonEvent.list)) {
@@ -424,7 +434,11 @@ export class FtkrGdmWindowEditorTranslator extends BasePluginTranslator {
         const oswCommandPrototype = window.Window_OswCommand?.prototype;
         const oswSelectPrototype = window.Window_OswSelect?.prototype;
 
-        if (!oswCommonPrototype?.drawContent || !oswCommandPrototype?.drawItem || !oswSelectPrototype?.drawItem) {
+        if (
+            !oswCommonPrototype?.drawContent ||
+            !oswCommandPrototype?.drawItem ||
+            !oswSelectPrototype?.drawItem
+        ) {
             return false;
         }
 
@@ -471,7 +485,10 @@ export class FtkrGdmWindowEditorTranslator extends BasePluginTranslator {
                     });
                 }
             } catch (error) {
-                console.warn('[FtkrGdmWindowEditorTranslator] Failed to translate drawText payload', error);
+                console.warn(
+                    '[FtkrGdmWindowEditorTranslator] Failed to translate drawText payload',
+                    error
+                );
             }
 
             return originalDrawText.apply(this, arguments);
@@ -491,7 +508,10 @@ export class FtkrGdmWindowEditorTranslator extends BasePluginTranslator {
                     });
                 }
             } catch (error) {
-                console.warn('[FtkrGdmWindowEditorTranslator] Failed to translate drawTextEx payload', error);
+                console.warn(
+                    '[FtkrGdmWindowEditorTranslator] Failed to translate drawTextEx payload',
+                    error
+                );
             }
 
             return originalDrawTextEx.apply(this, arguments);
@@ -538,7 +558,11 @@ export class FtkrGdmWindowEditorTranslator extends BasePluginTranslator {
 
         const runtimeParameters = this.getRuntimeParameters();
         if (runtimeParameters) {
-            this.collectParameterEntries(runtimeParameters, 'runtimePluginManagerParameter', entries);
+            this.collectParameterEntries(
+                runtimeParameters,
+                'runtimePluginManagerParameter',
+                entries
+            );
         }
 
         this.collectContainerPropertiesEntries(entries);
