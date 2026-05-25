@@ -9,11 +9,12 @@ import { ExternMessageTranslator } from './translators/ExternMessageTranslator.j
 import { FtkrCssDetailedStatusTranslator } from './translators/FtkrCssDetailedStatusTranslator.js';
 import { FtkrGdmWindowEditorTranslator } from './translators/FtkrGdmWindowEditorTranslator.js';
 import { FtkrItemCompositionSystemTranslator } from './translators/FtkrItemCompositionSystemTranslator.js';
-import { FtkrSkillExpansionTranslator } from './translators/FTKRSkillExpansionTranslator.js';
+import { FtkrSkillExpansionTranslator } from './translators/FtkrSkillExpansionTranslator.js';
 import { FtkrSkillTreeSystemTranslator } from './translators/FtkrSkillTreeSystemTranslator.js';
 import { FtkrMessageWindowLinesTranslator } from './translators/FTKRMessageWindowLinesTranslator.js';
 import { CbrEroStatusMvTranslator } from './translators/CbrEroStatusMvTranslator.js';
 import { DarkPlasmaCharacterTextTranslator } from './translators/DarkPlasmaCharacterTextTranslator.js';
+import { DescriptionExtendTranslator } from './translators/DescriptionExtendTranslator.js';
 import { DTextPictureTranslator } from './translators/DTextPictureTranslator.js';
 import { DynamicDatabaseTranslator } from './translators/DynamicDatabaseTranslator.js';
 import { EventLabelTranslator } from './translators/EventLabelTranslator.js';
@@ -119,6 +120,7 @@ class PluginTranslatorRegistry {
             FtkrMessageWindowLinesTranslator,
             CbrEroStatusMvTranslator,
             DarkPlasmaCharacterTextTranslator,
+            DescriptionExtendTranslator,
             DTextPictureTranslator,
             DynamicDatabaseTranslator,
             EventLabelTranslator,
