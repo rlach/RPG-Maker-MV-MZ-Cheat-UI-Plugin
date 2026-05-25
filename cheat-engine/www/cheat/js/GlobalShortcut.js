@@ -9,11 +9,15 @@ const INIT_RETRY_TIMEOUT_MS = 100;
 // default shortcut settings
 const defaultShortcutSettings = {
     toggleCheatModal: {
-        shortcut: 'ctrl c',
+        shortcut: 'f11',
     },
 
     toggleCheatModalToSaveLocationComponent: {
         shortcut: 'ctrl m',
+    },
+
+    toggleCheatModalToTextLogComponent: {
+        shortcut: 'l',
     },
 
     quickSave: {
@@ -151,6 +155,14 @@ const shortcutConfig = {
         desc: '',
         enterAction(param) {
             GeneralCheat.toggleCheatModal('save-recall-panel');
+        },
+    },
+
+    toggleCheatModalToTextLogComponent: {
+        name: 'Toggle "Text Log" tab',
+        desc: '',
+        enterAction(param) {
+            GeneralCheat.toggleCheatModal('text-log-panel');
         },
     },
 
@@ -758,7 +770,9 @@ class GlobalShortcut {
             // remove previous settings file
             try {
                 fs.unlinkSync(this.shortcutSettingsFile);
-            } catch (e) { /* empty */ }
+            } catch (e) {
+                /* empty */
+            }
 
             // create parent directory if not exists
             const parentDir = path.dirname(this.shortcutSettingsFile);
@@ -781,7 +795,9 @@ class GlobalShortcut {
             // remove settings file
             try {
                 require('fs').unlinkSync(this.shortcutSettingsFile);
-            } catch (e) { /* empty */ }
+            } catch (e) {
+                /* empty */
+            }
 
             this.initialize();
         }

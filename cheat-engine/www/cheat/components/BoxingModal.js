@@ -261,8 +261,8 @@ class BoxingService {
             }
 
             const maxItems =
-                Number(runtime.batchItemsLimit) > 0 ? Number(runtime.batchItemsLimit) : 20;
-            const maxChars = Number(runtime.charLimit) > 0 ? Number(runtime.charLimit) : 1000;
+                Number(runtime.batchItemsLimit) > 0 ? Number(runtime.batchItemsLimit) : 300;
+            const maxChars = Number(runtime.charLimit) > 0 ? Number(runtime.charLimit) : 1500;
 
             await runtime.batchManager.runBatchedTranslation([
                 {

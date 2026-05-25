@@ -27,6 +27,10 @@ export class BasePluginTranslator extends BasePhase {
         return this.getPluginName();
     }
 
+    getPluginAliases() {
+        return [this.getPluginName()];
+    }
+
     getCacheType() {
         return 'plugin';
     }
@@ -45,10 +49,19 @@ export class BasePluginTranslator extends BasePhase {
     }
 
     detectPlugin() {
-        const pluginName = String(this.getPluginName() || '')
-            .trim()
-            .toLowerCase();
-        if (!pluginName || !Array.isArray(window.$plugins)) {
+        if (!Array.isArray(window.$plugins)) {
+            return false;
+        }
+
+        const pluginNames = this.getPluginAliases()
+            .map((name) =>
+                String(name || '')
+                    .trim()
+                    .toLowerCase()
+            )
+            .filter(Boolean);
+
+        if (pluginNames.length <= 0) {
             return false;
         }
 
@@ -57,7 +70,7 @@ export class BasePluginTranslator extends BasePhase {
                 return false;
             }
 
-            return plugin.name.trim().toLowerCase() === pluginName;
+            return pluginNames.includes(plugin.name.trim().toLowerCase());
         });
     }
 
@@ -66,9 +79,7 @@ export class BasePluginTranslator extends BasePhase {
             return null;
         }
 
-        const needle = normalizeText(pluginName)
-            .trim()
-            .toLowerCase();
+        const needle = normalizeText(pluginName).trim().toLowerCase();
         if (!needle) {
             return null;
         }
