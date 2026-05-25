@@ -82,18 +82,34 @@ import { MessageAlignCenterTranslator } from './translators/MessageAlignCenterTr
 import { PlayMsgWndCharSeMZTranslator } from './translators/PlayMsgWndCharSeMZTranslator.js';
 import { LLInfoPopupWIndowTranslator } from './translators/LLInfoPopupWIndowTranslator.js';
 import { MkrMapItemSlotTranslator } from './translators/MkrMapItemSlotTranslator.js';
+import { ABEnemyBookTranslator } from './translators/ABEnemyBookTranslator.js';
+import { CommonPopupCoreTranslator } from './translators/CommonPopupCoreTranslator.js';
+import { FtkrCustomSimpleActorStatusTranslator } from './translators/FtkrCustomSimpleActorStatusTranslator.js';
+import { GirlsWindowTranslator } from './translators/GirlsWindowTranslator.js';
+import { ItemCombinationMZTranslator } from './translators/ItemCombinationMZTranslator.js';
+import { LiveCommentTranslator } from './translators/LiveCommentTranslator.js';
+import { MessagePExRiruTranslator } from './translators/MessagePExRiruTranslator.js';
+import { LLMenuScreenTranslator } from './translators/LLMenuScreenTranslator.js';
+import { NuunMenuScreenExTranslator } from './translators/NuunMenuScreenExTranslator.js';
+import { PopupMessageTranslator } from './translators/PopupMessageTranslator.js';
+import { ProfileExtendTranslator } from './translators/ProfileExtendTranslator.js';
+import { ResidentWindowTranslator } from './translators/ResidentWindowTranslator.js';
+import { SaveNameInputTranslator } from './translators/SaveNameInputTranslator.js';
 
 class PluginTranslatorRegistry {
     constructor() {
         this.translatorClasses = [
+            ABEnemyBookTranslator,
             AutoNamePopupTranslator,
             BBCustomSaveWindowTranslator,
             CategorySynthesisTranslator,
             ChronusTranslator,
             CbrEroStatusTranslator,
+            CommonPopupCoreTranslator,
             CustomizeConfigItemTranslator,
             ExternMessageTranslator,
             FtkrCssDetailedStatusTranslator,
+            FtkrCustomSimpleActorStatusTranslator,
             FtkrGdmWindowEditorTranslator,
             FtkrItemCompositionSystemTranslator,
             FtkrMessageWindowLinesTranslator,
@@ -105,7 +121,9 @@ class PluginTranslatorRegistry {
             EventInformationTranslator,
             ExtraWindowTranslator,
             GetInformationTranslator,
+            GirlsWindowTranslator,
             HelpWindowPluginTranslator,
+            ItemCombinationMZTranslator,
             DestinationWindowTranslator,
             KOriginalMenuScreenTranslator,
             KmsMapActiveMessageTranslator,
@@ -113,8 +131,10 @@ class PluginTranslatorRegistry {
             KzPictureChoicesTranslator,
             KekeVariableActorCommandTranslator,
             LunatlazurActorNameWindowTranslator,
+            LiveCommentTranslator,
             LLGalgeChoiceWindowTranslator,
             LLInfoPopupWIndowTranslator,
+            LLMenuScreenTranslator,
             LLMenuScreenCustomTranslator,
             LLStandingPictureTranslator,
             ManoInputConfigTranslator,
@@ -125,8 +145,10 @@ class PluginTranslatorRegistry {
             MogSceneItemTranslator,
             MessageWindowPopupTranslator,
             MogBattleCommandsTranslator,
+            MessagePExRiruTranslator,
             MogEventTextTranslator,
             NameBoxNoUseTranslator,
+            NuunMenuScreenExTranslator,
             MppChoiceExTranslator,
             MppMessageExTranslator,
             MenuSubCommandTranslator,
@@ -138,14 +160,18 @@ class PluginTranslatorRegistry {
             NuunSaveScreen3Translator,
             OriginMenuStatusTranslator,
             PandaProgressTextWindowTranslator,
+            PopupMessageTranslator,
+            ProfileExtendTranslator,
             PHQuestBookTranslator,
             PlayMsgWndCharSeMZTranslator,
             QuestSystemTranslator,
+            ResidentWindowTranslator,
             RecollectionForMZTranslator,
             RecollectionModeTranslator,
             RecollectionModeMZTranslator,
             SabaSimpleScenarioTranslator,
             SabaTachieTranslator,
+            SaveNameInputTranslator,
             SceneCustomMenuTranslator,
             SceneGlossaryTranslator,
             SetMessageFontSizeTranslator,
