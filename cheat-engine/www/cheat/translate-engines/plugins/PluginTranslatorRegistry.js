@@ -64,6 +64,7 @@ import { SItemsceneKzTranslator } from './translators/SItemsceneKzTranslator.js'
 import { TextPictureTranslator } from './translators/TextPictureTranslator.js';
 import { TMMenuLabelTranslator } from './translators/TMMenuLabelTranslator.js';
 import { TMNamePopTranslator } from './translators/TMNamePopTranslator.js';
+import { TMSaveDataLabelTranslator } from './translators/TMSaveDataLabelTranslator.js';
 import { TMStatusMenuExTranslator } from './translators/TMStatusMenuExTranslator.js';
 import { TorigoyaAchievement2Translator } from './translators/TorigoyaAchievement2Translator.js';
 import { TorigoyaAchievementTranslator } from './translators/TorigoyaAchievementTranslator.js';
@@ -192,6 +193,7 @@ class PluginTranslatorRegistry {
             TextPictureTranslator,
             TMMenuLabelTranslator,
             TMNamePopTranslator,
+            TMSaveDataLabelTranslator,
             TMStatusMenuExTranslator,
             TorigoyaAchievement2Translator,
             TorigoyaAchievementTranslator,
