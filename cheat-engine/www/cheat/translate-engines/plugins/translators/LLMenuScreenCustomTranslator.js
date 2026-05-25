@@ -264,6 +264,7 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
             if (this.translatedValues.has(originalText)) {
                 return originalText;
             }
+            console.log('[LLMenuScreenCustomTranslator] Resolving from cache:', originalText);
             const direct = resolveRuntimeTranslation(originalText, runtime, CACHE_TYPE, {
                 missValue: originalText,
             });

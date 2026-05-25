@@ -303,6 +303,7 @@ export class LLMenuScreenTranslator extends BasePluginTranslator {
                 return originalText;
             }
 
+            console.log('[LLMenuScreenTranslator] Resolving translation for:', originalText);
             const cacheKey = runtime.getCacheKey(originalText, CACHE_TYPE);
             runtime.trackCacheKeyUsage(cacheKey);
 
