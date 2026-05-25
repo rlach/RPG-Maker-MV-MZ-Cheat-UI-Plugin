@@ -54,7 +54,7 @@ export class LLStandingPictureTranslator extends BasePluginTranslator {
         return 'LL_StandingPicture';
     }
 
-    getPluginNameAliases() {
+    getPluginAliases() {
         return PLUGIN_NAME_ALIASES;
     }
 
@@ -64,31 +64,6 @@ export class LLStandingPictureTranslator extends BasePluginTranslator {
 
     getCacheType() {
         return CACHE_TYPE;
-    }
-
-    detectPlugin() {
-        if (!Array.isArray(window.$plugins)) {
-            return false;
-        }
-
-        const pluginNames = this.getPluginNameAliases()
-            .map((name) =>
-                String(name || '')
-                    .trim()
-                    .toLowerCase()
-            )
-            .filter(Boolean);
-        if (pluginNames.length <= 0) {
-            return false;
-        }
-
-        return window.$plugins.some((plugin) => {
-            if (!plugin || typeof plugin.name !== 'string') {
-                return false;
-            }
-
-            return pluginNames.includes(plugin.name.trim().toLowerCase());
-        });
     }
 
     enablePluginTranslation() {

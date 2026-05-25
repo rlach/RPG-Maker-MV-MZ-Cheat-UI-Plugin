@@ -6,6 +6,7 @@ const TM_NAME_POP_COMMAND = 'tmnamepop';
 const TM_NAME_POP_SET_SUBCOMMAND = 'set';
 const NAME_POP_TAG_REGEX = /<namePop:([^>]+)>/i;
 const CACHE_TYPE = 'plugin_tm_name_pop';
+const PLUGIN_NAME_ALIASES = ['TMNamePop', 'ネームポップ'];
 
 // Tag value format: "nameText [shiftY] [outlineColor]"
 // The name is the first space-separated token (mirroring arr[0] in the plugin source).
@@ -51,6 +52,10 @@ export class TMNamePopTranslator extends BasePluginTranslator {
 
     getPluginLabel() {
         return 'TMNamePop';
+    }
+
+    getPluginAliases() {
+        return PLUGIN_NAME_ALIASES;
     }
 
     getCacheType() {

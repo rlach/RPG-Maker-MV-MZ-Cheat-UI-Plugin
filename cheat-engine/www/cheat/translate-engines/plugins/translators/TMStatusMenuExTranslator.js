@@ -242,6 +242,7 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
+        console.log('[TMStatusMenuExTranslator] Enabling translation for TMStatusMenuEx plugin');
         const WindowStatusCtor = window['Window_Status'];
         if (!WindowStatusCtor?.prototype) {
             return false;

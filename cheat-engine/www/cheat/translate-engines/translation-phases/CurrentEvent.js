@@ -140,7 +140,7 @@ export class CurrentEvent extends BasePhase {
 
     collectAheadItems(runtime, currentText, currentSpeaker, interpreter, options = {}) {
         const charLimit = options.charLimit || runtime.charLimit;
-        const maxItems = options.maxItems || runtime.batchItemsLimit || 20;
+        const maxItems = options.maxItems || runtime.batchItemsLimit || 300;
         const maxDepth = options.maxDepth !== undefined ? options.maxDepth : 999;
         const messageType = runtime.getMessageCacheType({
             hasPortrait: !!options.messageHasPortrait,
