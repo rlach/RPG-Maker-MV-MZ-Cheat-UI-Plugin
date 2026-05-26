@@ -53,7 +53,7 @@ function normalizeScriptLiteral(expression) {
     }
 
     const quote = source[0];
-    if ((quote !== '\'' && quote !== '"') || !source.endsWith(quote)) {
+    if ((quote !== "'" && quote !== '"') || !source.endsWith(quote)) {
         return '';
     }
 
@@ -213,7 +213,11 @@ export class RJ01042745Translator extends BasePluginTranslator {
             return;
         }
 
-        for (let commonEventId = 0; commonEventId < window.$dataCommonEvents.length; commonEventId++) {
+        for (
+            let commonEventId = 0;
+            commonEventId < window.$dataCommonEvents.length;
+            commonEventId++
+        ) {
             const commonEvent = window.$dataCommonEvents[commonEventId];
             if (!commonEvent || !Array.isArray(commonEvent.list)) {
                 continue;
@@ -550,7 +554,11 @@ export class RJ01042745Translator extends BasePluginTranslator {
                     const runtime = getRuntime();
                     const windowName = String(this?.constructor?.name || '');
 
-                    if (runtime && windowName === 'Window_ExpCalcArea' && typeof text === 'string') {
+                    if (
+                        runtime &&
+                        windowName === 'Window_ExpCalcArea' &&
+                        typeof text === 'string'
+                    ) {
                         nextText = tryTranslateBonusText(text, runtime);
                     }
                 } catch (error) {

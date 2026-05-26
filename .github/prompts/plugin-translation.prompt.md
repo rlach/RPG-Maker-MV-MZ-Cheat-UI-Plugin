@@ -77,6 +77,7 @@ Plugins are managed by orchestrator.
 - If text may appear in maps, scan all map files via $dataMapInfos + MapXXX.json loading.
 - Scan common events when plugin can use them.
 - Parse only the text payload; preserve non-text command structure.
+- Preserve leading spaces in extracted text keys exactly as authored (including full-width spaces), unless a single command separator space must be removed by syntax. Mass-translation extraction and runtime observation MUST use identical key text.
 - Deduplicate by cacheKey.
 - Before creating any new helper function, check `cheat-engine/www/cheat/translate-engines/plugins/translators/TranslatorHelpers.js` and reuse helpers from there.
 - For JSON parsing in translators, always import and use `parseJsonSafely` from `TranslatorHelpers.js`.
@@ -108,6 +109,7 @@ Plugins are managed by orchestrator.
 - Only replace text payload, never required command keywords/prefixes.
 - Use base APIs directly (`this.getRuntime()`, `this.isRuntimeTranslationActive(runtime)`, `this.isUsableText(value)`) and keep translator code focused on plugin-specific behavior.
 - Runtime translation is allowed only when `this.isRuntimeTranslationActive(runtime)` is true; otherwise hooks must return original text/behavior unchanged.
+- Runtime hooks must preserve authored leading spaces in source text keys. Do not trim/normalize leading spaces in values sent to cache lookup; this preserves manual formatting and keeps parity with mass-translation keys.
 - All real-time hooks are gated by runtime translation settings: hooks only execute when **either**:
     - `runtime.isTranslationEnabled()` returns true (user enabled "Enable Real-time Translation"), **OR**
     - `runtime.translateCacheWhenDisabled` is true (user enabled "Translate cached keys even when Real-time translation is disabled")
