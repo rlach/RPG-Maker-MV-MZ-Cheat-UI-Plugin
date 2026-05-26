@@ -41,6 +41,7 @@ import { MogEventTextTranslator } from './translators/MogEventTextTranslator.js'
 import { MessageWindowPopupTranslator } from './translators/MessageWindowPopupTranslator.js';
 import { NameBoxNoUseTranslator } from './translators/NameBoxNoUseTranslator.js';
 import { MppChoiceExTranslator } from './translators/MppChoiceExTranslator.js';
+import { MppRemovoEquipTextTranslator } from './translators/MppRemovoEquipTextTranslator.js';
 import { MppMessageExTranslator } from './translators/MppMessageExTranslator.js';
 import { MultipleWindowSkinSystemTranslator } from './translators/MultipleWindowSkinSystemTranslator.js';
 import { MenuSubCommandTranslator } from './translators/MenuSubCommandTranslator.js';
@@ -162,6 +163,7 @@ class PluginTranslatorRegistry {
             NameBoxNoUseTranslator,
             NuunMenuScreenExTranslator,
             MppChoiceExTranslator,
+            MppRemovoEquipTextTranslator,
             MppMessageExTranslator,
             MenuSubCommandTranslator,
             MkrMapItemSlotTranslator,
