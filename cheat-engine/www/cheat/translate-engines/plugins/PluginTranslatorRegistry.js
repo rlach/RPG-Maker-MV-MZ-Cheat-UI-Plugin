@@ -99,7 +99,6 @@ import { ItemCombinationMZTranslator } from './translators/ItemCombinationMZTran
 import { ItemNameEscapeTranslator } from './translators/ItemNameEscapeTranslator.js';
 import { LiveCommentTranslator } from './translators/LiveCommentTranslator.js';
 import { MessagePExRiruTranslator } from './translators/MessagePExRiruTranslator.js';
-import { LLMenuScreenTranslator } from './translators/LLMenuScreenTranslator.js';
 import { NuunMenuScreenExTranslator } from './translators/NuunMenuScreenExTranslator.js';
 import { PopupMessageTranslator } from './translators/PopupMessageTranslator.js';
 import { ProfileExtendTranslator } from './translators/ProfileExtendTranslator.js';
@@ -148,7 +147,6 @@ class PluginTranslatorRegistry {
             LiveCommentTranslator,
             LLGalgeChoiceWindowTranslator,
             LLInfoPopupWIndowTranslator,
-            LLMenuScreenTranslator,
             LLMenuScreenCustomTranslator,
             LLStandingPictureTranslator,
             ManoInputConfigTranslator,

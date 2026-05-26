@@ -47,30 +47,16 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
         return PLUGIN_NAME_CUSTOM;
     }
 
+    getPluginAliases() {
+        return [this.getPluginName(), PLUGIN_NAME_CUSTOM_MV];
+    }
+
     getPluginLabel() {
-        return 'LL MenuScreen (help texts + labels)';
+        return 'LL MenuScreenCustom';
     }
 
     getCacheType() {
         return CACHE_TYPE;
-    }
-
-    detectPlugin() {
-        if (!Array.isArray(window.$plugins)) {
-            return false;
-        }
-
-        const lowerCustom = PLUGIN_NAME_CUSTOM.toLowerCase();
-        const lowerCustomMV = PLUGIN_NAME_CUSTOM_MV.toLowerCase();
-
-        return window.$plugins.some((plugin) => {
-            if (!plugin || typeof plugin.name !== 'string' || plugin.status !== true) {
-                return false;
-            }
-
-            const lower = plugin.name.trim().toLowerCase();
-            return lower === lowerCustom || lower === lowerCustomMV;
-        });
     }
 
     _findCustomPluginEntry() {
@@ -214,8 +200,8 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
     enablePluginTranslation() {
         const customPlugin = this._findCustomPluginEntry();
         if (!customPlugin?.parameters) {
-            console.warn(
-                '[LLMenuScreenTranslator] Failed to find plugin parameters for hooking',
+            console.log(
+                '[LLMenuScreenCustomTranslator] Failed to find plugin parameters for hooking',
                 customPlugin
             );
             return false;
@@ -223,14 +209,19 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
 
         const sceneMenuPrototype = window.Scene_Menu?.prototype;
         if (!sceneMenuPrototype) {
+            console.log('[LLMenuScreenCustomTranslator] Scene_Menu prototype not found');
             return false;
         }
 
         if (typeof sceneMenuPrototype.update !== 'function') {
+            console.log('[LLMenuScreenCustomTranslator] Scene_Menu.prototype.update not found');
             return false;
         }
 
         if (typeof sceneMenuPrototype.createMenuHelpWindow !== 'function') {
+            console.log(
+                '[LLMenuScreenCustomTranslator] Scene_Menu.prototype.createMenuHelpWindow not found'
+            );
             return false;
         }
 

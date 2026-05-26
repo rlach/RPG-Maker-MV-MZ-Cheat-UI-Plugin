@@ -1,27 +1,15 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
+import { parseJsonSafely } from './TranslatorHelpers.js';
 
 /**
- * AutoNamePopup compatibility fix translator.
+ * AutoNamePopup translator (MV/MZ, plugin ver.5.x).
  *
- * AutoNamePopup (Ver.5) hooks Game_Interpreter#command101 and prepends a
- * per-character optionString (e.g. "\SE[1]") to the first message line each
- * time a Show Text command runs.  When the game author has already embedded
- * that same optionString in the raw event data (code-401 parameters[0]), the
- * result inside $gameMessage._texts[0] has two consecutive copies of the
- * prefix (e.g. "\SE[1]\SE[1]（……").
- *
- * The translation runtime builds its cache key from $gameMessage.allText().
- * That key never matches the one built by the scan phase from the raw event
- * data (single prefix), so translations are never applied.
- *
- * Fix: hook Game_Message.prototype.allText (the sole observation point used by
- * the runtime's canStart hook) to normalise one duplicate leading optionString.
- * This approach operates at observation time and is therefore independent of
- * the command101 hook installation order and the 2-second plugin-detection
- * delay.
- *
- * No text extraction or cache entries are needed — all translatable strings are
- * captured by the standard message-scanning pipeline.
+ * AutoNamePopup can prepend a formatted name line and optionString to message
+ * body text at runtime. Event traversal collects the original Show Text body,
+ * so runtime cache lookup may miss when keys are built from unprefixed source.
+ * This translator augments collection-time message keys with the same
+ * AutoNamePopup-composed prefixes (name template + optionString) so translated
+ * results preserve who is speaking.
  */
 export class AutoNamePopupTranslator extends BasePluginTranslator {
     getPluginName() {
@@ -36,125 +24,183 @@ export class AutoNamePopupTranslator extends BasePluginTranslator {
         return 'plugin_auto_name_popup';
     }
 
-    enablePluginTranslation() {
-        const translator = this;
+    _resolveRuntimeConfig() {
+        const pluginEntry = this.findPluginEntry(this.getPluginName());
+        const parameters = pluginEntry?.parameters || {};
 
-        if (
-            !window.Game_Message ||
-            !Game_Message.prototype ||
-            (typeof Game_Message.prototype.allText !== 'function' &&
-                typeof Game_Message.prototype.setSpeakerName !== 'function')
-        ) {
-            console.log(
-                '[AutoNamePopupTranslator] Required Game_Message methods not found, skipping plugin translation',
-                Game_Message.prototype.allText,
-                Game_Message.prototype.setSpeakerName
-            );
-            return false;
+        const mode = Number(parameters.mode || 0);
+        const useMZ = Utils?.RPGMAKER_NAME === 'MZ';
+        const inTheWindow = mode > 0 || !useMZ;
+
+        let template = String(parameters.template || '%1');
+        const startNewLine = String(parameters.startNewLine || 'true') === 'true';
+        if ((useMZ ? mode === 1 : mode < 2) && startNewLine) {
+            template += '\n';
         }
 
-        const originalAllText = Game_Message.prototype.allText;
+        return { inTheWindow, template };
+    }
 
-        Game_Message.prototype.allText = function () {
-            const text = originalAllText.call(this);
-            try {
-                if (
-                    text &&
-                    typeof this._faceName === 'string' &&
-                    this._faceName.trim() &&
-                    window.$gameSystem &&
-                    typeof $gameSystem.getNameKeyParam === 'function'
-                ) {
-                    const faceIndex = typeof this._faceIndex === 'number' ? this._faceIndex : 0;
-                    const key = [this._faceName, faceIndex];
-                    const optionString = $gameSystem.getNameKeyParam(key, 'optionString');
+    _resolveMappedCharacterNameFromKey(faceName, faceIndex) {
+        if (!this.isUsableText(faceName)) {
+            return '';
+        }
 
-                    // Strip exactly one duplicate leading optionString so the result
-                    // matches the raw event-data text that was scanned for translation.
-                    if (optionString && text.startsWith(optionString + optionString)) {
-                        return text.slice(optionString.length);
-                    }
-                }
-            } catch (error) {
-                console.warn('[AutoNamePopupTranslator] allText normalisation failed', error);
+        const nameKeyMap = this._buildNameKeyMap();
+        const key = `${faceName}:${Number(faceIndex || 0)}`;
+        const value = nameKeyMap.get(key);
+        if (!value || typeof value !== 'object') {
+            return '';
+        }
+
+        return String(value.name || '');
+    }
+
+    _resolveOptionStringFromKey(faceName, faceIndex) {
+        if (!this.isUsableText(faceName)) {
+            return '';
+        }
+
+        const nameKeyMap = this._buildNameKeyMap();
+        const key = `${faceName}:${Number(faceIndex || 0)}`;
+        const value = nameKeyMap.get(key);
+        if (!value || typeof value !== 'object') {
+            return '';
+        }
+
+        return String(value.optionString || '');
+    }
+
+    _formatTemplate(template, value) {
+        return String(template || '%1').replaceAll('%1', String(value || ''));
+    }
+
+    _extractFaceInfoFromCommand(command) {
+        const parameters = Array.isArray(command?.parameters) ? command.parameters : [];
+        const faceName = String(parameters[0] || '');
+        const faceIndex = Number(parameters[1] || 0);
+        const commandName = String(parameters[4] || '');
+        return { faceName, faceIndex, commandName };
+    }
+
+    _resolveCharacterNameFromCommand(command) {
+        const faceInfo = this._extractFaceInfoFromCommand(command);
+        const commandName = faceInfo.commandName;
+        if (this.isUsableText(commandName) && commandName !== '_') {
+            return commandName;
+        }
+
+        if (commandName === '_') {
+            return '';
+        }
+
+        return this._resolveMappedCharacterNameFromKey(faceInfo.faceName, faceInfo.faceIndex);
+    }
+
+    _resolveOptionStringFromCommand(command) {
+        const faceInfo = this._extractFaceInfoFromCommand(command);
+        return this._resolveOptionStringFromKey(faceInfo.faceName, faceInfo.faceIndex);
+    }
+
+    _buildCollectionPrefix(command) {
+        const characterName = this._resolveCharacterNameFromCommand(command);
+        if (!this.isUsableText(characterName)) {
+            return '';
+        }
+
+        const config = this._resolveRuntimeConfig();
+        const optionString = this._resolveOptionStringFromCommand(command);
+        const namePrefix = config.inTheWindow
+            ? this._formatTemplate(config.template, characterName)
+            : '';
+        return `${namePrefix}${optionString}`;
+    }
+
+    _buildNameKeyMap() {
+        if (this._nameKeyMap instanceof Map) {
+            return this._nameKeyMap;
+        }
+
+        const pluginEntry = this.findPluginEntry(this.getPluginName());
+        const parameters = pluginEntry?.parameters || {};
+
+        const actorExpressions = Math.max(1, Number(parameters.actorFacialExpressions || 1));
+        const characterExpressions = Math.max(1, Number(parameters.characterFacialExpressions || 1));
+
+        const rawNameKeys = parseJsonSafely(parameters.nameKeys, []);
+        const nameKeyRows = Array.isArray(rawNameKeys)
+            ? rawNameKeys
+                  .map((row) => parseJsonSafely(row, null))
+                  .filter((row) => row && typeof row === 'object')
+            : [];
+
+        const map = new Map();
+        for (const row of nameKeyRows) {
+            const faceName = String(row.faceName || '');
+            if (!this.isUsableText(faceName)) {
+                continue;
             }
-            return text;
-        };
 
-        /**
-         * Extract plain text by removing RPG Maker control characters.
-         * Preserves the structure to detect formatting later.
-         */
-        const extractPlainText = (text) => {
-            if (!text || typeof text !== 'string') {
-                return text;
+            const startFaceIndex = Number(row.faceIndex || 0);
+            const rawExpressions = Number(row.facialExpressions || 0);
+            let expressions = characterExpressions;
+            if (rawExpressions === -1) {
+                expressions = actorExpressions;
+            } else if (rawExpressions > 0) {
+                expressions = rawExpressions;
             }
-            // Remove RPG Maker escape sequences: \c[N], \n[N], \v[N], \p[N], \g, \>, \<, \., \!, \|, \^, \$
-            return text
-                .replace(/\\[cCnNvVpPgG]\[\d+\]/g, '')
-                .replace(/\\[cCnNvVpPgG]/g, '')
-                .replace(/\\[.!<>|^$]/g, '')
-                .trim();
-        };
 
-        /**
-         * Build a template string from speaker name by replacing the plain text
-         * with a placeholder, then later replace the placeholder with translation.
-         * Example: '\>\c[14]よしひろ\c[0]' with plain='よしひろ' becomes template='\>\c[14]%TRANSLATED%\c[0]'
-         */
-        const buildTemplate = (text, plainText) => {
-            if (!plainText || !text || !text.includes(plainText)) {
-                return null;
+            for (let i = 0; i < expressions; i += 1) {
+                const currentFaceIndex = startFaceIndex + i;
+                const key = `${faceName}:${currentFaceIndex}`;
+                map.set(key, {
+                    name: String(row.name || ''),
+                    optionString: String(row.optionString || ''),
+                });
             }
-            return text.replace(plainText, '%TRANSLATED%');
-        };
+        }
 
-        const originalSetSpeakerName = Game_Message.prototype.setSpeakerName;
+        this._nameKeyMap = map;
+        return map;
+    }
 
-        Game_Message.prototype.setSpeakerName = function (speakerName) {
-            originalSetSpeakerName.call(this, speakerName);
+    _prependCollectionPrefix(sourceText, command) {
+        const prefix = this._buildCollectionPrefix(command);
+        if (!this.isUsableText(prefix)) {
+            return sourceText;
+        }
 
-            try {
-                const runtime = translator.getRuntime();
-                if (
-                    speakerName &&
-                    typeof speakerName === 'string' &&
-                    speakerName.trim() &&
-                    runtime
-                ) {
-                    // Extract plain text (without control characters)
-                    const plainText = extractPlainText(speakerName);
-                    if (!plainText) {
-                        return; // No plain text left after stripping control chars
-                    }
+        if (sourceText.startsWith(prefix)) {
+            return sourceText;
+        }
 
-                    const cacheKey = runtime.getCacheKey(plainText, 'speaker');
-                    if (runtime.hasUsableCacheValue(cacheKey)) {
-                        const translated = runtime.translationCache.get(cacheKey);
-                        if (typeof translated === 'string' && translated.trim()) {
-                            // Build template from original speaker name
-                            const template = buildTemplate(speakerName, plainText);
-                            if (template) {
-                                // Replace placeholder with translated text
-                                this._speakerName = template.replace('%TRANSLATED%', translated);
-                            } else {
-                                // Fallback: just use translation if template extraction fails
-                                this._speakerName = translated;
-                            }
-                        }
-                    }
-                }
-            } catch (error) {
-                console.warn('[AutoNamePopupTranslator] Speaker name translation failed', error);
-            }
-        };
+        return `${prefix}${sourceText}`;
+    }
 
-        return true;
+    _resolveChangedText(sourceText, normalizedText) {
+        if (normalizedText === sourceText) {
+            return null;
+        }
+
+        return normalizedText;
+    }
+
+    resolveMessageCacheSourceText(context = {}) {
+        const sourceText = typeof context.text === 'string' ? context.text : '';
+        if (!sourceText) {
+            return null;
+        }
+
+        if (context.mode === 'collection') {
+            const withPrefix = this._prependCollectionPrefix(sourceText, context.command || null);
+            return this._resolveChangedText(sourceText, withPrefix);
+        }
+
+        return null;
     }
 
     collectUntranslated() {
-        // No text extraction needed — all message text is picked up by the standard
-        // message scanner.  This translator only installs a runtime compatibility fix.
+        // No dedicated extraction required; generic message traversal covers source text.
         return [];
     }
 
