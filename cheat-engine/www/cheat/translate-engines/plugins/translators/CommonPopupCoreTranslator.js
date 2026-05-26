@@ -1,31 +1,38 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
-import { TAG_BRACKET, TAG_TYPE } from '../../ai-engine/constants.js';
+import { TAG_BRACKET, TAG_STYLE, TAG_TYPE } from '../../ai-engine/constants.js';
 
 /*
  * CommonPopupCore (Yana) translator.
  *
  * Supported versions:
  * - MV v1.06
+ * - MZ MNKR_CommonPopupCoreMZ v0.2.0
  *
  * Translation notes:
  * - Static text is primarily carried by MV plugin commands (code 356):
  *   CommonPopup add text:... and Japanese alias ポップアップ 表示 text:...
+ * - MZ plugin commands (code 357) use:
+ *   pluginName=MNKR_CommonPopupCoreMZ, command=CommonPopupAdd, args.text
  * - Script command blocks can also call addPopup(["add", "text:..."]).
- * - Runtime hook point is Game_Interpreter.prototype.addPopup, translating only
+ * - Runtime hook point is CommonPopupManager.setPopup, translating only
  *   the text payload and preserving command/action tokens unchanged.
  */
 
 const CACHE_TYPE = 'plugin_common_popup_core';
-const RUNTIME_HOOK_GUARD = '__CHEAT_COMMON_POPUP_CORE_TRANSLATOR_HOOKED__';
+const HOOK_FLAG_KEY = '__CHEAT_COMMON_POPUP_CORE_TRANSLATOR_HOOKED__';
 const ACTION_ADD = 'add';
 const ACTION_ADD_JA = '表示';
 const COMMAND_COMMON_POPUP = 'commonpopup';
 const COMMAND_COMMON_POPUP_JA = 'ポップアップ';
+const MZ_COMMAND_COMMON_POPUP_ADD = 'commonpopupadd';
+const PLUGIN_NAME_COMMON_POPUP_CORE = 'commonpopupcore';
+const PLUGIN_NAME_MNKR_COMMON_POPUP_CORE_MZ = 'mnkr_commonpopupcoremz';
 const PLUGIN_TAGS = [
     {
         description: 'Shows an icon as part of text, will match text size.',
         type: TAG_TYPE.WITH_CUSTOM_PARAMETER,
+        style: TAG_STYLE.ESCAPE,
         tagSymbol: 'I',
         bracket: TAG_BRACKET.SQUARE,
         maskValue: true,
@@ -36,6 +43,7 @@ const PLUGIN_TAGS = [
     {
         description: 'Shows an icon as part of text, will match text size.',
         type: TAG_TYPE.WITH_CUSTOM_PARAMETER,
+        style: TAG_STYLE.ESCAPE,
         tagSymbol: 'FS',
         bracket: TAG_BRACKET.SQUARE,
         maskValue: false,
@@ -50,6 +58,16 @@ function isCommonPopupCommandName(value) {
         .trim()
         .toLowerCase();
     return commandName === COMMAND_COMMON_POPUP || commandName === COMMAND_COMMON_POPUP_JA;
+}
+
+function isSupportedPluginName(value) {
+    const pluginName = String(value || '')
+        .trim()
+        .toLowerCase();
+    return (
+        pluginName === PLUGIN_NAME_COMMON_POPUP_CORE ||
+        pluginName === PLUGIN_NAME_MNKR_COMMON_POPUP_CORE_MZ
+    );
 }
 
 function isAddAction(value) {
@@ -121,6 +139,21 @@ function extractTextFromMvPluginCommand(commandLine) {
     return extractTextFromPopupArgs(parts.slice(2));
 }
 
+function extractTextFromMzPluginCommand(command) {
+    const parameters = Array.isArray(command?.parameters) ? command.parameters : [];
+    const pluginName = String(parameters[0] || '').trim();
+    const commandName = String(parameters[1] || '')
+        .trim()
+        .toLowerCase();
+
+    if (!isSupportedPluginName(pluginName) || commandName !== MZ_COMMAND_COMMON_POPUP_ADD) {
+        return null;
+    }
+
+    const args = parameters[3] && typeof parameters[3] === 'object' ? parameters[3] : null;
+    return typeof args?.text === 'string' ? args.text : null;
+}
+
 function extractScriptTexts(scriptBlock) {
     const result = [];
     const source = String(scriptBlock || '');
@@ -158,6 +191,10 @@ export class CommonPopupCoreTranslator extends BasePluginTranslator {
         return 'CommonPopupCore';
     }
 
+    getPluginAliases() {
+        return ['CommonPopupCore', 'MNKR_CommonPopupCoreMZ'];
+    }
+
     getPluginLabel() {
         return 'CommonPopupCore';
     }
@@ -167,40 +204,39 @@ export class CommonPopupCoreTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (window[RUNTIME_HOOK_GUARD]) {
+        const manager = window.CommonPopupManager;
+        if (!manager || typeof manager.setPopup !== 'function') {
+            return false;
+        }
+
+        if (manager[HOOK_FLAG_KEY]) {
             return true;
         }
 
-        if (
-            !window.Game_Interpreter ||
-            !Game_Interpreter.prototype ||
-            typeof Game_Interpreter.prototype.addPopup !== 'function'
-        ) {
-            return false;
-        }
         this.registerPluginCustomTags(PLUGIN_TAGS);
 
-        const originalAddPopup = Game_Interpreter.prototype.addPopup;
+        const originalSetPopup = manager.setPopup;
 
-        Game_Interpreter.prototype.addPopup = ((pluginTranslator) => {
-            return function (argParam) {
+        manager.setPopup = ((pluginTranslator) => {
+            /** @this {*} */
+            return function (argParam, character) {
                 const runtime = pluginTranslator.getRuntime();
                 if (!pluginTranslator.isRuntimeTranslationActive(runtime)) {
-                    return originalAddPopup.apply(this, arguments);
+                    return originalSetPopup.apply(this, arguments);
                 }
 
                 const translatedArgParam = pluginTranslator.translatePopupArgs(argParam, runtime);
                 if (translatedArgParam === argParam) {
-                    return originalAddPopup.apply(this, arguments);
+                    return originalSetPopup.apply(this, arguments);
                 }
 
                 const nextArguments = Array.from(arguments);
                 nextArguments[0] = translatedArgParam;
-                return originalAddPopup.apply(this, nextArguments);
+                return originalSetPopup.apply(this, nextArguments);
             };
         })(this);
 
-        window[RUNTIME_HOOK_GUARD] = true;
+        manager[HOOK_FLAG_KEY] = true;
         return true;
     }
 
@@ -424,6 +460,13 @@ export class CommonPopupCoreTranslator extends BasePluginTranslator {
                 const commandLine = String(command.parameters?.[0] || '');
                 const text = extractTextFromMvPluginCommand(commandLine);
                 this.pushTextEntry(output, text, baseMeta, cmdIdx, 'pluginCommand');
+                cmdIdx += 1;
+                continue;
+            }
+
+            if (code === 357) {
+                const text = extractTextFromMzPluginCommand(command);
+                this.pushTextEntry(output, text, baseMeta, cmdIdx, 'pluginCommandMZ');
                 cmdIdx += 1;
                 continue;
             }
