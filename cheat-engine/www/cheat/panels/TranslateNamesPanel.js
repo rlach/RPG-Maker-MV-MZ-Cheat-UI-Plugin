@@ -322,6 +322,11 @@ export default {
                     pattern: '\\c\\[\\d+\\]([^\\[]+)\\c\\[\\d+\\]\n',
                     example: '\\c[23]Char Name\\c[0]\nThe text being spoken.',
                 },
+                {
+                    pattern: String.raw`^([^\n。、.,…？?！!\\\[\]「」]+)\n`,
+                    example:
+                        'Char Name\nThe text being spoken. This will probably also capture some non-name text, so clean-up manually afterwards.',
+                },
             ],
             tableHeaders: [
                 {
