@@ -100,7 +100,8 @@ function extractVariableIdFromExpression(expression) {
 function extractBattleLogAddTextExpressions(scriptText) {
     const source = String(scriptText || '');
     const expressions = [];
-    const regex = /BattleManager\._logWindow\.push\s*\(\s*(['"])addText\1\s*,\s*([\s\S]*?)\s*\)\s*;/g;
+    const regex =
+        /BattleManager\._logWindow\.push\s*\(\s*(['"])addText\1\s*,\s*([\s\S]*?)\s*\)\s*;/g;
     let match = regex.exec(source);
 
     while (match) {
@@ -182,6 +183,8 @@ async function loadMapDataByIdLocal(mapId) {
 }
 
 export class RJ01042745Translator extends BasePluginTranslator {
+    initialDelayBeforeEnablePluginTranslationMs = 2000;
+
     constructor() {
         super();
         this._scanPrepared = false;
