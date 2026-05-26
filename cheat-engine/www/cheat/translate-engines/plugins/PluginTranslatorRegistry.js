@@ -106,6 +106,7 @@ import { PopupMessageTranslator } from './translators/PopupMessageTranslator.js'
 import { ProfileExtendTranslator } from './translators/ProfileExtendTranslator.js';
 import { ResidentWindowTranslator } from './translators/ResidentWindowTranslator.js';
 import { SaveNameInputTranslator } from './translators/SaveNameInputTranslator.js';
+import { MiniInformationWindowTranslator } from './translators/MiniInformationWindowTranslator.js';
 
 class PluginTranslatorRegistry {
     constructor() {
@@ -161,6 +162,7 @@ class PluginTranslatorRegistry {
             MessageWindowPopupTranslator,
             MogBattleCommandsTranslator,
             MessagePExRiruTranslator,
+            MiniInformationWindowTranslator,
             MogEventTextTranslator,
             NameBoxNoUseTranslator,
             NuunMenuScreenExTranslator,
