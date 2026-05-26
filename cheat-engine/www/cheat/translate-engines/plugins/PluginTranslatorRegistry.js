@@ -63,6 +63,7 @@ import { SkillCPSystemTranslator } from './translators/SkillCPSystemTranslator.j
 import { SkillTreeTranslator } from './translators/SkillTreeTranslator.js';
 import { SItemsceneKzTranslator } from './translators/SItemsceneKzTranslator.js';
 import { TextPictureTranslator } from './translators/TextPictureTranslator.js';
+import { TNLightSaveDataMapTranslator } from './translators/TNLightSaveDataMapTranslator.js';
 import { TMMenuLabelTranslator } from './translators/TMMenuLabelTranslator.js';
 import { TMNamePopTranslator } from './translators/TMNamePopTranslator.js';
 import { TMSaveDataLabelTranslator } from './translators/TMSaveDataLabelTranslator.js';
@@ -194,6 +195,7 @@ class PluginTranslatorRegistry {
             SkillCPSystemTranslator,
             SkillTreeTranslator,
             TextPictureTranslator,
+            TNLightSaveDataMapTranslator,
             TMMenuLabelTranslator,
             TMNamePopTranslator,
             TMSaveDataLabelTranslator,
