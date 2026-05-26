@@ -72,7 +72,7 @@ export class ResidentWindowTranslator extends BasePluginTranslator {
                 }
 
                 const cacheKey = runtime.getCacheKey(text, cacheType);
-                runtime.trackCacheKeyUsage(cacheKey);
+                runtime.trackCacheKeyUsage(cacheKey, { harvestMissing: false });
 
                 if (!isRuntimeTranslationActive(runtime)) {
                     return originalDrawText.apply(this, arguments);

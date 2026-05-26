@@ -19,6 +19,7 @@ const BONUS_SOURCE_PARAM_KEYS = ['DescSettings', '説明文の設定'];
 const BONUS_SOURCE_FIELD = 'expDesc';
 const PROFILE_HOOK_FLAG = '__CHEAT_RJ01042745_PROFILE_HOOKED__';
 const DRAW_TEXT_HOOK_FLAG = '__CHEAT_RJ01042745_BONUS_HOOKED__';
+const BATTLELOG_HOOK_FLAG = '__CHEAT_RJ01042745_BATTLELOG_HOOKED__';
 
 function parseJsonSafely(value, fallback = null) {
     if (typeof value !== 'string') {
@@ -96,6 +97,37 @@ function extractVariableIdFromExpression(expression) {
     return Number(match[1] || 0);
 }
 
+function extractBattleLogAddTextExpressions(scriptText) {
+    const source = String(scriptText || '');
+    const expressions = [];
+    const regex = /BattleManager\._logWindow\.push\s*\(\s*(['"])addText\1\s*,\s*([\s\S]*?)\s*\)\s*;/g;
+    let match = regex.exec(source);
+
+    while (match) {
+        expressions.push(String(match[2] || '').trim());
+        match = regex.exec(source);
+    }
+
+    return expressions;
+}
+
+function extractStringLiteralsFromExpression(expression) {
+    const source = String(expression || '');
+    const result = [];
+    const regex = /(['"])(?:\\.|(?!\1)[\s\S])*?\1/g;
+    let match = regex.exec(source);
+
+    while (match) {
+        const literal = normalizeScriptLiteral(match[0]);
+        if (isUsableText(literal)) {
+            result.push(literal);
+        }
+        match = regex.exec(source);
+    }
+
+    return result;
+}
+
 function extractStringFromVariableCommand(command122, variableId) {
     if (!command122 || Number(command122.code) !== 122) {
         return '';
@@ -156,6 +188,7 @@ export class RJ01042745Translator extends BasePluginTranslator {
         this._scanEntries = [];
         this._scanPromise = null;
         this._bonusSourceText = null;
+        this._battleLogFragments = [];
     }
 
     getPluginName() {
@@ -372,6 +405,7 @@ export class RJ01042745Translator extends BasePluginTranslator {
             output.push({
                 text: profileText,
                 actorId: call.actorId,
+                cacheType: PROFILE_CACHE_TYPE,
                 source: {
                     ...baseMeta,
                     cmdIdx: startIdx,
@@ -380,30 +414,57 @@ export class RJ01042745Translator extends BasePluginTranslator {
             });
         }
 
+        const addTextExpressions = extractBattleLogAddTextExpressions(scriptText);
+        for (const expression of addTextExpressions) {
+            const literals = extractStringLiteralsFromExpression(expression);
+
+            for (const text of literals) {
+                output.push({
+                    text,
+                    cacheType: this.getCacheType(),
+                    source: {
+                        ...baseMeta,
+                        cmdIdx: startIdx,
+                        kind: 'battleLogAddText',
+                    },
+                });
+            }
+        }
+
         return cursor;
     }
 
     buildUniquePendingItems(runtime) {
         const byCacheKey = new Map();
 
+        this._battleLogFragments = [];
+        const battleLogFragmentsByKey = new Map();
+
         for (const entry of this._scanEntries) {
-            const text = String(entry?.text || '').trim();
+            const text = String(entry?.text || '');
             if (!isUsableText(text)) {
                 continue;
             }
 
-            const cacheKey = runtime.getCacheKey(text, PROFILE_CACHE_TYPE);
+            const cacheType = String(entry?.cacheType || PROFILE_CACHE_TYPE);
+            const cacheKey = runtime.getCacheKey(text, cacheType);
             if (byCacheKey.has(cacheKey)) {
                 continue;
             }
 
             byCacheKey.set(cacheKey, {
-                type: PROFILE_CACHE_TYPE,
+                type: cacheType,
                 id: `rj01042745_actor_profile_${byCacheKey.size}`,
                 value: text,
                 cacheKey,
             });
+
+            if (cacheType === this.getCacheType() && !battleLogFragmentsByKey.has(cacheKey)) {
+                battleLogFragmentsByKey.set(cacheKey, text);
+            }
         }
+
+        this._battleLogFragments = Array.from(battleLogFragmentsByKey.values());
 
         return Array.from(byCacheKey.values());
     }
@@ -500,6 +561,44 @@ export class RJ01042745Translator extends BasePluginTranslator {
         return `${translatedPrefix}${text.slice(sourcePrefix.length)}`;
     }
 
+    translateBattleLogText(text, runtime) {
+        if (!isUsableText(text) || !runtime) {
+            return text;
+        }
+
+        const direct = this.resolveRuntimeTranslation(text, runtime, this.getCacheType(), {
+            requireRuntimeTranslationActive: true,
+            missValue: text,
+        });
+        if (direct !== text) {
+            return direct;
+        }
+
+        let nextText = text;
+        const fragments = Array.isArray(this._battleLogFragments) ? this._battleLogFragments : [];
+        for (const fragment of fragments) {
+            if (!isUsableText(fragment) || !nextText.includes(fragment)) {
+                continue;
+            }
+
+            const translatedFragment = this.resolveRuntimeTranslation(
+                fragment,
+                runtime,
+                this.getCacheType(),
+                {
+                    requireRuntimeTranslationActive: true,
+                    missValue: fragment,
+                }
+            );
+
+            if (translatedFragment !== fragment) {
+                nextText = nextText.replaceAll(fragment, translatedFragment);
+            }
+        }
+
+        return nextText;
+    }
+
     enablePluginTranslation() {
         if (
             typeof Game_Actor === 'undefined' ||
@@ -569,6 +668,34 @@ export class RJ01042745Translator extends BasePluginTranslator {
             };
 
             Window_Base.prototype[DRAW_TEXT_HOOK_FLAG] = true;
+        }
+
+        if (!window.Window_BattleLog?.prototype?.[BATTLELOG_HOOK_FLAG]) {
+            if (typeof window.Window_BattleLog?.prototype?.push !== 'function') {
+                return false;
+            }
+
+            const originalPush = window.Window_BattleLog.prototype.push;
+            const getRuntime = this.getRuntime.bind(this);
+            const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
+            const translateBattleLogText = this.translateBattleLogText.bind(this);
+
+            window.Window_BattleLog.prototype.push = function (methodName) {
+                const runtime = getRuntime();
+                if (!runtime || !isRuntimeTranslationActive(runtime)) {
+                    return originalPush.apply(this, arguments);
+                }
+
+                if (methodName !== 'addText' || typeof arguments[1] !== 'string') {
+                    return originalPush.apply(this, arguments);
+                }
+
+                const nextArguments = Array.from(arguments);
+                nextArguments[1] = translateBattleLogText(nextArguments[1], runtime);
+                return originalPush.apply(this, nextArguments);
+            };
+
+            window.Window_BattleLog.prototype[BATTLELOG_HOOK_FLAG] = true;
         }
 
         return true;
