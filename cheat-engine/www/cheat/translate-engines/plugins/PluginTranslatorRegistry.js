@@ -9,7 +9,7 @@ import { ExternMessageTranslator } from './translators/ExternMessageTranslator.j
 import { FtkrCssDetailedStatusTranslator } from './translators/FtkrCssDetailedStatusTranslator.js';
 import { FtkrGdmWindowEditorTranslator } from './translators/FtkrGdmWindowEditorTranslator.js';
 import { FtkrItemCompositionSystemTranslator } from './translators/FtkrItemCompositionSystemTranslator.js';
-import { FtkrSkillExpansionTranslator } from './translators/FtkrSkillExpansionTranslator.js';
+import { FtkrSkillExpansionTranslator } from './translators/FTKRSkillExpansionTranslator.js';
 import { FtkrSkillTreeSystemTranslator } from './translators/FtkrSkillTreeSystemTranslator.js';
 import { FtkrMessageWindowLinesTranslator } from './translators/FTKRMessageWindowLinesTranslator.js';
 import { CbrEroStatusMvTranslator } from './translators/CbrEroStatusMvTranslator.js';
@@ -65,6 +65,7 @@ import { SkillTreeTranslator } from './translators/SkillTreeTranslator.js';
 import { SItemsceneKzTranslator } from './translators/SItemsceneKzTranslator.js';
 import { TextPictureTranslator } from './translators/TextPictureTranslator.js';
 import { TNLightSaveDataMapTranslator } from './translators/TNLightSaveDataMapTranslator.js';
+import { TMMapHpGaugeTranslator } from './translators/TMMapHpGaugeTranslator.js';
 import { TMMenuLabelTranslator } from './translators/TMMenuLabelTranslator.js';
 import { TMNamePopTranslator } from './translators/TMNamePopTranslator.js';
 import { TMSaveDataLabelTranslator } from './translators/TMSaveDataLabelTranslator.js';
@@ -196,6 +197,7 @@ class PluginTranslatorRegistry {
             SkillTreeTranslator,
             TextPictureTranslator,
             TNLightSaveDataMapTranslator,
+            TMMapHpGaugeTranslator,
             TMMenuLabelTranslator,
             TMNamePopTranslator,
             TMSaveDataLabelTranslator,
