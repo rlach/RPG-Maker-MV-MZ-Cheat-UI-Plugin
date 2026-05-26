@@ -299,14 +299,13 @@ export function buildKnowledgeHints(relevantEntries) {
 export function buildKbaseInstruction() {
     return (
         'If you encounter any proper names that were not passed in the previous list, ' +
-        'add them at the end in key "kbase". Add description only if you have additional ' +
+        'add them at the end of THE SAME JSON, in key "kbase". If you put it into different' +
+        'JSON it will be REJECTED. Add description only if you have additional ' +
         'context from the dialogue. Main focus should be key:translation pairs to ensure ' +
         'consistent naming convention. Description is optional and should be short, like ' +
         '"Capital name of SampleCountry".\n' +
         'Example:\n' +
-        '"kbase": [\n' +
-        '    {"key": "例題技法：例示的技法", "translation": "Example Technique of Examplatory Example", "description": "Special technique used by LLM ninja"}\n' +
-        ']'
+        '"kbase": [{"key": "例題技法：例示的技法", "translation": "Example Technique of Examplatory Example", "description": "Special technique used by LLM ninja"}]'
     );
 }
 
