@@ -16,6 +16,10 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
         return 'TorigoyaMZ_NotifyMessage';
     }
 
+    getPluginAliases() {
+        return [this.getPluginName(), 'TorigoyaMZ_NotifyMessageZ'];
+    }
+
     getPluginLabel() {
         return 'Torigoya NotifyMessage';
     }
@@ -54,7 +58,8 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
             return true;
         }
 
-        const notifyWindowClass = window.Torigoya?.NotifyMessage?.Window;
+        const notifyWindowClass =
+            window.Torigoya?.NotifyMessageZ?.Window || window.Torigoya?.NotifyMessage?.Window;
 
         if (
             !notifyWindowClass?.prototype ||
@@ -256,7 +261,10 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
         const args = this.normalizeArgsObject(parameters[3]);
         const message = args && typeof args.message === 'string' ? args.message : '';
 
-        if (pluginName?.toLowerCase() !== 'torigoyamz_notifymessage') {
+        if (
+            pluginName?.toLowerCase() !== 'torigoyamz_notifymessage' &&
+            pluginName?.toLowerCase() !== 'torigoyamz_notifymessagez'
+        ) {
             return null;
         }
 

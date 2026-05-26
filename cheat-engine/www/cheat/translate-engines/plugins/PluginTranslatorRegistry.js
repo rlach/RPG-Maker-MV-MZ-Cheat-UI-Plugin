@@ -25,6 +25,7 @@ import { HelpWindowPluginTranslator } from './translators/HelpWindowPluginTransl
 import { DestinationWindowTranslator } from './translators/DestinationWindowTranslator.js';
 import { KOriginalMenuScreenTranslator } from './translators/KOriginalMenuScreenTranslator.js';
 import { KmsMapActiveMessageTranslator } from './translators/KmsMapActiveMessageTranslator.js';
+import { KmsQuickNotificationTranslator } from './translators/KmsQuickNotificationTranslator.js';
 import { KisekiTranslator } from './translators/KisekiTranslator.js';
 import { KzPictureChoicesTranslator } from './translators/KzPictureChoicesTranslator.js';
 import { KekeVariableActorCommandTranslator } from './translators/KekeVariableActorCommandTranslator.js';
@@ -140,6 +141,7 @@ class PluginTranslatorRegistry {
             DestinationWindowTranslator,
             KOriginalMenuScreenTranslator,
             KmsMapActiveMessageTranslator,
+            KmsQuickNotificationTranslator,
             KisekiTranslator,
             KzPictureChoicesTranslator,
             KekeVariableActorCommandTranslator,
