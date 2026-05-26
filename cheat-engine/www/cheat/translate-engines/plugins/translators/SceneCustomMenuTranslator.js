@@ -12,20 +12,30 @@ function normalizeCacheSourceText(value) {
     return typeof value === 'string' ? value.trim() : '';
 }
 
+const TranslatedTexts = new Set();
+
 function resolveCachedText(runtime, text, cacheType) {
     const normalizedText = normalizeCacheSourceText(text);
     if (!normalizedText) {
         return null;
     }
 
+    console.log(
+        '[SceneCustomMenuTranslator] Resolving cache for text:',
+        normalizedText,
+        !TranslatedTexts.has(normalizedText)
+    );
     const cacheKey = runtime.getCacheKey(normalizedText, cacheType);
-    runtime.trackCacheKeyUsage(cacheKey);
+    runtime.trackCacheKeyUsage(cacheKey, {
+        harvestMissing: !TranslatedTexts.has(normalizedText),
+    });
 
     if (!runtime.hasUsableCacheValue(cacheKey)) {
         return null;
     }
 
     const cached = runtime.translationCache.get(cacheKey);
+    TranslatedTexts.add(cached);
     return typeof cached === 'string' && cached.trim() ? cached : null;
 }
 
@@ -237,14 +247,21 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
                 target[methodName] = function (...args) {
                     try {
                         const runtime = getRuntime();
-                        if (runtime && isRuntimeTranslationActive(runtime) && typeof args[0] === 'string') {
+                        if (
+                            runtime &&
+                            isRuntimeTranslationActive(runtime) &&
+                            typeof args[0] === 'string'
+                        ) {
                             const cached = resolveCachedText(runtime, args[0], cacheType);
                             if (cached) {
                                 args[0] = cached;
                             }
                         }
                     } catch (error) {
-                        console.warn('[SceneCustomMenuTranslator] Failed to translate draw text', error);
+                        console.warn(
+                            '[SceneCustomMenuTranslator] Failed to translate draw text',
+                            error
+                        );
                     }
 
                     return original.apply(this, args);
@@ -257,8 +274,7 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
         const originalDrawItemSub = proto.drawItemSub;
         proto.drawItemSub = function (item, rect, index) {
             const runtime = getRuntime();
-            const runtimeTranslationActive =
-                !!runtime && isRuntimeTranslationActive(runtime);
+            const runtimeTranslationActive = !!runtime && isRuntimeTranslationActive(runtime);
             const originalItemDrawScript = this?._data?.ItemDrawScript;
             let replacedItemDrawScript = false;
 
@@ -283,7 +299,12 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
                 ) {
                     const cached = resolveCachedText(runtime, item.Text, cacheType);
                     if (cached) {
-                        return originalDrawItemSub.call(this, { ...item, Text: cached }, rect, index);
+                        return originalDrawItemSub.call(
+                            this,
+                            { ...item, Text: cached },
+                            rect,
+                            index
+                        );
                     }
                 }
             } catch (error) {
@@ -355,14 +376,21 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
                 target[methodName] = function (...args) {
                     try {
                         const runtime = getRuntime();
-                        if (runtime && isRuntimeTranslationActive(runtime) && typeof args[0] === 'string') {
+                        if (
+                            runtime &&
+                            isRuntimeTranslationActive(runtime) &&
+                            typeof args[0] === 'string'
+                        ) {
                             const cached = resolveCachedText(runtime, args[0], cacheType);
                             if (cached) {
                                 args[0] = cached;
                             }
                         }
                     } catch (error) {
-                        console.warn('[SceneCustomMenuTranslator] Failed to translate draw text', error);
+                        console.warn(
+                            '[SceneCustomMenuTranslator] Failed to translate draw text',
+                            error
+                        );
                     }
 
                     return original.apply(this, args);
@@ -379,8 +407,7 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
             const originalDrawItemSub = windowInstance.drawItemSub;
             windowInstance.drawItemSub = function (item, rect, index) {
                 const runtime = getRuntime();
-                const runtimeTranslationActive =
-                    !!runtime && isRuntimeTranslationActive(runtime);
+                const runtimeTranslationActive = !!runtime && isRuntimeTranslationActive(runtime);
                 const originalItemDrawScript = this?._data?.ItemDrawScript;
                 let replacedItemDrawScript = false;
 
@@ -480,7 +507,10 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
                 return;
             }
 
-            if (typeof value.drawItemSub === 'function' || typeof value.findHelpText === 'function') {
+            if (
+                typeof value.drawItemSub === 'function' ||
+                typeof value.findHelpText === 'function'
+            ) {
                 this._installCommandWindowInstanceHooks(value);
                 this._installCommandWindowHooks(Object.getPrototypeOf(value));
             }

@@ -591,20 +591,72 @@ export class TagManager {
             };
         }
 
+        const strictResult = this.postprocessTagsOnce(text, tagCounts, caseMap, {
+            allowLooseXmlCustomTagClosing: false,
+            suppressUnresolvedWarning: true,
+        });
+
+        if (
+            strictResult.valid ||
+            strictResult.errorReason !== 'Unresolved escaped tags left in output ([b=...)'
+        ) {
+            return strictResult;
+        }
+
+        const fallbackXmlTagIds = new Set();
+        const strictText = strictResult.text;
+        for (const entry of this.customParameterEntries) {
+            if (entry.style !== TAG_STYLE.XML) {
+                continue;
+            }
+
+            const tokenPrefix = `[b=${entry.tagId}${entry.bracket}`.toLowerCase();
+            const expectedCount = Number(tagCounts?.[entry.key] || 0);
+            if (
+                expectedCount > 0 ||
+                String(strictText || '')
+                    .toLowerCase()
+                    .includes(tokenPrefix)
+            ) {
+                fallbackXmlTagIds.add(entry.tagId);
+            }
+        }
+
+        if (fallbackXmlTagIds.size === 0) {
+            return strictResult;
+        }
+
+        return this.postprocessTagsOnce(text, tagCounts, caseMap, {
+            allowLooseXmlCustomTagClosing: true,
+            suppressUnresolvedWarning: false,
+            onlyLooseXmlTagIds: fallbackXmlTagIds,
+            skipMalformedRangeProtection: true,
+        });
+    }
+
+    postprocessTagsOnce(text, tagCounts, caseMap, options = {}) {
         let result = text;
         const actualCounts = {};
         const usedMaskedIdsByTagKey = {};
         const maskedByTagKey = caseMap?.maskedByTagKey || {};
+        const allowLooseXmlCustomTagClosing = options?.allowLooseXmlCustomTagClosing === true;
+        const suppressUnresolvedWarning = options?.suppressUnresolvedWarning === true;
+        const onlyLooseXmlTagIds = options?.onlyLooseXmlTagIds || null;
+        const skipMalformedRangeProtection = options?.skipMalformedRangeProtection === true;
         const processingEntries = [
             ...this.tagEntries.filter((entry) => entry.type === TAG_TYPE.WITH_CUSTOM_PARAMETER),
             ...this.tagEntries.filter((entry) => entry.type !== TAG_TYPE.WITH_CUSTOM_PARAMETER),
         ];
-        const malformedCustomRanges = this.findMalformedEncodedCustomTagRanges(result);
-        result = this.protectEncodedTagsInRanges(
-            result,
-            malformedCustomRanges,
-            PROTECTED_B_TAG_PREFIX
-        );
+        if (!skipMalformedRangeProtection) {
+            const malformedCustomRanges = this.findMalformedEncodedCustomTagRanges(result, {
+                allowLooseXmlCustomTagClosing,
+            });
+            result = this.protectEncodedTagsInRanges(
+                result,
+                malformedCustomRanges,
+                PROTECTED_B_TAG_PREFIX
+            );
+        }
 
         for (const entry of processingEntries) {
             if (entry.type === TAG_TYPE.WITH_NUMERIC_PARAMETER) {
@@ -633,6 +685,15 @@ export class TagManager {
             }
 
             if (entry.type === TAG_TYPE.WITH_CUSTOM_PARAMETER) {
+                if (
+                    onlyLooseXmlTagIds &&
+                    entry.style === TAG_STYLE.XML &&
+                    !onlyLooseXmlTagIds.has(entry.tagId)
+                ) {
+                    actualCounts[entry.key] = 0;
+                    continue;
+                }
+
                 const replacementResult = this.replaceEncodedCustomTags(
                     result,
                     entry,
@@ -658,6 +719,9 @@ export class TagManager {
                             return `<${entry.tagSymbol}:${resolvedValue}>`;
                         }
                         return `\\${entry.tagSymbol}${entry.bracket}${resolvedValue}${entry.bracketClose}`;
+                    },
+                    {
+                        allowLooseXmlCustomTagClosing,
                     }
                 );
                 result = replacementResult.text;
@@ -711,12 +775,28 @@ export class TagManager {
             result = result.replace(/\[\/b\]/gi, '');
         }
 
-        const hasUnresolvedEscapedTag = /\[b=/i.test(result);
+        let hasUnresolvedEscapedTag = /\[b=/i.test(result);
+        if (hasUnresolvedEscapedTag && onlyLooseXmlTagIds instanceof Set) {
+            hasUnresolvedEscapedTag = false;
+            for (const entry of this.customParameterEntries) {
+                if (entry.style !== TAG_STYLE.XML || !onlyLooseXmlTagIds.has(entry.tagId)) {
+                    continue;
+                }
+
+                const tokenPrefix = `[b=${entry.tagId}${entry.bracket}`.toLowerCase();
+                if (result.toLowerCase().includes(tokenPrefix)) {
+                    hasUnresolvedEscapedTag = true;
+                    break;
+                }
+            }
+        }
         if (hasUnresolvedEscapedTag) {
-            console.warn(
-                '[TagManager] Unresolved escaped tags found in postprocessed text:',
-                result
-            );
+            if (!suppressUnresolvedWarning) {
+                console.warn(
+                    '[TagManager] Unresolved escaped tags found in postprocessed text:',
+                    result
+                );
+            }
             return {
                 text: result,
                 valid: false,
@@ -851,7 +931,7 @@ export class TagManager {
         return tag;
     }
 
-    replaceEncodedCustomTags(text, entry, replacementFactory) {
+    replaceEncodedCustomTags(text, entry, replacementFactory, options = {}) {
         if (typeof text !== 'string') {
             return { text, count: 0 };
         }
@@ -861,6 +941,7 @@ export class TagManager {
         const sourceLower = source.toLowerCase();
         const open = entry.bracket;
         const close = entry.bracketClose;
+        const allowLooseXmlCustomTagClosing = options?.allowLooseXmlCustomTagClosing === true;
         let cursor = 0;
         let count = 0;
         let output = '';
@@ -875,8 +956,14 @@ export class TagManager {
             output += source.slice(cursor, tokenStart);
             const openIndex = tokenStart + tokenPrefix.length - 1;
             const balanced = this.readBalancedValue(source, openIndex, open, close);
+            const hasStrictClosing = balanced && source[balanced.closeIndex + 1] === ']';
+            const hasLooseXmlClosing =
+                allowLooseXmlCustomTagClosing &&
+                entry.style === TAG_STYLE.XML &&
+                balanced &&
+                !hasStrictClosing;
 
-            if (!balanced || source[balanced.closeIndex + 1] !== ']') {
+            if (!balanced || (!hasStrictClosing && !hasLooseXmlClosing)) {
                 // Leave malformed/mismatched token untouched and continue scanning.
                 output += source[tokenStart];
                 cursor = tokenStart + 1;
@@ -884,7 +971,7 @@ export class TagManager {
             }
 
             output += replacementFactory(balanced.value);
-            cursor = balanced.closeIndex + 2;
+            cursor = balanced.closeIndex + (hasStrictClosing ? 2 : 1);
             count += 1;
         }
 
@@ -928,13 +1015,14 @@ export class TagManager {
         return { text: output, count };
     }
 
-    findMalformedEncodedCustomTagRanges(text) {
+    findMalformedEncodedCustomTagRanges(text, options = {}) {
         if (typeof text !== 'string' || text.length === 0) {
             return [];
         }
 
         const ranges = [];
         const entries = this.customParameterEntries;
+        const allowLooseXmlCustomTagClosing = options?.allowLooseXmlCustomTagClosing === true;
 
         for (const entry of entries) {
             const tokenPrefix = `[b=${entry.tagId}${entry.bracket}`.toLowerCase();
@@ -952,13 +1040,19 @@ export class TagManager {
 
                 const openIndex = tokenStart + tokenPrefix.length - 1;
                 const balanced = this.readBalancedValue(source, openIndex, open, close);
+                const hasStrictClosing = balanced && source[balanced.closeIndex + 1] === ']';
+                const hasLooseXmlClosing =
+                    allowLooseXmlCustomTagClosing &&
+                    entry.style === TAG_STYLE.XML &&
+                    balanced &&
+                    !hasStrictClosing;
 
                 if (!balanced) {
                     cursor = tokenStart + 1;
                     continue;
                 }
 
-                if (source[balanced.closeIndex + 1] !== ']') {
+                if (!hasStrictClosing && !hasLooseXmlClosing) {
                     ranges.push({
                         start: tokenStart,
                         end: balanced.closeIndex + 1,
@@ -967,7 +1061,7 @@ export class TagManager {
                     continue;
                 }
 
-                cursor = balanced.closeIndex + 2;
+                cursor = balanced.closeIndex + (hasStrictClosing ? 2 : 1);
             }
         }
 
