@@ -66,6 +66,7 @@ import { TMMenuLabelTranslator } from './translators/TMMenuLabelTranslator.js';
 import { TMNamePopTranslator } from './translators/TMNamePopTranslator.js';
 import { TMSaveDataLabelTranslator } from './translators/TMSaveDataLabelTranslator.js';
 import { TMStatusMenuExTranslator } from './translators/TMStatusMenuExTranslator.js';
+import { TsumioBattleResultTranslator } from './translators/TsumioBattleResultTranslator.js';
 import { TorigoyaAchievement2Translator } from './translators/TorigoyaAchievement2Translator.js';
 import { TorigoyaAchievementTranslator } from './translators/TorigoyaAchievementTranslator.js';
 import { TorigoyaNotifyMessageTranslator } from './translators/TorigoyaNotifyMessageTranslator.js';
@@ -195,6 +196,7 @@ class PluginTranslatorRegistry {
             TMNamePopTranslator,
             TMSaveDataLabelTranslator,
             TMStatusMenuExTranslator,
+            TsumioBattleResultTranslator,
             TorigoyaAchievement2Translator,
             TorigoyaAchievementTranslator,
             TorigoyaNotifyMessageTranslator,
