@@ -88,8 +88,6 @@ export class DTextPictureTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        const translator = this;
-
         if (
             !window.Game_Screen?.prototype ||
             typeof Game_Screen.prototype.setDTextPicture !== 'function'
@@ -99,18 +97,18 @@ export class DTextPictureTranslator extends BasePluginTranslator {
         this.registerPluginCustomTags(PLUGIN_TAGS);
 
         const original = Game_Screen.prototype.setDTextPicture;
+        const resolveRuntimeTranslation = this.resolveRuntimeTranslation.bind(this);
+        const getRuntime = this.getRuntime.bind(this);
+        const getCacheType = this.getCacheType.bind(this);
+
         Game_Screen.prototype.setDTextPicture = function (value, size) {
             try {
-                const runtime = translator.getRuntime();
+                const runtime = getRuntime();
 
                 if (runtime && typeof value === 'string' && value.trim()) {
-                    const cacheKey = runtime.getCacheKey(value, 'plugin_dtext');
-                    if (runtime.hasUsableCacheValue(cacheKey)) {
-                        const cached = runtime.translationCache.get(cacheKey);
-                        if (typeof cached === 'string' && cached.trim()) {
-                            arguments[0] = cached;
-                        }
-                    }
+                    arguments[0] = resolveRuntimeTranslation(value, runtime, getCacheType(), {
+                        missValue: value,
+                    });
                 }
             } catch (error) {
                 console.warn(
@@ -154,28 +152,37 @@ export class DTextPictureTranslator extends BasePluginTranslator {
 
     async buildScanEntries() {
         const entries = [];
+        this.collectCommonEventEntries(entries);
+        await this.collectMapEntries(entries);
+        return entries;
+    }
 
-        if (Array.isArray(window.$dataCommonEvents)) {
-            for (let commonEventId = 0; commonEventId < $dataCommonEvents.length; commonEventId++) {
-                const commonEvent = $dataCommonEvents[commonEventId];
-                if (!commonEvent || !Array.isArray(commonEvent.list)) {
-                    continue;
-                }
-
-                this.collectDTextCommandsFromList(
-                    commonEvent.list,
-                    {
-                        scope: 'commonEvent',
-                        commonEventId,
-                    },
-                    entries
-                );
-            }
+    collectCommonEventEntries(output) {
+        if (!Array.isArray(window.$dataCommonEvents)) {
+            return;
         }
 
+        for (let commonEventId = 0; commonEventId < $dataCommonEvents.length; commonEventId++) {
+            const commonEvent = $dataCommonEvents[commonEventId];
+            if (!commonEvent || !Array.isArray(commonEvent.list)) {
+                continue;
+            }
+
+            this.collectDTextCommandsFromList(
+                commonEvent.list,
+                {
+                    scope: 'commonEvent',
+                    commonEventId,
+                },
+                output
+            );
+        }
+    }
+
+    async collectMapEntries(output) {
         const mapInfos = Array.isArray(window.$dataMapInfos) ? window.$dataMapInfos : [];
         for (const mapInfo of mapInfos) {
-            const mapId = Number(mapInfo && mapInfo.id);
+            const mapId = Number(mapInfo?.id);
             if (!mapId) {
                 continue;
             }
@@ -186,30 +193,7 @@ export class DTextPictureTranslator extends BasePluginTranslator {
                     continue;
                 }
 
-                for (let eventIdx = 0; eventIdx < mapData.events.length; eventIdx++) {
-                    const event = mapData.events[eventIdx];
-                    if (!event || !Array.isArray(event.pages)) {
-                        continue;
-                    }
-
-                    for (let pageIdx = 0; pageIdx < event.pages.length; pageIdx++) {
-                        const page = event.pages[pageIdx];
-                        if (!page || !Array.isArray(page.list)) {
-                            continue;
-                        }
-
-                        this.collectDTextCommandsFromList(
-                            page.list,
-                            {
-                                scope: 'mapEvent',
-                                mapId,
-                                eventIdx,
-                                pageIdx,
-                            },
-                            entries
-                        );
-                    }
-                }
+                this.collectMapEventEntries(mapData.events, mapId, output);
             } catch (error) {
                 console.warn(
                     `[DTextPictureTranslator] Failed to scan map ${mapId} for DTextPicture commands`,
@@ -217,8 +201,33 @@ export class DTextPictureTranslator extends BasePluginTranslator {
                 );
             }
         }
+    }
 
-        return entries;
+    collectMapEventEntries(events, mapId, output) {
+        for (let eventIdx = 0; eventIdx < events.length; eventIdx++) {
+            const event = events[eventIdx];
+            if (!event || !Array.isArray(event.pages)) {
+                continue;
+            }
+
+            for (let pageIdx = 0; pageIdx < event.pages.length; pageIdx++) {
+                const page = event.pages[pageIdx];
+                if (!page || !Array.isArray(page.list)) {
+                    continue;
+                }
+
+                this.collectDTextCommandsFromList(
+                    page.list,
+                    {
+                        scope: 'mapEvent',
+                        mapId,
+                        eventIdx,
+                        pageIdx,
+                    },
+                    output
+                );
+            }
+        }
     }
 
     collectDTextCommandsFromList(list, baseMeta, output) {
@@ -233,7 +242,7 @@ export class DTextPictureTranslator extends BasePluginTranslator {
             }
 
             const entry = this.extractDTextEntry(cmd);
-            if (!entry || !entry.text || !entry.text.trim()) {
+            if (!entry || !this.isUsableText(entry.text)) {
                 continue;
             }
 
@@ -250,7 +259,7 @@ export class DTextPictureTranslator extends BasePluginTranslator {
     }
 
     extractDTextEntry(cmd) {
-        const commandCode = Number(cmd && cmd.code);
+        const commandCode = Number(cmd?.code);
         if (commandCode === 357) {
             return this.extractMZDTextEntry(cmd);
         }
@@ -269,7 +278,7 @@ export class DTextPictureTranslator extends BasePluginTranslator {
         const args = parameters[3] && typeof parameters[3] === 'object' ? parameters[3] : null;
         const text = args && typeof args.text === 'string' ? args.text : '';
 
-        if (!pluginName || pluginName.toLowerCase() !== 'dtextpicture') {
+        if (pluginName.toLowerCase() !== 'dtextpicture') {
             return null;
         }
 
@@ -277,7 +286,7 @@ export class DTextPictureTranslator extends BasePluginTranslator {
             return null;
         }
 
-        if (!text || !text.trim()) {
+        if (!this.isUsableText(text)) {
             return null;
         }
 
@@ -303,30 +312,33 @@ export class DTextPictureTranslator extends BasePluginTranslator {
             return null;
         }
 
-        const parts = line.split(' ');
-        const commandName = String(parts.shift() || '').trim();
-        if (normalizeCommandName(commandName) !== 'D_TEXT') {
+        const firstSpaceIndex = line.indexOf(' ');
+        const commandToken = firstSpaceIndex >= 0 ? line.slice(0, firstSpaceIndex) : line;
+        if (normalizeCommandName(commandToken) !== 'D_TEXT') {
             return null;
         }
 
-        while (parts.length > 0 && !String(parts[parts.length - 1] || '').trim()) {
-            parts.pop();
-        }
+        // Remove exactly one ASCII separator between command token and value.
+        // Any additional leading spaces (including full-width spaces) are part of
+        // the text payload and must be preserved in cache keys.
+        let textWithArgs = firstSpaceIndex >= 0 ? line.slice(firstSpaceIndex + 1) : '';
 
-        if (parts.length > 1) {
-            const lastArg = String(parts[parts.length - 1] || '').trim();
-            if (/^[+-]?\d+$/.test(lastArg)) {
-                parts.pop();
+        // Keep legacy behavior: trailing numeric argument is treated as size,
+        // but do it without trimming leading text spacing.
+        const lastSeparatorIndex = textWithArgs.lastIndexOf(' ');
+        if (lastSeparatorIndex > 0) {
+            const trailingToken = textWithArgs.slice(lastSeparatorIndex + 1);
+            if (/^[+-]?\d+$/.test(trailingToken)) {
+                textWithArgs = textWithArgs.slice(0, lastSeparatorIndex);
             }
         }
 
-        const text = parts.join(' ').trim();
-        if (!text) {
+        if (!textWithArgs) {
             return null;
         }
 
         return {
-            text,
+            text: textWithArgs,
             commandName: 'D_TEXT',
             engine: 'MV',
         };
@@ -337,7 +349,7 @@ export class DTextPictureTranslator extends BasePluginTranslator {
 
         for (const entry of this._scanEntries) {
             const text = typeof entry.text === 'string' ? entry.text : '';
-            if (!text || !text.trim()) {
+            if (!this.isUsableText(text)) {
                 continue;
             }
 
