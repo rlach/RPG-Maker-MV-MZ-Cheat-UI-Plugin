@@ -1,7 +1,7 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { mergeKnowledgeEntries } from '../../../js/KnowledgeBaseRuntime.js';
 import { parseJsonSafely } from './TranslatorHelpers.js';
-import { TAG_TYPE } from '../../ai-engine/constants.js';
+import { TAG_BRACKET, TAG_STYLE, TAG_TYPE } from '../../ai-engine/constants.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_SCENE_GLOSSARY_TRANSLATOR_HOOKED__';
 const NOTE_CACHE_TYPE = 'item_note';
@@ -29,13 +29,13 @@ function returnStatTag(statName, tagSymbol) {
 
 const HAS_OWN_PROPERTY = Object.prototype.hasOwnProperty;
 
-const SCENE_GLOSSARY_PLUGIN_TAGS = (() => {
+export const SCENE_GLOSSARY_PLUGIN_TAGS = (() => {
     const xmlCustom = (description, tagSymbol, maskValue) => ({
         description,
         tagSymbol,
-        style: 'xml',
-        type: 'withCustomParameter',
-        bracket: 'none',
+        style: TAG_STYLE.XML,
+        type: TAG_TYPE.WITH_CUSTOM_PARAMETER,
+        bracket: TAG_BRACKET.NONE,
         maskValue,
         requiredConsistency: true,
     });
@@ -58,6 +58,7 @@ const SCENE_GLOSSARY_PLUGIN_TAGS = (() => {
         {
             description: 'Returns data from Glossary',
             type: TAG_TYPE.WITH_CUSTOM_PARAMETER,
+            bracket: TAG_BRACKET.SQUARE,
             tagSymbol: 'DATA',
             maskValue: true,
             requiredConsistency: true,
@@ -65,6 +66,7 @@ const SCENE_GLOSSARY_PLUGIN_TAGS = (() => {
         {
             description: 'Returns info from <CommonDescription>',
             type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
+            bracket: TAG_BRACKET.SQUARE,
             tagSymbol: 'COMMON',
             requiredConsistency: true,
         },
