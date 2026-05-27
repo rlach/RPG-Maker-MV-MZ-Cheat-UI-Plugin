@@ -1,5 +1,6 @@
 import { AutoNamePopupTranslator } from './translators/AutoNamePopupTranslator.js';
 import { BBCustomSaveWindowTranslator } from './translators/BBCustomSaveWindowTranslator.js';
+import { BattleFormationTranslator } from './translators/BattleFormationTranslator.js';
 import { BasePluginTranslator } from './BasePluginTranslator.js';
 import { CategorySynthesisTranslator } from './translators/CategorySynthesisTranslator.js';
 import { ChronusTranslator } from './translators/ChronusTranslator.js';
@@ -18,6 +19,7 @@ import { DarkPlasmaCharacterTextTranslator } from './translators/DarkPlasmaChara
 import { DescriptionExtendTranslator } from './translators/DescriptionExtendTranslator.js';
 import { DTextPictureTranslator } from './translators/DTextPictureTranslator.js';
 import { DynamicDatabaseTranslator } from './translators/DynamicDatabaseTranslator.js';
+import { EquipInfoAllViewTranslator } from './translators/EquipInfoAllViewTranslator.js';
 import { EventLabelTranslator } from './translators/EventLabelTranslator.js';
 import { EventInformationTranslator } from './translators/EventInformationTranslator.js';
 import { ExtraWindowTranslator } from './translators/ExtraWindowTranslator.js';
@@ -121,6 +123,7 @@ class PluginTranslatorRegistry {
             AlchemySystemTranslator,
             AutoNamePopupTranslator,
             BBCustomSaveWindowTranslator,
+            BattleFormationTranslator,
             CategorySynthesisTranslator,
             ChronusTranslator,
             ChangeSlotTranslator,
@@ -140,6 +143,7 @@ class PluginTranslatorRegistry {
             DescriptionExtendTranslator,
             DTextPictureTranslator,
             DynamicDatabaseTranslator,
+            EquipInfoAllViewTranslator,
             EventLabelTranslator,
             EventInformationTranslator,
             ExtraWindowTranslator,
