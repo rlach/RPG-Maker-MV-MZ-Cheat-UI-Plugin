@@ -235,7 +235,7 @@ export class BBCustomSaveWindowTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            const text = String(value || '').trim();
+            const text = String(value || '');
             if (!this.isUsableText(text)) {
                 continue;
             }
@@ -253,7 +253,7 @@ export class BBCustomSaveWindowTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            const text = String(value || '').trim();
+            const text = String(value || '');
             if (!this.isUsableText(text)) {
                 continue;
             }
@@ -275,7 +275,7 @@ export class BBCustomSaveWindowTranslator extends BasePluginTranslator {
         const unitTexts = [];
 
         for (const entry of this._scanEntries) {
-            const text = String(entry?.text || '').trim();
+            const text = String(entry?.text || '');
             if (!this.isUsableText(text)) {
                 continue;
             }
@@ -299,7 +299,7 @@ export class BBCustomSaveWindowTranslator extends BasePluginTranslator {
 
         const byCacheKey = new Map();
         for (const entry of this._scanEntries) {
-            const text = String(entry?.text || '').trim();
+            const text = String(entry?.text || '');
             if (!this.isUsableText(text)) {
                 continue;
             }

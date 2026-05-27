@@ -521,7 +521,7 @@ export const translateOnTheFlyRuntimeMethods = {
                 !shouldReturnTranslatedVariableValue() ||
                 !self.isVariableSafeForTranslation(safeVariableId) ||
                 typeof originalValue !== 'string' ||
-                originalValue.trim() === ''
+                originalValue === ''
             ) {
                 return originalValue;
             }

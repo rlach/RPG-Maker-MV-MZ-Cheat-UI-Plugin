@@ -35,7 +35,7 @@ export function applyTranslationsToCommands(commandList, runtime) {
         }
 
         const name = entry.name;
-        if (!name || typeof name !== 'string' || !name.trim()) {
+        if (!name || typeof name !== 'string' || !name) {
             continue;
         }
 
@@ -71,7 +71,7 @@ export function collectUntranslatedCommands(commandList, runtime) {
         }
 
         const name = entry.name;
-        if (!name || typeof name !== 'string' || !name.trim()) {
+        if (!name || typeof name !== 'string' || !name) {
             continue;
         }
 

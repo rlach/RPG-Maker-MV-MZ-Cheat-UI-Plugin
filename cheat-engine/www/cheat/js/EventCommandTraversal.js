@@ -9,7 +9,7 @@ const VARIABLE_OPERAND_CONSTANT = 0;
 const VARIABLE_OPERAND_SCRIPT = 4;
 
 function isNonEmptyString(value) {
-    return typeof value === 'string' && value.trim() !== '';
+    return typeof value === 'string' && value !== '';
 }
 
 function decodeSimpleJsStringLiteral(expression) {

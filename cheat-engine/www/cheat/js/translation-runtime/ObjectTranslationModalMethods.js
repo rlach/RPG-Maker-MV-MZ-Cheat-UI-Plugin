@@ -617,7 +617,7 @@ export const objectTranslationRuntimeMethods = {
         let total = 0;
         let left = 0;
         for (const val of source) {
-            if (!val || typeof val !== 'string' || val.trim() === '') continue;
+            if (!val || typeof val !== 'string' || val === '') continue;
             total++;
             const cacheKey = this.getCacheKey(val, 'command');
             if (!this.hasUsableCacheValue(cacheKey)) {
@@ -740,26 +740,21 @@ export const objectTranslationRuntimeMethods = {
             }
 
             for (const value of sourceArr) {
-                if (!value || typeof value !== 'string') {
+                if (typeof value !== 'string' || value === '') {
                     continue;
                 }
 
-                const trimmed = value.trim();
-                if (!trimmed) {
-                    continue;
-                }
-
-                if (!uniqueValuesMap.has(trimmed)) {
-                    uniqueValuesMap.set(trimmed, {
-                        value: trimmed,
+                if (!uniqueValuesMap.has(value)) {
+                    uniqueValuesMap.set(value, {
+                        value,
                         types: new Set(),
                         cacheKeys: new Set(),
                     });
                 }
 
-                const candidate = uniqueValuesMap.get(trimmed);
+                const candidate = uniqueValuesMap.get(value);
                 candidate.types.add(entry.type);
-                candidate.cacheKeys.add(this.getCacheKey(trimmed, entry.type));
+                candidate.cacheKeys.add(this.getCacheKey(value, entry.type));
             }
         }
 

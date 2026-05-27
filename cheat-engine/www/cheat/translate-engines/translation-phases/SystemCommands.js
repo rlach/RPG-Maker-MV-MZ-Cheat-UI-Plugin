@@ -1,5 +1,8 @@
 import { BasePhase } from './BasePhase.js';
-import { discoverCommandWindowClasses, ORIGINAL_MAKE_COMMAND_LIST } from '../../js/CommandTranslationManager.js';
+import {
+    discoverCommandWindowClasses,
+    ORIGINAL_MAKE_COMMAND_LIST,
+} from '../../js/CommandTranslationManager.js';
 
 export class SystemCommands extends BasePhase {
     /** @type {SystemCommands | null} */
@@ -34,7 +37,8 @@ export class SystemCommands extends BasePhase {
             return '';
         }
 
-        return value.trim();
+        // return value.trim();
+        return value;
     }
 
     normalizeCommandList(values) {
@@ -73,7 +77,7 @@ export class SystemCommands extends BasePhase {
                 const list = Array.isArray(collector._list) ? collector._list : [];
                 for (const entry of list) {
                     const name = entry?.name;
-                    if (name && typeof name === 'string' && name.trim() && !seen.has(name)) {
+                    if (name && typeof name === 'string' && name && !seen.has(name)) {
                         seen.add(name);
                         allNames.push(name);
                     }

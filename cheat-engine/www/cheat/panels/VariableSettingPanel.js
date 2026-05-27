@@ -188,7 +188,7 @@ export default {
             this.tableItems = this.variableNames.map((varName, idx) => {
                 return {
                     id: idx,
-                    name: varName,
+                    name: this.getDisplayVariableName(varName),
                     value: this.getRawVariableValue(idx),
                     safeForTranslate: this.isSafeForTranslate(idx),
                 };
@@ -203,6 +203,10 @@ export default {
             }
 
             return rawVariableNames;
+        },
+
+        getDisplayVariableName(variableName) {
+            return typeof variableName === 'string' ? variableName.trim() : variableName;
         },
 
         onItemChange(item) {

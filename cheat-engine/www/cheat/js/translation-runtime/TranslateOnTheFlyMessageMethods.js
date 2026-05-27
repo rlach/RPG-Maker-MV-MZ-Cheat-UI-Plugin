@@ -187,7 +187,7 @@ export const translateOnTheFlyMessageMethods = {
 
     async translateCommandName(commandName) {
         try {
-            const cleanName = (commandName || '').trim();
+            const cleanName = commandName || '';
             if (!cleanName) {
                 return commandName;
             }
