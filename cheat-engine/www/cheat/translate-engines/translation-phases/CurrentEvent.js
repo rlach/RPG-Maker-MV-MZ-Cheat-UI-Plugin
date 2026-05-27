@@ -1,5 +1,5 @@
 import { BasePhase } from './BasePhase.js';
-import { collectEventCommandEntries } from '../../js/EventCommandTraversal.js';
+import { collectEventCommandEntries, nameIsTag } from '../../js/EventCommandTraversal.js';
 import { buildPluginTraversalOptions } from '../plugins/PluginMessageEntryNormalizer.js';
 
 function isMessageTextType(type) {
@@ -89,14 +89,14 @@ export class CurrentEvent extends BasePhase {
 
         if (request.forceRefreshCache) {
             const refreshKeys = [];
-            if (originalText && originalText.trim()) {
+            if (originalText?.trim()) {
                 refreshKeys.push(
                     ...runtime.getMessageCacheLookupKeys(originalText, {
                         hasPortrait: messageHasPortrait,
                     })
                 );
             }
-            if (originalSpeakerName && originalSpeakerName.trim()) {
+            if (originalSpeakerName?.trim() && !nameIsTag(originalSpeakerName)) {
                 refreshKeys.push(runtime.getCacheKey(originalSpeakerName, 'speaker'));
             }
             const choices = gameMessage.choices ? gameMessage.choices() : [];
@@ -141,7 +141,7 @@ export class CurrentEvent extends BasePhase {
     collectAheadItems(runtime, currentText, currentSpeaker, interpreter, options = {}) {
         const charLimit = options.charLimit || runtime.charLimit;
         const maxItems = options.maxItems || runtime.batchItemsLimit || 300;
-        const maxDepth = options.maxDepth !== undefined ? options.maxDepth : 999;
+        const maxDepth = options.maxDepth === undefined ? 999 : options.maxDepth;
         const messageType = runtime.getMessageCacheType({
             hasPortrait: !!options.messageHasPortrait,
         });
@@ -273,7 +273,7 @@ export class CurrentEvent extends BasePhase {
 
     collectMandatoryChoiceCacheKeys(runtime) {
         const mandatoryChoiceCacheKeys = [];
-        if (window.$gameMessage && $gameMessage.isChoice && $gameMessage.isChoice()) {
+        if (window.$gameMessage && $gameMessage.isChoice?.()) {
             const currentChoices = $gameMessage._translateOriginalChoices || $gameMessage.choices();
             if (Array.isArray(currentChoices)) {
                 for (const choice of currentChoices) {
@@ -285,7 +285,7 @@ export class CurrentEvent extends BasePhase {
     }
 
     appendCurrentChoiceItems(runtime, items) {
-        if (!(window.$gameMessage && $gameMessage.isChoice && $gameMessage.isChoice())) {
+        if (!(window.$gameMessage && $gameMessage.isChoice?.())) {
             return;
         }
 
@@ -347,7 +347,7 @@ export class CurrentEvent extends BasePhase {
     }
 
     applyCurrentChoices(runtime) {
-        if (!(window.$gameMessage && $gameMessage.isChoice && $gameMessage.isChoice())) {
+        if (!(window.$gameMessage && $gameMessage.isChoice?.())) {
             return;
         }
 
@@ -409,7 +409,7 @@ export class CurrentEvent extends BasePhase {
         }
 
         const uncached = items.filter((item) => {
-            if (!item || !item.cacheKey) {
+            if (!item?.cacheKey) {
                 return false;
             }
 
@@ -477,7 +477,7 @@ export class CurrentEvent extends BasePhase {
         }
 
         for (const failure of failures || []) {
-            if (!failure || !failure.cacheKey) {
+            if (!failure?.cacheKey) {
                 continue;
             }
             runtime.setCacheValue(failure.cacheKey, '');
