@@ -247,7 +247,7 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
          * Translate a single string from the plugin_ll_menu_screen cache.
          * Marks the key as seen. Returns the original text if no cached translation exists.
          */
-        const resolveFromCache = (originalText, runtime) => {
+        const resolveFromCache = (originalText, runtime, harvestMissing = true) => {
             if (!isUsableText(originalText)) {
                 return originalText;
             }
@@ -255,9 +255,9 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
             if (this.translatedValues.has(originalText)) {
                 return originalText;
             }
-            console.log('[LLMenuScreenCustomTranslator] Resolving from cache:', originalText);
             const direct = resolveRuntimeTranslation(originalText, runtime, CACHE_TYPE, {
                 missValue: originalText,
+                harvestMissing,
             });
 
             if (direct !== originalText) {
@@ -426,13 +426,13 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
                                     harvestMissing: false,
                                 });
                                 if (resolved === text) {
-                                    resolved = resolveFromCache(text, runtime);
+                                    resolved = resolveFromCache(text, runtime, false);
                                 }
                             }
                         }
                     } catch (error) {
                         console.warn(
-                            '[LLMenuScreenTranslator] Failed to translate label text',
+                            '[LLMenuScreenCustomTranslator] Failed to translate label text',
                             error
                         );
                     }
@@ -441,7 +441,7 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
                 };
             } catch (error) {
                 console.warn(
-                    '[LLMenuScreenTranslator] Failed to patch Window_MenuHelp instance',
+                    '[LLMenuScreenCustomTranslator] Failed to patch Window_MenuHelp instance',
                     error
                 );
             }
@@ -468,13 +468,13 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
                                 harvestMissing: false,
                             });
                             if (resolved === text) {
-                                resolved = resolveFromCache(text, runtime);
+                                resolved = resolveFromCache(text, runtime, false);
                             }
                         }
                     }
                 } catch (error) {
                     console.warn(
-                        '[LLMenuScreenTranslator] Window_Base drawText fallback failed',
+                        '[LLMenuScreenCustomTranslator] Window_Base drawText fallback failed',
                         error
                     );
                 }
