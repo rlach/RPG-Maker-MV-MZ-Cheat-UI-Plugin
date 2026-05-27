@@ -94,6 +94,7 @@ import { PlayMsgWndCharSeMZTranslator } from './translators/PlayMsgWndCharSeMZTr
 import { LLInfoPopupWIndowTranslator } from './translators/LLInfoPopupWIndowTranslator.js';
 import { MkrMapItemSlotTranslator } from './translators/MkrMapItemSlotTranslator.js';
 import { ABEnemyBookTranslator } from './translators/ABEnemyBookTranslator.js';
+import { AlchemySystemTranslator } from './translators/AlchemySystemTranslator.js';
 import { CommonPopupCoreTranslator } from './translators/CommonPopupCoreTranslator.js';
 import { FtkrCustomSimpleActorStatusTranslator } from './translators/FtkrCustomSimpleActorStatusTranslator.js';
 import { GirlsWindowTranslator } from './translators/GirlsWindowTranslator.js';
@@ -112,6 +113,7 @@ class PluginTranslatorRegistry {
     constructor() {
         this.translatorClasses = [
             ABEnemyBookTranslator,
+            AlchemySystemTranslator,
             AutoNamePopupTranslator,
             BBCustomSaveWindowTranslator,
             CategorySynthesisTranslator,
