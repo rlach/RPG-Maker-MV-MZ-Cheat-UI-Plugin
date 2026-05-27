@@ -3,6 +3,7 @@ import { createTranslationBatchManager } from '../translate-engines/batch-manage
 import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
 import { ConfirmDialog } from '../js/DialogHelper.js';
 import { ensureTranslateCacheRuntime, isMapLike } from '../js/TranslateCacheRuntime.js';
+import { nameIsTag } from '../js/EventCommandTraversal.js';
 
 export default {
     name: 'TranslateNamesPanel',
@@ -679,7 +680,7 @@ export default {
             const changedKeys = [];
             for (const name of foundNames) {
                 const nameWithoutColor = name.replace(/\\c\[\d+\]/g, '').trim();
-                if (this.nameIsTag(nameWithoutColor)) {
+                if (nameIsTag(nameWithoutColor)) {
                     continue;
                 }
                 const cacheKey = this.buildCacheKey(nameWithoutColor, sourceLang, targetLang);
@@ -696,11 +697,6 @@ export default {
             }
 
             this.refresh();
-        },
-
-        nameIsTag(cacheKey) {
-            // Detect tags \N[\d+] or \V[\d+] patterns as they are used for dynamic content and not suitable for name translation.
-            return /^\\N\[\d+\]$/.test(cacheKey) || /^\\V\[\d+\]$/.test(cacheKey);
         },
 
         async translateNames() {

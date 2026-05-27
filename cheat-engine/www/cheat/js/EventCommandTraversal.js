@@ -536,3 +536,8 @@ export function findNearestMessageEntry(list, startIndex = 0) {
 
     return null;
 }
+
+export function nameIsTag(cacheKey) {
+    // Detect tags \N[\d+] or \V[\d+] patterns as they are used for dynamic content and not suitable for name translation.
+    return /^\\N\[\d+\]$/.test(cacheKey) || /^\\V\[\d+\]$/.test(cacheKey);
+}
