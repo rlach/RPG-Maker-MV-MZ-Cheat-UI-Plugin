@@ -80,6 +80,7 @@ import { YedWordWrapTranslator } from './translators/YedWordWrapTranslator.js';
 import { YkpItemCompositionTranslator } from './translators/YkpItemCompositionTranslator.js';
 import { YEPCoreEngineScriptTranslator } from './translators/YEPCoreEngineScriptTranslator.js';
 import { YepMessageCoreTranslator } from './translators/YepMessageCoreTranslator.js';
+import { YepStatusMenuCoreTranslator } from './translators/YepStatusMenuCoreTranslator.js';
 import { YepQuestJournalTranslator } from './translators/YepQuestJournalTranslator.js';
 import { YepEventMiniLabelTranslator } from './translators/YepEventMiniLabelTranslator.js';
 import { YepEquipCoreTranslator } from './translators/YepEquipCoreTranslator.js';
@@ -219,6 +220,7 @@ class PluginTranslatorRegistry {
             YepGabWindowTranslator,
             YepEventMiniLabelTranslator,
             YepMessageCoreTranslator,
+            YepStatusMenuCoreTranslator,
             YepQuestJournalTranslator,
             SaveFilePlusTranslator,
         ];
