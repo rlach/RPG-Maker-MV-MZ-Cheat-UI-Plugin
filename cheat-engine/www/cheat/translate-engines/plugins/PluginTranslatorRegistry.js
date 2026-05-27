@@ -3,6 +3,7 @@ import { BBCustomSaveWindowTranslator } from './translators/BBCustomSaveWindowTr
 import { BasePluginTranslator } from './BasePluginTranslator.js';
 import { CategorySynthesisTranslator } from './translators/CategorySynthesisTranslator.js';
 import { ChronusTranslator } from './translators/ChronusTranslator.js';
+import { ChangeSlotTranslator } from './translators/ChangeSlotTranslator.js';
 import { CbrEroStatusTranslator } from './translators/CbrEroStatusTranslator.js';
 import { CustomizeConfigItemTranslator } from './translators/CustomizeConfigItemTranslator.js';
 import { ExternMessageTranslator } from './translators/ExternMessageTranslator.js';
@@ -50,6 +51,7 @@ import { NekoGakuenMulitLanguageTranslator } from './translators/NekoGakuenMulit
 import { NrpMapTravelTranslator } from './translators/NrpMapTravelTranslator.js';
 import { NuunSaveScreenTranslator } from './translators/NuunSaveScreenTranslator.js';
 import { NuunSaveScreen3Translator } from './translators/NuunSaveScreen3Translator.js';
+import { NuunStatusScreenTranslator } from './translators/NuunStatusScreenTranslator.js';
 import { OriginMenuStatusTranslator } from './translators/OriginMenuStatusTranslator.js';
 import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTextWindowTranslator.js';
 import { QuestSystemTranslator } from './translators/QuestSystemTranslator.js';
@@ -120,6 +122,7 @@ class PluginTranslatorRegistry {
             BBCustomSaveWindowTranslator,
             CategorySynthesisTranslator,
             ChronusTranslator,
+            ChangeSlotTranslator,
             CbrEroStatusTranslator,
             CommonPopupCoreTranslator,
             CustomizeConfigItemTranslator,
@@ -180,6 +183,7 @@ class PluginTranslatorRegistry {
             NrpMapTravelTranslator,
             NuunSaveScreenTranslator,
             NuunSaveScreen3Translator,
+            NuunStatusScreenTranslator,
             OriginMenuStatusTranslator,
             PandaProgressTextWindowTranslator,
             PopupMessageTranslator,
