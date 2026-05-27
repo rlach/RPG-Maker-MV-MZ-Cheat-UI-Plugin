@@ -37,13 +37,12 @@ export class GameArrays extends BasePhase {
 
                 for (let i = 0; i < originalCopy.length; i++) {
                     const value = originalCopy[i];
-                    if (value == null || typeof value !== 'string' || value.trim() === '') {
+                    if (value == null || typeof value !== 'string' || value === '') {
                         parentObj[entry.prop][i] = value;
                         continue;
                     }
 
-                    const trimmed = value.trim();
-                    const primaryKey = runtime.getCacheKey(trimmed, entry.type);
+                    const primaryKey = runtime.getCacheKey(value, entry.type);
                     if (runtime.hasUsableCacheValue(primaryKey)) {
                         parentObj[entry.prop][i] = runtime.translationCache.get(primaryKey);
                         continue;
@@ -51,7 +50,7 @@ export class GameArrays extends BasePhase {
 
                     let applied = false;
                     for (const fallbackEntry of arrays) {
-                        const fallbackKey = runtime.getCacheKey(trimmed, fallbackEntry.type);
+                        const fallbackKey = runtime.getCacheKey(value, fallbackEntry.type);
                         if (runtime.hasUsableCacheValue(fallbackKey)) {
                             parentObj[entry.prop][i] = runtime.translationCache.get(fallbackKey);
                             applied = true;

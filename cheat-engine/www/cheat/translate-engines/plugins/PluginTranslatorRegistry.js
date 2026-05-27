@@ -50,9 +50,12 @@ import { MppMessageExTranslator } from './translators/MppMessageExTranslator.js'
 import { MultipleWindowSkinSystemTranslator } from './translators/MultipleWindowSkinSystemTranslator.js';
 import { MenuSubCommandTranslator } from './translators/MenuSubCommandTranslator.js';
 import { NekoGakuenMulitLanguageTranslator } from './translators/NekoGakuenMulitLanguageTranslator.js';
+import { NoreAutoSaveTranslator } from './translators/NoreAutoSaveTranslator.js';
+import { NoreRecollectionSaveTranslator } from './translators/NoreRecollectionSaveTranslator.js';
 import { NrpMapTravelTranslator } from './translators/NrpMapTravelTranslator.js';
 import { NuunSaveScreenTranslator } from './translators/NuunSaveScreenTranslator.js';
 import { NuunSaveScreen3Translator } from './translators/NuunSaveScreen3Translator.js';
+import { NuunSaveVerificationTranslator } from './translators/NuunSaveVerificationTranslator.js';
 import { NuunStatusScreenTranslator } from './translators/NuunStatusScreenTranslator.js';
 import { OriginMenuStatusTranslator } from './translators/OriginMenuStatusTranslator.js';
 import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTextWindowTranslator.js';
@@ -90,11 +93,15 @@ import { YepStatusMenuCoreTranslator } from './translators/YepStatusMenuCoreTran
 import { YepQuestJournalTranslator } from './translators/YepQuestJournalTranslator.js';
 import { YepEventMiniLabelTranslator } from './translators/YepEventMiniLabelTranslator.js';
 import { YepEquipCoreTranslator } from './translators/YepEquipCoreTranslator.js';
+import { YepSaveCoreTranslator } from './translators/YepSaveCoreTranslator.js';
 import { SabaSimpleScenarioTranslator } from './translators/SabaSimpleScenarioTranslator.js';
 import { SabaTachieTranslator } from './translators/SabaTachieTranslator.js';
+import { SaiScenefileTranslator } from './translators/SaiScenefileTranslator.js';
 import { YepGabWindowTranslator } from './translators/YepGabWindowTranslator.js';
 import { PHQuestBookTranslator } from './translators/PHQuestBookTranslator.js';
 import { SaveFilePlusTranslator } from './translators/SaveFilePlusTranslator.js';
+import { SaveLoadConfirmTranslator } from './translators/SaveLoadConfirmTranslator.js';
+import { SimpleFileLayoutTranslator } from './translators/SimpleFileLayoutTranslator.js';
 import { LLMenuScreenCustomTranslator } from './translators/LLMenuScreenCustomTranslator.js';
 import { MessageAlignCenterTranslator } from './translators/MessageAlignCenterTranslator.js';
 import { PlayMsgWndCharSeMZTranslator } from './translators/PlayMsgWndCharSeMZTranslator.js';
@@ -185,9 +192,12 @@ class PluginTranslatorRegistry {
             MkrMapItemSlotTranslator,
             MultipleWindowSkinSystemTranslator,
             NekoGakuenMulitLanguageTranslator,
+            NoreAutoSaveTranslator,
+            NoreRecollectionSaveTranslator,
             NrpMapTravelTranslator,
             NuunSaveScreenTranslator,
             NuunSaveScreen3Translator,
+            NuunSaveVerificationTranslator,
             NuunStatusScreenTranslator,
             OriginMenuStatusTranslator,
             PandaProgressTextWindowTranslator,
@@ -200,14 +210,17 @@ class PluginTranslatorRegistry {
             RecollectionForMZTranslator,
             RecollectionModeTranslator,
             RecollectionModeMZTranslator,
+            SaiScenefileTranslator,
             SabaSimpleScenarioTranslator,
             SabaTachieTranslator,
             SaveNameInputTranslator,
+            SaveLoadConfirmTranslator,
             SceneCustomMenuTranslator,
             SceneGlossaryTranslator,
             SetMessageFontSizeTranslator,
             SHMessageWindowBgTranslator,
             SItemsceneKzTranslator,
+            SimpleFileLayoutTranslator,
             SkillCPSystemTranslator,
             SkillTreeTranslator,
             TextPictureTranslator,
@@ -234,6 +247,7 @@ class PluginTranslatorRegistry {
             YepBattleStatisticsTranslator,
             YepStatusMenuCoreTranslator,
             YepQuestJournalTranslator,
+            YepSaveCoreTranslator,
             SaveFilePlusTranslator,
         ];
         this.translatorInstances = new Map();

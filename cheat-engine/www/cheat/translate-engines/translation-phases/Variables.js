@@ -131,7 +131,7 @@ export class Variables extends BasePhase {
     static mergeEntriesIntoUniqueItems(runtime, allEntries) {
         const uniqueItemsMap = new Map();
         for (const entry of allEntries) {
-            if (!entry || typeof entry.value !== 'string' || entry.value.trim() === '') {
+            if (!entry || typeof entry.value !== 'string' || entry.value === '') {
                 continue;
             }
 

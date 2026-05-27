@@ -207,14 +207,14 @@ export const translateOnTheFlyCoreMethods = {
 
     normalizeCommandLookupText(commandName) {
         if (typeof commandName === 'string') {
-            return commandName.trim();
+            return commandName;
         }
 
         if (commandName === null || commandName === undefined) {
             return '';
         }
 
-        return String(commandName).trim();
+        return String(commandName);
     },
 
     buildReverseCommandLookupFromCache() {
@@ -297,8 +297,7 @@ export const translateOnTheFlyCoreMethods = {
 
         this.removeReverseCommandLookupByCacheKey(cacheKey);
 
-        const normalizedLookupKey =
-            typeof normalizedValue === 'string' ? normalizedValue.trim() : '';
+        const normalizedLookupKey = typeof normalizedValue === 'string' ? normalizedValue : '';
         if (!normalizedLookupKey) {
             return;
         }
