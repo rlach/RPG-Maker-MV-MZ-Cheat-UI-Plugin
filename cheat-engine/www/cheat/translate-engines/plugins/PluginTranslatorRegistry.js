@@ -120,6 +120,7 @@ import { LiveCommentTranslator } from './translators/LiveCommentTranslator.js';
 import { MessagePExRiruTranslator } from './translators/MessagePExRiruTranslator.js';
 import { NuunMenuScreenExTranslator } from './translators/NuunMenuScreenExTranslator.js';
 import { ManoInfoWindowTranslator } from './translators/ManoInfoWindowTranslator.js';
+import { MNKRTMLogWindowMZTranslator } from './translators/MNKRTMLogWindowMZTranslator.js';
 import { PopupMessageTranslator } from './translators/PopupMessageTranslator.js';
 import { ProfileExtendTranslator } from './translators/ProfileExtendTranslator.js';
 import { ResidentWindowTranslator } from './translators/ResidentWindowTranslator.js';
@@ -188,6 +189,7 @@ class PluginTranslatorRegistry {
             MogBattleCommandsTranslator,
             MessagePExRiruTranslator,
             MiniInformationWindowTranslator,
+            MNKRTMLogWindowMZTranslator,
             MogEventTextTranslator,
             NameBoxNoUseTranslator,
             NuunMenuScreenExTranslator,
