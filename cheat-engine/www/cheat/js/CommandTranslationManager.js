@@ -9,7 +9,7 @@ const COMMAND_HOOK_NAME = 'CHEAT_COMMAND_TRANSLATION_HOOK';
 export function isTranslationActive(runtime) {
     return (
         runtime.isTranslationEnabled() ||
-        !!runtime.translateCacheWhenDisabled ||
+        !!runtime.enableTranslation ||
         runtime.isNonOtfTranslationProcessActive()
     );
 }

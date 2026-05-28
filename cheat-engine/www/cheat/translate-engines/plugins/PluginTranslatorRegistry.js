@@ -127,6 +127,7 @@ import { ResidentWindowTranslator } from './translators/ResidentWindowTranslator
 import { SaveNameInputTranslator } from './translators/SaveNameInputTranslator.js';
 import { MiniInformationWindowTranslator } from './translators/MiniInformationWindowTranslator.js';
 import { SRDHUDMakerTranslator } from './translators/SRDHUDMakerTranslator.js';
+import { isRpgMakerMv } from '../../js/RpgMakerRuntime.js';
 
 class PluginTranslatorRegistry {
     constructor() {
@@ -267,6 +268,115 @@ class PluginTranslatorRegistry {
         this.countsPrecomputePromise = null;
     }
 
+    _getNodeRequire() {
+        const nodeRequire = globalThis?.require;
+        return typeof nodeRequire === 'function' ? nodeRequire : null;
+    }
+
+    _resolvePluginManifestCandidatePaths() {
+        const nodeRequire = this._getNodeRequire();
+        if (!nodeRequire) {
+            return [];
+        }
+
+        const path = nodeRequire('path');
+        const cwd = typeof process?.cwd === 'function' ? process.cwd() : '.';
+
+        if (isRpgMakerMv()) {
+            return [path.join(cwd, 'www', 'js', 'plugins.js'), path.join(cwd, 'js', 'plugins.js')];
+        }
+
+        return [path.join(cwd, 'js', 'plugins.js')];
+    }
+
+    _parseEnabledPluginNamesFromPluginsJs(rawText) {
+        if (typeof rawText !== 'string' || !rawText) {
+            return new Set();
+        }
+
+        const enabledNames = new Set();
+        const entryPattern = /\{[\s\S]*?\}/g;
+        const namePattern = /"name"\s*:\s*"([^"]+)"/;
+        const statusPattern = /"status"\s*:\s*true/;
+
+        const entries = rawText.match(entryPattern) || [];
+        for (const entry of entries) {
+            if (!statusPattern.test(entry)) {
+                continue;
+            }
+
+            const nameMatch = namePattern.exec(entry);
+            const name = String(nameMatch?.[1] || '')
+                .trim()
+                .toLowerCase();
+            if (name) {
+                enabledNames.add(name);
+            }
+        }
+
+        return enabledNames;
+    }
+
+    _loadEnabledPluginNamesFromManifest() {
+        const nodeRequire = this._getNodeRequire();
+        if (!nodeRequire) {
+            return new Set();
+        }
+
+        const fs = nodeRequire('fs');
+        const candidatePaths = this._resolvePluginManifestCandidatePaths();
+
+        for (const candidatePath of candidatePaths) {
+            try {
+                if (!fs.existsSync(candidatePath)) {
+                    continue;
+                }
+
+                const rawText = fs.readFileSync(candidatePath, 'utf-8');
+                const names = this._parseEnabledPluginNamesFromPluginsJs(rawText);
+                if (names.size > 0) {
+                    return names;
+                }
+            } catch (error) {
+                console.warn(
+                    `[PluginTranslatorRegistry] Failed to parse plugin manifest: ${candidatePath}`,
+                    error
+                );
+            }
+        }
+
+        return new Set();
+    }
+
+    _markDetectedPluginsFromManifest(enabledPluginNames) {
+        if (!(enabledPluginNames instanceof Set) || enabledPluginNames.size <= 0) {
+            return;
+        }
+
+        for (const translator of this.translatorInstances.values()) {
+            const pluginName = String(translator?.getPluginName?.() || '').trim();
+            if (!pluginName || this.detectedPluginNames.has(pluginName)) {
+                continue;
+            }
+
+            const aliases = translator
+                .getPluginAliases()
+                .map((alias) =>
+                    String(alias || '')
+                        .trim()
+                        .toLowerCase()
+                )
+                .filter(Boolean);
+
+            if (!aliases.some((alias) => enabledPluginNames.has(alias))) {
+                continue;
+            }
+
+            translator.markDetectedFromPluginManifest();
+            this.detectedPluginNames.add(pluginName);
+        }
+    }
+
     ensureDetectionStarted(context = {}) {
         BasePluginTranslator.ensureGlobalRuntimeContract();
 
@@ -279,9 +389,6 @@ class PluginTranslatorRegistry {
                 console.warn('[PluginTranslatorRegistry] Plugin detection failed', error);
             })
             .finally(() => {
-                console.log('[PluginTranslatorRegistry] Plugin detection completed', {
-                    detectedPlugins: Array.from(this.detectedPluginNames),
-                });
                 this.detectionCompleted = true;
             });
 
@@ -338,10 +445,6 @@ class PluginTranslatorRegistry {
     }
 
     async runDetection(context = {}) {
-        // Phase 1 (sync): instantiate all translators and run detection immediately.
-        // This ensures translatorInstances + detectedPluginNames are populated before
-        // any async work begins, so resolveMessageCacheSourceText never misses a
-        // translator due to a slow precomputeCounts() call on an earlier entry.
         for (const TranslatorClass of this.translatorClasses) {
             const translator = new TranslatorClass();
             const pluginName = String(translator.getPluginName() || '').trim();
@@ -359,8 +462,31 @@ class PluginTranslatorRegistry {
             this.detectedPluginNames.add(pluginName);
         }
 
+        // Fallback boundary: some games expose plugin metadata only in plugins.js.
+        // If regular detection found nothing, parse plugins.js and match translator aliases.
+        if (this.detectedPluginNames.size <= 0) {
+            const enabledPluginNames = this._loadEnabledPluginNamesFromManifest();
+            this._markDetectedPluginsFromManifest(enabledPluginNames);
+        }
+
         // Detection no longer runs count precompute during startup.
         // Count data is precomputed lazily via ensureCountsPrecomputed().
+    }
+
+    getDetectedPluginActivationSummaries() {
+        return this.getDetectedTranslatorInstances()
+            .map((translator) => {
+                const status = translator.getEnablePluginTranslationStatus();
+
+                return {
+                    pluginName: translator.getPluginName(),
+                    label: translator.getPluginLabel(),
+                    activationSucceeded: !!status.enabled,
+                    activationFinalized: !!status.finalized,
+                    activationRetryCount: Math.max(0, Number(status.retries) || 0),
+                };
+            })
+            .sort((a, b) => String(a.label || '').localeCompare(String(b.label || '')));
     }
 
     isPluginDetected(pluginName) {

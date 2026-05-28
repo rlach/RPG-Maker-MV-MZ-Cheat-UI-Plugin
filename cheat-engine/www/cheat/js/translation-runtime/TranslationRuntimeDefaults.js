@@ -66,17 +66,19 @@ export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
     'maxLineWidth',
     'maxLineWidthWithPortrait',
     'descriptionMaxLineWidth',
+    'linkDescriptionMaxWidthToDialogue',
     'descriptionMaxRows',
     'addBoxWidthInfoToLlmPrompt',
     'removeNewlinesBeforeWrappingMaxCount',
     'textWrapFontScaleMultiplier',
     'translationEngine',
-    'translateCacheWhenDisabled',
-    'translateImagesInCacheIfAny',
-    'tryTranslateAhead',
-    'cancelBackgroundForOnTheFly',
+    'enableTranslation',
+    'enableImageReplacement',
+    'translateFullEventInRealtime',
+    'interruptQueueForRealtime',
     'changeToCurrentMapInMassTranslationMidPhase',
     'flatProgressWindow',
+    'highlightImages',
     'charLimit',
     'batchItemsLimit',
     'spinnerActiveCount',
@@ -135,6 +137,7 @@ export const PERSISTED_TRANSLATION_SETTINGS_KEYS = Object.freeze([
     'maxLineWidth',
     'maxLineWidthWithPortrait',
     'descriptionMaxLineWidth',
+    'linkDescriptionMaxWidthToDialogue',
     'descriptionMaxRows',
     'addBoxWidthInfoToLlmPrompt',
     'removeNewlinesBeforeWrappingMaxCount',
@@ -142,12 +145,13 @@ export const PERSISTED_TRANSLATION_SETTINGS_KEYS = Object.freeze([
     'charLimit',
     'batchItemsLimit',
     'translationEngine',
-    'translateCacheWhenDisabled',
-    'translateImagesInCacheIfAny',
-    'tryTranslateAhead',
-    'cancelBackgroundForOnTheFly',
+    'enableTranslation',
+    'enableImageReplacement',
+    'translateFullEventInRealtime',
+    'interruptQueueForRealtime',
     'changeToCurrentMapInMassTranslationMidPhase',
     'flatProgressWindow',
+    'highlightImages',
     'engineSettings',
     'objectTranslationTypeOrder',
     'enabledPluginTranslators',
@@ -169,17 +173,19 @@ export const UI_SYNC_STATE_KEYS = Object.freeze([
     'maxLineWidth',
     'maxLineWidthWithPortrait',
     'descriptionMaxLineWidth',
+    'linkDescriptionMaxWidthToDialogue',
     'descriptionMaxRows',
     'addBoxWidthInfoToLlmPrompt',
     'removeNewlinesBeforeWrappingMaxCount',
     'textWrapFontScaleMultiplier',
     'translationEngine',
-    'translateCacheWhenDisabled',
-    'translateImagesInCacheIfAny',
-    'tryTranslateAhead',
-    'cancelBackgroundForOnTheFly',
+    'enableTranslation',
+    'enableImageReplacement',
+    'translateFullEventInRealtime',
+    'interruptQueueForRealtime',
     'changeToCurrentMapInMassTranslationMidPhase',
     'flatProgressWindow',
+    'highlightImages',
     'charLimit',
     'batchItemsLimit',
     'libreTranslateHost',
@@ -242,17 +248,19 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
         maxLineWidth: getDefaultEngineSpecificSettings().dialogMaxLineWidth,
         maxLineWidthWithPortrait: getDefaultEngineSpecificSettings().dialogMaxLineWidthWithPortrait,
         descriptionMaxLineWidth: getDefaultEngineSpecificSettings().descriptionMaxLineWidth,
+        linkDescriptionMaxWidthToDialogue: true,
         descriptionMaxRows: 2,
         addBoxWidthInfoToLlmPrompt: false,
         removeNewlinesBeforeWrappingMaxCount: 0,
         textWrapFontScaleMultiplier: getDefaultEngineSpecificSettings().textWrapFontScaleMultiplier,
         translationEngine: 'mymemory',
-        translateCacheWhenDisabled: false,
-        translateImagesInCacheIfAny: true,
-        tryTranslateAhead: true,
-        cancelBackgroundForOnTheFly: false,
+        enableTranslation: false,
+        enableImageReplacement: true,
+        translateFullEventInRealtime: true,
+        interruptQueueForRealtime: false,
         changeToCurrentMapInMassTranslationMidPhase: false,
-        flatProgressWindow: false,
+        flatProgressWindow: true,
+        highlightImages: false,
         charLimit: 1500,
         batchItemsLimit: 300,
         spinnerActiveCount: 0,
@@ -332,6 +340,20 @@ export function normalizePersistedTranslationSettings(rawData = {}) {
     const defaults = createPersistedTranslationSettingsDefaults();
     const data = rawData && typeof rawData === 'object' ? rawData : {};
     const normalized = Object.assign({}, defaults, data);
+
+    // Backward compatibility for legacy persisted keys.
+    if (Object.prototype.hasOwnProperty.call(data, 'translateCacheWhenDisabled')) {
+        normalized.enableTranslation = !!data.translateCacheWhenDisabled;
+    }
+    if (Object.prototype.hasOwnProperty.call(data, 'translateImagesInCacheIfAny')) {
+        normalized.enableImageReplacement = !!data.translateImagesInCacheIfAny;
+    }
+    if (Object.prototype.hasOwnProperty.call(data, 'tryTranslateAhead')) {
+        normalized.translateFullEventInRealtime = !!data.tryTranslateAhead;
+    }
+    if (Object.prototype.hasOwnProperty.call(data, 'cancelBackgroundForOnTheFly')) {
+        normalized.interruptQueueForRealtime = !!data.cancelBackgroundForOnTheFly;
+    }
 
     const savedEngine = normalized.translationEngine || defaults.translationEngine;
     normalized.translationEngine = savedEngine === 'gpt4all' ? 'openApi' : savedEngine;

@@ -57,7 +57,7 @@ export const translateOnTheFlyCacheMethods = {
     },
 
     shouldTrackRealtimeCacheUsage() {
-        return this.isTranslationEnabled() || !!this.translateCacheWhenDisabled;
+        return this.isTranslationEnabled() || !!this.enableTranslation;
     },
 
     isTranslatedCacheValue(value) {

@@ -17,6 +17,7 @@ import TranslateImagesPanel from './panels/TranslateImagesPanel.js';
 import TranslateImagesKoharuPanel from './panels/TranslateImagesKoharuPanel.js';
 import TranslateKnowledgePanel from './panels/TranslateKnowledgePanel.js';
 import TranslateTagManagerPanel from './panels/TranslateTagManagerPanel.js';
+import TranslatePluginsPanel from './panels/TranslatePluginsPanel.js';
 import HacksPanel from './panels/HacksPanel.js';
 import { CHEAT_WINDOW_MANAGER } from './js/CheatWindowManager.js';
 
@@ -43,6 +44,7 @@ export default {
         TranslateImagesKoharuPanel,
         TranslateKnowledgePanel,
         TranslateTagManagerPanel,
+        TranslatePluginsPanel,
         HacksPanel,
     },
 
@@ -199,6 +201,11 @@ export default {
                             icon: 'mdi-book-open-variant',
                             component: 'translate-knowledge-panel',
                         },
+                        {
+                            name: 'Plugins',
+                            icon: 'mdi-puzzle',
+                            component: 'translate-plugins-panel',
+                        },
                     ],
                 },
                 {
@@ -309,7 +316,9 @@ export default {
         if (this.resizeObserver && this.$el) {
             try {
                 this.resizeObserver.unobserve(this.$el);
-            } catch (_e) { /* observer cleanup */ }
+            } catch (_e) {
+                /* observer cleanup */
+            }
         }
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();

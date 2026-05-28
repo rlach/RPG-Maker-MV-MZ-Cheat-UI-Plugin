@@ -66,7 +66,7 @@ export const translateOnTheFlyRuntimeMethods = {
         const applyLifecycleTranslations = (trigger) => {
             const shouldApplyLifecycleCache =
                 self.isTranslationEnabled() ||
-                !!self.translateCacheWhenDisabled ||
+                !!self.enableTranslation ||
                 (typeof self.isNonOtfTranslationProcessActive === 'function' &&
                     self.isNonOtfTranslationProcessActive());
 
@@ -86,7 +86,7 @@ export const translateOnTheFlyRuntimeMethods = {
         const shouldReturnTranslatedVariableValue = () => {
             return (
                 self.isTranslationEnabled() ||
-                !!self.translateCacheWhenDisabled ||
+                !!self.enableTranslation ||
                 (typeof self.isNonOtfTranslationProcessActive === 'function' &&
                     self.isNonOtfTranslationProcessActive())
             );
@@ -299,7 +299,7 @@ export const translateOnTheFlyRuntimeMethods = {
 
         const shouldUseImageCacheTranslation = () => {
             return (
-                !!self.translateImagesInCacheIfAny &&
+                !!self.enableImageReplacement &&
                 typeof self.targetLang === 'string' &&
                 self.targetLang.trim() !== ''
             );
@@ -359,6 +359,94 @@ export const translateOnTheFlyRuntimeMethods = {
             return fs.existsSync(translatedImagePath) ? translatedImagePath : null;
         };
 
+        const applyBitmapHighlightBorder = (bitmap) => {
+            if (!self.highlightImages || !bitmap) {
+                return bitmap;
+            }
+
+            const drawBorder = () => {
+                if (
+                    !self.highlightImages ||
+                    !bitmap?._canvas ||
+                    bitmap._loadingState === 'none' ||
+                    bitmap._highlighted
+                ) {
+                    return;
+                }
+
+                const canvas = bitmap._canvas;
+
+                /* ignore tilesets, system, characters
+                 */
+                if (
+                    bitmap._url.startsWith('img/tilesets') ||
+                    bitmap._url.startsWith('img/system')
+                    // bitmap._url.startsWith('img/characters')
+                ) {
+                    return;
+                }
+                console.log(
+                    `[TranslateOnTheFly] Highlighting loaded image: ${bitmap._url}`,
+                    bitmap
+                );
+
+                const width = Number(canvas.width) || 0;
+                const height = Number(canvas.height) || 0;
+                if (width <= 1 || height <= 1) {
+                    return;
+                }
+
+                const context = canvas.getContext('2d');
+                if (!context) {
+                    return;
+                }
+
+                context.save();
+                context.strokeStyle = '#ff00ff';
+                context.lineWidth = 4;
+                context.strokeRect(2, 2, width - 4, height - 4);
+
+                // then draw checkerboard pattern on the whole image (4x4 squares)
+                const patternSize = 4;
+                context.fillStyle = 'rgba(255, 0, 255, 0.2)';
+                for (let y = 0; y < height; y += patternSize) {
+                    for (let x = 0; x < width; x += patternSize) {
+                        if (((x / patternSize) | 0) % 2 === ((y / patternSize) | 0) % 2) {
+                            context.fillRect(x, y, patternSize, patternSize);
+                        }
+                    }
+                }
+
+                // // then draw cross trough the whole image
+                // context.beginPath();
+                // context.moveTo(0, 0);
+                // context.lineTo(width, height);
+                // context.moveTo(width, 0);
+                // context.lineTo(0, height);
+                // context.stroke();
+
+                // tint the whole image with semi-transparent magenta
+                context.fillStyle = 'rgba(255, 0, 30, 0.1)';
+                context.fillRect(0, 0, width, height);
+
+                context.restore();
+
+                bitmap._highlighted = true;
+
+                if (typeof bitmap._setDirty === 'function') {
+                    bitmap._setDirty();
+                }
+            };
+
+            if (typeof bitmap.addLoadListener === 'function') {
+                bitmap.addLoadListener(drawBorder);
+                return bitmap;
+            }
+
+            drawBorder();
+            return bitmap;
+        };
+
         const installImageManagerBitmapHook = () => {
             if (
                 (typeof ImageManager !== 'object' && typeof ImageManager !== 'function') ||
@@ -379,13 +467,15 @@ export const translateOnTheFlyRuntimeMethods = {
             ImageManager.loadBitmap = function (folder, filename, hue, smooth) {
                 const translatedImagePath = resolveTranslatedImagePath(folder, filename);
                 if (!translatedImagePath) {
-                    return ImageManager._translateOriginalLoadBitmap.call(
+                    const originalBitmap = ImageManager._translateOriginalLoadBitmap.call(
                         this,
                         folder,
                         filename,
                         hue,
                         smooth
                     );
+
+                    return applyBitmapHighlightBorder(originalBitmap);
                 }
 
                 try {
@@ -437,13 +527,15 @@ export const translateOnTheFlyRuntimeMethods = {
                     }
 
                     try {
-                        return ImageManager._translateOriginalLoadBitmap.call(
+                        const translatedBitmap = ImageManager._translateOriginalLoadBitmap.call(
                             this,
                             translatedFolder,
                             translatedFilename,
                             hue,
                             smooth
                         );
+
+                        return applyBitmapHighlightBorder(translatedBitmap);
                     } finally {
                         if (restoreMZEncryptedImages !== null) {
                             Utils._hasEncryptedImages = restoreMZEncryptedImages;
@@ -457,13 +549,15 @@ export const translateOnTheFlyRuntimeMethods = {
                         '[TranslateOnTheFly] Failed to load translated image from cache',
                         _error
                     );
-                    return ImageManager._translateOriginalLoadBitmap.call(
+                    const fallbackBitmap = ImageManager._translateOriginalLoadBitmap.call(
                         this,
                         folder,
                         filename,
                         hue,
                         smooth
                     );
+
+                    return applyBitmapHighlightBorder(fallbackBitmap);
                 }
             };
 
@@ -597,8 +691,7 @@ export const translateOnTheFlyRuntimeMethods = {
             const skipping = self.isSkippingMessages();
             const allowTranslation = translationEnabled && !skipping;
             const useCacheOnly =
-                (translationEnabled && skipping) ||
-                (!translationEnabled && self.translateCacheWhenDisabled);
+                (translationEnabled && skipping) || (!translationEnabled && self.enableTranslation);
 
             if (translationEnabled && allowTranslation && !$gameMessage._translateOriginalText) {
                 // Lightweight trace to confirm hook runs after restart
@@ -784,7 +877,7 @@ export const translateOnTheFlyRuntimeMethods = {
 
                 // Start translation with unified batch approach (maxDepth=0 for single, >0 for lookahead)
                 if (allowTranslation && hasText && !textReady) {
-                    const maxDepth = self.tryTranslateAhead ? 999 : 0; // 0 = only current message, 999 = scan ahead
+                    const maxDepth = self.translateFullEventInRealtime ? 999 : 0; // 0 = only current message, 999 = scan ahead
                     const logPrefix = maxDepth > 0 ? 'ahead translation batch' : 'translation';
                     console.log(
                         `[TranslateOnTheFly] Starting 01 ${logPrefix} for:`,
@@ -849,7 +942,7 @@ export const translateOnTheFlyRuntimeMethods = {
                     !choicesReady &&
                     !choiceCacheKeys.some((key) => self.pendingTranslations.has(key))
                 ) {
-                    const maxDepth = self.tryTranslateAhead ? 999 : 0;
+                    const maxDepth = self.translateFullEventInRealtime ? 999 : 0;
                     const logPrefix =
                         maxDepth > 0
                             ? 'ahead translation batch for choices'
@@ -901,7 +994,7 @@ export const translateOnTheFlyRuntimeMethods = {
 
                 // Start translation for speaker via unified foreground batch path.
                 if (allowTranslation && hasSpeakerName && !speakerReady) {
-                    const maxDepth = self.tryTranslateAhead ? 999 : 0;
+                    const maxDepth = self.translateFullEventInRealtime ? 999 : 0;
                     self.requestForegroundDialogBatch({
                         currentText: originalText || '',
                         currentSpeakerName: originalSpeakerName,
@@ -965,7 +1058,7 @@ export const translateOnTheFlyRuntimeMethods = {
                 const allowTranslation = translationEnabled && !skipping;
                 const useCacheOnly =
                     (translationEnabled && skipping) ||
-                    (!translationEnabled && self.translateCacheWhenDisabled);
+                    (!translationEnabled && self.enableTranslation);
 
                 if (!allowTranslation && !useCacheOnly) {
                     return result;
@@ -1087,8 +1180,7 @@ export const translateOnTheFlyRuntimeMethods = {
             const skipping = self.isSkippingMessages();
             const allowTranslation = translationEnabled && !skipping;
             const useCacheOnly =
-                (translationEnabled && skipping) ||
-                (!translationEnabled && self.translateCacheWhenDisabled);
+                (translationEnabled && skipping) || (!translationEnabled && self.enableTranslation);
 
             if (!allowTranslation && !useCacheOnly) {
                 return;
@@ -1196,8 +1288,7 @@ export const translateOnTheFlyRuntimeMethods = {
             const skipping = self.isSkippingMessages();
             const allowTranslation = translationEnabled && !skipping;
             const useCacheOnly =
-                (translationEnabled && skipping) ||
-                (!translationEnabled && self.translateCacheWhenDisabled);
+                (translationEnabled && skipping) || (!translationEnabled && self.enableTranslation);
 
             const originalText = getSafeCurrentMessageText();
             const hasText = !!(originalText && originalText.trim().length > 0);
@@ -1299,7 +1390,7 @@ export const translateOnTheFlyRuntimeMethods = {
 
                     // Kick off a batch translate for the event (unless already pending) and block until ready
                     if (!choiceKeys.some((key) => self.pendingTranslations.has(key))) {
-                        const maxDepth = self.tryTranslateAhead ? 999 : 0;
+                        const maxDepth = self.translateFullEventInRealtime ? 999 : 0;
                         const logPrefix =
                             maxDepth > 0
                                 ? 'ahead translation batch for choices (startInput fallback)'
