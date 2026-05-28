@@ -11,6 +11,10 @@ export class BasePluginTranslator extends BasePhase {
         super();
         this._pluginDetected = false;
         this._detectionChecked = false;
+        this._enableAttemptCount = 0;
+        this._enableRetryCount = 0;
+        this._enableSucceeded = false;
+        this._enableFinalized = false;
     }
 
     /**
@@ -99,6 +103,80 @@ export class BasePluginTranslator extends BasePhase {
         return true;
     }
 
+    getEnablePluginTranslationStatus() {
+        return {
+            enabled: !!this._enableSucceeded,
+            finalized: !!this._enableFinalized,
+            attempts: Math.max(0, Number(this._enableAttemptCount) || 0),
+            retries: Math.max(0, Number(this._enableRetryCount) || 0),
+        };
+    }
+
+    _markEnableSucceeded() {
+        this._enableSucceeded = true;
+        this._enableFinalized = true;
+    }
+
+    _scheduleEnablePluginTranslation() {
+        if (this._enableFinalized) {
+            return;
+        }
+
+        try {
+            // Use hook guard to prevent re-initialization if this translator runs in separate window.
+            // If another window already mounted the translator hook, treat this translator as active.
+            if (!shouldApplyHook(this._getPluginHookName())) {
+                this._markEnableSucceeded();
+                return;
+            }
+
+            const maxRetries = 20;
+            const retryDelayMs = 100;
+
+            const tryEnable = () => {
+                this._enableAttemptCount += 1;
+
+                const result = this.enablePluginTranslation();
+                if (result !== false) {
+                    this._markEnableSucceeded();
+                    return;
+                }
+
+                if (this._enableRetryCount >= maxRetries) {
+                    this._enableFinalized = true;
+                    Alert.html(
+                        `Plugin ${this.getPluginLabel()} failed to initialize.`,
+                        null,
+                        5000,
+                        'warn'
+                    );
+                    return;
+                }
+
+                this._enableRetryCount += 1;
+                setTimeout(tryEnable, retryDelayMs);
+            };
+
+            setTimeout(tryEnable, this.initialDelayBeforeEnablePluginTranslationMs);
+        } catch (error) {
+            this._enableFinalized = true;
+            console.warn(
+                `[PluginTranslator] Failed to enable plugin translation for ${this.getPluginName()}`,
+                error
+            );
+        }
+    }
+
+    markDetectedFromPluginManifest() {
+        if (this._pluginDetected && this._detectionChecked) {
+            return;
+        }
+
+        this._pluginDetected = true;
+        this._detectionChecked = true;
+        this._scheduleEnablePluginTranslation();
+    }
+
     /**
      * Called after a translation batch completes, allowing plugin translators
      * to extract domain-specific knowledge from the batch results.
@@ -185,48 +263,7 @@ export class BasePluginTranslator extends BasePhase {
         this._detectionChecked = true;
 
         if (this._pluginDetected) {
-            try {
-                // Use hook guard to prevent re-initialization if this translator runs in separate window
-                if (!shouldApplyHook(this._getPluginHookName())) {
-                    return this._pluginDetected;
-                }
-                const maxRetries = 20;
-                const retryDelayMs = 100;
-                let retries = 0;
-
-                const tryEnable = () => {
-                    const result = this.enablePluginTranslation();
-                    if (result !== false) {
-                        console.log(
-                            `[PluginTranslator] Plugin translation mounted for ${this.getPluginName()} after ${retries} retries.`
-                        );
-                        return;
-                    }
-
-                    if (retries >= maxRetries) {
-                        console.info(
-                            `[PluginTranslator] Plugin translation never mounted for ${this.getPluginName()} after ${maxRetries} retries.`
-                        );
-                        Alert.html(
-                            `Plugin ${this.getPluginLabel()} failed to initialize.`,
-                            null,
-                            5000,
-                            'warn'
-                        );
-                        return;
-                    }
-
-                    retries += 1;
-                    setTimeout(tryEnable, retryDelayMs);
-                };
-
-                setTimeout(tryEnable, this.initialDelayBeforeEnablePluginTranslationMs);
-            } catch (error) {
-                console.warn(
-                    `[PluginTranslator] Failed to enable plugin translation for ${this.getPluginName()}`,
-                    error
-                );
-            }
+            this._scheduleEnablePluginTranslation();
         }
 
         return this._pluginDetected;
@@ -425,6 +462,6 @@ export class BasePluginTranslator extends BasePhase {
         }
 
         const translationEnabled = !!(runtime.isTranslationEnabled() || runtime.enabled);
-        return translationEnabled || !!runtime.translateCacheWhenDisabled;
+        return translationEnabled || !!runtime.enableTranslation;
     }
 }

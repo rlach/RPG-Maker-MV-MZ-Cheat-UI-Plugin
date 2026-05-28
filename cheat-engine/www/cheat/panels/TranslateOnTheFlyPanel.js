@@ -26,55 +26,63 @@ export default {
 <v-card flat class="ma-0 pa-0">
     <v-card-subtitle class="pb-0 font-weight-bold">Translate Messages</v-card-subtitle>
     <v-card-text class="pb-0">
-        Enable this to automatically translate all in-game messages using Google Translate.
+        Enable this to automatically translate all in-game messages using selected engine.
     </v-card-text>
 
     <v-card-text class="py-0">
         <v-switch
+            v-model="enableTranslation"
+            label="Enable translation"
+            dense
+            hide-details
+            @click.self.stop
+            @change="onChangeEnableTranslation">
+        </v-switch>
+
+        <v-switch
+            v-model="enableImageReplacement"
+            label="Enable image replacement"
+            dense
+            hide-details
+            @click.self.stop
+            @change="onChangeEnableImageReplacement">
+        </v-switch>
+
+        <v-switch
             v-model="enabled"
-            label="Enable Real-time Translation"
+            label="Enable real-time events translation"
             dense
             hide-details
             @click.self.stop
             @change="onChangeEnabled">
         </v-switch>
+    </v-card-text>
 
+    <v-card-subtitle class="pb-0 mt-2 font-weight-bold">Real-time options</v-card-subtitle>
+
+    <v-card-text class="py-0">
         <v-switch
-            v-model="translateCacheWhenDisabled"
-            label="Translate cached keys even when Real-time translation is disabled"
+            v-model="translateFullEventInRealtime"
+            label="Try to translate full event"
             dense
             hide-details
             @click.self.stop
-            @change="onChangeCacheOnly">
+            @change="onChangeTranslateFullEventInRealtime">
         </v-switch>
 
         <v-switch
-            v-model="translateImagesInCacheIfAny"
-            label="Replace images from cache if available"
+            v-model="interruptQueueForRealtime"
+            label="Interrupt translation queue for real-time"
             dense
             hide-details
             @click.self.stop
-            @change="onChangeTranslateImagesInCacheIfAny">
+            @change="onChangeInterruptQueueForRealtime">
         </v-switch>
+    </v-card-text>
 
-        <v-switch
-            v-model="tryTranslateAhead"
-            label="Translate full event instead of single message"
-            dense
-            hide-details
-            @click.self.stop
-            @change="onChangeTryTranslateAhead">
-        </v-switch>
+    <v-card-subtitle class="pb-0 mt-2 font-weight-bold">General options</v-card-subtitle>
 
-        <v-switch
-            v-model="cancelBackgroundForOnTheFly"
-            label="Allow cancelling of background translations when on-the-fly is needed"
-            dense
-            hide-details
-            @click.self.stop
-            @change="onChangeCancelBackgroundForOnTheFly">
-        </v-switch>
-
+    <v-card-text class="py-0">
         <v-switch
           v-model="changeToCurrentMapInMassTranslationMidPhase"
           label="Change to current map in mass translation mid-phase"
@@ -260,6 +268,34 @@ export default {
         </div>
 
         <div class="d-flex align-center" style="gap: 8px;">
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on, attrs }">
+                    <v-btn
+                        icon
+                        small
+                        v-bind="attrs"
+                        v-on="on"
+                        :color="linkDescriptionMaxWidthToDialogue ? 'primary' : 'grey lighten-1'"
+                        :disabled="!enableTextWrapping"
+                        @click="toggleDescriptionWidthLink">
+                        <v-icon small>
+                            {{
+                                linkDescriptionMaxWidthToDialogue
+                                    ? 'mdi-link-variant'
+                                    : 'mdi-link-variant-off'
+                            }}
+                        </v-icon>
+                    </v-btn>
+                </template>
+                <span>
+                    {{
+                        linkDescriptionMaxWidthToDialogue
+                            ? 'Linked: description width follows dialogue width'
+                            : 'Unlinked: description width is independent'
+                    }}
+                </span>
+            </v-tooltip>
+
             <v-text-field
                 v-model.number="descriptionMaxLineWidth"
                 label="Maximum line width for descriptions (items, skills etc.)"
@@ -269,7 +305,7 @@ export default {
                 min="20"
                 max="200"
                 hide-details
-                :disabled="!enableTextWrapping"
+                :disabled="!enableTextWrapping || linkDescriptionMaxWidthToDialogue"
                 @keydown.self.stop
                 @change="onChangeDescriptionMaxWidth"
                 @focus="$event.target.select()"
@@ -536,20 +572,20 @@ export default {
             return this.callRuntime('onChangeEnabled');
         },
 
-        onChangeCacheOnly() {
-            return this.callRuntime('onChangeCacheOnly');
+        onChangeEnableTranslation() {
+            return this.callRuntime('onChangeEnableTranslation');
         },
 
-        onChangeTranslateImagesInCacheIfAny() {
-            return this.callRuntime('onChangeTranslateImagesInCacheIfAny');
+        onChangeEnableImageReplacement() {
+            return this.callRuntime('onChangeEnableImageReplacement');
         },
 
-        onChangeTryTranslateAhead() {
-            return this.callRuntime('onChangeTryTranslateAhead');
+        onChangeTranslateFullEventInRealtime() {
+            return this.callRuntime('onChangeTranslateFullEventInRealtime');
         },
 
-        onChangeCancelBackgroundForOnTheFly() {
-            return this.callRuntime('onChangeCancelBackgroundForOnTheFly');
+        onChangeInterruptQueueForRealtime() {
+            return this.callRuntime('onChangeInterruptQueueForRealtime');
         },
 
         onChangeCurrentMapMidPhasePriority() {
@@ -642,6 +678,11 @@ export default {
 
         onChangeDescriptionMaxWidth() {
             return this.callRuntime('onChangeDescriptionMaxWidth');
+        },
+
+        toggleDescriptionWidthLink() {
+            this.linkDescriptionMaxWidthToDialogue = !this.linkDescriptionMaxWidthToDialogue;
+            return this.callRuntime('onChangeLinkDescriptionMaxWidthToDialogue');
         },
 
         onChangeDescriptionMaxRows() {

@@ -345,7 +345,7 @@ export const translateOnTheFlyFlowMethods = {
     },
 
     preemptBackgroundForForeground(operationKey, sourceTrigger = 'unknown') {
-        if (!this.cancelBackgroundForOnTheFly) {
+        if (!this.interruptQueueForRealtime) {
             return false;
         }
 

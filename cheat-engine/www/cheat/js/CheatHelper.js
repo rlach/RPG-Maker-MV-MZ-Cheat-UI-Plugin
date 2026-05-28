@@ -969,6 +969,26 @@ export class MessageCheat {
         }
     }
 
+    static toggleHighlightImages(notify = true) {
+        const runtime = ensureTranslationRuntime();
+        if (!runtime) {
+            Alert.error('Translation runtime not initialized');
+            return false;
+        }
+
+        const nextValue = !runtime.highlightImages;
+        runtime.highlightImages = nextValue;
+        if (typeof runtime.onChangeHighlightImages === 'function') {
+            runtime.onChangeHighlightImages();
+        }
+
+        if (notify) {
+            Alert.info(`Highlight images: ${nextValue ? 'enabled' : 'disabled'}`);
+        }
+
+        return nextValue;
+    }
+
     static logCurrentMessage() {
         try {
             if (!$gameMessage || typeof $gameMessage.allText !== 'function') {

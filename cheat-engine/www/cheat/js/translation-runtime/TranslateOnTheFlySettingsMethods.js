@@ -53,6 +53,10 @@ export const translateOnTheFlySettingsMethods = {
 
         Object.assign(this, normalized);
 
+        if (this.linkDescriptionMaxWidthToDialogue) {
+            this.descriptionMaxLineWidth = this.maxLineWidth;
+        }
+
         TranslateOnTheFlyState.setEnabled(this.enabled, { notify: false });
     },
 
@@ -112,25 +116,25 @@ export const translateOnTheFlySettingsMethods = {
         this.kvStorage.setAll(data);
     },
 
-    onChangeCacheOnly() {
+    onChangeEnableTranslation() {
         // When real-time is enabled, this flag is ignored; still persist for when disabled later
-        if (this.translateCacheWhenDisabled) {
+        if (this.enableTranslation) {
             this.ensureHookInitialized('cache-only-enabled');
         }
         this.saveSettings();
         this.notifyCacheRuntime('settings-cache-only');
     },
 
-    onChangeTranslateImagesInCacheIfAny() {
+    onChangeEnableImageReplacement() {
         this.saveSettings();
         this.notifyCacheRuntime('settings-image-cache-toggle');
     },
 
-    onChangeTryTranslateAhead() {
+    onChangeTranslateFullEventInRealtime() {
         this.saveSettings();
     },
 
-    onChangeCancelBackgroundForOnTheFly() {
+    onChangeInterruptQueueForRealtime() {
         this.saveSettings();
     },
 
@@ -141,6 +145,10 @@ export const translateOnTheFlySettingsMethods = {
     onChangeFlatProgressWindow() {
         this.resetProgressBoxPositionToDefault();
         this.ensureProgressBoxElements();
+        this.saveSettings();
+    },
+
+    onChangeHighlightImages() {
         this.saveSettings();
     },
 
@@ -223,6 +231,10 @@ export const translateOnTheFlySettingsMethods = {
     },
 
     onChangeMaxWidth() {
+        if (this.linkDescriptionMaxWidthToDialogue) {
+            this.descriptionMaxLineWidth = this.maxLineWidth;
+        }
+
         // Don't clear cache - wrapping is applied on display, not stored in cache
         this.saveSettings();
     },
@@ -234,6 +246,14 @@ export const translateOnTheFlySettingsMethods = {
 
     onChangeDescriptionMaxWidth() {
         // Don't clear cache - wrapping is applied on display, not stored in cache
+        this.saveSettings();
+    },
+
+    onChangeLinkDescriptionMaxWidthToDialogue() {
+        if (this.linkDescriptionMaxWidthToDialogue) {
+            this.descriptionMaxLineWidth = this.maxLineWidth;
+        }
+
         this.saveSettings();
     },
 
@@ -278,5 +298,22 @@ export const translateOnTheFlySettingsMethods = {
     onChangeBatchItemsLimit() {
         if (!this.batchItemsLimit || this.batchItemsLimit < 1) this.batchItemsLimit = 1;
         this.saveSettings();
+    },
+
+    // Backward-compatible aliases for older panel/runtime calls.
+    onChangeCacheOnly() {
+        return this.onChangeEnableTranslation();
+    },
+
+    onChangeTranslateImagesInCacheIfAny() {
+        return this.onChangeEnableImageReplacement();
+    },
+
+    onChangeTryTranslateAhead() {
+        return this.onChangeTranslateFullEventInRealtime();
+    },
+
+    onChangeCancelBackgroundForOnTheFly() {
+        return this.onChangeInterruptQueueForRealtime();
     },
 };

@@ -111,7 +111,7 @@ class TranslationRuntime {
             ensureKnowledgeForLangPair(this.sourceLang, this.targetLang);
         }
 
-        if (this.translateCacheWhenDisabled) {
+        if (this.enableTranslation) {
             console.log('[TranslateOnTheFly] Applying cached translations to data objects');
             this.applyCachedTranslationsToData();
         }
@@ -189,7 +189,7 @@ class TranslationRuntime {
     shouldInitializeHooks() {
         return (
             this.isTranslationEnabled() ||
-            !!this.translateCacheWhenDisabled ||
+            !!this.enableTranslation ||
             this.isNonOtfTranslationProcessActive()
         );
     }

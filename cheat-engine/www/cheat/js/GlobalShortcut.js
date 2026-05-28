@@ -116,6 +116,10 @@ const defaultShortcutSettings = {
         shortcut: 'alt shift t',
     },
 
+    toggleHighlightImages: {
+        shortcut: 'alt i',
+    },
+
     openDevTool: {
         shortcut: 'f12',
     },
@@ -408,6 +412,14 @@ const shortcutConfig = {
         desc: 'Select and start background translation for game objects',
         enterAction() {
             MessageCheat.openObjectTranslationModal();
+        },
+    },
+
+    toggleHighlightImages: {
+        name: 'Toggle image highlights',
+        desc: 'Draw or hide 1px magenta border for runtime-loaded images',
+        enterAction() {
+            MessageCheat.toggleHighlightImages(true);
         },
     },
 
