@@ -114,6 +114,7 @@ import { FtkrCustomSimpleActorStatusTranslator } from './translators/FtkrCustomS
 import { GirlsWindowTranslator } from './translators/GirlsWindowTranslator.js';
 import { ItemCombinationMZTranslator } from './translators/ItemCombinationMZTranslator.js';
 import { ItemNameEscapeTranslator } from './translators/ItemNameEscapeTranslator.js';
+import { JavaHutSaveExTranslator } from './translators/JavaHutSaveExTranslator.js';
 import { LiveCommentTranslator } from './translators/LiveCommentTranslator.js';
 import { MessagePExRiruTranslator } from './translators/MessagePExRiruTranslator.js';
 import { NuunMenuScreenExTranslator } from './translators/NuunMenuScreenExTranslator.js';
@@ -159,6 +160,7 @@ class PluginTranslatorRegistry {
             HelpWindowPluginTranslator,
             ItemCombinationMZTranslator,
             ItemNameEscapeTranslator,
+            JavaHutSaveExTranslator,
             DestinationWindowTranslator,
             KOriginalMenuScreenTranslator,
             KmsMapActiveMessageTranslator,

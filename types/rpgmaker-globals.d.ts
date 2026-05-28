@@ -103,6 +103,8 @@ declare const Window_ShopStatus: any;
 declare const Window_InfoMenu: any;
 declare const Window_StatusBase: any;
 declare const Window_Gab: any;
+declare const Window_Prompt: any;
+declare const JavaHut: any;
 
 declare const Game_Picture: any;
 declare const Spriteset_Map: any;
@@ -183,6 +185,8 @@ declare interface Window {
     Window_TitleCommand?: any;
     Window_StatusBase?: any;
     Window_Gab?: any;
+    Window_Prompt?: any;
+    JavaHut?: any;
     Window_InfoMenu?: any;
     Window_Help?: any;
     Window_CustomMenuCommand?: any;
