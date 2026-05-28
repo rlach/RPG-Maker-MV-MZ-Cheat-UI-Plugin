@@ -429,6 +429,14 @@ export const translateOnTheFlyRuntimeMethods = {
                 context.fillStyle = 'rgba(255, 0, 30, 0.1)';
                 context.fillRect(0, 0, width, height);
 
+                // set every single pixel to 100% transparent
+                // const imageData = context.getImageData(0, 0, width, height);
+                // const data = imageData.data;
+                // for (let i = 0; i < data.length; i += 4) {
+                //     data[i + 3] = 0; // set alpha to 0
+                // }
+                // context.putImageData(imageData, 0, 0);
+
                 context.restore();
 
                 bitmap._highlighted = true;

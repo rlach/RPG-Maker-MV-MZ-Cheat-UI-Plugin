@@ -1,4 +1,5 @@
 import { AutoNamePopupTranslator } from './translators/AutoNamePopupTranslator.js';
+import { AKUNOUOptionMessageSpeedTranslator } from './translators/AKUNOU_OptionMessageSpeedTranslator.js';
 import { BBCustomSaveWindowTranslator } from './translators/BBCustomSaveWindowTranslator.js';
 import { BattleFormationTranslator } from './translators/BattleFormationTranslator.js';
 import { BasePluginTranslator } from './BasePluginTranslator.js';
@@ -36,6 +37,7 @@ import { LunatlazurActorNameWindowTranslator } from './translators/LunatlazurAct
 import { LLGalgeChoiceWindowTranslator } from './translators/LLGalgeChoiceWindowTranslator.js';
 import { ManoInputConfigTranslator } from './translators/ManoInputConfigTranslator.js';
 import { LLStandingPictureTranslator } from './translators/LLStandingPictureTranslator.js';
+import { LL_MenuScreenShopTranslator } from './translators/LL_MenuScreenShopTranslator.js';
 import { MgpExternChoicesTranslator } from './translators/MgpExternChoicesTranslator.js';
 import { MogSceneMenuFileRenameTranslator } from './translators/MogSceneMenuFileRenameTranslator.js';
 import { MogSceneMenuTranslator } from './translators/MogSceneMenuTranslator.js';
@@ -50,12 +52,15 @@ import { MppMessageExTranslator } from './translators/MppMessageExTranslator.js'
 import { MultipleWindowSkinSystemTranslator } from './translators/MultipleWindowSkinSystemTranslator.js';
 import { MenuSubCommandTranslator } from './translators/MenuSubCommandTranslator.js';
 import { NekoGakuenMulitLanguageTranslator } from './translators/NekoGakuenMulitLanguageTranslator.js';
+import { NrpLearnSkillListTranslator } from './translators/NRP_LearnSkillListTranslator.js';
+import { NRP_MessageWindowTranslator } from './translators/NRP_MessageWindowTranslator.js';
 import { NoreAutoSaveTranslator } from './translators/NoreAutoSaveTranslator.js';
 import { NoreRecollectionSaveTranslator } from './translators/NoreRecollectionSaveTranslator.js';
 import { NrpMapTravelTranslator } from './translators/NrpMapTravelTranslator.js';
 import { NuunSaveScreenTranslator } from './translators/NuunSaveScreenTranslator.js';
 import { NuunSaveScreen3Translator } from './translators/NuunSaveScreen3Translator.js';
 import { NuunSaveVerificationTranslator } from './translators/NuunSaveVerificationTranslator.js';
+import { NuunResultTranslator } from './translators/NUUN_ResultTranslator.js';
 import { NuunStatusScreenTranslator } from './translators/NuunStatusScreenTranslator.js';
 import { OriginMenuStatusTranslator } from './translators/OriginMenuStatusTranslator.js';
 import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTextWindowTranslator.js';
@@ -63,6 +68,7 @@ import { QuestSystemTranslator } from './translators/QuestSystemTranslator.js';
 import { RecollectionForMZTranslator } from './translators/RecollectionForMZTranslator.js';
 import { RecollectionModeTranslator } from './translators/RecollectionModeTranslator.js';
 import { RecollectionModeMZTranslator } from './translators/RecollectionModeMZTranslator.js';
+import { EquipSceneExtensionTranslator } from './translators/EquipScene_ExtensionTranslator.js';
 import { SceneCustomMenuTranslator } from './translators/SceneCustomMenuTranslator.js';
 import { SceneGlossaryTranslator } from './translators/SceneGlossaryTranslator.js';
 import { SetMessageFontSizeTranslator } from './translators/SetMessageFontSizeTranslator.js';
@@ -133,6 +139,7 @@ class PluginTranslatorRegistry {
     constructor() {
         this.translatorClasses = [
             ABEnemyBookTranslator,
+            AKUNOUOptionMessageSpeedTranslator,
             AlchemySystemTranslator,
             AutoNamePopupTranslator,
             BBCustomSaveWindowTranslator,
@@ -167,6 +174,7 @@ class PluginTranslatorRegistry {
             ItemNameEscapeTranslator,
             JavaHutSaveExTranslator,
             DestinationWindowTranslator,
+            EquipSceneExtensionTranslator,
             KOriginalMenuScreenTranslator,
             KmsMapActiveMessageTranslator,
             KmsQuickNotificationTranslator,
@@ -178,6 +186,7 @@ class PluginTranslatorRegistry {
             LLGalgeChoiceWindowTranslator,
             LLInfoPopupWIndowTranslator,
             LLMenuScreenCustomTranslator,
+            LL_MenuScreenShopTranslator,
             LLStandingPictureTranslator,
             ManoInfoWindowTranslator,
             ManoInputConfigTranslator,
@@ -201,12 +210,15 @@ class PluginTranslatorRegistry {
             MkrMapItemSlotTranslator,
             MultipleWindowSkinSystemTranslator,
             NekoGakuenMulitLanguageTranslator,
+            NrpLearnSkillListTranslator,
+            NRP_MessageWindowTranslator,
             NoreAutoSaveTranslator,
             NoreRecollectionSaveTranslator,
             NrpMapTravelTranslator,
             NuunSaveScreenTranslator,
             NuunSaveScreen3Translator,
             NuunSaveVerificationTranslator,
+            NuunResultTranslator,
             NuunStatusScreenTranslator,
             OriginMenuStatusTranslator,
             PandaProgressTextWindowTranslator,

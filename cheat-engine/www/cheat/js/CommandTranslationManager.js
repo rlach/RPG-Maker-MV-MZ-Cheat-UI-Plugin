@@ -180,7 +180,7 @@ export function installCommandTranslationHook(runtime) {
 
     // If Scene_Boot is unavailable or the game already booted past it,
     // all scripts are loaded — hook immediately.
-    if (!sceneBoot || (globalThis.SceneManager && globalThis.SceneManager._scene)) {
+    if (!sceneBoot || globalThis.SceneManager?._scene) {
         hookDiscoveredCommandWindows(runtime);
         return;
     }
