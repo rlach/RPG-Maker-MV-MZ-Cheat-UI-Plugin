@@ -6,7 +6,12 @@ import { TAG_BRACKET, TAG_STYLE, TAG_TYPE } from '../../ai-engine/constants.js';
  * DTextPicture translator.
  *
  * Supported plugin versions:
- * - DTextPicture.js v1.20.5 (MV/MZ): runtime hook on Game_Screen#setDTextPicture.
+ * - DTextPicture.js v1.6.1 (MV): runtime hook on Game_Screen#setDTextPicture,
+ *   plus Game_Picture#updateDTextVariable for REAL_TIME refresh parity.
+ * - DTextPicture.js v1.20.3 (MV): runtime hook on Game_Screen#setDTextPicture,
+ *   plus Game_Picture#updateDTextVariable for REAL_TIME refresh parity.
+ * - DTextPicture.js v1.20.5 (MV/MZ): runtime hook on Game_Screen#setDTextPicture,
+ *   plus Game_Picture#updateDTextVariable for REAL_TIME refresh parity.
  * - DTextPicture.js v1.20.2 modified fork (MV): runtime hook on
  *   Game_Interpreter#pluginCommandDTextPicture (interpreter-local D_TEXT pipeline,
  *   no Game_Screen#setDTextPicture available).
@@ -108,6 +113,7 @@ export class DTextPictureTranslator extends BasePluginTranslator {
 
         if (hasLegacyHookPoint) {
             this.installLegacySetDTextPictureHook();
+            this.installDTextRealTimeRefreshHook();
             return true;
         }
 
@@ -117,6 +123,62 @@ export class DTextPictureTranslator extends BasePluginTranslator {
         }
 
         return false;
+    }
+
+    installDTextRealTimeRefreshHook() {
+        if (Game_Picture.prototype.__CHEAT_DTEXT_REAL_TIME_TRANSLATOR_HOOKED__) {
+            return;
+        }
+
+        if (typeof Game_Picture.prototype.updateDTextVariable !== 'function') {
+            return;
+        }
+
+        const original = Game_Picture.prototype.updateDTextVariable;
+        const getRuntime = this.getRuntime.bind(this);
+        const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
+        const isUsableText = this.isUsableText.bind(this);
+        const resolveRuntimeTranslation = this.resolveRuntimeTranslation.bind(this);
+        const getCacheType = this.getCacheType.bind(this);
+
+        Game_Picture.prototype.updateDTextVariable = function () {
+            const info = this.dTextInfo;
+
+            if (info && typeof info.originalValue === 'string' && info.originalValue) {
+                const runtime = getRuntime();
+                if (runtime && isRuntimeTranslationActive(runtime)) {
+                    const lines = info.originalValue.split('\n');
+                    let changed = false;
+                    const translatedLines = lines.map((line) => {
+                        if (!isUsableText(line)) return line;
+                        const translated = resolveRuntimeTranslation(
+                            line,
+                            runtime,
+                            getCacheType(),
+                            { requireRuntimeTranslationActive: true, missValue: line }
+                        );
+                        if (translated !== line) changed = true;
+                        return translated;
+                    });
+                    if (changed) {
+                        info.originalValue = translatedLines.join('\n');
+                    }
+                }
+            }
+
+            return original.apply(this, arguments);
+        };
+
+        Object.defineProperty(
+            Game_Picture.prototype,
+            '__CHEAT_DTEXT_REAL_TIME_TRANSLATOR_HOOKED__',
+            {
+                value: true,
+                configurable: true,
+                enumerable: false,
+                writable: false,
+            }
+        );
     }
 
     installLegacySetDTextPictureHook() {
@@ -180,21 +242,16 @@ export class DTextPictureTranslator extends BasePluginTranslator {
             return null;
         }
 
-        const translatedText = this.resolveRuntimeTranslation(
-            sourceText,
-            runtime,
-            this.getCacheType(),
-            {
-                missValue: sourceText,
-                requireRuntimeTranslationActive: true,
-            }
-        );
+        const translatedText = this.resolveRuntimeTranslation(sourceText, runtime, this.getCacheType(), {
+            missValue: sourceText,
+            requireRuntimeTranslationActive: true,
+        });
 
         if (translatedText === sourceText) {
             return null;
         }
 
-        const translatedArgs = String(translatedText).split(' ');
+        const translatedArgs = [String(translatedText)];
         if (trailingSizeToken !== null) {
             translatedArgs.push(trailingSizeToken);
         }
@@ -202,7 +259,6 @@ export class DTextPictureTranslator extends BasePluginTranslator {
     }
 
     async precomputeCounts() {
-
         if (this._scanPrepared) {
             return;
         }

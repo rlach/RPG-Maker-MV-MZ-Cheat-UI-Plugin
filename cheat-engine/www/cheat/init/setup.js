@@ -158,6 +158,7 @@ async function bootstrapCheatUi() {
             console.warn('[Cheat] Custom translator consent/load failed', error);
         }
 
+        console.log('[Cheat] Starting plugin translation detection');
         PLUGIN_TRANSLATOR_REGISTRY.ensureDetectionStarted({ runtime });
     }, 0);
 }

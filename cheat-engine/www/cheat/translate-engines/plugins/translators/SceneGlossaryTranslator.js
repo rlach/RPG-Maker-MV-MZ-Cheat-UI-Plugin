@@ -18,6 +18,15 @@ const GLOSSARY_TEXT_FIELDS = [
     'VisibleItemNotYet',
 ];
 
+const NOTE_TAG_DATABASE_SOURCES = [
+    { scope: 'items', getter: () => window.$dataItems },
+    { scope: 'weapons', getter: () => window.$dataWeapons },
+    { scope: 'armors', getter: () => window.$dataArmors },
+    { scope: 'skills', getter: () => window.$dataSkills },
+    { scope: 'states', getter: () => window.$dataStates },
+    { scope: 'enemies', getter: () => window.$dataEnemies },
+];
+
 function returnStatTag(statName, tagSymbol) {
     return {
         description: `Returns ${statName}`,
@@ -150,6 +159,100 @@ function parseStringArray(rawValue) {
     return result;
 }
 
+function hasCjkCharacters(text) {
+    return /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/.test(String(text || ''));
+}
+
+function isLikelyTranslatableNoteValue(value) {
+    if (!(typeof value === 'string' && value.trim() !== '')) {
+        return false;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return false;
+    }
+
+    if (/^\d+(?:\.\d+)?$/.test(trimmed)) {
+        return false;
+    }
+
+    if (/^<[^>]+>$/.test(trimmed)) {
+        return false;
+    }
+
+    if (!hasCjkCharacters(trimmed) && /^[A-Za-z0-9_./:%+-]+$/.test(trimmed)) {
+        return false;
+    }
+
+    return true;
+}
+
+function extractTagSymbolsFromRawValue(rawValue, outputSet) {
+    const parsed = parseJsonSafely(rawValue, rawValue);
+
+    if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+            extractTagSymbolsFromRawValue(item, outputSet);
+        }
+        return;
+    }
+
+    if (parsed && typeof parsed === 'object') {
+        for (const value of Object.values(parsed)) {
+            extractTagSymbolsFromRawValue(value, outputSet);
+        }
+        return;
+    }
+
+    const source = typeof parsed === 'string' ? parsed : '';
+    if (!source.trim()) {
+        return;
+    }
+
+    const xmlTagRegex = /<\s*([A-Za-z_]\w*)\s*[:>]/g;
+    let match = null;
+    while ((match = xmlTagRegex.exec(source)) !== null) {
+        outputSet.add(String(match[1] || '').trim().toLowerCase());
+    }
+
+    const tokenRegex = /(?:^|[,\s])([A-Za-z_]\w*)(?=$|[,\s])/g;
+    while ((match = tokenRegex.exec(source)) !== null) {
+        outputSet.add(String(match[1] || '').trim().toLowerCase());
+    }
+}
+
+function collectConfiguredCustomTagSymbols(parameters) {
+    const symbols = new Set();
+    if (!parameters || typeof parameters !== 'object') {
+        return symbols;
+    }
+
+    for (const [key, value] of Object.entries(parameters)) {
+        if (!/tag/i.test(String(key || ''))) {
+            continue;
+        }
+
+        extractTagSymbolsFromRawValue(value, symbols);
+    }
+
+    return symbols;
+}
+
+function isSceneGlossaryDefaultTagSymbol(symbol) {
+    const text = String(symbol || '').trim();
+    if (!text) {
+        return false;
+    }
+
+    return (
+        /^SG(?:説明|Description)\d*$/i.test(text) ||
+        /^SG(?:共通説明|CommonDescription)\d*$/i.test(text) ||
+        /^SG(?:未入手説明|NotYetDescription)\d*$/i.test(text) ||
+        /^SG(?:カテゴリ|Category)$/i.test(text)
+    );
+}
+
 function parseNoteTagEntries(noteText) {
     const result = [];
     const text = String(noteText || '');
@@ -157,16 +260,109 @@ function parseNoteTagEntries(noteText) {
         return result;
     }
 
-    const regex = /<\s*(SG[^:\s>]+)\s*:\s*([\s\S]*?)>/gi;
+    const regex = /<\s*([^:\s>]+)\s*:\s*([\s\S]*?)>/gi;
     let match = null;
     while ((match = regex.exec(text)) !== null) {
         const tag = String(match[1] || '').trim();
-        const value = String(match[2] || '').trim();
+        const value = String(match[2] || '');
         if (!tag || !(typeof value === 'string' && value.trim() !== '')) {
             continue;
         }
 
         result.push({ tag, value });
+    }
+
+    return result;
+}
+
+function appendEntriesFromGlossaryDatabaseNoteRecord(
+    record,
+    sourceScope,
+    dataId,
+    allowedTags,
+    output
+) {
+    const note = typeof record?.note === 'string' ? record.note : '';
+    if (!note.trim()) {
+        return;
+    }
+
+    const tagEntries = parseNoteTagEntries(note);
+    for (const tagEntry of tagEntries) {
+        const tagName = String(tagEntry.tag || '').trim();
+        const normalizedTagName = tagName.toLowerCase();
+        if (
+            !isSceneGlossaryDefaultTagSymbol(tagName) &&
+            !allowedTags.has(normalizedTagName)
+        ) {
+            continue;
+        }
+
+        const value = typeof tagEntry.value === 'string' ? tagEntry.value : '';
+        if (!isLikelyTranslatableNoteValue(value)) {
+            continue;
+        }
+
+        pushScanEntry(
+            output,
+            value,
+            {
+                scope: 'databaseNoteTag',
+                dataset: sourceScope,
+                dataId,
+                tag: tagName,
+            },
+            'plugin_scene_glossary'
+        );
+    }
+}
+
+function appendEntriesFromGlossaryDatabaseNotes(customTagSymbols, output) {
+    const allowedTags = new Set(
+        Array.from(customTagSymbols || [])
+            .map((tag) => String(tag || '').trim().toLowerCase())
+            .filter(Boolean)
+    );
+
+    for (const source of NOTE_TAG_DATABASE_SOURCES) {
+        const records = source.getter();
+        if (!Array.isArray(records)) {
+            continue;
+        }
+
+        for (let dataId = 0; dataId < records.length; dataId++) {
+            appendEntriesFromGlossaryDatabaseNoteRecord(
+                records[dataId],
+                source.scope,
+                dataId,
+                allowedTags,
+                output
+            );
+        }
+    }
+}
+
+function buildCustomXmlTagConfigs(symbols) {
+    const result = [];
+    const seen = new Set();
+
+    for (const symbol of symbols || []) {
+        const normalized = String(symbol || '').trim();
+        if (!normalized || seen.has(normalized.toLowerCase())) {
+            continue;
+        }
+
+        seen.add(normalized.toLowerCase());
+        result.push({
+            description: `SceneGlossary custom tag: ${normalized}`,
+            tagSymbol: normalized,
+            style: TAG_STYLE.XML,
+            type: TAG_TYPE.WITH_CUSTOM_PARAMETER,
+            bracket: TAG_BRACKET.NONE,
+            maskValue: false,
+            requiredConsistency: true,
+            alwaysTranslate: true,
+        });
     }
 
     return result;
@@ -372,6 +568,25 @@ function extractDescriptionFromNoteText(noteText, pageIndex) {
     return '';
 }
 
+function appendEntryFromGlossaryInfoField(glossaryInfo, field, scope, glossaryIndex, output) {
+    const text = typeof glossaryInfo[field] === 'string' ? glossaryInfo[field] : '';
+    if (!(typeof text === 'string' && text.trim() !== '')) {
+        return;
+    }
+
+    const cacheType = field === 'CommandName' ? 'command' : 'plugin_scene_glossary';
+    pushScanEntry(
+        output,
+        text,
+        {
+            scope,
+            field,
+            glossaryIndex,
+        },
+        cacheType
+    );
+}
+
 function appendEntriesFromGlossaryInfo(glossaryInfoList, scope, output) {
     if (!Array.isArray(glossaryInfoList) || !Array.isArray(output)) {
         return;
@@ -384,22 +599,7 @@ function appendEntriesFromGlossaryInfo(glossaryInfoList, scope, output) {
         }
 
         for (const field of GLOSSARY_TEXT_FIELDS) {
-            const text = typeof glossaryInfo[field] === 'string' ? glossaryInfo[field] : '';
-            if (!(typeof text === 'string' && text.trim() !== '')) {
-                continue;
-            }
-
-            const cacheType = field === 'CommandName' ? 'command' : 'plugin_scene_glossary';
-            pushScanEntry(
-                output,
-                text,
-                {
-                    scope,
-                    field,
-                    glossaryIndex,
-                },
-                cacheType
-            );
+            appendEntryFromGlossaryInfoField(glossaryInfo, field, scope, glossaryIndex, output);
         }
     }
 }
@@ -714,6 +914,7 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
         this._scanPrepared = false;
         this._scanEntries = [];
         this._scanPromise = null;
+        this._customTagSymbols = new Set();
     }
 
     getPluginName() {
@@ -740,6 +941,9 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
         patchGlossaryPartyMessages(this);
         patchGlossaryMenuCommand(this);
         this.registerPluginCustomTags(SCENE_GLOSSARY_PLUGIN_TAGS);
+        this.registerPluginCustomTags(
+            buildCustomXmlTagConfigs(Array.from(this._customTagSymbols))
+        );
         window[RUNTIME_HOOK_GUARD] = true;
         return true;
     }
@@ -775,9 +979,19 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
     buildScanEntries() {
         const entries = [];
 
+        this._customTagSymbols = new Set();
+
         const pluginEntry = this.findPluginEntry();
         if (pluginEntry?.parameters) {
             appendEntriesFromParameters(pluginEntry.parameters, 'pluginEntryParameter', entries);
+            const pluginCustomTagSymbols = collectConfiguredCustomTagSymbols(
+                pluginEntry.parameters
+            );
+            for (const symbol of pluginCustomTagSymbols) {
+                if (!isSceneGlossaryDefaultTagSymbol(symbol)) {
+                    this._customTagSymbols.add(symbol);
+                }
+            }
         }
 
         if (window.PluginManager && typeof PluginManager.parameters === 'function') {
@@ -787,7 +1001,15 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
                 'runtimePluginManagerParameter',
                 entries
             );
+            const runtimeCustomTagSymbols = collectConfiguredCustomTagSymbols(runtimeParameters);
+            for (const symbol of runtimeCustomTagSymbols) {
+                if (!isSceneGlossaryDefaultTagSymbol(symbol)) {
+                    this._customTagSymbols.add(symbol);
+                }
+            }
         }
+
+        appendEntriesFromGlossaryDatabaseNotes(this._customTagSymbols, entries);
 
         return entries;
     }

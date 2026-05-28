@@ -80,6 +80,7 @@ import { TMSoloMenuTranslator } from './translators/TMSoloMenuTranslator.js';
 import { TMStatusMenuExTranslator } from './translators/TMStatusMenuExTranslator.js';
 import { TsumioBattleResultTranslator } from './translators/TsumioBattleResultTranslator.js';
 import { TorigoyaAchievement2Translator } from './translators/TorigoyaAchievement2Translator.js';
+import { TorigoyaAchievement2AddonCategoryTranslator } from './translators/TorigoyaAchievement2AddonCategoryTranslator.js';
 import { TorigoyaAchievementTranslator } from './translators/TorigoyaAchievementTranslator.js';
 import { TorigoyaNotifyMessageTranslator } from './translators/TorigoyaNotifyMessageTranslator.js';
 import { TRPSkitTranslator } from './translators/TrpSkitTranslator.js';
@@ -118,11 +119,13 @@ import { JavaHutSaveExTranslator } from './translators/JavaHutSaveExTranslator.j
 import { LiveCommentTranslator } from './translators/LiveCommentTranslator.js';
 import { MessagePExRiruTranslator } from './translators/MessagePExRiruTranslator.js';
 import { NuunMenuScreenExTranslator } from './translators/NuunMenuScreenExTranslator.js';
+import { ManoInfoWindowTranslator } from './translators/ManoInfoWindowTranslator.js';
 import { PopupMessageTranslator } from './translators/PopupMessageTranslator.js';
 import { ProfileExtendTranslator } from './translators/ProfileExtendTranslator.js';
 import { ResidentWindowTranslator } from './translators/ResidentWindowTranslator.js';
 import { SaveNameInputTranslator } from './translators/SaveNameInputTranslator.js';
 import { MiniInformationWindowTranslator } from './translators/MiniInformationWindowTranslator.js';
+import { SRDHUDMakerTranslator } from './translators/SRDHUDMakerTranslator.js';
 
 class PluginTranslatorRegistry {
     constructor() {
@@ -174,6 +177,7 @@ class PluginTranslatorRegistry {
             LLInfoPopupWIndowTranslator,
             LLMenuScreenCustomTranslator,
             LLStandingPictureTranslator,
+            ManoInfoWindowTranslator,
             ManoInputConfigTranslator,
             MessageAlignCenterTranslator,
             MgpExternChoicesTranslator,
@@ -225,6 +229,7 @@ class PluginTranslatorRegistry {
             SimpleFileLayoutTranslator,
             SkillCPSystemTranslator,
             SkillTreeTranslator,
+            SRDHUDMakerTranslator,
             TextPictureTranslator,
             TNLightSaveDataMapTranslator,
             TMMapHpGaugeTranslator,
@@ -235,6 +240,7 @@ class PluginTranslatorRegistry {
             TMStatusMenuExTranslator,
             TsumioBattleResultTranslator,
             TorigoyaAchievement2Translator,
+            TorigoyaAchievement2AddonCategoryTranslator,
             TorigoyaAchievementTranslator,
             TorigoyaNotifyMessageTranslator,
             TRPSkitTranslator,
@@ -271,6 +277,9 @@ class PluginTranslatorRegistry {
                 console.warn('[PluginTranslatorRegistry] Plugin detection failed', error);
             })
             .finally(() => {
+                console.log('[PluginTranslatorRegistry] Plugin detection completed', {
+                    detectedPlugins: Array.from(this.detectedPluginNames),
+                });
                 this.detectionCompleted = true;
             });
 
