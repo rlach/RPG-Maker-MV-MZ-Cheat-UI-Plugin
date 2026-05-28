@@ -144,8 +144,7 @@ export class RJ352933TsukaTranslator extends BasePluginTranslator {
         const hasPluginEntry = Array.isArray(window.$plugins)
             ? window.$plugins.some(
                   (plugin) =>
-                      plugin &&
-                      plugin.status === true &&
+                      plugin?.status === true &&
                       String(plugin.name || '').trim().toLowerCase() === 'licotsuka_fix'
               )
             : false;
@@ -163,37 +162,91 @@ export class RJ352933TsukaTranslator extends BasePluginTranslator {
         }
 
         const originalSetupRandomTalk = window.CCUtils.setupRandomTalk;
-        const translator = this;
+        const runtimeForHook = () => this.getRuntime();
+        const runtimeTranslationEnabled = (runtime) => this.isRuntimeTranslationActive(runtime);
+        const resolveHookTranslation = (text, runtime) =>
+            this.resolveRuntimeTranslation(text, runtime, this.getCacheType(), {
+                requireRuntimeTranslationActive: true,
+            });
+
+        const translateGabMessage = (source, runtime) => {
+            const message = typeof source === 'string' ? source : String(source ?? '');
+            if (!this.isUsableText(message)) {
+                return source;
+            }
+
+            const segments = message.split('|');
+            let changed = false;
+            const translatedSegments = segments.map((segment) => {
+                if (!this.isUsableText(segment)) {
+                    return segment;
+                }
+
+                const translated = resolveHookTranslation(segment, runtime);
+                if (this.isUsableText(translated) && translated !== segment) {
+                    changed = true;
+                    return translated;
+                }
+
+                return segment;
+            });
+
+            if (!changed) {
+                return source;
+            }
+
+            return translatedSegments.join('|');
+        };
 
         window.CCUtils.setupRandomTalk = function (groupName, levelVariableId, talkVariableId, voiceVariableId) {
             const result = originalSetupRandomTalk.apply(this, arguments);
 
-            const runtime = translator.getRuntime();
-            if (!runtime || !translator.isRuntimeTranslationActive(runtime)) {
+            const runtime = runtimeForHook();
+            if (!runtime || !runtimeTranslationEnabled(runtime)) {
                 return result;
             }
 
             const targetTalkVariableId = Number(talkVariableId || 884) || 884;
             const currentText = $gameVariables.value(targetTalkVariableId);
-            if (!translator.isUsableText(currentText)) {
+            if (typeof currentText !== 'string' || !currentText.trim()) {
                 return result;
             }
 
-            const translated = translator.resolveRuntimeTranslation(
-                currentText,
-                runtime,
-                translator.getCacheType(),
-                {
-                    requireRuntimeTranslationActive: true,
-                }
-            );
+            const translated = resolveHookTranslation(currentText, runtime);
 
-            if (translator.isUsableText(translated)) {
+            if (typeof translated === 'string' && translated.trim()) {
                 $gameVariables.setValue(targetTalkVariableId, translated);
             }
 
             return result;
         };
+
+        const gameSystemProto = window.Game_System?.prototype;
+        if (gameSystemProto && typeof gameSystemProto.pushGabRightMessage === 'function') {
+            const originalPushGabRightMessage = gameSystemProto.pushGabRightMessage;
+            gameSystemProto.pushGabRightMessage = function (message) {
+                const runtime = runtimeForHook();
+                if (!runtime || !runtimeTranslationEnabled(runtime)) {
+                    return originalPushGabRightMessage.apply(this, arguments);
+                }
+
+                const translatedMessage = translateGabMessage(message, runtime);
+                return originalPushGabRightMessage.call(this, translatedMessage);
+            };
+        }
+
+        if (gameSystemProto && typeof gameSystemProto.pushGabLeftMessage === 'function') {
+            const originalPushGabLeftMessage = gameSystemProto.pushGabLeftMessage;
+            gameSystemProto.pushGabLeftMessage = function (message, actorId) {
+                const runtime = runtimeForHook();
+                if (!runtime || !runtimeTranslationEnabled(runtime)) {
+                    return originalPushGabLeftMessage.apply(this, arguments);
+                }
+
+                const translatedMessage = translateGabMessage(message, runtime);
+                return originalPushGabLeftMessage.call(this, translatedMessage, actorId);
+            };
+        }
 
         window.CCUtils.__CHEAT_RJ352933_TSUKA_RANDOM_TALK_PATCHED__ = true;
         return true;
