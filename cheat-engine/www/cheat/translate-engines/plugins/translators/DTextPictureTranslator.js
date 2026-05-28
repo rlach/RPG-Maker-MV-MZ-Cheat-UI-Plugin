@@ -1,6 +1,21 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
-import { TAG_BRACKET, TAG_TYPE } from '../../ai-engine/constants.js';
+import { TAG_BRACKET, TAG_STYLE, TAG_TYPE } from '../../ai-engine/constants.js';
+
+/**
+ * DTextPicture translator.
+ *
+ * Supported plugin versions:
+ * - DTextPicture.js v1.20.5 (MV/MZ): runtime hook on Game_Screen#setDTextPicture.
+ * - DTextPicture.js v1.20.2 modified fork (MV): runtime hook on
+ *   Game_Interpreter#pluginCommandDTextPicture (interpreter-local D_TEXT pipeline,
+ *   no Game_Screen#setDTextPicture available).
+ *
+ * Notes:
+ * - Mass-translation scanning reads D_TEXT command payloads from MV (356) and MZ (357)
+ *   event commands in maps/common events.
+ * - Runtime translation only mutates text payloads, never command tokens.
+ */
 
 function normalizeCommandName(value) {
     return String(value || '')
@@ -8,18 +23,11 @@ function normalizeCommandName(value) {
         .toUpperCase();
 }
 
-/*
- * 専用制御文字
- * \V[n,m](m桁分のパラメータで指定した文字で埋めた変数の値)
-
-
-
- *
- * */
 function addTagWithNumericParameter(tagSymbol, description) {
     return {
         description,
         type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
+        style: TAG_STYLE.ESCAPE,
         tagSymbol,
         bracket: TAG_BRACKET.SQUARE,
         requiredConsistency: true,
@@ -30,6 +38,7 @@ function addTagWithCustomParameter(tagSymbol, description) {
     return {
         description,
         type: TAG_TYPE.WITH_CUSTOM_PARAMETER,
+        style: TAG_STYLE.ESCAPE,
         tagSymbol,
         bracket: TAG_BRACKET.SQUARE,
         maskValue: true,
@@ -88,44 +97,111 @@ export class DTextPictureTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (
-            !window.Game_Screen?.prototype ||
-            typeof Game_Screen.prototype.setDTextPicture !== 'function'
-        ) {
-            return false;
-        }
         this.registerPluginCustomTags(PLUGIN_TAGS);
 
+        const hasLegacyHookPoint =
+            !!window.Game_Screen?.prototype &&
+            typeof Game_Screen.prototype.setDTextPicture === 'function';
+        const hasModifiedHookPoint =
+            !!window.Game_Interpreter?.prototype &&
+            typeof Game_Interpreter.prototype.pluginCommandDTextPicture === 'function';
+
+        if (hasLegacyHookPoint) {
+            this.installLegacySetDTextPictureHook();
+            return true;
+        }
+
+        if (hasModifiedHookPoint) {
+            this.installModifiedInterpreterHook();
+            return true;
+        }
+
+        return false;
+    }
+
+    installLegacySetDTextPictureHook() {
         const original = Game_Screen.prototype.setDTextPicture;
-        const resolveRuntimeTranslation = this.resolveRuntimeTranslation.bind(this);
         const getRuntime = this.getRuntime.bind(this);
+        const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
+        const resolveRuntimeTranslation = this.resolveRuntimeTranslation.bind(this);
         const getCacheType = this.getCacheType.bind(this);
 
         Game_Screen.prototype.setDTextPicture = function (value, size) {
-            try {
-                const runtime = getRuntime();
-
-                if (runtime && typeof value === 'string' && value.trim()) {
-                    arguments[0] = resolveRuntimeTranslation(value, runtime, getCacheType(), {
-                        missValue: value,
-                    });
-                }
-            } catch (error) {
-                console.warn(
-                    '[DTextPictureTranslator] Failed to apply cached dynamic text translation',
-                    error
-                );
+            const runtime = getRuntime();
+            if (runtime && isRuntimeTranslationActive(runtime)) {
+                arguments[0] = resolveRuntimeTranslation(value, runtime, getCacheType(), {
+                    missValue: value,
+                    requireRuntimeTranslationActive: true,
+                });
             }
 
             return original.apply(this, arguments);
         };
-        return true;
+    }
+
+    installModifiedInterpreterHook() {
+        const original = Game_Interpreter.prototype.pluginCommandDTextPicture;
+        const getRuntime = this.getRuntime.bind(this);
+        const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
+        const buildTranslatedModifiedDTextArgs = this.buildTranslatedModifiedDTextArgs.bind(this);
+
+        Game_Interpreter.prototype.pluginCommandDTextPicture = function (command, args) {
+            const runtime = getRuntime();
+            if (
+                runtime &&
+                isRuntimeTranslationActive(runtime) &&
+                normalizeCommandName(command) === 'D_TEXT' &&
+                Array.isArray(args) &&
+                args.length > 0
+            ) {
+                const translatedArgs = buildTranslatedModifiedDTextArgs(args, runtime);
+                if (translatedArgs) {
+                    arguments[1] = translatedArgs;
+                }
+            }
+
+            return original.apply(this, arguments);
+        };
+    }
+
+    buildTranslatedModifiedDTextArgs(args, runtime) {
+        const workingArgs = args.slice();
+        let trailingSizeToken = null;
+
+        if (workingArgs.length > 1) {
+            const lastToken = String(workingArgs[workingArgs.length - 1] || '');
+            if (/^[+-]?\d+$/.test(lastToken)) {
+                trailingSizeToken = workingArgs.pop();
+            }
+        }
+
+        const sourceText = workingArgs.join(' ');
+        if (!this.isUsableText(sourceText)) {
+            return null;
+        }
+
+        const translatedText = this.resolveRuntimeTranslation(
+            sourceText,
+            runtime,
+            this.getCacheType(),
+            {
+                missValue: sourceText,
+                requireRuntimeTranslationActive: true,
+            }
+        );
+
+        if (translatedText === sourceText) {
+            return null;
+        }
+
+        const translatedArgs = String(translatedText).split(' ');
+        if (trailingSizeToken !== null) {
+            translatedArgs.push(trailingSizeToken);
+        }
+        return translatedArgs;
     }
 
     async precomputeCounts() {
-        if (!this.ensureDetection()) {
-            return;
-        }
 
         if (this._scanPrepared) {
             return;
