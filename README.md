@@ -126,19 +126,3 @@ Proper fir will look like this:
 ```
 
 This will disable anti-malware guard that some games have, so do it on your own responsibility. The script blocks CSS styles downloads by cheat-engine and LLM requests.
-
-## Text cut off in text box
-
-Some games show 3.5 lines of text or similar in the text box. Usually it's done trough `NRP_MessageWindow` plugin. You can fix it by changing the setting in plugins.json for example:
-
-```
-"WindowHeight":"this.fittingHeight(4) + 20",
-```
-
-to
-
-```
-"WindowHeight":"this.fittingHeight(4)",
-```
-
-Sometimes games have other fancy values. This might be implemented one day to automate it.

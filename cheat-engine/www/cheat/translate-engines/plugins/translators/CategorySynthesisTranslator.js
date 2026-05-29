@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
+import { parseJsonSafely } from './TranslatorHelpers.js';
 
 const CACHE_TYPE = 'plugin_category_synthesis';
 const COMMAND_CACHE_TYPE = 'command';
@@ -372,6 +373,24 @@ function splitCsvValues(value) {
         .filter((entry) => entry.length > 0);
 }
 
+function parseCategoryValues(value) {
+    const source = String(value || '').trim();
+    if (!source) {
+        return [];
+    }
+
+    if (source.startsWith('[') && source.endsWith(']')) {
+        const parsed = parseJsonSafely(source, null);
+        if (Array.isArray(parsed)) {
+            return parsed
+                .map((entry) => String(entry || '').trim())
+                .filter((entry) => entry.length > 0);
+        }
+    }
+
+    return splitCsvValues(source);
+}
+
 function parseCommandPayloadSegments(payload) {
     const segments = [];
     const source = String(payload || '').trim();
@@ -539,7 +558,71 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
 
         for (let cmdIdx = 0; cmdIdx < list.length; cmdIdx++) {
             const cmd = list[cmdIdx];
-            if (!cmd || Number(cmd.code) !== 356) {
+            if (!cmd) {
+                continue;
+            }
+
+            const code = Number(cmd.code);
+
+            if (code === 357) {
+                const parameters = Array.isArray(cmd.parameters) ? cmd.parameters : [];
+                const pluginName = String(parameters[0] || '').trim();
+                const commandName = String(parameters[1] || '').trim();
+                const args = parameters[3] && typeof parameters[3] === 'object' ? parameters[3] : null;
+
+                if (
+                    pluginName.toLowerCase() !== this.getPluginName().toLowerCase() ||
+                    !args ||
+                    !CALL_COMMAND_NAMES.has(commandName) && !SHOP_COMMAND_NAMES.has(commandName)
+                ) {
+                    continue;
+                }
+
+                for (const [rawKey, rawValue] of Object.entries(args)) {
+                    const key = String(rawKey || '').trim();
+                    const value = String(rawValue || '').trim();
+                    if (!key || !this.isUsableText(value)) {
+                        continue;
+                    }
+
+                    if (COMMAND_ARG_NAME_KEYS.has(key)) {
+                        output.push({
+                            text: value,
+                            cacheType: COMMAND_CACHE_TYPE,
+                            role: 'commandName',
+                            source: {
+                                ...baseMeta,
+                                cmdIdx,
+                                command: commandName,
+                                argument: key,
+                            },
+                        });
+                        continue;
+                    }
+
+                    if (COMMAND_ARG_CATEGORY_KEYS.has(key)) {
+                        const categories = parseCategoryValues(value);
+                        for (let i = 0; i < categories.length; i++) {
+                            output.push({
+                                text: categories[i],
+                                cacheType: COMMAND_CACHE_TYPE,
+                                role: 'category',
+                                source: {
+                                    ...baseMeta,
+                                    cmdIdx,
+                                    command: commandName,
+                                    argument: key,
+                                    index: i,
+                                },
+                            });
+                        }
+                    }
+                }
+
+                continue;
+            }
+
+            if (code !== 356) {
                 continue;
             }
 
@@ -725,6 +808,18 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
     translateKnownPluginText(runtime, text) {
         if (!this.isUsableText(text)) {
             return text;
+        }
+
+        const knownCategoryTokens = this.getKnownCategoryTokens();
+        for (const categoryToken of knownCategoryTokens) {
+            if (String(categoryToken) !== String(text)) {
+                continue;
+            }
+
+            const translatedCategory = this.resolveCachedText(runtime, categoryToken, COMMAND_CACHE_TYPE);
+            if (this.isUsableText(translatedCategory) && translatedCategory !== categoryToken) {
+                return translatedCategory;
+            }
         }
 
         const sourceTextByField = this.getSourceTextByField();
@@ -1395,6 +1490,9 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
             'Window_Material',
             'Window_SynthesisResult',
             'Window_Synthesis',
+            'Window_CategorySynthesis',
+            'Window_SynthesisCategory',
+            'Window_Category',
         ]);
 
         const translator = this;
