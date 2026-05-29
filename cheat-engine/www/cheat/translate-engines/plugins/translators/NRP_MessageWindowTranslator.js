@@ -55,20 +55,9 @@ export class NRP_MessageWindowTranslator extends BasePluginTranslator {
 
         messageProto.calcWindowHeight = function () {
             const rawHeight = originalCalcWindowHeight.apply(this, arguments);
-            const numericHeight = Number(rawHeight);
-            if (!Number.isFinite(numericHeight) || numericHeight <= 0) {
-                return rawHeight;
-            }
-
             const lineHeight = Number(this.lineHeight?.()) || 0;
-            const padding = Number(this.standardPadding?.()) || 0;
-            if (lineHeight <= 0) {
-                return rawHeight;
-            }
-
-            const usableHeight = Math.max(0, numericHeight - padding * 2);
-            const lineCount = Math.max(1, Math.ceil(usableHeight / lineHeight));
-            return this.fittingHeight(lineCount);
+            const floredLineCount = Math.max(1, Math.floor(rawHeight / lineHeight));
+            return this.fittingHeight(floredLineCount);
         };
 
         Object.defineProperty(messageProto, HOOK_FLAG, {
