@@ -290,7 +290,11 @@ function measureTextWidthAndFontLevel(
             }
         }
 
-        weightedWidth += computeVisibleCharWidthCost(fontLevel, multiplier);
+        const isFullWidthChar = sourceText.charCodeAt(i) > 0xff;
+
+        weightedWidth +=
+            computeVisibleCharWidthCost(fontLevel, multiplier) * (isFullWidthChar ? 2 : 1);
+
         i += 1;
     }
 
