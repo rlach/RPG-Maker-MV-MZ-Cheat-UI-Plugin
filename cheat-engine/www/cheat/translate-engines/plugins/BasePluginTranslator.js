@@ -69,13 +69,13 @@ export class BasePluginTranslator extends BasePhase {
             return false;
         }
 
-        return window.$plugins.some((plugin) => {
-            if (!plugin || typeof plugin.name !== 'string' || plugin.status !== true) {
-                return false;
-            }
-
-            return pluginNames.includes(plugin.name.trim().toLowerCase());
-        });
+        return window.$plugins
+            .filter((p) => p && typeof p.name === 'string' && p.status === true)
+            .map((p) => p.name.split('/').pop()?.trim() || '')
+            .filter((p) => !!p)
+            .some((pluginName) => {
+                return pluginNames.includes(pluginName.toLowerCase());
+            });
     }
 
     findPluginEntry(pluginName) {
@@ -90,7 +90,7 @@ export class BasePluginTranslator extends BasePhase {
 
         return (
             window.$plugins.find((plugin) => {
-                const name = normalizeText(plugin?.name).toLowerCase();
+                const name = normalizeText(plugin?.name?.split('/').pop()?.trim()).toLowerCase();
                 return !!name && name === needle;
             }) || null
         );
