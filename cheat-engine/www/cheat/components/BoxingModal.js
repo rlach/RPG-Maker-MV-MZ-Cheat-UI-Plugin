@@ -93,7 +93,7 @@ function buildBtagInfo() {
     return base + '.';
 }
 
-function buildBoxingSystemMessage(cacheTypes, widthInChars, maxRows) {
+function buildBoxingSystemMessage(basePrompt, cacheTypes, widthInChars, maxRows) {
     const presentTypes = cacheTypes.filter((t) => t.endsWith('_description'));
 
     // Build type prefix hints for types present in the request
@@ -112,7 +112,22 @@ function buildBoxingSystemMessage(cacheTypes, widthInChars, maxRows) {
         (typeHints ? `\n${typeHints}.` : '') +
         `\n\n${btagInfo}`;
 
-    return DEFAULT_BOXING_PROMPT + dynamicSuffix;
+    const promptBase = typeof basePrompt === 'string' ? basePrompt : DEFAULT_BOXING_PROMPT;
+    return promptBase + dynamicSuffix;
+}
+
+function removeShortNewlines(text, maxCount) {
+    if (typeof text !== 'string' || text === '') {
+        return '';
+    }
+
+    if (!Number.isFinite(maxCount) || maxCount <= 0) {
+        return text;
+    }
+
+    const pattern = String.raw`(?<!\n)\n{1,` + maxCount + String.raw`}(?!\n)`;
+    const regex = new RegExp(pattern, 'g');
+    return text.replace(regex, ' ');
 }
 
 class BoxingService {
@@ -123,6 +138,7 @@ class BoxingService {
             selection: {}, // type -> boolean
             showAllTypes: false,
             llmPrompt: DEFAULT_BOXING_PROMPT,
+            onlyReformatWithoutLlm: false,
             isRunning: false,
         });
     }
@@ -211,6 +227,7 @@ class BoxingService {
         this.state.selection = {};
         this.refreshTypeStats(runtime);
         this.state.llmPrompt = DEFAULT_BOXING_PROMPT;
+        this.state.onlyReformatWithoutLlm = false;
         this.state.isRunning = false;
         this.state.dialogVisible = true;
     }
@@ -219,34 +236,56 @@ class BoxingService {
         this.state.dialogVisible = false;
     }
 
-    async startBoxing() {
-        let runtime;
-        try {
-            runtime = ensureTranslationRuntime();
-        } catch {
-            console.error('[BoxingService] Translation runtime not initialized');
-            return;
+    runLocalReformat(runtime, selectedTypes) {
+        const typeSet = new Set(selectedTypes);
+        const widthInChars = runtime.descriptionMaxLineWidth || runtime.maxLineWidth || 59;
+        const removeShortCount = Number(runtime.removeNewlinesBeforeWrappingMaxCount);
+        let updatedCount = 0;
+
+        for (const [cacheKey, value] of runtime.translationCache.entries()) {
+            const parsed = parseCacheKeyForLangPair(
+                cacheKey,
+                runtime.sourceLang,
+                runtime.targetLang
+            );
+            if (!parsed || !typeSet.has(parsed.type)) {
+                continue;
+            }
+
+            const currentValue = typeof value === 'string' ? value : '';
+            if (currentValue === '') {
+                continue;
+            }
+
+            const newlineNormalized = removeShortNewlines(currentValue, removeShortCount);
+            const wrapped = runtime.wrapText(runtime.cleanTranslatedText(newlineNormalized), widthInChars);
+
+            if (wrapped === currentValue) {
+                continue;
+            }
+
+            runtime.setCacheValue(cacheKey, wrapped, {
+                persist: false,
+                notify: false,
+            });
+            updatedCount += 1;
         }
 
-        if (runtime.isNonOtfTranslationProcessActive()) {
-            const label = runtime.getActiveNonOtfTranslationProcessLabel();
-            runtime.notify('warn', `Another translation is already in progress (${label}).`);
-            return;
+        if (updatedCount > 0) {
+            runtime.persistCache();
+            runtime.notifyCacheRuntime('cache-set');
         }
 
-        const selectedTypes = this.state.typeStats
-            .filter((stat) => this.state.selection[stat.type])
-            .map((stat) => stat.type);
+        runtime.notify('info', `Reformatted ${updatedCount} cached descriptions without LLM.`);
+    }
 
-        if (!selectedTypes.length) {
-            runtime.notify('warn', 'No description types selected.');
-            return;
-        }
-
-        const widthInChars = runtime.descriptionMaxLineWidth || 59;
-        const maxRows = runtime.descriptionMaxRows || 2;
-
-        const boxingSystemMessage = buildBoxingSystemMessage(selectedTypes, widthInChars, maxRows);
+    async runLlmBoxing(runtime, selectedTypes, widthInChars, maxRows) {
+        const boxingSystemMessage = buildBoxingSystemMessage(
+            this.state.llmPrompt,
+            selectedTypes,
+            widthInChars,
+            maxRows
+        );
 
         if (!runtime.beginNonOtfTranslationProcess('descriptions cleanup')) {
             return;
@@ -283,6 +322,56 @@ class BoxingService {
             this.state.isRunning = false;
             runtime.endNonOtfTranslationProcess();
         }
+    }
+
+    runLocalBoxing(runtime, selectedTypes) {
+        this.state.isRunning = true;
+        this.state.dialogVisible = false;
+
+        try {
+            this.runLocalReformat(runtime, selectedTypes);
+        } catch (error) {
+            console.error('[BoxingService] Local reformat failed', error);
+            const message = error instanceof Error ? error.message : String(error);
+            runtime.notify('error', 'Local reformat failed: ' + message);
+        } finally {
+            this.state.isRunning = false;
+        }
+    }
+
+    async startBoxing() {
+        let runtime;
+        try {
+            runtime = ensureTranslationRuntime();
+        } catch {
+            console.error('[BoxingService] Translation runtime not initialized');
+            return;
+        }
+
+        if (runtime.isNonOtfTranslationProcessActive()) {
+            const label = runtime.getActiveNonOtfTranslationProcessLabel();
+            runtime.notify('warn', `Another translation is already in progress (${label}).`);
+            return;
+        }
+
+        const selectedTypes = this.state.typeStats
+            .filter((stat) => this.state.selection[stat.type])
+            .map((stat) => stat.type);
+
+        if (!selectedTypes.length) {
+            runtime.notify('warn', 'No description types selected.');
+            return;
+        }
+
+        const widthInChars = runtime.descriptionMaxLineWidth || 59;
+        const maxRows = runtime.descriptionMaxRows || 2;
+
+        if (this.state.onlyReformatWithoutLlm) {
+            this.runLocalBoxing(runtime, selectedTypes);
+            return;
+        }
+
+        await this.runLlmBoxing(runtime, selectedTypes, widthInChars, maxRows);
     }
 }
 
@@ -351,8 +440,16 @@ export default {
 
       <v-card-text class="pt-2">
         <div class="subtitle-2 mb-2">LLM Prompt:</div>
+                <v-checkbox
+                    v-model="onlyReformatWithoutLlm"
+                    label="Only reformat, without LLM"
+                    hide-details
+                    dense
+                    class="ma-0 mb-2 pa-0"
+                ></v-checkbox>
         <v-textarea
           v-model="llmPrompt"
+                    :disabled="onlyReformatWithoutLlm"
           outlined
           dense
           rows="8"
@@ -441,6 +538,14 @@ export default {
             },
             set(v) {
                 BOXING_SERVICE.state.llmPrompt = v;
+            },
+        },
+        onlyReformatWithoutLlm: {
+            get() {
+                return BOXING_SERVICE.state.onlyReformatWithoutLlm;
+            },
+            set(v) {
+                BOXING_SERVICE.state.onlyReformatWithoutLlm = !!v;
             },
         },
         descriptionMaxLineWidth: {

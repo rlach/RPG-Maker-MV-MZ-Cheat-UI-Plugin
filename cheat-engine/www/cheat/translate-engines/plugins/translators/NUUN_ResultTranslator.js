@@ -21,7 +21,14 @@ const HOOK_FLAG = '__CHEAT_NUUN_RESULT_PATCHED__';
 const WINDOW_DRAW_HOOK_FLAG = '__CHEAT_NUUN_RESULT_WINDOW_DRAW_PATCHED__';
 const RESULT_EXP_VALUE_SPRITE_HOOK_FLAG = '__CHEAT_NUUN_RESULT_EXP_VALUE_SPRITE_PATCHED__';
 
-const TOP_LEVEL_TEXT_FIELDS = new Set(['ResultName', 'LevelUpResultHelpName']);
+const TOP_LEVEL_TEXT_FIELDS = new Set([
+    'ResultName',
+    'LevelUpResultHelpName',
+    'GetEXPName',
+    'GetItemName',
+    'LevelUpName',
+    'learnSkillName',
+]);
 const NESTED_TEXT_FIELDS = new Set(['ParamName', 'SystemName', 'Text', 'Name', 'HelpText']);
 
 export class NuunResultTranslator extends BasePluginTranslator {
@@ -285,10 +292,6 @@ export class NuunResultTranslator extends BasePluginTranslator {
         }
 
         const resultExpValueProto = window.Sprite_ResultExpValue?.prototype;
-        console.log(
-            '[NUUN_ResultTranslator] patching Sprite_ResultExpValue:',
-            !!resultExpValueProto
-        );
         if (
             resultExpValueProto &&
             typeof resultExpValueProto.redraw === 'function' &&

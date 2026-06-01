@@ -10,6 +10,7 @@ import { CbrEroStatusTranslator } from './translators/CbrEroStatusTranslator.js'
 import { CustomizeConfigItemTranslator } from './translators/CustomizeConfigItemTranslator.js';
 import { ExternMessageTranslator } from './translators/ExternMessageTranslator.js';
 import { FtkrCssDetailedStatusTranslator } from './translators/FtkrCssDetailedStatusTranslator.js';
+import { FtkrCssShopStatusTranslator } from './translators/FtkrCssShopStatusTranslator.js';
 import { FtkrGdmWindowEditorTranslator } from './translators/FtkrGdmWindowEditorTranslator.js';
 import { FtkrItemCompositionSystemTranslator } from './translators/FtkrItemCompositionSystemTranslator.js';
 import { FtkrSkillExpansionTranslator } from './translators/FTKRSkillExpansionTranslator.js';
@@ -21,13 +22,16 @@ import { DescriptionExtendTranslator } from './translators/DescriptionExtendTran
 import { DTextPictureTranslator } from './translators/DTextPictureTranslator.js';
 import { DynamicDatabaseTranslator } from './translators/DynamicDatabaseTranslator.js';
 import { EquipInfoAllViewTranslator } from './translators/EquipInfoAllViewTranslator.js';
+import { EquipAndShopStatusRTranslator } from './translators/EquipAndShopStatusRTranslator.js';
 import { EventLabelTranslator } from './translators/EventLabelTranslator.js';
 import { EventInformationTranslator } from './translators/EventInformationTranslator.js';
 import { ExtraWindowTranslator } from './translators/ExtraWindowTranslator.js';
 import { GetInformationTranslator } from './translators/GetInformationTranslator.js';
 import { HelpWindowPluginTranslator } from './translators/HelpWindowPluginTranslator.js';
 import { DestinationWindowTranslator } from './translators/DestinationWindowTranslator.js';
+import { KanjiPartyChangeTranslator } from './translators/KanjiPartyChangeTranslator.js';
 import { KOriginalMenuScreenTranslator } from './translators/KOriginalMenuScreenTranslator.js';
+import { EventSelectorTranslator } from './translators/EventSelectorTranslator.js';
 import { KmsMapActiveMessageTranslator } from './translators/KmsMapActiveMessageTranslator.js';
 import { KmsQuickNotificationTranslator } from './translators/KmsQuickNotificationTranslator.js';
 import { KisekiTranslator } from './translators/KisekiTranslator.js';
@@ -53,16 +57,20 @@ import { MultipleWindowSkinSystemTranslator } from './translators/MultipleWindow
 import { MenuSubCommandTranslator } from './translators/MenuSubCommandTranslator.js';
 import { NekoGakuenMulitLanguageTranslator } from './translators/NekoGakuenMulitLanguageTranslator.js';
 import { NrpLearnSkillListTranslator } from './translators/NRP_LearnSkillListTranslator.js';
+import { NRP_AutoHealTranslator } from './translators/NRP_AutoHealTranslator.js';
 import { NRP_MessageWindowTranslator } from './translators/NRP_MessageWindowTranslator.js';
 import { NoreAutoSaveTranslator } from './translators/NoreAutoSaveTranslator.js';
 import { NoreRecollectionSaveTranslator } from './translators/NoreRecollectionSaveTranslator.js';
 import { NrpMapTravelTranslator } from './translators/NrpMapTravelTranslator.js';
+import { NUUN_EnemyBookTranslator } from './translators/NUUN_EnemyBookTranslator.js';
+import { NuunItemBookTranslator } from './translators/NUUN_ItemBookTranslator.js';
 import { NuunSaveScreenTranslator } from './translators/NuunSaveScreenTranslator.js';
 import { NuunSaveScreen3Translator } from './translators/NuunSaveScreen3Translator.js';
 import { NuunSaveVerificationTranslator } from './translators/NuunSaveVerificationTranslator.js';
 import { NuunResultTranslator } from './translators/NUUN_ResultTranslator.js';
 import { NuunStatusScreenTranslator } from './translators/NuunStatusScreenTranslator.js';
 import { OriginMenuStatusTranslator } from './translators/OriginMenuStatusTranslator.js';
+import { OptionHelpTranslator } from './translators/OptionHelpTranslator.js';
 import { PandaProgressTextWindowTranslator } from './translators/PandaProgressTextWindowTranslator.js';
 import { QuestSystemTranslator } from './translators/QuestSystemTranslator.js';
 import { RecollectionForMZTranslator } from './translators/RecollectionForMZTranslator.js';
@@ -100,6 +108,7 @@ import { YepStatusMenuCoreTranslator } from './translators/YepStatusMenuCoreTran
 import { YepQuestJournalTranslator } from './translators/YepQuestJournalTranslator.js';
 import { YepEventMiniLabelTranslator } from './translators/YepEventMiniLabelTranslator.js';
 import { YepEquipCoreTranslator } from './translators/YepEquipCoreTranslator.js';
+import { YepBattleEngineCoreTranslator } from './translators/YepBattleEngineCoreTranslator.js';
 import { YepSaveCoreTranslator } from './translators/YepSaveCoreTranslator.js';
 import { SabaSimpleScenarioTranslator } from './translators/SabaSimpleScenarioTranslator.js';
 import { SabaTachieTranslator } from './translators/SabaTachieTranslator.js';
@@ -152,6 +161,7 @@ class PluginTranslatorRegistry {
             CustomizeConfigItemTranslator,
             ExternMessageTranslator,
             FtkrCssDetailedStatusTranslator,
+            FtkrCssShopStatusTranslator,
             FtkrCustomSimpleActorStatusTranslator,
             FtkrGdmWindowEditorTranslator,
             FtkrItemCompositionSystemTranslator,
@@ -164,6 +174,7 @@ class PluginTranslatorRegistry {
             DTextPictureTranslator,
             DynamicDatabaseTranslator,
             EquipInfoAllViewTranslator,
+            EquipAndShopStatusRTranslator,
             EventLabelTranslator,
             EventInformationTranslator,
             ExtraWindowTranslator,
@@ -172,9 +183,11 @@ class PluginTranslatorRegistry {
             HelpWindowPluginTranslator,
             ItemCombinationMZTranslator,
             ItemNameEscapeTranslator,
+            EventSelectorTranslator,
             JavaHutSaveExTranslator,
             DestinationWindowTranslator,
             EquipSceneExtensionTranslator,
+            KanjiPartyChangeTranslator,
             KOriginalMenuScreenTranslator,
             KmsMapActiveMessageTranslator,
             KmsQuickNotificationTranslator,
@@ -210,17 +223,21 @@ class PluginTranslatorRegistry {
             MkrMapItemSlotTranslator,
             MultipleWindowSkinSystemTranslator,
             NekoGakuenMulitLanguageTranslator,
+            NRP_AutoHealTranslator,
             NrpLearnSkillListTranslator,
             NRP_MessageWindowTranslator,
             NoreAutoSaveTranslator,
             NoreRecollectionSaveTranslator,
             NrpMapTravelTranslator,
+            NUUN_EnemyBookTranslator,
+            NuunItemBookTranslator,
             NuunSaveScreenTranslator,
             NuunSaveScreen3Translator,
             NuunSaveVerificationTranslator,
             NuunResultTranslator,
             NuunStatusScreenTranslator,
             OriginMenuStatusTranslator,
+            OptionHelpTranslator,
             PandaProgressTextWindowTranslator,
             PopupMessageTranslator,
             ProfileExtendTranslator,
@@ -264,6 +281,7 @@ class PluginTranslatorRegistry {
             YkpItemCompositionTranslator,
             YEPCoreEngineScriptTranslator,
             YepEquipCoreTranslator,
+            YepBattleEngineCoreTranslator,
             YepGabWindowTranslator,
             YepEventMiniLabelTranslator,
             YepMessageCoreTranslator,
