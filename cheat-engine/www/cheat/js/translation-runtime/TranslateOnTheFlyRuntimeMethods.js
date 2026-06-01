@@ -8,6 +8,18 @@ import { PLUGIN_TRANSLATOR_REGISTRY } from '../../translate-engines/plugins/Plug
 export const translateOnTheFlyRuntimeMethods = {
     setupTranslationHook() {
         const self = this;
+
+        setTimeout(() => {
+            try {
+                $dataSystem.locale = self.targetLang || 'en';
+            } catch (error) {
+                console.log(
+                    '[TranslateOnTheFly] Failed to set $dataSystem.locale, continuing without it',
+                    error
+                );
+            }
+        }, 1000);
+
         const markCurrentMessageAsEventOrigin = (kind, interpreter) => {
             if (!window.$gameMessage) {
                 return;
