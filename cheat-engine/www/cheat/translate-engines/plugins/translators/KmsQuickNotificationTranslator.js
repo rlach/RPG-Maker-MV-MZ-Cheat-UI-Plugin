@@ -25,6 +25,18 @@ const PLUGIN_COMMAND_NAME = 'QuickNotification';
 const PLUGIN_COMMAND_REGISTER = 'register';
 const HOOK_FLAG = '__CHEAT_KMS_QUICK_NOTIFICATION_TRANSLATOR_HOOKED__';
 
+function normalizeQuickNotificationSourceText(text) {
+    const source = typeof text === 'string' ? text : String(text ?? '');
+    const lines = source.split('\n');
+
+    // Plugin runtime strips leading empty Show Text lines in register flow.
+    while (lines.length > 1 && lines[0] === '') {
+        lines.shift();
+    }
+
+    return lines.join('\n');
+}
+
 function splitMvPluginCommandLine(commandLine) {
     const normalized = String(commandLine || '').trim();
     if (!normalized) {
@@ -88,7 +100,7 @@ export class KmsQuickNotificationTranslator extends BasePluginTranslator {
             let nextNotification = notification;
 
             try {
-                const sourceText = String(notification?.text || '');
+                const sourceText = normalizeQuickNotificationSourceText(notification?.text || '');
                 const runtime = getRuntime();
 
                 if (runtime && isUsableText(sourceText)) {
@@ -306,13 +318,14 @@ export class KmsQuickNotificationTranslator extends BasePluginTranslator {
 
             const messageEntry = extractMessageEntryAt(list, cmdIdx);
             isRegistrationPending = false;
-            if (!messageEntry || !this.isUsableText(messageEntry.text)) {
+            const sourceText = normalizeQuickNotificationSourceText(messageEntry?.text || '');
+            if (!this.isUsableText(sourceText)) {
                 cmdIdx += 1;
                 continue;
             }
 
             output.push({
-                text: messageEntry.text,
+                text: sourceText,
                 source: {
                     ...baseMeta,
                     cmdIdx,
