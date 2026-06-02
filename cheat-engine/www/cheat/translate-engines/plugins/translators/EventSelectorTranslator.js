@@ -78,58 +78,79 @@ export class EventSelectorTranslator extends BasePluginTranslator {
     }
 
     translateEventName(name, runtime) {
-        return this.resolveRuntimeTranslation(name, runtime, [
-            this.getCacheType(),
-            COMMON_EVENT_NAME_CACHE_TYPE,
-        ], {
-            requireRuntimeTranslationActive: true,
-            missValue: name,
-        });
+        return this.resolveRuntimeTranslation(
+            name,
+            runtime,
+            [this.getCacheType(), COMMON_EVENT_NAME_CACHE_TYPE],
+            {
+                requireRuntimeTranslationActive: true,
+                missValue: name,
+            }
+        );
     }
 
     enablePluginTranslation() {
-        const windowProto = globalThis.Window_EventSelector?.prototype;
-        if (!windowProto || typeof windowProto.drawItem !== 'function') {
+        if (!Game_System.prototype.eventSelectorData) {
             return false;
         }
 
-        if (windowProto[HOOK_FLAG]) {
+        const self = this;
+
+        const _Scene_Map_createAllWindows = Scene_Map.prototype.createAllWindows;
+        Scene_Map.prototype.createAllWindows = function () {
+            _Scene_Map_createAllWindows.call(this);
+            const windowProto = this._eventSelectorWindow.constructor?.prototype;
+
+            if (!windowProto || typeof windowProto.drawItem !== 'function') {
+                console.warn(
+                    '[EventSelectorTranslator] Window_EventSelector not found, translation disabled',
+                    window.Window_EventSelector?.prototype,
+                    windowProto?.drawItem,
+                    Scene_Map.prototype.createAllWindows
+                );
+                return false;
+            }
+
+            if (windowProto[HOOK_FLAG]) {
+                return true;
+            }
+
+            const originalDrawItem = windowProto.drawItem;
+            const getRuntime = self.getRuntime.bind(self);
+            const isRuntimeTranslationActive = self.isRuntimeTranslationActive.bind(self);
+            const isUsableText = self.isUsableText.bind(self);
+            const translateEventName = self.translateEventName.bind(self);
+
+            windowProto.drawItem = function (index) {
+                const runtime = getRuntime();
+                if (!isRuntimeTranslationActive(runtime)) {
+                    return originalDrawItem.call(this, index);
+                }
+
+                const list = Array.isArray(this._list) ? this._list : null;
+                const entry = list ? list[index] : null;
+                const sourceName = typeof entry?.name === 'string' ? entry.name : '';
+                if (!isUsableText(sourceName)) {
+                    return originalDrawItem.call(this, index);
+                }
+
+                const translatedName = translateEventName(sourceName, runtime);
+                if (translatedName === sourceName) {
+                    return originalDrawItem.call(this, index);
+                }
+
+                entry.name = translatedName;
+                try {
+                    return originalDrawItem.call(this, index);
+                } finally {
+                    entry.name = sourceName;
+                }
+            };
+
+            windowProto[HOOK_FLAG] = true;
             return true;
-        }
-
-        const originalDrawItem = windowProto.drawItem;
-        const getRuntime = this.getRuntime.bind(this);
-        const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
-        const isUsableText = this.isUsableText.bind(this);
-        const translateEventName = this.translateEventName.bind(this);
-
-        windowProto.drawItem = function (index) {
-            const runtime = getRuntime();
-            if (!isRuntimeTranslationActive(runtime)) {
-                return originalDrawItem.call(this, index);
-            }
-
-            const list = Array.isArray(this._list) ? this._list : null;
-            const entry = list ? list[index] : null;
-            const sourceName = typeof entry?.name === 'string' ? entry.name : '';
-            if (!isUsableText(sourceName)) {
-                return originalDrawItem.call(this, index);
-            }
-
-            const translatedName = translateEventName(sourceName, runtime);
-            if (translatedName === sourceName) {
-                return originalDrawItem.call(this, index);
-            }
-
-            entry.name = translatedName;
-            try {
-                return originalDrawItem.call(this, index);
-            } finally {
-                entry.name = sourceName;
-            }
         };
 
-        windowProto[HOOK_FLAG] = true;
         return true;
     }
 
@@ -210,7 +231,11 @@ export class EventSelectorTranslator extends BasePluginTranslator {
             return;
         }
 
-        for (let commonEventId = 0; commonEventId < globalThis.$dataCommonEvents.length; commonEventId++) {
+        for (
+            let commonEventId = 0;
+            commonEventId < globalThis.$dataCommonEvents.length;
+            commonEventId++
+        ) {
             const commonEvent = globalThis.$dataCommonEvents[commonEventId];
             if (!commonEvent || !Array.isArray(commonEvent.list)) {
                 continue;

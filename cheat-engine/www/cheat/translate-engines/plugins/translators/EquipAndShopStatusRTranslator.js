@@ -227,6 +227,16 @@ export class EquipAndShopStatusRTranslator extends BasePluginTranslator {
             typeof refineShopStatusProto.drawEffectText !== 'function' ||
             typeof refineShopStatusProto.drawMetaTag !== 'function'
         ) {
+            console.log(
+                '[EquipAndShopStatusRTranslator] Required prototypes or methods not found. Runtime translation patches will not be applied.',
+                {
+                    equipStatusProto,
+                    refineShopStatusProto,
+                    drawExParams: equipStatusProto?.drawExParams,
+                    drawEffectText: refineShopStatusProto?.drawEffectText,
+                    drawMetaTag: refineShopStatusProto?.drawMetaTag,
+                }
+            );
             return false;
         }
 
@@ -349,7 +359,11 @@ export class EquipAndShopStatusRTranslator extends BasePluginTranslator {
             return;
         }
 
-        if (/^e\d+$/i.test(normalized) || /^s\d+$/i.test(normalized) || /^d\d+$/i.test(normalized)) {
+        if (
+            /^e\d+$/i.test(normalized) ||
+            /^s\d+$/i.test(normalized) ||
+            /^d\d+$/i.test(normalized)
+        ) {
             return;
         }
 

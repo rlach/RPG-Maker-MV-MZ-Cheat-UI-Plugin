@@ -165,6 +165,9 @@ export class RJ340674Translator extends BasePluginTranslator {
     installMenuCallOkPatch() {
         const menuProto = globalThis.Window_MenuEx?.prototype;
         if (!menuProto || typeof menuProto.callOkEvent !== 'function') {
+            console.warn(
+                `[${this.getPluginLabel()}] Window_MenuEx.prototype.callOkEvent not found. Menu command translation patch will not be applied.`
+            );
             return false;
         }
 
@@ -209,6 +212,9 @@ export class RJ340674Translator extends BasePluginTranslator {
     installHStatusPicturePatch() {
         const hStatusProto = globalThis.Window_HStatus?.prototype;
         if (!hStatusProto || typeof hStatusProto.initialize !== 'function') {
+            console.warn(
+                `[${this.getPluginLabel()}] Window_HStatus.prototype.initialize not found. HStatus picture translation patch will not be applied.`
+            );
             return false;
         }
 
@@ -238,8 +244,9 @@ export class RJ340674Translator extends BasePluginTranslator {
         this.captureOriginalPictureNames();
 
         const menuPatched = this.installMenuCallOkPatch();
-        const hStatusPatched = this.installHStatusPicturePatch();
+        // Second path of the patch doesn't work.
+        // const hStatusPatched = this.installHStatusPicturePatch();
 
-        return menuPatched && hStatusPatched;
+        return menuPatched; // && hStatusPatched;
     }
 }
