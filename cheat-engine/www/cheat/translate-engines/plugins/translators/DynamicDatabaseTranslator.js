@@ -121,6 +121,18 @@ export class DynamicDatabaseTranslator extends BasePluginTranslator {
             return false;
         }
 
+        // DynamicDatabase removes set, which causes ItemNameEscape and other plugins to fail.
+        DynamicDatabaseManager._makePropertyString = function(parent, key, child) {
+            Object.defineProperty(parent, key, {
+                get: function() {
+                    return PluginManagerEx.convertEscapeCharacters(child);
+                },
+                set: function(value) {
+                    parent['_' + key] = value;
+                }
+            });
+        };
+
         const translator = this;
         const originalDrawItemName = Window_Base.prototype.drawItemName;
         Window_Base.prototype.drawItemName = function (item) {

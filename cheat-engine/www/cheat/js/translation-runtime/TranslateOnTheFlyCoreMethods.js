@@ -996,6 +996,10 @@ export const translateOnTheFlyCoreMethods = {
             return false;
         }
 
+        if (target[field] === value) {
+            return true;
+        }
+
         try {
             target[field] = value;
             return true;

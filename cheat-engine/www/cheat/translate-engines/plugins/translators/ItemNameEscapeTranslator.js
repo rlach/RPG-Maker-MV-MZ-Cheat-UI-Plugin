@@ -61,8 +61,13 @@ export class ItemNameEscapeTranslator extends BasePluginTranslator {
         DataManager.convertName = function (data) {
             try {
                 const runtime = getRuntime();
-                if (runtime && isRuntimeTranslationActive(runtime) && data && typeof data === 'object') {
-                    if (isUsableText(data.preName)) {
+                if (
+                    runtime &&
+                    isRuntimeTranslationActive(runtime) &&
+                    data &&
+                    typeof data === 'object'
+                ) {
+                    if (isUsableText(data.preName) && !!data.preName.set) {
                         const translatedPreName = resolveRuntimeTranslation(
                             data.preName,
                             runtime,
@@ -79,7 +84,7 @@ export class ItemNameEscapeTranslator extends BasePluginTranslator {
                         }
                     }
 
-                    if (isUsableText(data.preDescription)) {
+                    if (isUsableText(data.preDescription) && !!data.preDescription.set) {
                         const translatedPreDescription = resolveRuntimeTranslation(
                             data.preDescription,
                             runtime,
@@ -99,8 +104,9 @@ export class ItemNameEscapeTranslator extends BasePluginTranslator {
             } catch (error) {
                 console.warn(
                     '[ItemNameEscapeTranslator] Failed to apply cached translation to preName/preDescription',
-                    error
+                    data
                 );
+                throw error;
             }
 
             return originalConvertName.apply(this, arguments);
