@@ -5,6 +5,7 @@ import { parseJsonSafely } from './TranslatorHelpers.js';
  * TMMapHpGauge translator.
  *
  * Supported plugin versions:
+ * - TMMapHpGauge.js v1.3.0 (MV)
  * - TMMapHpGauge.js v1.4.4 (MV)
  *
  * Translation notes:
@@ -39,9 +40,17 @@ export class TMMapHpGaugeTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        const sceneBaseProto = globalThis.Scene_Base?.prototype;
+        let sceneBaseProto = globalThis.Scene_Base?.prototype;
         if (!sceneBaseProto || typeof sceneBaseProto.createMapHpGaugeWindow !== 'function') {
-            return false;
+            sceneBaseProto = globalThis.Scene_Map?.prototype;
+            if (!sceneBaseProto || typeof sceneBaseProto.createMapHpGaugeWindow !== 'function') {
+                console.log(
+                    '[TMMapHpGaugeTranslator] Unsupported game or plugin version detected',
+                    sceneBaseProto,
+                    sceneBaseProto?.createMapHpGaugeWindow
+                );
+                return false;
+            }
         }
 
         if (sceneBaseProto.__CHEAT_TM_MAP_HP_GAUGE_TRANSLATOR_HOOKED__) {
