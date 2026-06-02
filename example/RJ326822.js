@@ -16,7 +16,6 @@ const BasePluginTranslator = globalThis.__CheatBasePluginTranslator;
 
 const CACHE_TYPE = 'plugin_rj326822_menu';
 const MENU_CALL_OK_PATCH_FLAG = '__CHEAT_RJ326822_MENU_CALL_OK_PATCHED__';
-const HSTATUS_INIT_PATCH_FLAG = '__CHEAT_RJ326822_HSTATUS_INIT_PATCHED__';
 
 const COMMAND_ALIASES = [
     {
@@ -195,40 +194,11 @@ export class RJ326822Translator extends BasePluginTranslator {
         return true;
     }
 
-    installHStatusPicturePatch() {
-        const hStatusProto = globalThis.Window_HStatus?.prototype;
-        if (!hStatusProto || typeof hStatusProto.initialize !== 'function') {
-            return false;
-        }
-
-        if (hStatusProto[HSTATUS_INIT_PATCH_FLAG]) {
-            return true;
-        }
-
-        const originalInitialize = hStatusProto.initialize;
-        const restoreOriginalPictureNames = this.restoreOriginalPictureNames.bind(this);
-
-        hStatusProto.initialize = function () {
-            restoreOriginalPictureNames();
-            return originalInitialize.apply(this, arguments);
-        };
-
-        Object.defineProperty(hStatusProto, HSTATUS_INIT_PATCH_FLAG, {
-            value: true,
-            configurable: true,
-            enumerable: false,
-            writable: false,
-        });
-
-        return true;
-    }
-
     enablePluginTranslation() {
         this.captureOriginalPictureNames();
 
         const menuPatched = this.installMenuCallOkPatch();
-        const hStatusPatched = this.installHStatusPicturePatch();
 
-        return menuPatched && hStatusPatched;
+        return menuPatched;
     }
 }
