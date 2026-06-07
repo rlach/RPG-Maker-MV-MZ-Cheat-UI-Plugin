@@ -8,11 +8,7 @@ const DESCRIPTION_TYPES = [
     'armor_description',
     'weapon_description',
     'skill_description',
-    'class_description',
-    'enemy_description',
-    'actor_description',
-    'map_description',
-    'state_description',
+    'actor_profile',
 ];
 
 // Maps base entity type → short LLM key prefix
@@ -258,7 +254,10 @@ class BoxingService {
             }
 
             const newlineNormalized = removeShortNewlines(currentValue, removeShortCount);
-            const wrapped = runtime.wrapText(runtime.cleanTranslatedText(newlineNormalized), widthInChars);
+            const wrapped = runtime.wrapText(
+                runtime.cleanTranslatedText(newlineNormalized),
+                widthInChars
+            );
 
             if (wrapped === currentValue) {
                 continue;

@@ -113,7 +113,9 @@ export default class BaseTranslationEngine {
     }
 
     isDescriptionType(type) {
-        return typeof type === 'string' && type.endsWith('_description');
+        return (
+            typeof type === 'string' && (type.endsWith('_description') || type === 'actor_profile')
+        );
     }
 
     isMessageType(type) {

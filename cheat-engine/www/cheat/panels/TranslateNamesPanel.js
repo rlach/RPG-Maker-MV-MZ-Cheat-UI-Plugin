@@ -320,7 +320,7 @@ export default {
                     example: '【Char Name】\nThe text being spoken.',
                 },
                 {
-                    pattern: '\\c\\[\\d+\\]([^\\[]+)\\c\\[\\d+\\]\n',
+                    pattern: String.raw`\\c\[\d+\]([^\[]+)\\c\[\d+\]\n`,
                     example: '\\c[23]Char Name\\c[0]\nThe text being spoken.',
                 },
                 {
