@@ -1,7 +1,5 @@
 import { findNearestMessageEntry } from '../EventCommandTraversal.js';
-import {
-    computeLangPairCompletionByKeyLength,
-} from '../TranslationCompletionMetrics.js';
+import { computeLangPairCompletionByKeyLength } from '../TranslationCompletionMetrics.js';
 import { BatchSummaryReporter } from '../../translate-engines/batch-manager/BatchSummaryReporter.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { CurrentEvent } from '../../translate-engines/translation-phases/CurrentEvent.js';

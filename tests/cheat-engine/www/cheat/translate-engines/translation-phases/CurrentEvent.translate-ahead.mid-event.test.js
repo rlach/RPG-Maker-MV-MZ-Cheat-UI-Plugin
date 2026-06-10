@@ -70,7 +70,9 @@ function createRuntime({ list, startIndex, charLimit = 20, failedCacheKeys = [] 
             return `${type}:ja-en:${value}`;
         },
         hasUsableCacheValue(cacheKey) {
-            return this.translationCache.has(cacheKey) && this.translationCache.get(cacheKey) !== '';
+            return (
+                this.translationCache.has(cacheKey) && this.translationCache.get(cacheKey) !== ''
+            );
         },
     };
 
@@ -116,7 +118,9 @@ describe('CurrentEvent translateAhead from middle of event', () => {
         });
 
         const items = strategy.collectUntranslated({ runtime });
-        const messageValues = items.filter((item) => item.type === 'message').map((item) => item.value);
+        const messageValues = items
+            .filter((item) => item.type === 'message')
+            .map((item) => item.value);
 
         expect(messageValues).toEqual(['M05', 'M06', 'M07', 'M08', 'M01']);
     });
@@ -144,7 +148,9 @@ describe('CurrentEvent translateAhead from middle of event', () => {
         });
 
         const items = strategy.collectUntranslated({ runtime });
-        const messageValues = items.filter((item) => item.type === 'message').map((item) => item.value);
+        const messageValues = items
+            .filter((item) => item.type === 'message')
+            .map((item) => item.value);
 
         expect(messageValues).toContain('A02');
         expect(messageValues).toContain('A03');
@@ -173,13 +179,18 @@ describe('CurrentEvent translateAhead from middle of event', () => {
         });
 
         const items = strategy.collectUntranslated({ runtime });
-        const messageValues = items.filter((item) => item.type === 'message').map((item) => item.value);
+        const messageValues = items
+            .filter((item) => item.type === 'message')
+            .map((item) => item.value);
 
         expect(messageValues).toEqual(['N25', 'N26', 'N27', 'N28', 'N29', 'N30', 'N01', 'N02']);
     });
 
     it('uses chunker-compatible fallback limits when runtime limits are missing', () => {
-        const messages = Array.from({ length: 89 }, (_, idx) => `E${String(idx + 1).padStart(2, '0')}`);
+        const messages = Array.from(
+            { length: 89 },
+            (_, idx) => `E${String(idx + 1).padStart(2, '0')}`
+        );
         const list = buildShowTextEvent(messages);
 
         const runtime = createRuntime({
@@ -198,7 +209,9 @@ describe('CurrentEvent translateAhead from middle of event', () => {
         });
 
         const items = strategy.collectUntranslated({ runtime });
-        const messageValues = items.filter((item) => item.type === 'message').map((item) => item.value);
+        const messageValues = items
+            .filter((item) => item.type === 'message')
+            .map((item) => item.value);
 
         // Keep it in one foreground request window (default item fallback = 20),
         // and prioritize from the landing point before wrapping.
@@ -231,7 +244,9 @@ describe('CurrentEvent translateAhead from middle of event', () => {
         });
 
         const items = strategy.collectUntranslated({ runtime });
-        const messageValues = items.filter((item) => item.type === 'message').map((item) => item.value);
+        const messageValues = items
+            .filter((item) => item.type === 'message')
+            .map((item) => item.value);
 
         expect(messageValues[0]).toBe('C05');
         expect(messageValues.slice(0, 3)).toEqual(['C05', 'C06', 'C07']);
@@ -274,7 +289,9 @@ describe('CurrentEvent translateAhead from middle of event', () => {
         });
 
         const items = strategy.collectUntranslated({ runtime });
-        const messageValues = items.filter((item) => item.type === 'message').map((item) => item.value);
+        const messageValues = items
+            .filter((item) => item.type === 'message')
+            .map((item) => item.value);
 
         expect(messageValues[0]).toBe('P05');
     });

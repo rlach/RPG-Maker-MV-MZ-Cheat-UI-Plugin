@@ -266,7 +266,9 @@ function createRuntime({
             this.lastSeenByCacheKey.set(cacheKey, Date.now());
         },
         hasUsableCacheValue(cacheKey) {
-            return this.translationCache.has(cacheKey) && this.translationCache.get(cacheKey) !== '';
+            return (
+                this.translationCache.has(cacheKey) && this.translationCache.get(cacheKey) !== ''
+            );
         },
         setCacheValue(cacheKey, value) {
             this.translationCache.set(cacheKey, value);
