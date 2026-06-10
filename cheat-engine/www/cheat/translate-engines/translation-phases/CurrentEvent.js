@@ -6,6 +6,11 @@ function isMessageTextType(type) {
     return type === 'message' || type === 'message_portrait';
 }
 
+function resolvePositiveLimit(candidate, fallback) {
+    const parsed = Number(candidate);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export class CurrentEvent extends BasePhase {
     static getInstance() {
         if (!CurrentEvent._instance) {
@@ -139,8 +144,8 @@ export class CurrentEvent extends BasePhase {
     }
 
     collectAheadItems(runtime, currentText, currentSpeaker, interpreter, options = {}) {
-        const charLimit = options.charLimit ?? runtime.charLimit;
-        const maxItems = options.maxItems ?? runtime.batchItemsLimit ?? 300;
+        const charLimit = resolvePositiveLimit(options.charLimit ?? runtime.charLimit, 1000);
+        const maxItems = resolvePositiveLimit(options.maxItems ?? runtime.batchItemsLimit, 20);
         const maxDepth = options.maxDepth ?? 999;
         const messageType = runtime.getMessageCacheType({
             hasPortrait: !!options.messageHasPortrait,
@@ -377,8 +382,8 @@ export class CurrentEvent extends BasePhase {
             normalizedCurrentSpeaker,
             interpreter,
             {
-                charLimit: runtime.charLimit,
-                maxItems: runtime.batchItemsLimit,
+                charLimit: resolvePositiveLimit(runtime.charLimit, 1000),
+                maxItems: resolvePositiveLimit(runtime.batchItemsLimit, 20),
                 maxDepth: this.maxDepth,
                 messageHasPortrait: this.messageHasPortrait,
             }

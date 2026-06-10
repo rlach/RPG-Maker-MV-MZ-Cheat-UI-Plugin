@@ -658,6 +658,8 @@ export const translateOnTheFlyFlowMethods = {
     resolveOriginalMessageContext(currentText, currentSpeaker, interpreter) {
         let resolvedText = currentText || '';
         let resolvedSpeaker = currentSpeaker || '';
+        let hasStoredOriginalText = false;
+        let hasStoredOriginalSpeaker = false;
 
         if (window.$gameMessage) {
             if (
@@ -665,12 +667,14 @@ export const translateOnTheFlyFlowMethods = {
                 $gameMessage._translateOriginalText.length > 0
             ) {
                 resolvedText = $gameMessage._translateOriginalText;
+                hasStoredOriginalText = true;
             }
             if (
                 typeof $gameMessage._translateOriginalSpeaker === 'string' &&
                 $gameMessage._translateOriginalSpeaker.length > 0
             ) {
                 resolvedSpeaker = $gameMessage._translateOriginalSpeaker;
+                hasStoredOriginalSpeaker = true;
             }
         }
 
@@ -686,10 +690,10 @@ export const translateOnTheFlyFlowMethods = {
                 resolvedText === displayedText
             );
 
-            if (!resolvedText || seemsDisplayedText) {
+            if (!hasStoredOriginalText && (!resolvedText || seemsDisplayedText)) {
                 resolvedText = entry.text || resolvedText;
             }
-            if (!resolvedSpeaker) {
+            if (!hasStoredOriginalSpeaker && !resolvedSpeaker) {
                 resolvedSpeaker = entry.speaker || resolvedSpeaker;
             }
         }

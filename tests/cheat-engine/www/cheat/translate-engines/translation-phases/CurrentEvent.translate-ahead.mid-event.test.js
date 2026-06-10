@@ -13,6 +13,7 @@ vi.mock(
 );
 
 import { CurrentEvent } from '../../../../../../../cheat-engine/www/cheat/translate-engines/translation-phases/CurrentEvent.js';
+import { translateOnTheFlyFlowMethods } from '../../../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslateOnTheFlyFlowMethods.js';
 
 function buildShowTextEvent(messageTexts) {
     const list = [];
@@ -175,5 +176,106 @@ describe('CurrentEvent translateAhead from middle of event', () => {
         const messageValues = items.filter((item) => item.type === 'message').map((item) => item.value);
 
         expect(messageValues).toEqual(['N25', 'N26', 'N27', 'N28', 'N29', 'N30', 'N01', 'N02']);
+    });
+
+    it('uses chunker-compatible fallback limits when runtime limits are missing', () => {
+        const messages = Array.from({ length: 89 }, (_, idx) => `E${String(idx + 1).padStart(2, '0')}`);
+        const list = buildShowTextEvent(messages);
+
+        const runtime = createRuntime({
+            list,
+            // Enter in the middle of the event.
+            startIndex: 45,
+            charLimit: null,
+        });
+        runtime.batchItemsLimit = undefined;
+
+        const strategy = CurrentEvent.getInstance().configure({
+            currentText: 'E23',
+            currentSpeakerName: '',
+            maxDepth: 999,
+            messageHasPortrait: false,
+        });
+
+        const items = strategy.collectUntranslated({ runtime });
+        const messageValues = items.filter((item) => item.type === 'message').map((item) => item.value);
+
+        // Keep it in one foreground request window (default item fallback = 20),
+        // and prioritize from the landing point before wrapping.
+        expect(messageValues.length).toBe(20);
+        expect(messageValues[0]).toBe('E23');
+        expect(messageValues[1]).toBe('E24');
+    });
+
+    it('starts from current message when interpreter index points to 401 line', () => {
+        const messages = ['C01', 'C02', 'C03', 'C04', 'C05', 'C06', 'C07'];
+        const list = buildShowTextEvent(messages);
+
+        const runtime = createRuntime({
+            list,
+            // points to 401 of C05 (cmd101 is at 8, cmd401 is at 9)
+            startIndex: 9,
+            charLimit: 21,
+        });
+        runtime.getInterpreterCurrentMessageEntry =
+            translateOnTheFlyFlowMethods.getInterpreterCurrentMessageEntry;
+        runtime.resolveOriginalMessageContext =
+            translateOnTheFlyFlowMethods.resolveOriginalMessageContext;
+
+        const strategy = CurrentEvent.getInstance().configure({
+            // Simulate stale/empty currentText from runtime context.
+            currentText: '',
+            currentSpeakerName: '',
+            maxDepth: 999,
+            messageHasPortrait: false,
+        });
+
+        const items = strategy.collectUntranslated({ runtime });
+        const messageValues = items.filter((item) => item.type === 'message').map((item) => item.value);
+
+        expect(messageValues[0]).toBe('C05');
+        expect(messageValues.slice(0, 3)).toEqual(['C05', 'C06', 'C07']);
+    });
+
+    it('keeps +0 message when interpreter already points to next 101', () => {
+        const messages = Array.from({ length: 12 }, (_, idx) => {
+            return `P${String(idx + 1).padStart(2, '0')}`;
+        });
+        const list = buildShowTextEvent(messages);
+
+        // Interpreter already advanced to 101 of P06 while currently displayed text is still P05.
+        const runtime = createRuntime({
+            list,
+            startIndex: 10,
+            charLimit: 15,
+        });
+
+        runtime.getInterpreterCurrentMessageEntry =
+            translateOnTheFlyFlowMethods.getInterpreterCurrentMessageEntry;
+        runtime.resolveOriginalMessageContext =
+            translateOnTheFlyFlowMethods.resolveOriginalMessageContext;
+        runtime._testInterpreter = {
+            _list: list,
+            _index: 10,
+            _waitMode: 'message',
+            isRunning() {
+                return true;
+            },
+        };
+
+        globalThis.$gameMessage._texts = ['P05'];
+        globalThis.$gameMessage._translateOriginalText = 'P05';
+
+        const strategy = CurrentEvent.getInstance().configure({
+            currentText: 'P05',
+            currentSpeakerName: '',
+            maxDepth: 999,
+            messageHasPortrait: false,
+        });
+
+        const items = strategy.collectUntranslated({ runtime });
+        const messageValues = items.filter((item) => item.type === 'message').map((item) => item.value);
+
+        expect(messageValues[0]).toBe('P05');
     });
 });
