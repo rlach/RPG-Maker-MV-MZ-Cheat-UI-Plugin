@@ -662,11 +662,15 @@ export class TagManager {
             if (entry.type === TAG_TYPE.WITH_NUMERIC_PARAMETER) {
                 const matches = result.match(entry.postPattern) || [];
                 actualCounts[entry.key] = matches.length;
-                result = result.replace(entry.postPattern, (_, param) => {
+                result = result.replace(entry.postPattern, (match, param, offset, sourceText) => {
                     if (entry.style === TAG_STYLE.XML) {
                         return `<${entry.tagSymbol}:${param}>`;
                     }
-                    return `\\${entry.tagSymbol}[${param}]`;
+
+                    return this.appendSpaceAfterLetterEndedEscapeTag(
+                        `\\${entry.tagSymbol}[${param}]`,
+                        sourceText[offset + match.length] || ''
+                    );
                 });
                 continue;
             }
@@ -674,12 +678,19 @@ export class TagManager {
             if (entry.type === TAG_TYPE.WITHOUT_PARAMETER) {
                 const matches = result.match(entry.postPattern) || [];
                 actualCounts[entry.key] = matches.length;
-                result = result.replace(entry.postPattern, () => {
+                result = result.replace(entry.postPattern, (match, offset, sourceText) => {
                     if (entry.style === TAG_STYLE.XML) {
                         return `<${entry.tagSymbol}>`;
                     }
                     const replacement = `\\${entry.tagSymbol}`;
-                    return entry.addSpace ? `${replacement} ` : replacement;
+                    if (entry.addSpace) {
+                        return `${replacement} `;
+                    }
+
+                    return this.appendSpaceAfterLetterEndedEscapeTag(
+                        replacement,
+                        sourceText[offset + match.length] || ''
+                    );
                 });
                 continue;
             }
@@ -697,7 +708,7 @@ export class TagManager {
                 const replacementResult = this.replaceEncodedCustomTags(
                     result,
                     entry,
-                    (paramValue) => {
+                    (paramValue, context = {}) => {
                         let resolvedValue = paramValue;
 
                         if (entry.maskValue) {
@@ -718,7 +729,11 @@ export class TagManager {
                         if (entry.style === TAG_STYLE.XML) {
                             return `<${entry.tagSymbol}:${resolvedValue}>`;
                         }
-                        return `\\${entry.tagSymbol}${entry.bracket}${resolvedValue}${entry.bracketClose}`;
+
+                        return this.appendSpaceAfterLetterEndedEscapeTag(
+                            `\\${entry.tagSymbol}${entry.bracket}${resolvedValue}${entry.bracketClose}`,
+                            context.nextChar || ''
+                        );
                     },
                     {
                         allowLooseXmlCustomTagClosing,
@@ -931,6 +946,18 @@ export class TagManager {
         return tag;
     }
 
+    appendSpaceAfterLetterEndedEscapeTag(replacement, nextChar) {
+        if (typeof replacement !== 'string' || typeof nextChar !== 'string') {
+            return replacement;
+        }
+
+        if (!/[A-Za-z]$/.test(replacement) || !/^[A-Za-z]$/.test(nextChar)) {
+            return replacement;
+        }
+
+        return `${replacement} `;
+    }
+
     replaceEncodedCustomTags(text, entry, replacementFactory, options = {}) {
         if (typeof text !== 'string') {
             return { text, count: 0 };
@@ -970,8 +997,11 @@ export class TagManager {
                 continue;
             }
 
-            output += replacementFactory(balanced.value);
-            cursor = balanced.closeIndex + (hasStrictClosing ? 2 : 1);
+            const nextIndex = balanced.closeIndex + (hasStrictClosing ? 2 : 1);
+            output += replacementFactory(balanced.value, {
+                nextChar: source[nextIndex] || '',
+            });
+            cursor = nextIndex;
             count += 1;
         }
 

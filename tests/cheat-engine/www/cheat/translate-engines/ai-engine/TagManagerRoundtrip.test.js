@@ -368,12 +368,64 @@ describe('Scene glossary roundtrip', () => {
     });
 });
 
+function createTagManagerWithEscapeSpacingTags() {
+    const tagManager = new TagManager(null);
+    tagManager.setCustomTagConfigs([
+        {
+            description: 'lowercase c tag',
+            type: TAG_TYPE.WITHOUT_PARAMETER,
+            tagSymbol: 'c',
+            requiredConsistency: true,
+        },
+        {
+            description: 'lowercase d numeric tag',
+            type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
+            tagSymbol: 'd',
+            requiredConsistency: true,
+        },
+    ]);
+    return tagManager;
+}
+
+describe('TagManager postprocess escape tag spacing', () => {
+    it('adds a space when a restored letter-ended tag would merge with plain text', () => {
+        const tagManager = createTagManagerWithEscapeSpacingTags();
+        const { tagCounts, caseMap } = tagManager.preprocessTags(String.raw`\ctest`);
+        const tagEntry = tagManager.tagEntries.find((entry) => entry.tagSymbol === 'c');
+
+        const postResult = tagManager.postprocessTags(
+            `[b=${tagEntry.tagId}]test`,
+            tagCounts,
+            caseMap
+        );
+
+        expect(postResult.valid).toBe(true);
+        expect(postResult.text).toBe(String.raw`\c test`);
+    });
+
+    it('does not add a space when the restored tag is followed by another tag', () => {
+        const tagManager = createTagManagerWithEscapeSpacingTags();
+        const { tagCounts, caseMap } = tagManager.preprocessTags(String.raw`\c\d[3]test`);
+        const cTagEntry = tagManager.tagEntries.find((entry) => entry.tagSymbol === 'c');
+        const dTagEntry = tagManager.tagEntries.find((entry) => entry.tagSymbol === 'd');
+
+        const postResult = tagManager.postprocessTags(
+            `[b=${cTagEntry.tagId}][b=${dTagEntry.tagId}3]test`,
+            tagCounts,
+            caseMap
+        );
+
+        expect(postResult.valid).toBe(true);
+        expect(postResult.text).toBe(String.raw`\c\d[3]test`);
+    });
+});
+
 const SG_INPUT_REAL = String.raw`<SG種別:2>[b=sg<プリテンド>]<SG説明4:コ、1。
 キ、原><SGピクチャ5:プリテンド>`;
 
 const LLM_OUTPUT_REAL = `<SG種別:2>[b=sg<Pretend>][b=sx<H, b, o.[b=sn]W, t><SGピクチャ5:プリテンド>`;
 
-const SG_INPUT_REAL_2 = String.raw`<SG種別:2> 
+const SG_INPUT_REAL_2 = String.raw`<SG種別:2>
 <SG説明:blah
 blah
 blah
