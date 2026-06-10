@@ -17,12 +17,41 @@ export const translateOnTheFlyCoreMethods = {
         this._batchQueueAbortRequested = false;
     },
 
-    requestBatchQueueAbort() {
-        if (!this.isNonOtfTranslationProcessActive()) {
+    isRealtimeAbortRequested() {
+        return !!this._realtimeAbortRequested;
+    },
+
+    clearRealtimeAbortRequest() {
+        this._realtimeAbortRequested = false;
+    },
+
+    consumeRealtimeAbortRequest() {
+        if (!this.isRealtimeAbortRequested()) {
             return false;
         }
 
-        this._batchQueueAbortRequested = true;
+        this.clearRealtimeAbortRequest();
+        return true;
+    },
+
+    requestBatchQueueAbort() {
+        const hasNonOtfProcess = this.isNonOtfTranslationProcessActive();
+        const hasForegroundOtfWork = this.isForegroundDialogBatchActive();
+        const hasPendingOtfWork =
+            this.pendingTranslations instanceof Map && this.pendingTranslations.size > 0;
+
+        if (!hasNonOtfProcess && !hasForegroundOtfWork && !hasPendingOtfWork) {
+            return false;
+        }
+
+        if (hasNonOtfProcess) {
+            this._batchQueueAbortRequested = true;
+        }
+
+        if (hasForegroundOtfWork || hasPendingOtfWork) {
+            this._realtimeAbortRequested = true;
+        }
+
         const cancelled =
             this.engine?.cancelActiveRequest?.('request_aborted') ||
             this.engine?.cancelActiveBackgroundRequest?.() ||

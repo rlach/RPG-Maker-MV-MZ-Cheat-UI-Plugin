@@ -837,8 +837,8 @@ export class TranslationBatchManager {
                 }
 
                 this.runtime?.markQueueCompletionItemsProcessed?.([
-                    ...(successes || []),
-                    ...(failures || []),
+                    ...(translated?.successes || []),
+                    ...(translated?.failures || []),
                 ]);
 
                 safeQueueEntries.shift();

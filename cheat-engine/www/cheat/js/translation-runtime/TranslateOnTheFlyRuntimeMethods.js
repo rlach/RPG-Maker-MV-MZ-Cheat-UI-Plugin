@@ -776,6 +776,23 @@ export const translateOnTheFlyRuntimeMethods = {
                 $gameMessage._translateOriginalSpeaker = originalSpeakerName;
             }
 
+            if (allowTranslation && self.consumeRealtimeAbortRequest()) {
+                if (hasText) {
+                    self.replaceMessageText(originalText);
+                }
+
+                if (hasChoices) {
+                    self.replaceChoiceText(originalChoices);
+                }
+
+                if (hasSpeakerName) {
+                    self.replaceSpeakerName(originalSpeakerName);
+                }
+
+                this._translationApplied = true;
+                return originalCanStart;
+            }
+
             const textReady = !hasText || textCacheState.ready;
             const choicesReady =
                 !hasChoices || choiceCacheKeys.every((key) => self.hasUsableCacheValue(key));
@@ -1325,6 +1342,26 @@ export const translateOnTheFlyRuntimeMethods = {
             const textKey = textCacheState.activeKey;
             const originalSpeakerName =
                 $gameMessage._translateOriginalSpeaker || $gameMessage._speakerName || '';
+            const originalChoices = Array.isArray($gameMessage._translateOriginalChoices)
+                ? $gameMessage._translateOriginalChoices
+                : Array.isArray($gameMessage.choices && $gameMessage.choices())
+                  ? $gameMessage.choices()
+                  : [];
+
+            if (allowTranslation && self.consumeRealtimeAbortRequest()) {
+                if (hasText) {
+                    self.replaceMessageText(originalText);
+                }
+                if (originalChoices.length > 0) {
+                    self.replaceChoiceText(originalChoices);
+                }
+                if (originalSpeakerName && originalSpeakerName.trim()) {
+                    self.replaceSpeakerName(originalSpeakerName);
+                }
+
+                this._translationApplied = true;
+                return Window_Message.prototype._originalStartInput.call(this);
+            }
 
             if (allowTranslation) {
                 if (self.isForegroundDialogBatchActive()) {
