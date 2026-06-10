@@ -340,6 +340,9 @@ export class TranslationBatchManager {
 
         const queueEntries = [];
         const queueScopeCacheTypes = new Set();
+        if (this.runtime) {
+            this.runtime.clearBatchThroughputSamples?.();
+        }
         const safeRequests = Array.isArray(items) ? items : [];
         const hasOnlyKindRequests = safeRequests.every((item) => {
             return !!(item && typeof item === 'object' && typeof item.kind === 'string');
@@ -385,6 +388,36 @@ export class TranslationBatchManager {
         const aggregatedErrorStats = BatchSummaryReporter.createErrorStatsAccumulator();
         const mergeStats = (stats) => {
             BatchSummaryReporter.mergeErrorStats(aggregatedErrorStats, stats);
+        };
+        const countQueueRequestedChars = (entries) => {
+            let total = 0;
+
+            for (const entry of entries || []) {
+                if (!entry) {
+                    continue;
+                }
+
+                if (Array.isArray(entry.items)) {
+                    total += this.countBatchRequestedChars(entry.items);
+                    continue;
+                }
+
+                const strategy = entry.strategy;
+                if (!strategy || typeof strategy.collectUntranslated !== 'function') {
+                    continue;
+                }
+
+                const pendingItems = strategy.collectUntranslated({
+                    runtime: this.runtime,
+                });
+                const batchItems =
+                    typeof strategy.toTranslationBatchItems === 'function'
+                        ? strategy.toTranslationBatchItems(pendingItems || [])
+                        : pendingItems || [];
+                total += this.countBatchRequestedChars(batchItems);
+            }
+
+            return total;
         };
         const executeEntry = async (entryItems, entryOptions = {}) => {
             const strategy = entryOptions.strategy;
@@ -612,7 +645,7 @@ export class TranslationBatchManager {
                 // Let all detected plugin translators inspect batch results for knowledge extraction
                 this._notifyPluginKnowledgeBase(successes, failures);
 
-                if (!dryRun && this.runtime) {
+                if (!dryRun && this.runtime && !this.isAbortBatchResult(failures, batch.length)) {
                     this.runtime.recordBatchThroughputSample(
                         batchRequestedChars,
                         Date.now() - batchStartedAt
@@ -711,7 +744,10 @@ export class TranslationBatchManager {
         }
 
         if (this.runtime) {
-            this.runtime.startQueueCompletionScope(Array.from(queueScopeCacheTypes));
+            this.runtime.startQueueCompletionScope(
+                Array.from(queueScopeCacheTypes),
+                countQueueRequestedChars(queueEntries)
+            );
         }
 
         this.progressTracker.beginQueue();
@@ -799,6 +835,11 @@ export class TranslationBatchManager {
                 ) {
                     continue;
                 }
+
+                this.runtime?.markQueueCompletionItemsProcessed?.([
+                    ...(successes || []),
+                    ...(failures || []),
+                ]);
 
                 safeQueueEntries.shift();
             }

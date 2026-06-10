@@ -1,7 +1,6 @@
 import { findNearestMessageEntry } from '../EventCommandTraversal.js';
 import {
     computeLangPairCompletionByKeyLength,
-    computeLangPairCompletionByCacheTypes,
 } from '../TranslationCompletionMetrics.js';
 import { BatchSummaryReporter } from '../../translate-engines/batch-manager/BatchSummaryReporter.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
@@ -34,7 +33,7 @@ export const translateOnTheFlyFlowMethods = {
         this.queueCompletionScope = null;
     },
 
-    startQueueCompletionScope(cacheTypes) {
+    startQueueCompletionScope(cacheTypes, totalChars = null) {
         this.clearQueueCompletionScope();
 
         if (!this.dryRunExecutedAtLeastOnce) {
@@ -46,24 +45,10 @@ export const translateOnTheFlyFlowMethods = {
             return;
         }
 
-        const useAllTypes = normalizedTypes.includes('*');
-        const scopedStats = useAllTypes
-            ? computeLangPairCompletionByKeyLength({
-                  translationCache: this.translationCache,
-                  sourceLang: this.sourceLang,
-                  targetLang: this.targetLang,
-              })
-            : computeLangPairCompletionByCacheTypes({
-                  translationCache: this.translationCache,
-                  sourceLang: this.sourceLang,
-                  targetLang: this.targetLang,
-                  cacheTypes: normalizedTypes,
-              });
-
         this.queueCompletionScope = {
             cacheTypes: normalizedTypes,
-            useAllTypes,
-            totalKeyLength: Math.max(0, Number(scopedStats.totalKeyLength) || 0),
+            totalChars: Math.max(0, Number(totalChars) || 0),
+            processedChars: 0,
         };
     },
 
@@ -73,35 +58,50 @@ export const translateOnTheFlyFlowMethods = {
             return null;
         }
 
-        const scopedStats = scope.useAllTypes
-            ? computeLangPairCompletionByKeyLength({
-                  translationCache: this.translationCache,
-                  sourceLang: this.sourceLang,
-                  targetLang: this.targetLang,
-              })
-            : computeLangPairCompletionByCacheTypes({
-                  translationCache: this.translationCache,
-                  sourceLang: this.sourceLang,
-                  targetLang: this.targetLang,
-                  cacheTypes: scope.cacheTypes,
-              });
-
-        const totalKeyLength = Math.max(
-            0,
-            Number(scope.totalKeyLength) || Number(scopedStats.totalKeyLength) || 0
-        );
-        const translatedKeyLength = Math.min(
-            totalKeyLength,
-            Math.max(0, Number(scopedStats.translatedKeyLength) || 0)
-        );
-        const completionPercent =
-            totalKeyLength > 0 ? (translatedKeyLength / totalKeyLength) * 100 : 0;
+        const totalChars = Math.max(0, Number(scope.totalChars) || 0);
+        const processedChars = Math.min(totalChars, Math.max(0, Number(scope.processedChars) || 0));
+        const completionPercent = totalChars > 0 ? (processedChars / totalChars) * 100 : 0;
 
         return {
-            totalKeyLength,
-            translatedKeyLength,
+            totalChars,
+            processedChars,
             completionPercent,
         };
+    },
+
+    getQueueItemCharLength(item) {
+        const value = item?.value;
+        if (typeof value === 'string') {
+            return value.length;
+        }
+
+        if (value === null || value === undefined) {
+            return 0;
+        }
+
+        return String(value).length;
+    },
+
+    accountQueueCompletionItems(items) {
+        const scope = this.queueCompletionScope;
+        if (!scope || !Array.isArray(items) || items.length === 0) {
+            return;
+        }
+
+        for (const item of items) {
+            scope.totalChars += Math.max(0, this.getQueueItemCharLength(item));
+        }
+    },
+
+    markQueueCompletionItemsProcessed(items) {
+        const scope = this.queueCompletionScope;
+        if (!scope || !Array.isArray(items) || items.length === 0) {
+            return;
+        }
+
+        for (const item of items) {
+            scope.processedChars += Math.max(0, this.getQueueItemCharLength(item));
+        }
     },
 
     getBatchThroughputSamples() {
@@ -110,6 +110,10 @@ export const translateOnTheFlyFlowMethods = {
         }
 
         return this.batchThroughputSamples;
+    },
+
+    clearBatchThroughputSamples() {
+        this.batchThroughputSamples = [];
     },
 
     recordBatchThroughputSample(requestedChars, durationMs) {
@@ -189,7 +193,7 @@ export const translateOnTheFlyFlowMethods = {
             this.getQueueScopedCompletionStats() || this.getOverallTranslationCompletionStats();
         const remainingChars = Math.max(
             0,
-            Number(stats.totalKeyLength || 0) - Number(stats.translatedKeyLength || 0)
+            Number(stats.totalChars || 0) - Number(stats.processedChars || 0)
         );
         const avgCharsPerSecond = this.getAverageBatchCharsPerSecond();
 

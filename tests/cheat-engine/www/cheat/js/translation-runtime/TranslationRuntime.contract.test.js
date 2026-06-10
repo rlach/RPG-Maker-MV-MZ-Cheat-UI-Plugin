@@ -86,6 +86,26 @@ describe('TranslationRuntime contract', () => {
         });
     });
 
+    describe('queue ETA', () => {
+        it('uses queue char progress rather than cache completion', async () => {
+            const { TranslationRuntime } = await importRuntime();
+            const runtime = new TranslationRuntime();
+
+            runtime.dryRunExecutedAtLeastOnce = true;
+            runtime.batchThroughputSamples = [100];
+            runtime.startQueueCompletionScope(['gameArrays'], 1000);
+            runtime.markQueueCompletionItemsProcessed([
+                {
+                    value: 'x'.repeat(400),
+                },
+            ]);
+
+            expect(runtime.getOverallTranslationCompletionLine()).toBe(
+                'total 40.0% complete (ETA 6s)'
+            );
+        });
+    });
+
     describe('architectural boundaries', () => {
         it('runtime files do not import AlertHelper', () => {
             assertNoImportInRuntimeFiles('AlertHelper');
