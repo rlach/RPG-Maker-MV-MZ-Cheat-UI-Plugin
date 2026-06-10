@@ -129,7 +129,6 @@ export class RecollectionForMZTranslator extends BasePluginTranslator {
         const resolveRuntimeTranslation = this.resolveRuntimeTranslation.bind(this);
         const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
         const getRuntime = this.getRuntime.bind(this);
-        const cacheType = this.getCacheType();
 
         prototype.addCommand = function (name, symbol, enabled, ext) {
             let translatedName = name;

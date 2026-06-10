@@ -1,6 +1,10 @@
 import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../translate-engines/plugins/PluginTranslatorRegistry.js';
+import {
+    clearConsentForCurrentGame,
+    scanCustomScriptFiles,
+} from '../js/CustomTranslatorConsent.js';
 
 const pluginsPanelTableStateMemory = {
     sortBy: 'label',
@@ -38,12 +42,12 @@ export default {
                     @keydown.self.stop>
                 </v-text-field>
                 <v-btn
+                    v-if="hasCustomTranslatorScripts"
                     small
-                    outlined
-                    color="primary"
-                    @click="refreshEntries">
-                    <v-icon small left>mdi-refresh</v-icon>
-                    Refresh
+                    text
+                    color="warning"
+                    @click="resetCustomTranslatorConsent">
+                    Reset script consent
                 </v-btn>
             </div>
         </template>
@@ -93,6 +97,7 @@ export default {
             ],
             tableItems: [],
             _refreshTimerId: 0,
+            hasCustomTranslatorScripts: scanCustomScriptFiles().length > 0,
         };
     },
 
@@ -175,6 +180,15 @@ export default {
                     activationRetryCount: Math.max(0, Number(summary.activationRetryCount) || 0),
                 })
             );
+        },
+
+        resetCustomTranslatorConsent() {
+            clearConsentForCurrentGame();
+            if (window.Alert && typeof window.Alert.info === 'function') {
+                window.Alert.info(
+                    'Custom translator consent has been reset. Restart the game to re-evaluate.'
+                );
+            }
         },
 
         restoreTableState() {

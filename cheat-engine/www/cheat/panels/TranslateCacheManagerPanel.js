@@ -10,10 +10,6 @@ import { computeLangPairCompletionByKeyLength } from '../js/TranslationCompletio
 import { ConfirmDialog } from '../js/DialogHelper.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
 import { BOXING_SERVICE } from '../components/BoxingModal.js';
-import {
-    clearConsentForCurrentGame,
-    scanCustomScriptFiles,
-} from '../js/CustomTranslatorConsent.js';
 
 const cacheManagerTableStateMemory = {
     sortBy: 'seenSort',
@@ -22,6 +18,7 @@ const cacheManagerTableStateMemory = {
     searchInput: '',
     selectedTypeFilter: '',
     searchIn: 'both',
+    onlyEmpty: false,
 };
 
 export default {
@@ -35,9 +32,17 @@ export default {
 
     <v-card-text class="pt-0 pb-1">
         <div class="d-flex align-center justify-space-between">
-            <div class="caption grey--text text--lighten-1">
-          {{ activeLanguagePairLabel }}
-            </div>
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on, attrs }">
+                    <div
+                        class="caption grey--text text--lighten-1"
+                        v-bind="attrs"
+                        v-on="on">
+                        {{ activeLanguagePairLabel }}
+                    </div>
+                </template>
+                <span>{{ activeLanguagePairTooltip }}</span>
+            </v-tooltip>
             <div class="d-flex align-center" style="gap: 4px;">
                 <v-btn
                     small
@@ -55,14 +60,6 @@ export default {
                     @click="openBoxingModal">
                     Boxing...
                 </v-btn>
-                <v-btn
-                    v-if="hasCustomTranslatorScripts"
-                    small
-                    text
-                    color="warning"
-                    @click="resetCustomTranslatorConsent">
-                    Reset script consent
-                </v-btn>
             </div>
         </div>
     </v-card-text>
@@ -75,82 +72,93 @@ export default {
         :sort-by.sync="sortBy"
         :sort-desc.sync="sortDesc"
         :items-per-page.sync="rowsPerPage">
-        <template v-slot:top>
-          <div>
-            <div class="d-flex align-center" style="gap: 8px;">
-              <v-text-field
-                v-model="searchInput"
-                :label="searchFieldLabel"
-                solo
-                dense
-                hide-details
-                background-color="grey darken-3"
-                @keydown.self.stop>
-              </v-text-field>
-              <v-select
-                v-model="selectedTypeFilter"
-                :items="typeFilterOptions"
-                label="Type"
-                item-text="text"
-                item-value="value"
-                solo
-                dense
-                clearable
-                hide-details
-                background-color="grey darken-3"
-                style="max-width: 220px;"
-                @keydown.self.stop>
-              </v-select>
-              <v-tooltip bottom>
-                <template v-slot:activator="{ on, attrs }">
-                  <v-btn icon small v-bind="attrs" v-on="on" @click="searchExpanded = !searchExpanded">
-                    <v-icon small>{{ searchExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
-                  </v-btn>
+                <template v-slot:top>
+                    <div>
+                        <div class="d-flex align-center" style="gap: 8px;">
+                            <v-text-field
+                                v-model="searchInput"
+                                :label="searchFieldLabel"
+                                solo
+                                dense
+                                hide-details
+                                background-color="grey darken-3"
+                                @keydown.self.stop>
+                            </v-text-field>
+                            <v-select
+                                v-model="selectedTypeFilter"
+                                :items="typeFilterOptions"
+                                label="Type"
+                                item-text="text"
+                                item-value="value"
+                                solo
+                                dense
+                                clearable
+                                hide-details
+                                background-color="grey darken-3"
+                                style="max-width: 220px;"
+                                @keydown.self.stop>
+                            </v-select>
+                            <v-tooltip bottom>
+                                <template v-slot:activator="{ on, attrs }">
+                                    <v-btn icon small v-bind="attrs" v-on="on" @click="searchExpanded = !searchExpanded">
+                                        <v-icon small>{{ searchExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                                    </v-btn>
+                                </template>
+                                <span>{{ searchExpanded ? 'Hide options' : 'More options' }}</span>
+                            </v-tooltip>
+                        </div>
+                        <div v-if="searchExpanded" class="d-flex align-center mt-1" style="gap: 8px;">
+                            <v-text-field
+                                v-model="replaceInput"
+                                label="Replace"
+                                solo
+                                dense
+                                hide-details
+                                background-color="grey darken-3"
+                                @keydown.self.stop>
+                            </v-text-field>
+                            <v-btn
+                                small
+                                color="primary"
+                                :disabled="replaceButtonDisabled"
+                                @click="performReplace">
+                                Replace
+                            </v-btn>
+                            <span class="caption grey--text text--lighten-1" style="white-space: nowrap;">Search in:</span>
+                            <v-select
+                                v-model="searchIn"
+                                :items="searchInOptions"
+                                item-text="text"
+                                item-value="value"
+                                solo
+                                dense
+                                hide-details
+                                background-color="grey darken-3"
+                                style="max-width: 180px;"
+                                @keydown.self.stop>
+                            </v-select>
+                            <v-btn
+                                icon
+                                small
+                                color="error"
+                                :disabled="matchingFilterEntryCount <= 0"
+                                @click="confirmClearTranslationsMatchingFilter">
+                                <v-icon small>mdi-delete</v-icon>
+                            </v-btn>
+                        </div>
+                        <div v-if="searchExpanded" class="d-flex align-center mt-1" style="gap: 8px;">
+                            <v-switch
+                                v-model="onlyEmpty"
+                                label="Only empty"
+                                inset
+                                dense
+                                hide-details
+                                class="mt-0 pt-0"
+                                @keydown.self.stop>
+                            </v-switch>
+                        </div>
+                    </div>
                 </template>
-                <span>{{ searchExpanded ? 'Hide options' : 'More options' }}</span>
-              </v-tooltip>
-            </div>
-            <div v-if="searchExpanded" class="d-flex align-center mt-1" style="gap: 8px;">
-              <v-text-field
-                v-model="replaceInput"
-                label="Replace"
-                solo
-                dense
-                hide-details
-                background-color="grey darken-3"
-                @keydown.self.stop>
-              </v-text-field>
-              <v-btn
-                small
-                color="primary"
-                :disabled="replaceButtonDisabled"
-                @click="performReplace">
-                Replace
-              </v-btn>
-              <span class="caption grey--text text--lighten-1" style="white-space: nowrap;">Search in:</span>
-              <v-select
-                v-model="searchIn"
-                :items="searchInOptions"
-                item-text="text"
-                item-value="value"
-                solo
-                dense
-                hide-details
-                background-color="grey darken-3"
-                style="max-width: 180px;"
-                @keydown.self.stop>
-              </v-select>
-              <v-btn
-                icon
-                small
-                color="error"
-                :disabled="matchingFilterEntryCount <= 0"
-                @click="confirmClearTranslationsMatchingFilter">
-                <v-icon small>mdi-delete</v-icon>
-              </v-btn>
-            </div>
-          </div>
-        </template>
 
         <template v-slot:item.seenSort="{ item }">
             <span class="caption">{{item.seenDisplay}}</span>
@@ -261,6 +269,7 @@ export default {
             searchExpanded: false,
             replaceInput: '',
             searchIn: 'both',
+            onlyEmpty: false,
             editingKey: null,
             sourceLang: 'ja',
             targetLang: 'en',
@@ -269,7 +278,6 @@ export default {
             refreshTimer: null,
             searchDebounceTimer: null,
             isTranslatingEmptyStrings: false,
-            hasCustomTranslatorScripts: scanCustomScriptFiles().length > 0,
             tableHeaders: [
                 {
                     text: 'Seen',
@@ -392,6 +400,10 @@ export default {
         searchIn() {
             this.saveTableState();
         },
+
+        onlyEmpty() {
+            this.saveTableState();
+        },
     },
 
     computed: {
@@ -403,6 +415,17 @@ export default {
             }).completionPercent.toFixed(1);
 
             return `Active language pair: ${this.sourceLang} -> ${this.targetLang} (${completion}% complete)`;
+        },
+
+        activeLanguagePairTooltip() {
+            const { translatedKeyLength, totalKeyLength } = computeLangPairCompletionByKeyLength({
+                translationCache: this.translationCache,
+                sourceLang: this.sourceLang,
+                targetLang: this.targetLang,
+            });
+            const translated = translatedKeyLength;
+            const total = totalKeyLength;
+            return `${translated} out of ${total} characters`;
         },
 
         matchingFilterEntryCount() {
@@ -634,6 +657,9 @@ export default {
             ) {
                 this.searchIn = state.searchIn;
             }
+            if (typeof state.onlyEmpty === 'boolean') {
+                this.onlyEmpty = state.onlyEmpty;
+            }
         },
 
         saveTableState() {
@@ -643,6 +669,7 @@ export default {
             cacheManagerTableStateMemory.searchInput = this.searchInput;
             cacheManagerTableStateMemory.selectedTypeFilter = this.selectedTypeFilter;
             cacheManagerTableStateMemory.searchIn = this.searchIn;
+            cacheManagerTableStateMemory.onlyEmpty = !!this.onlyEmpty;
         },
 
         flushPendingCacheEdits(reason = 'unknown') {
@@ -737,6 +764,32 @@ export default {
             this.onTranslationInput(item, '');
         },
 
+        isEmptyTranslationEntry(entry) {
+            return this.normalizeCacheValue(entry?.translation).trim() === '';
+        },
+
+        matchesSearchTermByScope(entry, term, searchIn) {
+            if (!term) {
+                return true;
+            }
+
+            const matchesOriginal = this.normalizeCacheValue(entry && entry.original)
+                .toLowerCase()
+                .includes(term);
+            const matchesTranslation = this.normalizeCacheValue(entry && entry.translation)
+                .toLowerCase()
+                .includes(term);
+
+            if (searchIn === 'original') {
+                return matchesOriginal;
+            }
+            if (searchIn === 'translation') {
+                return matchesTranslation;
+            }
+
+            return matchesOriginal || matchesTranslation;
+        },
+
         getEntriesMatchingFilter(searchValue, selectedType = '') {
             const search = this.normalizeCacheValue(searchValue);
             const term = search === null ? '' : String(search).trim().toLowerCase();
@@ -746,24 +799,15 @@ export default {
                     return false;
                 }
 
-                if (!term) {
+                if (!this.matchesSearchTermByScope(entry, term, searchIn)) {
+                    return false;
+                }
+
+                if (!this.onlyEmpty) {
                     return true;
                 }
 
-                const matchesOriginal = this.normalizeCacheValue(entry && entry.original)
-                    .toLowerCase()
-                    .includes(term);
-                const matchesTranslation = this.normalizeCacheValue(entry && entry.translation)
-                    .toLowerCase()
-                    .includes(term);
-
-                if (searchIn === 'original') {
-                    return matchesOriginal;
-                }
-                if (searchIn === 'translation') {
-                    return matchesTranslation;
-                }
-                return matchesOriginal || matchesTranslation;
+                return this.isEmptyTranslationEntry(entry);
             });
         },
 
@@ -838,15 +882,6 @@ export default {
 
         openBoxingModal() {
             BOXING_SERVICE.openModal();
-        },
-
-        resetCustomTranslatorConsent() {
-            clearConsentForCurrentGame();
-            if (window.Alert && typeof window.Alert.info === 'function') {
-                window.Alert.info(
-                    'Custom translator consent has been reset. Restart the game to re-evaluate.'
-                );
-            }
         },
 
         async translateEmptyStrings() {
@@ -940,7 +975,11 @@ export default {
                 this.flushPendingCacheEdits('start-edit-switch');
             }
             this.editingKey = item.key;
-            this.$set(this.draftByKey, item.key, this.normalizeCacheValue(this.getDraftValue(item)));
+            this.$set(
+                this.draftByKey,
+                item.key,
+                this.normalizeCacheValue(this.getDraftValue(item))
+            );
         },
 
         saveEdit() {
@@ -961,7 +1000,10 @@ export default {
             }
 
             const replaceWith = this.normalizeCacheValue(this.replaceInput);
-            const matching = this.getEntriesMatchingFilter(this.searchInput, this.selectedTypeFilter);
+            const matching = this.getEntriesMatchingFilter(
+                this.searchInput,
+                this.selectedTypeFilter
+            );
             const regex = new RegExp(this.escapeRegex(searchTerm), 'gi');
 
             const changedKeys = [];
