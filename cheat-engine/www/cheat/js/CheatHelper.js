@@ -1035,7 +1035,9 @@ export class MessageCheat {
 
         try {
             const runtime = ensureTranslationRuntime();
-            if (runtime && typeof runtime.requestBatchQueueAbort === 'function') {
+            if (runtime && typeof runtime.requestRealtimeAbort === 'function') {
+                runtime.requestRealtimeAbort();
+            } else if (runtime && typeof runtime.requestBatchQueueAbort === 'function') {
                 runtime.requestBatchQueueAbort();
             }
         } catch (err) {

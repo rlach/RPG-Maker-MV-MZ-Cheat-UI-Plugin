@@ -704,13 +704,19 @@ export const translateOnTheFlyFlowMethods = {
         };
     },
 
-    async startAheadTranslation({ currentText, currentSpeakerName, cacheKey, maxDepth }) {
-        if (!this.batchManager) {
-            this.batchManager = createTranslationBatchManager(this);
+    getForegroundBatchManager() {
+        if (!this._foregroundBatchManager) {
+            this._foregroundBatchManager = createTranslationBatchManager(this);
         }
 
+        return this._foregroundBatchManager;
+    },
+
+    async startAheadTranslation({ currentText, currentSpeakerName, cacheKey, maxDepth }) {
+        const manager = this.getForegroundBatchManager();
+
         try {
-            return await this.batchManager.runBatchedTranslation(
+            return await manager.runBatchedTranslation(
                 [
                     {
                         kind: 'currentEvent',

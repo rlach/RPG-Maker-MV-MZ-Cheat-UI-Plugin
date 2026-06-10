@@ -34,6 +34,25 @@ export const translateOnTheFlyCoreMethods = {
         return true;
     },
 
+    requestRealtimeAbort() {
+        const hasForegroundOtfWork = this.isForegroundDialogBatchActive();
+        const hasPendingOtfWork =
+            this.pendingTranslations instanceof Map && this.pendingTranslations.size > 0;
+
+        if (!hasForegroundOtfWork && !hasPendingOtfWork) {
+            return false;
+        }
+
+        this._realtimeAbortRequested = true;
+
+        const cancelled = this.engine?.cancelActiveRequest?.('request_aborted') || false;
+
+        console.log(
+            `[TranslateOnTheFly] Realtime abort requested by user (${cancelled ? 'active request cancelled' : 'no active request'})`
+        );
+        return true;
+    },
+
     requestBatchQueueAbort() {
         const hasNonOtfProcess = this.isNonOtfTranslationProcessActive();
         const hasForegroundOtfWork = this.isForegroundDialogBatchActive();
