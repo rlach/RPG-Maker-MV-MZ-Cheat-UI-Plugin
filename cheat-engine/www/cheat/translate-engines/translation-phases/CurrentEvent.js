@@ -139,9 +139,9 @@ export class CurrentEvent extends BasePhase {
     }
 
     collectAheadItems(runtime, currentText, currentSpeaker, interpreter, options = {}) {
-        const charLimit = options.charLimit || runtime.charLimit;
-        const maxItems = options.maxItems || runtime.batchItemsLimit || 300;
-        const maxDepth = options.maxDepth === undefined ? 999 : options.maxDepth;
+        const charLimit = options.charLimit ?? runtime.charLimit;
+        const maxItems = options.maxItems ?? runtime.batchItemsLimit ?? 300;
+        const maxDepth = options.maxDepth ?? 999;
         const messageType = runtime.getMessageCacheType({
             hasPortrait: !!options.messageHasPortrait,
         });
@@ -377,8 +377,8 @@ export class CurrentEvent extends BasePhase {
             normalizedCurrentSpeaker,
             interpreter,
             {
-                charLimit: Number.MAX_SAFE_INTEGER,
-                maxItems: Number.MAX_SAFE_INTEGER,
+                charLimit: runtime.charLimit,
+                maxItems: runtime.batchItemsLimit,
                 maxDepth: this.maxDepth,
                 messageHasPortrait: this.messageHasPortrait,
             }
@@ -394,6 +394,7 @@ export class CurrentEvent extends BasePhase {
         }
 
         const mandatoryCacheKeys = new Set();
+        const shouldSkipPreviouslyFailedEntries = !(Number(this.maxDepth) > 0);
         if (normalizedCurrentText) {
             mandatoryCacheKeys.add(
                 runtime.getMessageCacheKey(normalizedCurrentText, {
@@ -418,6 +419,7 @@ export class CurrentEvent extends BasePhase {
             }
 
             if (
+                shouldSkipPreviouslyFailedEntries &&
                 runtime.failedTranslations.has(item.cacheKey) &&
                 !item.mandatory &&
                 !mandatoryCacheKeys.has(item.cacheKey)
