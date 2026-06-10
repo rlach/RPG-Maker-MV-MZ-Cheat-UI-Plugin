@@ -248,10 +248,7 @@ export class KmsQuickNotificationTranslator extends BasePluginTranslator {
                 const mapData = await loadMapDataById(mapId);
                 this.collectMapEventEntries(mapData, mapId, output);
             } catch (error) {
-                console.warn(
-                    `[KmsQuickNotificationTranslator] Failed to scan map ${mapId}`,
-                    error
-                );
+                console.warn(`[KmsQuickNotificationTranslator] Failed to scan map ${mapId}`, error);
             }
         }
     }

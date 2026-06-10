@@ -119,7 +119,11 @@ export function customizeRPGMakerFunctions(mainComponent) {
     // -------------------------------------------------------------------------
 
     const installUpdatePatches = () => {
-        if (window.TouchInput && typeof TouchInput.update === 'function' && !TouchInput.__cheat_originalUpdate) {
+        if (
+            window.TouchInput &&
+            typeof TouchInput.update === 'function' &&
+            !TouchInput.__cheat_originalUpdate
+        ) {
             TouchInput.__cheat_originalUpdate = TouchInput.update;
             TouchInput.update = function () {
                 if (isCheatWindowVisible()) {

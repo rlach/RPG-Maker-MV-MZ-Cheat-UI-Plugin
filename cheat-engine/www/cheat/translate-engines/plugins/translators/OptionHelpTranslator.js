@@ -151,10 +151,15 @@ export class OptionHelpTranslator extends BasePluginTranslator {
                     return;
                 }
 
-                const translated = resolveRuntimeTranslation(sourceDescription, runtime, CACHE_TYPE, {
-                    requireRuntimeTranslationActive: true,
-                    missValue: sourceDescription,
-                });
+                const translated = resolveRuntimeTranslation(
+                    sourceDescription,
+                    runtime,
+                    CACHE_TYPE,
+                    {
+                        requireRuntimeTranslationActive: true,
+                        missValue: sourceDescription,
+                    }
+                );
 
                 this._helpWindow.setText(translated);
             } catch (error) {
@@ -205,7 +210,11 @@ export class OptionHelpTranslator extends BasePluginTranslator {
 
         const pluginEntry = this.findPluginEntry(this.getPluginName());
         if (pluginEntry?.parameters) {
-            this.appendEntriesFromParameters(pluginEntry.parameters, 'pluginEntryParameter', entries);
+            this.appendEntriesFromParameters(
+                pluginEntry.parameters,
+                'pluginEntryParameter',
+                entries
+            );
         }
 
         const runtimeParameters = this.getRuntimeParameters();

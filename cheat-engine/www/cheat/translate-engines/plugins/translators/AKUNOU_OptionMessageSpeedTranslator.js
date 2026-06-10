@@ -118,7 +118,9 @@ export class AKUNOUOptionMessageSpeedTranslator extends BasePluginTranslator {
 
         const items = this._buildUniquePendingItems(runtime);
         const totalStrings = items.length;
-        const leftStrings = items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey)).length;
+        const leftStrings = items.filter(
+            (item) => !runtime.hasUsableCacheValue(item.cacheKey)
+        ).length;
 
         return {
             total: totalStrings,
@@ -182,7 +184,10 @@ export class AKUNOUOptionMessageSpeedTranslator extends BasePluginTranslator {
                     }
                 }
             } catch (error) {
-                console.warn('[AKUNOUOptionMessageSpeedTranslator] Failed to translate command label', error);
+                console.warn(
+                    '[AKUNOUOptionMessageSpeedTranslator] Failed to translate command label',
+                    error
+                );
             }
 
             return result;
@@ -214,7 +219,10 @@ export class AKUNOUOptionMessageSpeedTranslator extends BasePluginTranslator {
 
                 return isUsableText(translated) ? translated : result;
             } catch (error) {
-                console.warn('[AKUNOUOptionMessageSpeedTranslator] Failed to translate status text', error);
+                console.warn(
+                    '[AKUNOUOptionMessageSpeedTranslator] Failed to translate status text',
+                    error
+                );
                 return result;
             }
         };
@@ -239,7 +247,10 @@ export class AKUNOUOptionMessageSpeedTranslator extends BasePluginTranslator {
         if (typeof window.PluginManager?.parameters === 'function') {
             const runtimeParameters = window.PluginManager.parameters(this.getPluginName());
             if (runtimeParameters && typeof runtimeParameters === 'object') {
-                sources.push({ scope: 'runtimePluginManagerParameter', parameters: runtimeParameters });
+                sources.push({
+                    scope: 'runtimePluginManagerParameter',
+                    parameters: runtimeParameters,
+                });
             }
         }
 

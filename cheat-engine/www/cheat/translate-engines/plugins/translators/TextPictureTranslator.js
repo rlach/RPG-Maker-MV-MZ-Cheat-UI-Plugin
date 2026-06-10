@@ -40,9 +40,7 @@ export class TextPictureTranslator extends BasePluginTranslator {
                 const runtime =
                     window.__ensureTranslationRuntime?.() || window.__TranslationRuntime || null;
 
-                if (
-                    !runtime
-                ) {
+                if (!runtime) {
                     return result;
                 }
 

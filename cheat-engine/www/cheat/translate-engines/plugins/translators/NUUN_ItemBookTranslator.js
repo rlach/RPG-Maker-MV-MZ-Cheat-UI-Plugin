@@ -238,7 +238,9 @@ export class NuunItemBookTranslator extends BasePluginTranslator {
                         return;
                     }
 
-                    const command = this._list.find((entry) => entry?.symbol === MENU_COMMAND_SYMBOL);
+                    const command = this._list.find(
+                        (entry) => entry?.symbol === MENU_COMMAND_SYMBOL
+                    );
                     const sourceText = String(command?.name || '');
                     if (!isUsableText(sourceText)) {
                         return;
@@ -257,7 +259,10 @@ export class NuunItemBookTranslator extends BasePluginTranslator {
                         harvestMissing: false,
                     });
                 } catch (error) {
-                    console.warn('[NUUN_ItemBookTranslator] Failed to translate menu command', error);
+                    console.warn(
+                        '[NUUN_ItemBookTranslator] Failed to translate menu command',
+                        error
+                    );
                 }
             };
 
@@ -284,16 +289,24 @@ export class NuunItemBookTranslator extends BasePluginTranslator {
                             runtime.trackCacheKeyUsage(cacheKey);
 
                             if (isRuntimeTranslationActive(runtime)) {
-                                nextName = resolveRuntimeTranslation(sourceText, runtime, cacheType, {
-                                    requireRuntimeTranslationActive: true,
-                                    missValue: sourceText,
-                                    harvestMissing: false,
-                                });
+                                nextName = resolveRuntimeTranslation(
+                                    sourceText,
+                                    runtime,
+                                    cacheType,
+                                    {
+                                        requireRuntimeTranslationActive: true,
+                                        missValue: sourceText,
+                                        harvestMissing: false,
+                                    }
+                                );
                             }
                         }
                     }
                 } catch (error) {
-                    console.warn('[NUUN_ItemBookTranslator] Failed to translate command name', error);
+                    console.warn(
+                        '[NUUN_ItemBookTranslator] Failed to translate command name',
+                        error
+                    );
                 }
 
                 return originalAddCommand.call(this, nextName, symbol, enabled, ext);
@@ -357,7 +370,10 @@ export class NuunItemBookTranslator extends BasePluginTranslator {
                         }
                     }
                 } catch (error) {
-                    console.warn('[NUUN_ItemBookTranslator] Failed to translate drawText payload', error);
+                    console.warn(
+                        '[NUUN_ItemBookTranslator] Failed to translate drawText payload',
+                        error
+                    );
                 }
 
                 return originalDrawText.call(this, nextText, x, y, maxWidth, align);

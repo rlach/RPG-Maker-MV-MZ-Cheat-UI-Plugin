@@ -568,12 +568,13 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
                 const parameters = Array.isArray(cmd.parameters) ? cmd.parameters : [];
                 const pluginName = String(parameters[0] || '').trim();
                 const commandName = String(parameters[1] || '').trim();
-                const args = parameters[3] && typeof parameters[3] === 'object' ? parameters[3] : null;
+                const args =
+                    parameters[3] && typeof parameters[3] === 'object' ? parameters[3] : null;
 
                 if (
                     pluginName.toLowerCase() !== this.getPluginName().toLowerCase() ||
                     !args ||
-                    !CALL_COMMAND_NAMES.has(commandName) && !SHOP_COMMAND_NAMES.has(commandName)
+                    (!CALL_COMMAND_NAMES.has(commandName) && !SHOP_COMMAND_NAMES.has(commandName))
                 ) {
                     continue;
                 }
@@ -816,7 +817,11 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            const translatedCategory = this.resolveCachedText(runtime, categoryToken, COMMAND_CACHE_TYPE);
+            const translatedCategory = this.resolveCachedText(
+                runtime,
+                categoryToken,
+                COMMAND_CACHE_TYPE
+            );
             if (this.isUsableText(translatedCategory) && translatedCategory !== categoryToken) {
                 return translatedCategory;
             }

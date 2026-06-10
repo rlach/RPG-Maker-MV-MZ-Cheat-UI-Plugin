@@ -25,7 +25,8 @@ export class DescriptionsCleanup extends BasePhase {
 
     configure(cacheTypes, boxingSystemMessage) {
         this._cacheTypes = Array.isArray(cacheTypes) ? cacheTypes : [];
-        this._boxingSystemMessage = typeof boxingSystemMessage === 'string' ? boxingSystemMessage : '';
+        this._boxingSystemMessage =
+            typeof boxingSystemMessage === 'string' ? boxingSystemMessage : '';
     }
 
     collectUntranslated({ runtime } = {}) {
@@ -38,7 +39,11 @@ export class DescriptionsCleanup extends BasePhase {
         let idCounter = 0;
 
         for (const [cacheKey, value] of runtime.translationCache.entries()) {
-            const parsed = parseCacheKeyForLangPair(cacheKey, runtime.sourceLang, runtime.targetLang);
+            const parsed = parseCacheKeyForLangPair(
+                cacheKey,
+                runtime.sourceLang,
+                runtime.targetLang
+            );
             if (!parsed) {
                 continue;
             }

@@ -138,7 +138,11 @@ export class DarkPlasmaCharacterTextTranslator extends BasePluginTranslator {
     }
 
     isCharacterTextEvent(event) {
-        return !!(event && Array.isArray(event.pages) && CHARACTER_TEXT_META_REGEX.test(event.note || ''));
+        return !!(
+            event &&
+            Array.isArray(event.pages) &&
+            CHARACTER_TEXT_META_REGEX.test(event.note || '')
+        );
     }
 
     collectMapEntries(mapId, mapData, output) {
@@ -200,7 +204,9 @@ export class DarkPlasmaCharacterTextTranslator extends BasePluginTranslator {
         }
 
         const parameters = Array.isArray(cmd.parameters) ? cmd.parameters : [];
-        const pluginName = String(parameters[0] || '').trim().toLowerCase();
+        const pluginName = String(parameters[0] || '')
+            .trim()
+            .toLowerCase();
         const commandName = String(parameters[1] || '').trim();
         const args = parameters[3] && typeof parameters[3] === 'object' ? parameters[3] : null;
         const text = String(args?.text || '').trim();

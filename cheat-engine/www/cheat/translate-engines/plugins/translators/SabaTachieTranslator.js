@@ -64,13 +64,19 @@ function extractSpeakerNameFromPluginCommand(cmd) {
 
     // Split on regular space only to match MV's command356 parsing behavior.
     const parts = commandLine.split(' ');
-    const command = String(parts[0] || '').trim().toLowerCase();
+    const command = String(parts[0] || '')
+        .trim()
+        .toLowerCase();
 
     if (command !== TACHIE_COMMAND && command !== TACHIE_COMMAND_JP) {
         return null;
     }
 
-    if (String(parts[1] || '').trim().toLowerCase() !== SHOW_NAME_SUBCOMMAND) {
+    if (
+        String(parts[1] || '')
+            .trim()
+            .toLowerCase() !== SHOW_NAME_SUBCOMMAND
+    ) {
         return null;
     }
 
@@ -110,9 +116,7 @@ export class SabaTachieTranslator extends BasePluginTranslator {
      */
     _resolveTachieMessageClass() {
         return (
-            window.Saba?.Tachie?.Window_TachieMessage ||
-            globalThis['Window_TachieMessage'] ||
-            null
+            window.Saba?.Tachie?.Window_TachieMessage || globalThis['Window_TachieMessage'] || null
         );
     }
 
@@ -325,7 +329,10 @@ export class SabaTachieTranslator extends BasePluginTranslator {
         // the original startMessage ran), the name window already has the right text.
         // But if translation happens to be available now (e.g. cache populated between
         // pre and post), apply it by re-drawing the name window.
-        if (messageWindow._messageNameWindow && typeof messageWindow._messageNameWindow.draw === 'function') {
+        if (
+            messageWindow._messageNameWindow &&
+            typeof messageWindow._messageNameWindow.draw === 'function'
+        ) {
             const speakerKey = runtime.getCacheKey(speakerName, NAME_CACHE_TYPE);
             // Already tracked in _trackAndTranslateSpeakerName, just check cache
             if (runtime.hasUsableCacheValue(speakerKey)) {
@@ -387,7 +394,11 @@ export class SabaTachieTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            this._collectNamesFromList(commonEvent.list, { scope: 'commonEvent', commonEventId: i }, output);
+            this._collectNamesFromList(
+                commonEvent.list,
+                { scope: 'commonEvent', commonEventId: i },
+                output
+            );
         }
     }
 

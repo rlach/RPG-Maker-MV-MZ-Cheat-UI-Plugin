@@ -384,12 +384,16 @@ export class FtkrSkillTreeSystemTranslator extends BasePluginTranslator {
                 return originalDrawText.apply(this, arguments);
             };
 
-            Object.defineProperty(windowBasePrototype, '__CHEAT_FTKR_STS_TRANSLATOR_DRAW_TEXT_HOOKED__', {
-                value: true,
-                configurable: true,
-                enumerable: false,
-                writable: false,
-            });
+            Object.defineProperty(
+                windowBasePrototype,
+                '__CHEAT_FTKR_STS_TRANSLATOR_DRAW_TEXT_HOOKED__',
+                {
+                    value: true,
+                    configurable: true,
+                    enumerable: false,
+                    writable: false,
+                }
+            );
         }
 
         if (!windowBasePrototype.__CHEAT_FTKR_STS_TRANSLATOR_DRAW_TEXT_EX_HOOKED__) {

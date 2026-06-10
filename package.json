@@ -1,12 +1,12 @@
 {
     "name": "rpg-maker-mv-mz-cheat-ui-plugin",
     "private": true,
-    "version": "1.29.6",
+    "version": "1.29.4",
     "scripts": {
         "prepare": "husky",
         "deploy": "python ./deploy/main.py",
-        "format": "prettier --write \"./cheat-engine/www/**/*.{js,vue,css,html,json}\" \"./types/**/*.d.ts\" \"./.vscode/*.{json}\" \"./*.json\"",
-        "format:check": "prettier --check \"./cheat-engine/www/**/*.{js,vue,css,html,json}\" \"./types/**/*.d.ts\" \"./.vscode/*.{json}\" \"./*.json\"",
+        "format": "prettier --write \"./cheat-engine/www/**/*.{js,vue,css,html,json}\" \"./types/**/*.d.ts\" \"./*.json\"",
+        "format:check": "prettier --check \"./cheat-engine/www/**/*.{js,vue,css,html,json}\" \"./types/**/*.d.ts\" \"./*.json\"",
         "lint": "eslint ./cheat-engine/www --ext .js,.vue",
         "lint:fix": "eslint ./cheat-engine/www --ext .js,.vue --fix",
         "check:duplicates": "node ./scripts/check-duplicates.mjs",

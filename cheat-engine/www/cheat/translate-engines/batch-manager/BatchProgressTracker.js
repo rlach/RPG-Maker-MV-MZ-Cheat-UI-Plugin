@@ -131,7 +131,9 @@ export class BatchProgressTracker {
 
     _render() {
         const activeTitle = this.currentStepLabel || 'translating';
-        const title = this.paused ? `${activeTitle} (paused for ${this.pauseReason || 'OTF'})` : activeTitle;
+        const title = this.paused
+            ? `${activeTitle} (paused for ${this.pauseReason || 'OTF'})`
+            : activeTitle;
         const totalCompletionLine = this.runtime?.getOverallTranslationCompletionLine?.() || null;
         const progress = BatchSummaryReporter.buildProgress({
             title,

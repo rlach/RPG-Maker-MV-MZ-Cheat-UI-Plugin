@@ -84,7 +84,8 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
 
         const sceneMessageProto = window.Scene_Message?.prototype;
         const canInstallSceneMessageHook =
-            sceneMessageProto && typeof sceneMessageProto.createGalgeChoiceListWindow === 'function';
+            sceneMessageProto &&
+            typeof sceneMessageProto.createGalgeChoiceListWindow === 'function';
         if (canInstallSceneMessageHook && !this.installSceneMessageHooks()) {
             return false;
         }
@@ -698,7 +699,9 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            const entry = this.extractShowChoiceEntry(cmd) || this.extractShowChoiceEntryFromMvList(list, cmdIdx);
+            const entry =
+                this.extractShowChoiceEntry(cmd) ||
+                this.extractShowChoiceEntryFromMvList(list, cmdIdx);
             if (!entry) {
                 continue;
             }

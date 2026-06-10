@@ -62,7 +62,9 @@ export class FtkrSkillExpansionTranslator extends BasePluginTranslator {
         }
 
         const skillId = resolveNumber(skill?.id);
-        const baseSkill = Array.isArray(globalThis.$dataSkills) ? globalThis.$dataSkills[skillId] : null;
+        const baseSkill = Array.isArray(globalThis.$dataSkills)
+            ? globalThis.$dataSkills[skillId]
+            : null;
         const originalFromBase = baseSkill?._translateOriginal?.[field];
         if (this.isUsableText(originalFromBase)) {
             return originalFromBase;
@@ -212,12 +214,16 @@ export class FtkrSkillExpansionTranslator extends BasePluginTranslator {
                 return result;
             };
 
-            Object.defineProperty(DataManager, '__CHEAT_FTKR_SKILL_EXPANSION_MAKE_SEP_DATA_HOOKED__', {
-                value: true,
-                configurable: true,
-                enumerable: false,
-                writable: false,
-            });
+            Object.defineProperty(
+                DataManager,
+                '__CHEAT_FTKR_SKILL_EXPANSION_MAKE_SEP_DATA_HOOKED__',
+                {
+                    value: true,
+                    configurable: true,
+                    enumerable: false,
+                    writable: false,
+                }
+            );
         }
 
         if (!gameActorPrototype.__CHEAT_FTKR_SKILL_EXPANSION_SET_SEP_SKILL_HOOKED__) {
@@ -268,12 +274,16 @@ export class FtkrSkillExpansionTranslator extends BasePluginTranslator {
                 return skill;
             };
 
-            Object.defineProperty(gameActorPrototype, '__CHEAT_FTKR_SKILL_EXPANSION_SEP_SKILL_HOOKED__', {
-                value: true,
-                configurable: true,
-                enumerable: false,
-                writable: false,
-            });
+            Object.defineProperty(
+                gameActorPrototype,
+                '__CHEAT_FTKR_SKILL_EXPANSION_SEP_SKILL_HOOKED__',
+                {
+                    value: true,
+                    configurable: true,
+                    enumerable: false,
+                    writable: false,
+                }
+            );
         }
 
         if (!gameActorPrototype.__CHEAT_FTKR_SKILL_EXPANSION_GET_SKILL_HOOKED__) {
@@ -294,12 +304,16 @@ export class FtkrSkillExpansionTranslator extends BasePluginTranslator {
                 return skill;
             };
 
-            Object.defineProperty(gameActorPrototype, '__CHEAT_FTKR_SKILL_EXPANSION_GET_SKILL_HOOKED__', {
-                value: true,
-                configurable: true,
-                enumerable: false,
-                writable: false,
-            });
+            Object.defineProperty(
+                gameActorPrototype,
+                '__CHEAT_FTKR_SKILL_EXPANSION_GET_SKILL_HOOKED__',
+                {
+                    value: true,
+                    configurable: true,
+                    enumerable: false,
+                    writable: false,
+                }
+            );
         }
 
         if (!gameActorPrototype.__CHEAT_FTKR_SKILL_EXPANSION_SKILLS_HOOKED__) {
@@ -320,12 +334,16 @@ export class FtkrSkillExpansionTranslator extends BasePluginTranslator {
                 return skills;
             };
 
-            Object.defineProperty(gameActorPrototype, '__CHEAT_FTKR_SKILL_EXPANSION_SKILLS_HOOKED__', {
-                value: true,
-                configurable: true,
-                enumerable: false,
-                writable: false,
-            });
+            Object.defineProperty(
+                gameActorPrototype,
+                '__CHEAT_FTKR_SKILL_EXPANSION_SKILLS_HOOKED__',
+                {
+                    value: true,
+                    configurable: true,
+                    enumerable: false,
+                    writable: false,
+                }
+            );
         }
 
         if (

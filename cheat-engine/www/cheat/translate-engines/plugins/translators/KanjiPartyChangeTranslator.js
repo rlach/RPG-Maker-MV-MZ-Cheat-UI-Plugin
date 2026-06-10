@@ -221,10 +221,17 @@ export class KanjiPartyChangeTranslator extends BasePluginTranslator {
                         }
                     }
                 } catch (error) {
-                    console.warn('[KanjiPartyChangeTranslator] Failed to translate drawn text', error);
+                    console.warn(
+                        '[KanjiPartyChangeTranslator] Failed to translate drawn text',
+                        error
+                    );
                 }
 
-                return originalDrawText.call(this, nextText, ...Array.prototype.slice.call(arguments, 1));
+                return originalDrawText.call(
+                    this,
+                    nextText,
+                    ...Array.prototype.slice.call(arguments, 1)
+                );
             };
 
             Object.defineProperty(baseProto, DRAW_TEXT_HOOK_FLAG, {
@@ -276,7 +283,11 @@ export class KanjiPartyChangeTranslator extends BasePluginTranslator {
 
         const pluginEntry = this.findPluginEntry(this.getPluginName());
         if (pluginEntry?.parameters) {
-            this.appendEntriesFromParameters(pluginEntry.parameters, 'pluginEntryParameter', entries);
+            this.appendEntriesFromParameters(
+                pluginEntry.parameters,
+                'pluginEntryParameter',
+                entries
+            );
         }
 
         const runtimeParameters = this.getRuntimeParameters();

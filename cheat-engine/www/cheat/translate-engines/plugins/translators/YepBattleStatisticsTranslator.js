@@ -176,7 +176,11 @@ export class YepBattleStatisticsTranslator extends BasePluginTranslator {
 
     withTranslatedRuntimeParams(runtime, paramKeys, invoke) {
         const yanflyParams = window.Yanfly?.Param;
-        if (!yanflyParams || !this.isRuntimeTranslationActive(runtime) || !Array.isArray(paramKeys)) {
+        if (
+            !yanflyParams ||
+            !this.isRuntimeTranslationActive(runtime) ||
+            !Array.isArray(paramKeys)
+        ) {
             return invoke();
         }
 
@@ -267,8 +271,10 @@ export class YepBattleStatisticsTranslator extends BasePluginTranslator {
             const original = klass.prototype.drawBattleCount;
             const withTranslatedRuntimeParams = this.withTranslatedRuntimeParams.bind(this);
             klass.prototype.drawBattleCount = function () {
-                return withTranslatedRuntimeParams(getRuntime(), RUNTIME_PARAM_KEYS.battleCount, () =>
-                    original.apply(this, arguments)
+                return withTranslatedRuntimeParams(
+                    getRuntime(),
+                    RUNTIME_PARAM_KEYS.battleCount,
+                    () => original.apply(this, arguments)
                 );
             };
 

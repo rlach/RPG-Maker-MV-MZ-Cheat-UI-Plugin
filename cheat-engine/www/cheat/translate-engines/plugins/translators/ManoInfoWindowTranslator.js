@@ -192,7 +192,11 @@ export class ManoInfoWindowTranslator extends BasePluginTranslator {
         if (typeof pluginManager?.parameters === 'function') {
             const runtimeParameters = pluginManager.parameters(this.getPluginName());
             if (runtimeParameters && typeof runtimeParameters === 'object') {
-                this.collectListTexts(runtimeParameters.list, 'runtimePluginManagerParameter', entries);
+                this.collectListTexts(
+                    runtimeParameters.list,
+                    'runtimePluginManagerParameter',
+                    entries
+                );
             }
         }
 

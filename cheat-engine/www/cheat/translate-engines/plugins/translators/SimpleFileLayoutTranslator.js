@@ -133,10 +133,15 @@ export class SimpleFileLayoutTranslator extends BasePluginTranslator {
                 return original.call(this, text, x, y, maxWidth, align);
             }
 
-            const translated = resolveRuntimeTranslation(text, runtime, 'plugin_simple_file_layout', {
-                requireRuntimeTranslationActive: true,
-                missValue: text,
-            });
+            const translated = resolveRuntimeTranslation(
+                text,
+                runtime,
+                'plugin_simple_file_layout',
+                {
+                    requireRuntimeTranslationActive: true,
+                    missValue: text,
+                }
+            );
 
             return original.call(this, translated, x, y, maxWidth, align);
         };

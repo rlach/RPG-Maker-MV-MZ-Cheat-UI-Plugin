@@ -372,7 +372,9 @@ export class MiniInformationWindowTranslator extends BasePluginTranslator {
     }
 
     getPluginSettings() {
-        const pluginManagerParameters = globalThis.PluginManager?.parameters?.(this.getPluginName());
+        const pluginManagerParameters = globalThis.PluginManager?.parameters?.(
+            this.getPluginName()
+        );
         const pluginEntry = this.findPluginEntry(this.getPluginName());
         const parameters = pluginManagerParameters || pluginEntry?.parameters || {};
         return this.parsePluginSettings(parameters);
@@ -383,9 +385,7 @@ export class MiniInformationWindowTranslator extends BasePluginTranslator {
         const paramVocab = [];
         for (let i = 1; i <= 7; i += 1) {
             const key = `Param Text${i}`;
-            paramVocab.push(
-                String(safeParameters[key] || DEFAULT_PARAM_TEXT[i]).split(',')
-            );
+            paramVocab.push(String(safeParameters[key] || DEFAULT_PARAM_TEXT[i]).split(','));
         }
 
         return {
@@ -402,7 +402,9 @@ export class MiniInformationWindowTranslator extends BasePluginTranslator {
         const lines = [];
         const noteInfo = this.extractNoteInfo(item);
         this.appendUsableTexts(lines, noteInfo.preInfos);
-        this.appendBuiltTexts(lines, item?.effects, (effect) => this.buildEffectText(effect, settings));
+        this.appendBuiltTexts(lines, item?.effects, (effect) =>
+            this.buildEffectText(effect, settings)
+        );
         this.appendUsableTexts(lines, this.buildParamTexts(item?.params, settings));
         this.appendBuiltTexts(lines, item?.traits, (trait) => this.buildTraitText(trait, settings));
         this.appendUsableTexts(lines, item?.data);
@@ -511,7 +513,9 @@ export class MiniInformationWindowTranslator extends BasePluginTranslator {
 
     buildGainTpEffectText(effect, settings) {
         const { s, g, effectNames } = this.getEffectContext(settings);
-        return effect.value1 > 0 && effectNames[4] ? `${s}${effectNames[4]}${g}+${effect.value1}` : '';
+        return effect.value1 > 0 && effectNames[4]
+            ? `${s}${effectNames[4]}${g}+${effect.value1}`
+            : '';
     }
 
     buildAddStateEffectText(effect, settings) {
@@ -563,7 +567,9 @@ export class MiniInformationWindowTranslator extends BasePluginTranslator {
     buildParamOnlyEffectText(effect, settings, effectNameIndex) {
         const { s, c, effectNames } = this.getEffectContext(settings);
         const name = globalThis.TextManager?.param(effect.dataId) || '';
-        return effectNames[effectNameIndex] ? `${s}${effectNames[effectNameIndex]}:${c}${name}` : '';
+        return effectNames[effectNameIndex]
+            ? `${s}${effectNames[effectNameIndex]}:${c}${name}`
+            : '';
     }
 
     buildEscapeEffectText(_effect, settings) {
@@ -665,7 +671,9 @@ export class MiniInformationWindowTranslator extends BasePluginTranslator {
     buildStateResistTraitText(trait, settings) {
         const context = this.getTraitContext(trait, settings);
         const state = globalThis.$dataStates?.[context.dataId]?.name;
-        return context.vocab[0]?.[2] ? `${context.c}${state}${context.s}${context.vocab[0][2]}` : '';
+        return context.vocab[0]?.[2]
+            ? `${context.c}${state}${context.s}${context.vocab[0][2]}`
+            : '';
     }
 
     buildParamRateTraitText(trait, settings) {

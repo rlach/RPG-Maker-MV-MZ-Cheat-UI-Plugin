@@ -248,7 +248,10 @@ export class NRP_AutoHealTranslator extends BasePluginTranslator {
                         harvestMissing: false,
                     });
                 } catch (error) {
-                    console.warn('[NRP_AutoHealTranslator] Failed to translate menu command', error);
+                    console.warn(
+                        '[NRP_AutoHealTranslator] Failed to translate menu command',
+                        error
+                    );
                 }
 
                 return result;
@@ -292,7 +295,10 @@ export class NRP_AutoHealTranslator extends BasePluginTranslator {
                         harvestMissing: false,
                     });
                 } catch (error) {
-                    console.warn('[NRP_AutoHealTranslator] Failed to translate message text', error);
+                    console.warn(
+                        '[NRP_AutoHealTranslator] Failed to translate message text',
+                        error
+                    );
                 }
 
                 return originalAdd.call(this, nextText);

@@ -238,9 +238,9 @@ export default {
                 return this.service.state.dialogVisible;
             },
             set(value) {
-            if (this.service.state.modalDataGathering) {
-              return;
-            }
+                if (this.service.state.modalDataGathering) {
+                    return;
+                }
                 this.service.state.dialogVisible = !!value;
             },
         },
@@ -286,7 +286,7 @@ export default {
         },
 
         objectTranslationDataGathering() {
-          return !!this.service.state.modalDataGathering;
+            return !!this.service.state.modalDataGathering;
         },
 
         objectTranslationSelection() {
@@ -372,16 +372,16 @@ export default {
         },
 
         closeObjectTranslationModal() {
-          if (this.objectTranslationDataGathering) {
-            return;
-          }
+            if (this.objectTranslationDataGathering) {
+                return;
+            }
             this.service.closeModal();
         },
 
         startObjectTranslationFromModal(dryRun = false) {
-          if (this.objectTranslationDataGathering) {
-            return;
-          }
+            if (this.objectTranslationDataGathering) {
+                return;
+            }
             this.service.startObjectTranslationFromModal(!!dryRun);
         },
 
@@ -418,12 +418,12 @@ export default {
         },
 
         onItemDragStart(event, index) {
-          if (this.objectTranslationDataGathering) {
-            if (event) {
-              event.preventDefault();
+            if (this.objectTranslationDataGathering) {
+                if (event) {
+                    event.preventDefault();
+                }
+                return;
             }
-            return;
-          }
             const item = this.objectTranslationModalStats[index];
             if (item && item.noDragDrop) {
                 if (event) {

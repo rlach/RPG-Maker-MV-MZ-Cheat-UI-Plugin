@@ -102,7 +102,10 @@ export class SItemsceneKzTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        if (!window.Scene_Item?.prototype || typeof window.Scene_Item.prototype.update !== 'function') {
+        if (
+            !window.Scene_Item?.prototype ||
+            typeof window.Scene_Item.prototype.update !== 'function'
+        ) {
             return false;
         }
 
@@ -176,7 +179,10 @@ export class SItemsceneKzTranslator extends BasePluginTranslator {
 
                 infoWindow.setText(nextDescription, nextIll);
             } catch (error) {
-                console.warn('[SItemsceneKzTranslator] Failed to apply runtime item description translation', error);
+                console.warn(
+                    '[SItemsceneKzTranslator] Failed to apply runtime item description translation',
+                    error
+                );
             }
 
             return result;

@@ -1,4 +1,3 @@
-
 import { ensureTranslationRuntime } from './TranslationRuntime.js';
 
 const makeObservable = (value) => {
@@ -68,12 +67,15 @@ class ObjectTranslationService {
         try {
             const stats = runtime.getObjectTranslationStats();
             const commonEventsStats =
-                stats.find((item) => item.id === 'commonEvents') || runtime.countCommonEventsStats();
+                stats.find((item) => item.id === 'commonEvents') ||
+                runtime.countCommonEventsStats();
             const mapEventsStats =
                 stats.find((item) => item.id === 'mapEvents') || runtime.countMapEventsStats();
             const selectedMapIds = runtime.getSelectedObjectTranslationMapIds();
             const pluginDetails = await runtime.buildObjectTranslationPluginDetails();
-            const selectedPluginsCount = pluginDetails.filter((item) => item && item.selected).length;
+            const selectedPluginsCount = pluginDetails.filter(
+                (item) => item && item.selected
+            ).length;
 
             this.state.modalStats = stats
                 .map((item) => {

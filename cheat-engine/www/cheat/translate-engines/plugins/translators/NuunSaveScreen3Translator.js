@@ -1,21 +1,21 @@
 /**
  * NuunSaveScreen3Translator
- * 
+ *
  * Translator for NUUN's SaveScreen_3 plugin (v3.0.0+)
- * 
+ *
  * NUUN_SaveScreen_3.js is a comprehensive save screen enhancement plugin for RPG Maker MZ.
  * It allows customization of save screen layout, display of actor information,
  * and custom parameter displays. This translator extracts and manages translations for:
- * 
+ *
  * 1. ParamName labels - Custom labels for each displayed parameter (Location, Gold, etc.)
  *    stored in SaveLayout.SaveMainWindowList.ContentsList[].ParamName
- * 
+ *
  * This translator intentionally only tracks stable ParamName labels.
  * Dynamic chapter/AnyName values are not tracked to avoid duplicate cache entries.
- * 
+ *
  * Supported versions: 3.0.0 - 3.0.6+
  * Engine: MZ only
- * 
+ *
  * Note: Different from NuunSaveScreenTranslator which handles an earlier version
  * with different method names and parameter structure.
  */
@@ -71,10 +71,7 @@ export class NuunSaveScreen3Translator extends BasePluginTranslator {
 
             try {
                 const runtime = getRuntime();
-                if (
-                    isRuntimeTranslationActive(runtime) &&
-                    isUsableText(effectiveName)
-                ) {
+                if (isRuntimeTranslationActive(runtime) && isUsableText(effectiveName)) {
                     const cacheKey = runtime.getCacheKey(effectiveName, cacheType);
                     runtime.trackCacheKeyUsage(cacheKey);
 
@@ -175,10 +172,7 @@ export class NuunSaveScreen3Translator extends BasePluginTranslator {
      * @private
      */
     _resolvePluginParameters() {
-        if (
-            window.PluginManager &&
-            typeof window.PluginManager.parameters === 'function'
-        ) {
+        if (window.PluginManager && typeof window.PluginManager.parameters === 'function') {
             const params = window.PluginManager.parameters(this.getPluginName());
             if (params && typeof params === 'object') {
                 return params;
@@ -293,9 +287,8 @@ export class NuunSaveScreen3Translator extends BasePluginTranslator {
         const preferredStyle = this._normalizeToken(parameters.SaveLayoutStyle);
         const activeLayout = preferredStyle
             ? layouts.find(
-                (layout) =>
-                    this._normalizeToken(layout?.StyleName) === preferredStyle
-            ) || layouts[0]
+                  (layout) => this._normalizeToken(layout?.StyleName) === preferredStyle
+              ) || layouts[0]
             : layouts[0];
 
         return this._decodeLayout(activeLayout);

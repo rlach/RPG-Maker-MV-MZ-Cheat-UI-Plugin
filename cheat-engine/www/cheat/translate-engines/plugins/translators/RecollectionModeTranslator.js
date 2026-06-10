@@ -372,10 +372,15 @@ export class RecollectionModeTranslator extends BasePluginTranslator {
         const originalNeverWatchTitle = listWindow?.never_watch_title_text;
 
         if (this.isUsableText(originalTitle)) {
-            cgEntry.title = this.resolveRuntimeTranslation(originalTitle, runtime, this.getCacheType(), {
-                requireRuntimeTranslationActive: true,
-                missValue: originalTitle,
-            });
+            cgEntry.title = this.resolveRuntimeTranslation(
+                originalTitle,
+                runtime,
+                this.getCacheType(),
+                {
+                    requireRuntimeTranslationActive: true,
+                    missValue: originalTitle,
+                }
+            );
         }
 
         if (listWindow && this.isUsableText(originalNeverWatchTitle)) {

@@ -18,13 +18,7 @@ export class RetryHandler {
      * @returns {Promise<Object>} {ok, response?, error?}
      */
     async handleJsonError(options) {
-        const {
-            strategy,
-            previousResponse,
-            itemData,
-            isBackgroundJob,
-            retryState,
-        } = options;
+        const { strategy, previousResponse, itemData, isBackgroundJob, retryState } = options;
 
         if (!strategy || strategy === 'none') {
             return { ok: false, error: 'JSON_INVALID' };

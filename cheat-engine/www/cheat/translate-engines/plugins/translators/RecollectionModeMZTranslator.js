@@ -63,10 +63,7 @@ export class RecollectionModeMZTranslator extends BasePluginTranslator {
 
         this._installTitleCommandHook(titleProto);
 
-        const recoCommandProto = this._resolvePrototype(
-            'Window_RecollectionCommand',
-            'addCommand'
-        );
+        const recoCommandProto = this._resolvePrototype('Window_RecollectionCommand', 'addCommand');
         if (recoCommandProto) {
             this._installRecollectionCommandHook(recoCommandProto);
         }
@@ -354,12 +351,16 @@ export class RecollectionModeMZTranslator extends BasePluginTranslator {
             return originalAddCommand.call(this, translatedName, symbol, enabled, ext);
         };
 
-        Object.defineProperty(prototype, '__CHEAT_RECOLLECTION_MODE_MZ_TITLE_ADD_COMMAND_PATCHED__', {
-            value: true,
-            configurable: true,
-            enumerable: false,
-            writable: false,
-        });
+        Object.defineProperty(
+            prototype,
+            '__CHEAT_RECOLLECTION_MODE_MZ_TITLE_ADD_COMMAND_PATCHED__',
+            {
+                value: true,
+                configurable: true,
+                enumerable: false,
+                writable: false,
+            }
+        );
     }
 
     _installRecollectionCommandHook(prototype) {
@@ -522,9 +523,10 @@ export class RecollectionModeMZTranslator extends BasePluginTranslator {
     }
 
     _resolveRecoDataFileName(parameters) {
-        const raw = typeof parameters?.[PARAM_RECO_DATA_FILE] === 'string'
-            ? parameters[PARAM_RECO_DATA_FILE]
-            : '';
+        const raw =
+            typeof parameters?.[PARAM_RECO_DATA_FILE] === 'string'
+                ? parameters[PARAM_RECO_DATA_FILE]
+                : '';
         return raw.trim();
     }
 

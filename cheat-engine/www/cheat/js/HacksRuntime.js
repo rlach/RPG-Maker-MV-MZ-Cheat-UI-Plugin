@@ -109,7 +109,8 @@ class HacksRuntime {
             const data = JSON.parse(json);
             if (data && typeof data === 'object') {
                 if (hasOwn(data, BITMAP_GET_PIXEL_LONG_FIX_KEY)) {
-                    this.state[BITMAP_GET_PIXEL_LONG_FIX_KEY] = !!data[BITMAP_GET_PIXEL_LONG_FIX_KEY];
+                    this.state[BITMAP_GET_PIXEL_LONG_FIX_KEY] =
+                        !!data[BITMAP_GET_PIXEL_LONG_FIX_KEY];
                 }
                 if (hasOwn(data, MV_LOCAL_SAVE_PATH_FIX_KEY)) {
                     this.state[MV_LOCAL_SAVE_PATH_FIX_KEY] = !!data[MV_LOCAL_SAVE_PATH_FIX_KEY];

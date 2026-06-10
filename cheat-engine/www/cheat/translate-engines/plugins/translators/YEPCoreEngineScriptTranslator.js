@@ -360,11 +360,7 @@ export class YEPCoreEngineScriptTranslator extends BasePluginTranslator {
     }
 
     static applyCachedTranslationsToGameVariables(runtime, cacheType) {
-        if (
-            !runtime ||
-            !window.$gameVariables ||
-            !Array.isArray($gameVariables._data)
-        ) {
+        if (!runtime || !window.$gameVariables || !Array.isArray($gameVariables._data)) {
             return { replaced: 0, visited: 0 };
         }
 

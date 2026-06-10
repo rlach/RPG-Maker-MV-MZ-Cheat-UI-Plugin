@@ -3,4 +3,3 @@ export class ConfirmDialog {
 
     static close() {}
 }
-

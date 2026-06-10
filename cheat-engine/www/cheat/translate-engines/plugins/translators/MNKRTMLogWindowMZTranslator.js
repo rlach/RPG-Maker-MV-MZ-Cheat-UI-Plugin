@@ -321,7 +321,11 @@ export class MNKRTMLogWindowMZTranslator extends BasePluginTranslator {
             return;
         }
 
-        for (let commonEventId = 0; commonEventId < window.$dataCommonEvents.length; commonEventId++) {
+        for (
+            let commonEventId = 0;
+            commonEventId < window.$dataCommonEvents.length;
+            commonEventId++
+        ) {
             const commonEvent = window.$dataCommonEvents[commonEventId];
             if (!commonEvent || !Array.isArray(commonEvent.list)) {
                 continue;

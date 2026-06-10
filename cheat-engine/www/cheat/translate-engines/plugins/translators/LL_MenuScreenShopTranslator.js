@@ -115,7 +115,9 @@ export class LL_MenuScreenShopTranslator extends BasePluginTranslator {
 
         const items = this._buildUniquePendingItems(runtime);
         const totalStrings = items.length;
-        const leftStrings = items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey)).length;
+        const leftStrings = items.filter(
+            (item) => !runtime.hasUsableCacheValue(item.cacheKey)
+        ).length;
 
         return {
             total: totalStrings,
@@ -202,7 +204,10 @@ export class LL_MenuScreenShopTranslator extends BasePluginTranslator {
                     isUsableText(translated) ? translated : sourceText
                 );
             } catch (error) {
-                console.warn('[LL_MenuScreenShopTranslator] Failed to translate shop message', error);
+                console.warn(
+                    '[LL_MenuScreenShopTranslator] Failed to translate shop message',
+                    error
+                );
                 return originalSetText.apply(this, arguments);
             }
         };
@@ -225,7 +230,10 @@ export class LL_MenuScreenShopTranslator extends BasePluginTranslator {
         if (typeof window.PluginManager?.parameters === 'function') {
             const runtimeParameters = window.PluginManager.parameters(this.getPluginName());
             if (runtimeParameters && typeof runtimeParameters === 'object') {
-                sources.push({ scope: 'runtimePluginManagerParameter', parameters: runtimeParameters });
+                sources.push({
+                    scope: 'runtimePluginManagerParameter',
+                    parameters: runtimeParameters,
+                });
             }
         }
 

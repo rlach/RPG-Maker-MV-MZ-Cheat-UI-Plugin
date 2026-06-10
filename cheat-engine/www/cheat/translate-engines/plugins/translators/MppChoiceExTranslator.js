@@ -191,11 +191,7 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
     applyRuntimeChoiceHelpTranslations() {
         const runtime = this.getRuntime();
         const gameMessage = runtimeGlobal.$gameMessage;
-        if (
-            !runtime ||
-            !gameMessage ||
-            typeof gameMessage.setChoiceHelpTexts !== 'function'
-        ) {
+        if (!runtime || !gameMessage || typeof gameMessage.setChoiceHelpTexts !== 'function') {
             return;
         }
 

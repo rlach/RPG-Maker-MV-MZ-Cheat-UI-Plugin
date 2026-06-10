@@ -176,11 +176,19 @@ export class FtkrCssDetailedStatusTranslator extends BasePluginTranslator {
             const valueText = normalizeText(entry?.value);
 
             if (this.isUsableText(textToken) && !isStatusControlToken(textToken)) {
-                this.appendTextEntry(textToken, { scope: 'runtimeStatusList', index, field: 'text' }, output);
+                this.appendTextEntry(
+                    textToken,
+                    { scope: 'runtimeStatusList', index, field: 'text' },
+                    output
+                );
             }
 
             if (this.isUsableText(valueText) && shouldTranslateStatusValue(textToken)) {
-                this.appendTextEntry(valueText, { scope: 'runtimeStatusList', index, field: 'value' }, output);
+                this.appendTextEntry(
+                    valueText,
+                    { scope: 'runtimeStatusList', index, field: 'value' },
+                    output
+                );
             }
         }
     }
@@ -215,13 +223,20 @@ export class FtkrCssDetailedStatusTranslator extends BasePluginTranslator {
     }
 
     resolveCombinedRuntimeTranslation(text, runtime) {
-        return this.resolveRuntimeTranslation(text, runtime, [this.getCacheType(), SIMPLE_CACHE_TYPE], {
-            requireRuntimeTranslationActive: true,
-        });
+        return this.resolveRuntimeTranslation(
+            text,
+            runtime,
+            [this.getCacheType(), SIMPLE_CACHE_TYPE],
+            {
+                requireRuntimeTranslationActive: true,
+            }
+        );
     }
 
     buildTranslatedDetailedStatus(detailedStatus, runtime) {
-        const statusList = Array.isArray(detailedStatus?.statusList) ? detailedStatus.statusList : null;
+        const statusList = Array.isArray(detailedStatus?.statusList)
+            ? detailedStatus.statusList
+            : null;
         if (!statusList) {
             return detailedStatus;
         }
@@ -388,7 +403,11 @@ export class FtkrCssDetailedStatusTranslator extends BasePluginTranslator {
 
         const runtimeParameters = this.getRuntimeParameters();
         if (runtimeParameters) {
-            this.collectParameterEntries(runtimeParameters, 'runtimePluginManagerParameter', entries);
+            this.collectParameterEntries(
+                runtimeParameters,
+                'runtimePluginManagerParameter',
+                entries
+            );
         }
 
         this.collectRuntimeDetailedStatusEntries(entries);

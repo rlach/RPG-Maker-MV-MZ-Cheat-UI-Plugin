@@ -28,7 +28,7 @@ function buildGabTextFromArgs(args) {
 
     let text = '';
     for (const arg of args) {
-        text = text + String(arg || '') + ' '; 
+        text = text + String(arg || '') + ' ';
     }
 
     return text;
@@ -260,7 +260,10 @@ export class YepGabWindowTranslator extends BasePluginTranslator {
                     this._text = cached;
                 }
             } catch (error) {
-                console.warn('[YepGabWindowTranslator] Failed to apply runtime gab translation', error);
+                console.warn(
+                    '[YepGabWindowTranslator] Failed to apply runtime gab translation',
+                    error
+                );
             }
         };
 

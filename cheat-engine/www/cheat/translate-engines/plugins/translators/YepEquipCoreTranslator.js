@@ -108,7 +108,9 @@ export class YepEquipCoreTranslator extends BasePluginTranslator {
 
         const items = this._buildUniquePendingItems(runtime);
         const totalStrings = items.length;
-        const leftStrings = items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey)).length;
+        const leftStrings = items.filter(
+            (item) => !runtime.hasUsableCacheValue(item.cacheKey)
+        ).length;
 
         return {
             total: totalStrings,
@@ -146,17 +148,25 @@ export class YepEquipCoreTranslator extends BasePluginTranslator {
                 const runtime = getRuntime();
                 if (runtime && isUsableText(originalText)) {
                     if (isRuntimeTranslationActive(runtime)) {
-                        translatedText = resolveRuntimeTranslation(originalText, runtime, cacheType, {
-                            requireRuntimeTranslationActive: true,
-                            missValue: originalText,
-                        });
+                        translatedText = resolveRuntimeTranslation(
+                            originalText,
+                            runtime,
+                            cacheType,
+                            {
+                                requireRuntimeTranslationActive: true,
+                                missValue: originalText,
+                            }
+                        );
                     } else {
                         const cacheKey = runtime.getCacheKey(originalText, cacheType);
                         runtime.trackCacheKeyUsage(cacheKey);
                     }
                 }
             } catch (error) {
-                console.warn('[YepEquipCoreTranslator] Failed to translate empty equip text', error);
+                console.warn(
+                    '[YepEquipCoreTranslator] Failed to translate empty equip text',
+                    error
+                );
             }
 
             if (translatedText === originalText) {
@@ -178,17 +188,25 @@ export class YepEquipCoreTranslator extends BasePluginTranslator {
                 const runtime = getRuntime();
                 if (runtime && isUsableText(originalText)) {
                     if (isRuntimeTranslationActive(runtime)) {
-                        translatedText = resolveRuntimeTranslation(originalText, runtime, cacheType, {
-                            requireRuntimeTranslationActive: true,
-                            missValue: originalText,
-                        });
+                        translatedText = resolveRuntimeTranslation(
+                            originalText,
+                            runtime,
+                            cacheType,
+                            {
+                                requireRuntimeTranslationActive: true,
+                                missValue: originalText,
+                            }
+                        );
                     } else {
                         const cacheKey = runtime.getCacheKey(originalText, cacheType);
                         runtime.trackCacheKeyUsage(cacheKey);
                     }
                 }
             } catch (error) {
-                console.warn('[YepEquipCoreTranslator] Failed to translate remove equip text', error);
+                console.warn(
+                    '[YepEquipCoreTranslator] Failed to translate remove equip text',
+                    error
+                );
             }
 
             if (translatedText === originalText) {

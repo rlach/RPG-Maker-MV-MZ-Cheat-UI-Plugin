@@ -98,7 +98,9 @@ export class EquipSceneExtensionTranslator extends BasePluginTranslator {
 
         const items = this._buildUniquePendingItems(runtime);
         const totalStrings = items.length;
-        const leftStrings = items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey)).length;
+        const leftStrings = items.filter(
+            (item) => !runtime.hasUsableCacheValue(item.cacheKey)
+        ).length;
 
         return {
             total: totalStrings,
@@ -162,7 +164,10 @@ export class EquipSceneExtensionTranslator extends BasePluginTranslator {
             try {
                 return originalDrawItem.apply(this, arguments);
             } catch (error) {
-                console.warn('[EquipSceneExtensionTranslator] Failed to translate empty equip label', error);
+                console.warn(
+                    '[EquipSceneExtensionTranslator] Failed to translate empty equip label',
+                    error
+                );
                 return originalDrawItem.apply(this, arguments);
             } finally {
                 this.drawText = originalDrawText;
@@ -189,7 +194,10 @@ export class EquipSceneExtensionTranslator extends BasePluginTranslator {
         if (typeof window.PluginManager?.parameters === 'function') {
             const runtimeParameters = window.PluginManager.parameters(this.getPluginName());
             if (runtimeParameters && typeof runtimeParameters === 'object') {
-                sources.push({ scope: 'runtimePluginManagerParameter', parameters: runtimeParameters });
+                sources.push({
+                    scope: 'runtimePluginManagerParameter',
+                    parameters: runtimeParameters,
+                });
             }
         }
 

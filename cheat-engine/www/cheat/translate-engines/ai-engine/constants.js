@@ -181,8 +181,8 @@ export const DEFAULT_BOXING_PROMPT =
     'keep the meaning of the descriptions in their original language\n\n' +
     'you can remove all existing newline characters - [b=sn]\n\n' +
     'You have to fit those descriptions into given box size in characters ([b=sn] is not part of the limit)\n\n' +
-    'You can use shortened synonyms, change grammar, use abbreviations to fit descriptions into the box, but don\'t lose overall meaning of the description.\n\n' +
-    'Don\'t extend length of descriptions that already fit in the box.\n\n' +
+    "You can use shortened synonyms, change grammar, use abbreviations to fit descriptions into the box, but don't lose overall meaning of the description.\n\n" +
+    "Don't extend length of descriptions that already fit in the box.\n\n" +
     'In response return flat single line json, with exactly the same keys, but updated values.';
 
 export const DEFAULT_BANNED_PHRASES = Object.freeze(['tool_call', 'JSON']);

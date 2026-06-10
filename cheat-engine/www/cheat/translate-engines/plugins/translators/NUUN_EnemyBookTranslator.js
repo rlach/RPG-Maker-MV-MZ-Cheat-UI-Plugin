@@ -272,7 +272,10 @@ export class NUUN_EnemyBookTranslator extends BasePluginTranslator {
                         });
                     }
                 } catch (error) {
-                    console.warn('[NUUN_EnemyBookTranslator] Failed to translate menu commands', error);
+                    console.warn(
+                        '[NUUN_EnemyBookTranslator] Failed to translate menu commands',
+                        error
+                    );
                 }
 
                 return result;
@@ -295,7 +298,8 @@ export class NUUN_EnemyBookTranslator extends BasePluginTranslator {
                     const ctorName = String(this?.constructor?.name || '');
                     const shouldTranslate =
                         COMMAND_WINDOW_CTORS.has(ctorName) ||
-                        (ctorName === 'Window_PartyCommand' && MENU_SYMBOLS.has(String(symbol || '')));
+                        (ctorName === 'Window_PartyCommand' &&
+                            MENU_SYMBOLS.has(String(symbol || '')));
 
                     if (shouldTranslate && isUsableText(name)) {
                         const runtime = getRuntime();
@@ -305,16 +309,24 @@ export class NUUN_EnemyBookTranslator extends BasePluginTranslator {
                             runtime.trackCacheKeyUsage(cacheKey);
 
                             if (isRuntimeTranslationActive(runtime)) {
-                                nextName = resolveRuntimeTranslation(sourceText, runtime, cacheType, {
-                                    requireRuntimeTranslationActive: true,
-                                    missValue: sourceText,
-                                    harvestMissing: false,
-                                });
+                                nextName = resolveRuntimeTranslation(
+                                    sourceText,
+                                    runtime,
+                                    cacheType,
+                                    {
+                                        requireRuntimeTranslationActive: true,
+                                        missValue: sourceText,
+                                        harvestMissing: false,
+                                    }
+                                );
                             }
                         }
                     }
                 } catch (error) {
-                    console.warn('[NUUN_EnemyBookTranslator] Failed to translate command name', error);
+                    console.warn(
+                        '[NUUN_EnemyBookTranslator] Failed to translate command name',
+                        error
+                    );
                 }
 
                 return originalAddCommand.call(this, nextName, symbol, enabled, ext);
@@ -365,7 +377,10 @@ export class NUUN_EnemyBookTranslator extends BasePluginTranslator {
                         }
                     }
                 } catch (error) {
-                    console.warn('[NUUN_EnemyBookTranslator] Failed to translate drawText payload', error);
+                    console.warn(
+                        '[NUUN_EnemyBookTranslator] Failed to translate drawText payload',
+                        error
+                    );
                 }
 
                 return originalDrawText.call(this, nextText, x, y, maxWidth, align);

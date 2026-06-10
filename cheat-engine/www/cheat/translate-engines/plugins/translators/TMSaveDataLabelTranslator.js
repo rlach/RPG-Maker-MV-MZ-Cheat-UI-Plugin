@@ -166,7 +166,11 @@ export class TMSaveDataLabelTranslator extends BasePluginTranslator {
 
         const pluginEntry = this.findPluginEntry(this.getPluginName());
         if (pluginEntry?.parameters) {
-            this.appendEntriesFromParameters(pluginEntry.parameters, 'pluginEntryParameter', entries);
+            this.appendEntriesFromParameters(
+                pluginEntry.parameters,
+                'pluginEntryParameter',
+                entries
+            );
         }
 
         const pluginManager = window.PluginManager;

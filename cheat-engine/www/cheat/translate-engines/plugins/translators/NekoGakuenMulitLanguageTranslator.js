@@ -432,7 +432,9 @@ export class NekoGakuenMulitLanguageTranslator extends BasePluginTranslator {
         // RegExp is built dynamically to avoid a literal ESC control char in a regex literal
         // (which some linters and editors flag as a control character violation).
         const SAY_TAG_RE = new RegExp(
-            String.raw`[\\]Say\[([^\]]*?)\]|` + String.fromCodePoint(0x1b) + String.raw`Say\[([^\]]*?)\]`,
+            String.raw`[\\]Say\[([^\]]*?)\]|` +
+                String.fromCodePoint(0x1b) +
+                String.raw`Say\[([^\]]*?)\]`,
             'gi'
         );
         return input.replace(SAY_TAG_RE, (match, p1, p2) => {

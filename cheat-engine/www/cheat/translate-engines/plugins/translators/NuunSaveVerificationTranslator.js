@@ -220,10 +220,15 @@ export class NuunSaveVerificationTranslator extends BasePluginTranslator {
             }
 
             const source = isUsableText(text) ? text : String(text || '');
-            const translated = resolveRuntimeTranslation(source, runtime, 'plugin_nuun_save_verification', {
-                requireRuntimeTranslationActive: true,
-                missValue: source,
-            });
+            const translated = resolveRuntimeTranslation(
+                source,
+                runtime,
+                'plugin_nuun_save_verification',
+                {
+                    requireRuntimeTranslationActive: true,
+                    missValue: source,
+                }
+            );
 
             return original.call(this, translated, x, y, maxWidth, align);
         };

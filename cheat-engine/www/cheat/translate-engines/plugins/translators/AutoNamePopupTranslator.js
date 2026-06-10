@@ -125,7 +125,10 @@ export class AutoNamePopupTranslator extends BasePluginTranslator {
         const parameters = pluginEntry?.parameters || {};
 
         const actorExpressions = Math.max(1, Number(parameters.actorFacialExpressions || 1));
-        const characterExpressions = Math.max(1, Number(parameters.characterFacialExpressions || 1));
+        const characterExpressions = Math.max(
+            1,
+            Number(parameters.characterFacialExpressions || 1)
+        );
 
         const rawNameKeys = parseJsonSafely(parameters.nameKeys, []);
         const nameKeyRows = Array.isArray(rawNameKeys)

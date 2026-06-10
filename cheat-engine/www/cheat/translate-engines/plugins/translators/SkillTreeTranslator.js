@@ -190,7 +190,9 @@ export class SkillTreeTranslator extends BasePluginTranslator {
             : [];
         this._collectSkillTreeTypeEntries(skillTreeTypes, entries);
 
-        const skillTreeInfo = Array.isArray(configData.skillTreeInfo) ? configData.skillTreeInfo : [];
+        const skillTreeInfo = Array.isArray(configData.skillTreeInfo)
+            ? configData.skillTreeInfo
+            : [];
         this._collectSkillTreeInfoHelpEntries(skillTreeInfo, entries);
     }
 
@@ -456,10 +458,7 @@ export class SkillTreeTranslator extends BasePluginTranslator {
             Window_Help.prototype.setText = function (text) {
                 let nextText = text;
                 try {
-                    if (
-                        typeof text === 'string' &&
-                        text.trim()
-                    ) {
+                    if (typeof text === 'string' && text.trim()) {
                         if (this._skillTreeTranslator?.sourceTexts?.has(text)) {
                             nextText = this._skillTreeTranslator.translateText(text);
                         } else {

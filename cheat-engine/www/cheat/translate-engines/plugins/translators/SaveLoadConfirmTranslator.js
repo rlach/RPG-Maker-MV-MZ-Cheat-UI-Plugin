@@ -187,10 +187,15 @@ export class SaveLoadConfirmTranslator extends BasePluginTranslator {
 
             const originalAddCommand = this.addCommand;
             this.addCommand = function (name, symbol, enabled, ext) {
-                const translated = resolveRuntimeTranslation(name, runtime, 'plugin_save_load_confirm', {
-                    requireRuntimeTranslationActive: true,
-                    missValue: name,
-                });
+                const translated = resolveRuntimeTranslation(
+                    name,
+                    runtime,
+                    'plugin_save_load_confirm',
+                    {
+                        requireRuntimeTranslationActive: true,
+                        missValue: name,
+                    }
+                );
 
                 return originalAddCommand.call(this, translated, symbol, enabled, ext);
             };

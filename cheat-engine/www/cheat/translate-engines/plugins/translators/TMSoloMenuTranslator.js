@@ -141,7 +141,11 @@ export class TMSoloMenuTranslator extends BasePluginTranslator {
 
         const pluginEntry = this.findPluginEntry(this.getPluginName());
         if (pluginEntry?.parameters) {
-            this.appendEntriesFromParameters(entries, pluginEntry.parameters, 'pluginEntryParameters');
+            this.appendEntriesFromParameters(
+                entries,
+                pluginEntry.parameters,
+                'pluginEntryParameters'
+            );
         }
 
         const runtimeParameters = window.PluginManager?.parameters?.(this.getPluginName());
@@ -217,7 +221,11 @@ export class TMSoloMenuTranslator extends BasePluginTranslator {
             }
 
             const template = String(entry?.text || '');
-            if (!this.isUsableText(template) || !template.includes('%1') || byTemplate.has(template)) {
+            if (
+                !this.isUsableText(template) ||
+                !template.includes('%1') ||
+                byTemplate.has(template)
+            ) {
                 continue;
             }
 
@@ -407,7 +415,12 @@ export class TMSoloMenuTranslator extends BasePluginTranslator {
                             ...parameter,
                             name: translatedName,
                         };
-                        return originalDrawBattleParameter.call(this, actor, paramId, nextParameter);
+                        return originalDrawBattleParameter.call(
+                            this,
+                            actor,
+                            paramId,
+                            nextParameter
+                        );
                     }
                 }
             } catch (error) {

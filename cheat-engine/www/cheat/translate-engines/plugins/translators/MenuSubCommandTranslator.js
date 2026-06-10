@@ -112,18 +112,28 @@ export class MenuSubCommandTranslator extends BasePluginTranslator {
 
         subCommand.getName = (...args) => {
             const originalText = originalGetName.apply(subCommand, args);
-            return this.resolveRuntimeTranslation(originalText, this.getRuntime(), this.getCacheType(), {
-                requireRuntimeTranslationActive: true,
-                missValue: originalText,
-            });
+            return this.resolveRuntimeTranslation(
+                originalText,
+                this.getRuntime(),
+                this.getCacheType(),
+                {
+                    requireRuntimeTranslationActive: true,
+                    missValue: originalText,
+                }
+            );
         };
 
         subCommand.getParentName = (...args) => {
             const originalText = originalGetParentName.apply(subCommand, args);
-            return this.resolveRuntimeTranslation(originalText, this.getRuntime(), this.getCacheType(), {
-                requireRuntimeTranslationActive: true,
-                missValue: originalText,
-            });
+            return this.resolveRuntimeTranslation(
+                originalText,
+                this.getRuntime(),
+                this.getCacheType(),
+                {
+                    requireRuntimeTranslationActive: true,
+                    missValue: originalText,
+                }
+            );
         };
 
         Object.defineProperty(subCommand, INSTANCE_HOOK_FLAG, {
@@ -218,7 +228,11 @@ export class MenuSubCommandTranslator extends BasePluginTranslator {
 
         const pluginEntry = this.findPluginEntry(this.getPluginName());
         if (pluginEntry?.parameters) {
-            this.appendEntriesFromParameters(pluginEntry.parameters, 'pluginEntryParameter', entries);
+            this.appendEntriesFromParameters(
+                pluginEntry.parameters,
+                'pluginEntryParameter',
+                entries
+            );
         }
 
         const runtimeParameters = window.PluginManager?.parameters?.(this.getPluginName());

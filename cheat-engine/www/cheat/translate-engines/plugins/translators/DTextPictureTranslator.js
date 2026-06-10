@@ -242,10 +242,15 @@ export class DTextPictureTranslator extends BasePluginTranslator {
             return null;
         }
 
-        const translatedText = this.resolveRuntimeTranslation(sourceText, runtime, this.getCacheType(), {
-            missValue: sourceText,
-            requireRuntimeTranslationActive: true,
-        });
+        const translatedText = this.resolveRuntimeTranslation(
+            sourceText,
+            runtime,
+            this.getCacheType(),
+            {
+                missValue: sourceText,
+                requireRuntimeTranslationActive: true,
+            }
+        );
 
         if (translatedText === sourceText) {
             return null;

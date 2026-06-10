@@ -125,7 +125,9 @@ export class ChronusTranslator extends BasePluginTranslator {
 
         const items = this._buildUniquePendingItems(runtime);
         const totalStrings = items.length;
-        const leftStrings = items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey)).length;
+        const leftStrings = items.filter(
+            (item) => !runtime.hasUsableCacheValue(item.cacheKey)
+        ).length;
 
         return {
             total: totalStrings,
@@ -169,7 +171,10 @@ export class ChronusTranslator extends BasePluginTranslator {
             if (typeof translatedFormat !== 'string' || !translatedFormat.trim()) {
                 return null;
             }
-            return this._applyAmPmTranslation(chronus.convertDateFormatText(translatedFormat), runtime);
+            return this._applyAmPmTranslation(
+                chronus.convertDateFormatText(translatedFormat),
+                runtime
+            );
         };
 
         Game_Chronus.prototype.getDateFormat = function (index) {

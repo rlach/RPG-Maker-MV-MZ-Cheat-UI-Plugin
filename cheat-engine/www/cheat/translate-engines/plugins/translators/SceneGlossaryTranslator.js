@@ -213,12 +213,20 @@ function extractTagSymbolsFromRawValue(rawValue, outputSet) {
     const xmlTagRegex = /<\s*([A-Za-z_]\w*)\s*[:>]/g;
     let match = null;
     while ((match = xmlTagRegex.exec(source)) !== null) {
-        outputSet.add(String(match[1] || '').trim().toLowerCase());
+        outputSet.add(
+            String(match[1] || '')
+                .trim()
+                .toLowerCase()
+        );
     }
 
     const tokenRegex = /(?:^|[,\s])([A-Za-z_]\w*)(?=$|[,\s])/g;
     while ((match = tokenRegex.exec(source)) !== null) {
-        outputSet.add(String(match[1] || '').trim().toLowerCase());
+        outputSet.add(
+            String(match[1] || '')
+                .trim()
+                .toLowerCase()
+        );
     }
 }
 
@@ -291,10 +299,7 @@ function appendEntriesFromGlossaryDatabaseNoteRecord(
     for (const tagEntry of tagEntries) {
         const tagName = String(tagEntry.tag || '').trim();
         const normalizedTagName = tagName.toLowerCase();
-        if (
-            !isSceneGlossaryDefaultTagSymbol(tagName) &&
-            !allowedTags.has(normalizedTagName)
-        ) {
+        if (!isSceneGlossaryDefaultTagSymbol(tagName) && !allowedTags.has(normalizedTagName)) {
             continue;
         }
 
@@ -320,7 +325,11 @@ function appendEntriesFromGlossaryDatabaseNoteRecord(
 function appendEntriesFromGlossaryDatabaseNotes(customTagSymbols, output) {
     const allowedTags = new Set(
         Array.from(customTagSymbols || [])
-            .map((tag) => String(tag || '').trim().toLowerCase())
+            .map((tag) =>
+                String(tag || '')
+                    .trim()
+                    .toLowerCase()
+            )
             .filter(Boolean)
     );
 
@@ -941,9 +950,7 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
         patchGlossaryPartyMessages(this);
         patchGlossaryMenuCommand(this);
         this.registerPluginCustomTags(SCENE_GLOSSARY_PLUGIN_TAGS);
-        this.registerPluginCustomTags(
-            buildCustomXmlTagConfigs(Array.from(this._customTagSymbols))
-        );
+        this.registerPluginCustomTags(buildCustomXmlTagConfigs(Array.from(this._customTagSymbols)));
         window[RUNTIME_HOOK_GUARD] = true;
         return true;
     }

@@ -102,11 +102,16 @@ export class DescriptionExtendTranslator extends BasePluginTranslator {
             return inputText;
         }
 
-        const translated = this.resolveRuntimeTranslation(sourceText, runtime, this.getCacheType(), {
-            requireRuntimeTranslationActive: true,
-            missValue: sourceText,
-            harvestMissing: false,
-        });
+        const translated = this.resolveRuntimeTranslation(
+            sourceText,
+            runtime,
+            this.getCacheType(),
+            {
+                requireRuntimeTranslationActive: true,
+                missValue: sourceText,
+                harvestMissing: false,
+            }
+        );
 
         if (!this.isUsableText(translated) || translated === sourceText) {
             return inputText;
@@ -148,7 +153,8 @@ export class DescriptionExtendTranslator extends BasePluginTranslator {
         const originalSetItem = Window_Help.prototype.setItem;
         const originalSetText = Window_Help.prototype.setText;
         const getRuntime = this.getRuntime.bind(this);
-        const applyRuntimeDescriptionTranslation = this._applyRuntimeDescriptionTranslation.bind(this);
+        const applyRuntimeDescriptionTranslation =
+            this._applyRuntimeDescriptionTranslation.bind(this);
 
         Window_Help.prototype.setItem = function () {
             this[HELP_ITEM_STASH_KEY] = arguments[0] || null;

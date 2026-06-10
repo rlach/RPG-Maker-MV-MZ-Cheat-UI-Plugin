@@ -95,7 +95,10 @@ export class TorigoyaAchievement2AddonCategoryTranslator extends BasePluginTrans
     enablePluginTranslation() {
         const categoryWindowClass =
             window.Torigoya?.Achievement2?.Addons?.Category?.Window_AchievementCategory;
-        if (!categoryWindowClass?.prototype || typeof categoryWindowClass.prototype.makeCommandList !== 'function') {
+        if (
+            !categoryWindowClass?.prototype ||
+            typeof categoryWindowClass.prototype.makeCommandList !== 'function'
+        ) {
             return false;
         }
 
@@ -106,9 +109,16 @@ export class TorigoyaAchievement2AddonCategoryTranslator extends BasePluginTrans
         const originalMakeCommandList = categoryWindowClass.prototype.makeCommandList;
         categoryWindowClass.prototype.makeCommandList = function () {
             const result = originalMakeCommandList.apply(this, arguments);
-            const runtime = this?.constructor?.__CHEAT_TORIGOYA_ACHIEVEMENT2_ADDON_CATEGORY_TRANSLATOR__?.getRuntime();
-            const translator = this?.constructor?.__CHEAT_TORIGOYA_ACHIEVEMENT2_ADDON_CATEGORY_TRANSLATOR__;
-            if (!translator || !runtime || !translator.isRuntimeTranslationActive(runtime) || !Array.isArray(this._list)) {
+            const runtime =
+                this?.constructor?.__CHEAT_TORIGOYA_ACHIEVEMENT2_ADDON_CATEGORY_TRANSLATOR__?.getRuntime();
+            const translator =
+                this?.constructor?.__CHEAT_TORIGOYA_ACHIEVEMENT2_ADDON_CATEGORY_TRANSLATOR__;
+            if (
+                !translator ||
+                !runtime ||
+                !translator.isRuntimeTranslationActive(runtime) ||
+                !Array.isArray(this._list)
+            ) {
                 return result;
             }
 

@@ -92,7 +92,10 @@ export class YedWordWrapTranslator extends BasePluginTranslator {
                     return originalWrapText.call(this, text, maxWidth, options);
                 }
 
-                if (activeRuntime && typeof activeRuntime.getPreferredMessageCacheEntry === 'function') {
+                if (
+                    activeRuntime &&
+                    typeof activeRuntime.getPreferredMessageCacheEntry === 'function'
+                ) {
                     activeRuntime.getPreferredMessageCacheEntry(sourceText, {
                         hasPortrait: !!activeRuntime.hasCurrentMessagePortrait?.(),
                     });

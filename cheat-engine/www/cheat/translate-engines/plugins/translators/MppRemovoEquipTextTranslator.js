@@ -71,7 +71,10 @@ export class MppRemovoEquipTextTranslator extends BasePluginTranslator {
         const entries = [];
 
         for (const source of this._resolveParameterSources()) {
-            const text = typeof source.parameters?.[PARAM_TEXT] === 'string' ? source.parameters[PARAM_TEXT] : '';
+            const text =
+                typeof source.parameters?.[PARAM_TEXT] === 'string'
+                    ? source.parameters[PARAM_TEXT]
+                    : '';
             if (!this.isUsableText(text)) {
                 continue;
             }
@@ -104,7 +107,9 @@ export class MppRemovoEquipTextTranslator extends BasePluginTranslator {
 
         const items = this._buildUniquePendingItems(runtime);
         const totalStrings = items.length;
-        const leftStrings = items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey)).length;
+        const leftStrings = items.filter(
+            (item) => !runtime.hasUsableCacheValue(item.cacheKey)
+        ).length;
 
         return {
             total: totalStrings,
@@ -153,10 +158,15 @@ export class MppRemovoEquipTextTranslator extends BasePluginTranslator {
                     return originalDrawItem.call(this, index);
                 }
 
-                const translatedText = resolveRuntimeTranslation(originalText, runtime, CACHE_TYPE, {
-                    requireRuntimeTranslationActive: true,
-                    missValue: originalText,
-                });
+                const translatedText = resolveRuntimeTranslation(
+                    originalText,
+                    runtime,
+                    CACHE_TYPE,
+                    {
+                        requireRuntimeTranslationActive: true,
+                        missValue: originalText,
+                    }
+                );
 
                 if (!isUsableText(translatedText) || translatedText === originalText) {
                     return originalDrawItem.call(this, index);
@@ -179,12 +189,16 @@ export class MppRemovoEquipTextTranslator extends BasePluginTranslator {
             }
         };
 
-        Object.defineProperty(Window_EquipItem.prototype, '__CHEAT_MPP_REMOVO_EQUIP_TEXT_DRAW_ITEM_PATCHED__', {
-            value: true,
-            configurable: true,
-            enumerable: false,
-            writable: false,
-        });
+        Object.defineProperty(
+            Window_EquipItem.prototype,
+            '__CHEAT_MPP_REMOVO_EQUIP_TEXT_DRAW_ITEM_PATCHED__',
+            {
+                value: true,
+                configurable: true,
+                enumerable: false,
+                writable: false,
+            }
+        );
 
         return true;
     }
@@ -237,7 +251,9 @@ export class MppRemovoEquipTextTranslator extends BasePluginTranslator {
 
     _resolveConfiguredTextEnabled() {
         for (const source of this._resolveParameterSources()) {
-            const raw = String(source.parameters?.[PARAM_TEXT_ENABLED] || '').trim().toLowerCase();
+            const raw = String(source.parameters?.[PARAM_TEXT_ENABLED] || '')
+                .trim()
+                .toLowerCase();
             if (!raw) {
                 continue;
             }

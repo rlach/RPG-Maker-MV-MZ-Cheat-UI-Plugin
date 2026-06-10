@@ -226,7 +226,9 @@ export class YepBattleEngineCoreTranslator extends BasePluginTranslator {
             return false;
         }
 
-        if (/[{};]|\$game|\$data|\$gameSwitches|\$gameVariables|\bMath\b|=>|\bthis\b/.test(trimmed)) {
+        if (
+            /[{};]|\$game|\$data|\$gameSwitches|\$gameVariables|\bMath\b|=>|\bthis\b/.test(trimmed)
+        ) {
             return false;
         }
 

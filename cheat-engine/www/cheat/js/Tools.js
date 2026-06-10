@@ -16,7 +16,9 @@ export function isNwjsEnvironment() {
     if (utils && typeof utils.isNwjs === 'function') {
         try {
             return Boolean(utils.isNwjs());
-        } catch (err) { /* empty */ }
+        } catch (err) {
+            /* empty */
+        }
     }
 
     return false;

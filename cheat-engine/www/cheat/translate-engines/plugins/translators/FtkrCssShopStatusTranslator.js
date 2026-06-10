@@ -211,10 +211,15 @@ export class FtkrCssShopStatusTranslator extends BasePluginTranslator {
 
             let nextValue = entry.value;
             if (this.isUsableText(sourceValue) && shouldTranslateStatusValue(sourceTextToken)) {
-                nextValue = this.resolveRuntimeTranslation(sourceValue, runtime, this.getCacheType(), {
-                    requireRuntimeTranslationActive: true,
-                    missValue: sourceValue,
-                });
+                nextValue = this.resolveRuntimeTranslation(
+                    sourceValue,
+                    runtime,
+                    this.getCacheType(),
+                    {
+                        requireRuntimeTranslationActive: true,
+                        missValue: sourceValue,
+                    }
+                );
             }
 
             if (nextTextToken === entry.text && nextValue === entry.value) {

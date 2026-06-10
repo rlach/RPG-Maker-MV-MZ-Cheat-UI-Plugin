@@ -1,4 +1,7 @@
-import { collectEventCommandEntries, extractMessageEntryAt } from '../../../js/EventCommandTraversal.js';
+import {
+    collectEventCommandEntries,
+    extractMessageEntryAt,
+} from '../../../js/EventCommandTraversal.js';
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 
 const SCENARIO_FILE_NAME = 'Scenario.json';
@@ -256,8 +259,7 @@ export class SabaSimpleScenarioTranslator extends BasePluginTranslator {
 
                 const errors = Array.isArray(dataManager._errors) ? dataManager._errors : [];
                 const errorIndex = errors.findIndex(
-                    (error) =>
-                        error?.name === tempName && error?.src === SCENARIO_FILE_NAME
+                    (error) => error?.name === tempName && error?.src === SCENARIO_FILE_NAME
                 );
 
                 if (errorIndex >= 0) {

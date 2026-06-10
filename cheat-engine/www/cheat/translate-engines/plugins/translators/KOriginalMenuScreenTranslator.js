@@ -109,7 +109,9 @@ export class KOriginalMenuScreenTranslator extends BasePluginTranslator {
 
         const items = this._buildUniquePendingItems(runtime);
         const totalStrings = items.length;
-        const leftStrings = items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey)).length;
+        const leftStrings = items.filter(
+            (item) => !runtime.hasUsableCacheValue(item.cacheKey)
+        ).length;
 
         return {
             total: totalStrings,
@@ -149,7 +151,10 @@ export class KOriginalMenuScreenTranslator extends BasePluginTranslator {
                 return;
             }
 
-            if (typeof windowInstance.setText !== 'function' || typeof windowInstance.drawText !== 'function') {
+            if (
+                typeof windowInstance.setText !== 'function' ||
+                typeof windowInstance.drawText !== 'function'
+            ) {
                 return;
             }
 
@@ -184,10 +189,15 @@ export class KOriginalMenuScreenTranslator extends BasePluginTranslator {
                     const runtime = getRuntime();
                     if (isRuntimeTranslationActive(runtime)) {
                         if (text === LOCATION_LABEL_TEXT || text === PLAYTIME_LABEL_TEXT) {
-                            renderedText = resolveRuntimeTranslation(renderedText, runtime, cacheType, {
-                                requireRuntimeTranslationActive: true,
-                                missValue: renderedText,
-                            });
+                            renderedText = resolveRuntimeTranslation(
+                                renderedText,
+                                runtime,
+                                cacheType,
+                                {
+                                    requireRuntimeTranslationActive: true,
+                                    missValue: renderedText,
+                                }
+                            );
                         }
                     }
                 } catch (error) {
@@ -200,12 +210,16 @@ export class KOriginalMenuScreenTranslator extends BasePluginTranslator {
                 return originalDrawText.call(this, renderedText, x, y, maxWidth, align);
             };
 
-            Object.defineProperty(windowInstance, '__CHEAT_K_ORIGINAL_MENU_SCREEN_WINDOW_PATCHED__', {
-                value: true,
-                configurable: true,
-                enumerable: false,
-                writable: false,
-            });
+            Object.defineProperty(
+                windowInstance,
+                '__CHEAT_K_ORIGINAL_MENU_SCREEN_WINDOW_PATCHED__',
+                {
+                    value: true,
+                    configurable: true,
+                    enumerable: false,
+                    writable: false,
+                }
+            );
         };
 
         sceneMenuPrototype.createInformationWindow = function () {
@@ -223,12 +237,16 @@ export class KOriginalMenuScreenTranslator extends BasePluginTranslator {
             return result;
         };
 
-        Object.defineProperty(sceneMenuPrototype, '__CHEAT_K_ORIGINAL_MENU_SCREEN_CREATE_INFO_PATCHED__', {
-            value: true,
-            configurable: true,
-            enumerable: false,
-            writable: false,
-        });
+        Object.defineProperty(
+            sceneMenuPrototype,
+            '__CHEAT_K_ORIGINAL_MENU_SCREEN_CREATE_INFO_PATCHED__',
+            {
+                value: true,
+                configurable: true,
+                enumerable: false,
+                writable: false,
+            }
+        );
 
         return true;
     }
