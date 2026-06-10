@@ -5,10 +5,11 @@ import { BatchSummaryReporter } from './BatchSummaryReporter.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../plugins/PluginTranslatorRegistry.js';
 
 export class TranslationBatchManager {
-    constructor(runtime) {
+    constructor(runtime, options = {}) {
         this.runtime = runtime;
         this.errorRecovery = new ErrorRecoveryStrategy('default');
-        this.progressTracker = new BatchProgressTracker(runtime);
+        const progressUi = options.progressUi || runtime;
+        this.progressTracker = new BatchProgressTracker(runtime, progressUi);
         this.kindRegistry = new Map();
     }
 

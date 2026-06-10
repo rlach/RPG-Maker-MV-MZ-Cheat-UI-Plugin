@@ -25,9 +25,17 @@ describe('TranslateOnTheFlyFlowMethods foreground manager isolation', () => {
 
         createTranslationBatchManager.mockReturnValue(foregroundManager);
 
+        const getProgressUiAdapter = vi.fn(() => ({
+            showSpinner: vi.fn(),
+            hideSpinner: vi.fn(),
+            hideProgressBox: vi.fn(),
+            updateProgressBox: vi.fn(),
+        }));
+
         const runtime = {
             batchManager: backgroundManager,
             _foregroundBatchManager: null,
+            getProgressUiAdapter,
         };
         Object.assign(runtime, translateOnTheFlyFlowMethods);
 
@@ -39,6 +47,9 @@ describe('TranslateOnTheFlyFlowMethods foreground manager isolation', () => {
         });
 
         expect(createTranslationBatchManager).toHaveBeenCalledTimes(1);
+        expect(createTranslationBatchManager).toHaveBeenCalledWith(runtime, {
+            progressChannel: 'foreground',
+        });
         expect(foregroundManager.runBatchedTranslation).toHaveBeenCalledTimes(1);
         expect(backgroundManager.runBatchedTranslation).not.toHaveBeenCalled();
         expect(runtime.batchManager).toBe(backgroundManager);

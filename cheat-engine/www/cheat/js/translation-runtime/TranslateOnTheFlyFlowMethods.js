@@ -704,7 +704,9 @@ export const translateOnTheFlyFlowMethods = {
 
     getForegroundBatchManager() {
         if (!this._foregroundBatchManager) {
-            this._foregroundBatchManager = createTranslationBatchManager(this);
+            this._foregroundBatchManager = createTranslationBatchManager(this, {
+                progressChannel: 'foreground',
+            });
         }
 
         return this._foregroundBatchManager;

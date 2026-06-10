@@ -1,8 +1,9 @@
 import { BatchSummaryReporter } from './BatchSummaryReporter.js';
 
 export class BatchProgressTracker {
-    constructor(runtime) {
+    constructor(runtime, progressUi = runtime) {
         this.runtime = runtime;
+        this.progressUi = progressUi;
         this.currentStepLabel = '';
         this.currentProcessed = 0;
         this.currentTotal = 0;
@@ -33,7 +34,7 @@ export class BatchProgressTracker {
         this.queueTotal = 0;
         this.phaseStartQueueProcessed = 0;
         this.paused = false;
-        this.runtime.showSpinner();
+        this.progressUi.showSpinner();
         this._render();
     }
 
@@ -57,8 +58,8 @@ export class BatchProgressTracker {
      * End the queue: hide spinner and progress box.
      */
     endQueue() {
-        this.runtime.hideSpinner();
-        this.runtime.hideProgressBox();
+        this.progressUi.hideSpinner();
+        this.progressUi.hideProgressBox();
     }
 
     updateStep(stepLabel, currentProcessed, currentTotal) {
@@ -129,9 +130,8 @@ export class BatchProgressTracker {
     }
 
     _render() {
-        const title = this.paused
-            ? `batch paused by OTF - ${this.pauseReason || 'translating event'}`
-            : this.currentStepLabel;
+        const activeTitle = this.currentStepLabel || 'translating';
+        const title = this.paused ? `${activeTitle} (paused for ${this.pauseReason || 'OTF'})` : activeTitle;
         const totalCompletionLine = this.runtime?.getOverallTranslationCompletionLine?.() || null;
         const progress = BatchSummaryReporter.buildProgress({
             title,
@@ -144,7 +144,7 @@ export class BatchProgressTracker {
             totalCompletionLine,
         });
 
-        this.runtime.updateProgressBox(
+        this.progressUi.updateProgressBox(
             progress.title,
             progress.message,
             progress.totalCompletionLine,

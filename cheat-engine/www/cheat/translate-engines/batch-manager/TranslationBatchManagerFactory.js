@@ -52,8 +52,16 @@ function registerDefaultStrategies(manager) {
     manager.register(CurrentEvent.getInstance());
 }
 
-export function createTranslationBatchManager(runtime) {
-    const manager = new TranslationBatchManager(runtime);
+export function createTranslationBatchManager(runtime, options = {}) {
+    const progressChannel = options.progressChannel || 'main';
+    const progressUi =
+        typeof runtime.getProgressUiAdapter === 'function'
+            ? runtime.getProgressUiAdapter(progressChannel)
+            : runtime;
+    const manager = new TranslationBatchManager(runtime, {
+        ...options,
+        progressUi,
+    });
     registerDefaultStrategies(manager);
     return manager;
 }
