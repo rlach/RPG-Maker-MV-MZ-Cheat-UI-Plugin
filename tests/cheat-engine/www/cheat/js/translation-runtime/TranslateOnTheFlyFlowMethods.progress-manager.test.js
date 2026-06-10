@@ -54,4 +54,59 @@ describe('TranslateOnTheFlyFlowMethods foreground manager isolation', () => {
         expect(backgroundManager.runBatchedTranslation).not.toHaveBeenCalled();
         expect(runtime.batchManager).toBe(backgroundManager);
     });
+
+    it('shows waiting foreground status and pauses main queue when interrupt is disabled', async () => {
+        const foregroundManager = {
+            runBatchedTranslation: vi.fn().mockResolvedValue({
+                successes: [],
+                failures: [],
+            }),
+            countAmountSync: vi.fn(() => [{ left: 69 }]),
+        };
+        createTranslationBatchManager.mockReturnValue(foregroundManager);
+
+        const batchManager = {
+            onBatchPausedByOtf: vi.fn(),
+            onBatchResumed: vi.fn(),
+        };
+
+        const updateProgressBox = vi.fn();
+        const runtime = {
+            _foregroundBatchManager: null,
+            interruptQueueForRealtime: false,
+            batchManager,
+            engine: {
+                hasActiveBackgroundRequest: vi.fn(() => true),
+            },
+            isNonOtfTranslationProcessActive: vi.fn(() => true),
+            getActiveNonOtfTranslationProcessLabel: vi.fn(() => 'translating common events'),
+            updateProgressBox,
+        };
+        Object.assign(runtime, translateOnTheFlyFlowMethods);
+        runtime.buildForegroundOperationKey = vi.fn(() => 'foreground::key');
+        runtime.preemptBackgroundForForeground = vi.fn(() => false);
+        runtime.waitForActiveBackgroundRequestToFinish = vi.fn(async () => {
+            runtime.engine.hasActiveBackgroundRequest = vi.fn(() => false);
+        });
+
+        await runtime.requestForegroundDialogBatch({
+            currentText: 'NPC line',
+            currentSpeakerName: 'NPC',
+            cacheKey: 'message:ja-en:NPC line',
+            hasPortrait: false,
+            maxDepth: 99,
+        });
+
+        expect(updateProgressBox).toHaveBeenCalledWith(
+            'current event (waiting for main queue to pause)',
+            '0/69 translated (0%)',
+            null,
+            null,
+            null,
+            'foreground'
+        );
+        expect(batchManager.onBatchPausedByOtf).toHaveBeenCalledWith('current event');
+        expect(batchManager.onBatchResumed).toHaveBeenCalledWith('translating common events');
+        expect(foregroundManager.runBatchedTranslation).toHaveBeenCalledTimes(1);
+    });
 });

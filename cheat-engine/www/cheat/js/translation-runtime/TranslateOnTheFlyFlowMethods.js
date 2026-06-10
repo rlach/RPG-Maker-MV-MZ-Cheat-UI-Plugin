@@ -374,6 +374,82 @@ export const translateOnTheFlyFlowMethods = {
         return cancelled;
     },
 
+    estimateForegroundBatchTotalItems({
+        currentText,
+        currentSpeakerName,
+        cacheKey,
+        hasPortrait = false,
+        maxDepth,
+    }) {
+        try {
+            const manager = this.getForegroundBatchManager();
+
+            const requests = [
+                {
+                    kind: 'currentEvent',
+                    currentText,
+                    currentSpeakerName,
+                    cacheKey,
+                    fullEvent: true,
+                    maxDepth,
+                    hasPortrait: !!hasPortrait,
+                },
+            ];
+            const counts = manager.countAmountSync(requests);
+            const total = Array.isArray(counts) && counts[0] ? Number(counts[0].left) || 0 : 0;
+            return Math.max(0, total);
+        } catch (error) {
+            return 0;
+        }
+    },
+
+    showForegroundWaitingForMainQueue(totalItems = 0) {
+        const safeTotal = Math.max(0, Number(totalItems) || 0);
+        const message = `0/${safeTotal} translated (0%)`;
+        this.updateProgressBox(
+            'current event (waiting for main queue to pause)',
+            message,
+            null,
+            null,
+            null,
+            'foreground'
+        );
+    },
+
+    async waitForActiveBackgroundRequestToFinish() {
+        while (this.engine?.hasActiveBackgroundRequest?.()) {
+            await new Promise((resolve) => setTimeout(resolve, 75));
+        }
+    },
+
+    async pauseMainQueueForForegroundIfNeeded(foregroundPayload) {
+        if (this.interruptQueueForRealtime) {
+            return false;
+        }
+
+        if (!this.isNonOtfTranslationProcessActive()) {
+            return false;
+        }
+
+        if (this.engine?.hasActiveBackgroundRequest?.()) {
+            const totalItems = this.estimateForegroundBatchTotalItems(foregroundPayload);
+            this.showForegroundWaitingForMainQueue(totalItems);
+            await this.waitForActiveBackgroundRequestToFinish();
+        }
+
+        this.batchManager?.onBatchPausedByOtf?.('current event');
+        return true;
+    },
+
+    resumeMainQueueAfterForegroundIfNeeded(pausedByForeground) {
+        if (!pausedByForeground) {
+            return;
+        }
+
+        const activeLabel = this.getActiveNonOtfTranslationProcessLabel();
+        this.batchManager?.onBatchResumed?.(activeLabel || null);
+    },
+
     requestForegroundDialogBatch({
         currentText,
         currentSpeakerName,
@@ -406,15 +482,23 @@ export const translateOnTheFlyFlowMethods = {
 
         this.preemptBackgroundForForeground(operationKey, sourceTrigger);
 
-        const promise = Promise.resolve().then(() =>
-            this.startAheadTranslation({
-                currentText,
-                currentSpeakerName,
-                cacheKey,
-                hasPortrait: !!hasPortrait,
-                maxDepth,
-            })
-        );
+        const foregroundPayload = {
+            currentText,
+            currentSpeakerName,
+            cacheKey,
+            hasPortrait: !!hasPortrait,
+            maxDepth,
+        };
+
+        const promise = Promise.resolve().then(async () => {
+            const pausedByForeground =
+                await this.pauseMainQueueForForegroundIfNeeded(foregroundPayload);
+            try {
+                return await this.startAheadTranslation(foregroundPayload);
+            } finally {
+                this.resumeMainQueueAfterForegroundIfNeeded(pausedByForeground);
+            }
+        });
 
         state.active = true;
         state.operationKey = operationKey;
