@@ -14,7 +14,7 @@ import { shouldApplyHook } from '../../../../../cheat-engine/www/cheat/js/HookGu
 
 function createRuntime({
     translationEnabled = false,
-    translateCacheWhenDisabled = false,
+    enableTranslation = false,
     nonOtfActive = false,
     cacheEntries = [],
 } = {}) {
@@ -24,7 +24,7 @@ function createRuntime({
     return {
         translationCache,
         lastSeenByCacheKey,
-        translateCacheWhenDisabled,
+        enableTranslation,
         sourceLang: 'ja',
         targetLang: 'en',
         isTranslationEnabled: () => translationEnabled,
@@ -55,7 +55,7 @@ function cmdKey(runtime, text) {
 describe('applyTranslationsToCommands', () => {
     it('replaces names from cache in-place', () => {
         const runtime = createRuntime({
-            translateCacheWhenDisabled: true,
+            enableTranslation: true,
             cacheEntries: [['command:ja-en-ニューゲーム', 'New Game']],
         });
 
@@ -101,10 +101,22 @@ describe('applyTranslationsToCommands', () => {
         expect(runtime.translationCache.size).toBe(0);
     });
 
+    it('keeps leading spaces for non-empty names like "    a"', () => {
+        const runtime = createRuntime({ translationEnabled: true });
+
+        const list = [{ name: '    a', symbol: 'test', enabled: true, ext: null }];
+        applyTranslationsToCommands(list, runtime);
+
+        const expectedKey = cmdKey(runtime, '    a');
+        expect(runtime.translationCache.get(expectedKey)).toBe('');
+        expect(runtime.lastSeenByCacheKey.has(expectedKey)).toBe(true);
+        expect(list[0].name).toBe('    a');
+    });
+
     it('does nothing when no translation mode is active', () => {
         const runtime = createRuntime({
             translationEnabled: false,
-            translateCacheWhenDisabled: false,
+            enableTranslation: false,
             cacheEntries: [['command:ja-en-アイテム', 'Items']],
         });
 
@@ -138,7 +150,7 @@ describe('applyTranslationsToCommands', () => {
 
     it('translates multiple commands in a single list', () => {
         const runtime = createRuntime({
-            translateCacheWhenDisabled: true,
+            enableTranslation: true,
             cacheEntries: [
                 ['command:ja-en-アイテム', 'Items'],
                 ['command:ja-en-スキル', 'Skills'],
@@ -280,7 +292,7 @@ describe('installCommandTranslationHook', () => {
 
     it('hooks subclass makeCommandList when game already booted', () => {
         const runtime = createRuntime({
-            translateCacheWhenDisabled: true,
+            enableTranslation: true,
             cacheEntries: [
                 ['command:ja-en-ニューゲーム', 'New Game'],
                 ['command:ja-en-コンティニュー', 'Continue'],
@@ -303,7 +315,7 @@ describe('installCommandTranslationHook', () => {
         globalThis.Scene_Boot.prototype.start = function () {};
 
         const runtime = createRuntime({
-            translateCacheWhenDisabled: true,
+            enableTranslation: true,
             cacheEntries: [['command:ja-en-ニューゲーム', 'New Game']],
         });
 

@@ -125,7 +125,7 @@ describe('wrapTextByVisibleWidth', () => {
             fontScaleWidthMultiplier: 0.69,
         });
 
-        expect(output).toBe('\\{To jest przykładowy tekst buahahahaha. Co\nmi teraz zrobisz?');
+        expect(output).toBe('\\{To jest przykładowy tekst buahahahaha.\nCo mi teraz zrobisz?');
     });
 
     it('keeps line unwrapped when \} lowers text level and effective width usage', () => {

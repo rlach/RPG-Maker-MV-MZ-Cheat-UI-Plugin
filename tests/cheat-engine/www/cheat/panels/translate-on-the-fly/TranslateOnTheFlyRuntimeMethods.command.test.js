@@ -251,7 +251,7 @@ function installRpgMakerGlobals({ commandsOriginal = [], commands = [] } = {}) {
 
 function createRuntime({
     translationEnabled = false,
-    translateCacheWhenDisabled = false,
+    enableTranslation = false,
     cacheEntries = [],
     batchResult = { successes: [], failures: [] },
 } = {}) {
@@ -273,7 +273,7 @@ function createRuntime({
         lastSeenByCacheKey: new Map(),
         pendingTranslations: new Map(),
         failedTranslations: new Map(),
-        translateCacheWhenDisabled,
+        enableTranslation,
         sourceLang: 'pl',
         targetLang: 'en',
         batchItemsLimit: 20,
@@ -402,11 +402,11 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         delete globalThis.Scene_Map;
     });
 
-    it('injects cached command translations during menu refresh and marks the original key as seen', () => {
+    it('injects cached command translations during menu refresh when cache-mode is enabled', () => {
         installRpgMakerGlobals();
         const runtime = createRuntime({
             translationEnabled: false,
-            translateCacheWhenDisabled: true,
+            enableTranslation: true,
             cacheEntries: [[`command:pl-en-Galeria`, 'Gallery']],
         });
 
@@ -431,7 +431,7 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         });
         const runtime = createRuntime({
             translationEnabled: false,
-            translateCacheWhenDisabled: true,
+            enableTranslation: true,
             cacheEntries: [[`command:pl-en-Galeria`, 'Gallery']],
         });
 
@@ -452,7 +452,7 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         installRpgMakerGlobals();
         const runtime = createRuntime({
             translationEnabled: false,
-            translateCacheWhenDisabled: true,
+            enableTranslation: true,
             cacheEntries: [['command:ja-en-CGｼｰﾝﾃｷｽﾄ背景', 'CG Scene Text Background']],
         });
 
@@ -473,7 +473,7 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         installRpgMakerGlobals();
         const runtime = createRuntime({
             translationEnabled: false,
-            translateCacheWhenDisabled: true,
+            enableTranslation: true,
         });
 
         translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
@@ -492,7 +492,7 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         installRpgMakerGlobals();
         const runtime = createRuntime({
             translationEnabled: false,
-            translateCacheWhenDisabled: true,
+            enableTranslation: true,
         });
 
         translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
@@ -513,7 +513,7 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         installRpgMakerGlobals();
         const runtime = createRuntime({
             translationEnabled: false,
-            translateCacheWhenDisabled: true,
+            enableTranslation: true,
         });
 
         translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
@@ -528,7 +528,7 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         expect(runtime.lastSeenByCacheKey.size).toBe(0);
     });
 
-    it('does not harvest dialog choice entries as command cache items in translation-enabled refresh flow', () => {
+    it('does not harvest dialog choice entries as command cache items in realtime refresh flow', () => {
         installRpgMakerGlobals();
         const runtime = createRuntime({
             translationEnabled: true,
@@ -547,7 +547,7 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         expect(runtime.lastSeenByCacheKey.size).toBe(0);
     });
 
-    it('harvests missing command keys during refresh when translation is enabled', () => {
+    it('harvests missing command keys during refresh when realtime translation is enabled', () => {
         installRpgMakerGlobals();
         const runtime = createRuntime({
             translationEnabled: true,
@@ -565,13 +565,13 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         expect(runtime.lastSeenByCacheKey.has(commandKey(runtime, 'Galeria'))).toBe(true);
     });
 
-    it('applies cached scroll_text translation when scroll message starts in cache-only mode', () => {
+    it('applies cached scroll_text translation when scroll message starts in cache-mode', () => {
         installRpgMakerGlobals();
         globalThis.$gameMessage.allText = () => 'Original scroll line';
 
         const runtime = createRuntime({
             translationEnabled: false,
-            translateCacheWhenDisabled: true,
+            enableTranslation: true,
             cacheEntries: [[`scroll_text:pl-en-Original scroll line`, 'Translated scroll line']],
         });
 
@@ -634,7 +634,7 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         installRpgMakerGlobals();
         const runtime = createRuntime({
             translationEnabled: false,
-            translateCacheWhenDisabled: true,
+            enableTranslation: true,
         });
 
         translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);

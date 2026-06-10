@@ -59,7 +59,7 @@ export const SIMPLE_NEWLINE_TAG_CONFIG = Object.freeze({
     type: TAG_TYPE.WITHOUT_PARAMETER,
     style: TAG_STYLE.ESCAPE,
     tagSymbol: 'sn',
-    requiredConsistency: true,
+    requiredConsistency: false,
     reservedWidth: 0,
     extraPromptForLlm:
         'This tag represents newline, put it in places where newline typically would appear',

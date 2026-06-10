@@ -49,12 +49,12 @@ export default {
         </v-switch>
 
         <v-switch
-            v-model="enabled"
+            v-model="enableRealtime"
             label="Enable real-time events translation"
             dense
             hide-details
             @click.self.stop
-            @change="onChangeEnabled">
+            @change="onChangeEnableRealtime">
         </v-switch>
     </v-card-text>
 
@@ -531,6 +531,15 @@ export default {
                 (Number(this.maxLineWidthWithPortrait) || 0) * multiplier * multiplier
             );
         },
+
+        enableRealtime: {
+            get() {
+                return !!this.enabled;
+            },
+            set(value) {
+                this.enabled = !!value;
+            },
+        },
     },
 
     methods: {
@@ -568,8 +577,12 @@ export default {
             return result;
         },
 
-        onChangeEnabled() {
+        onChangeEnableRealtime() {
             return this.callRuntime('onChangeEnabled');
+        },
+
+        onChangeEnabled() {
+            return this.onChangeEnableRealtime();
         },
 
         onChangeEnableTranslation() {
