@@ -126,6 +126,33 @@ function removeShortNewlines(text, maxCount) {
     return text.replace(regex, ' ');
 }
 
+function normalizePositiveInteger(value, fallback, min = 1) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < min) {
+        return fallback;
+    }
+    return Math.floor(parsed);
+}
+
+function normalizeNonNegativeInteger(value, fallback) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        return fallback;
+    }
+    return Math.floor(parsed);
+}
+
+function readInitialBoxingSettings(runtime) {
+    return {
+        descriptionMaxLineWidth: normalizePositiveInteger(runtime.descriptionMaxLineWidth, 59, 20),
+        descriptionMaxRows: normalizePositiveInteger(runtime.descriptionMaxRows, 2, 1),
+        removeNewlinesBeforeWrappingMaxCount: normalizeNonNegativeInteger(
+            runtime.removeNewlinesBeforeWrappingMaxCount,
+            0
+        ),
+    };
+}
+
 class BoxingService {
     constructor() {
         this.state = makeObservable({
@@ -136,6 +163,10 @@ class BoxingService {
             llmPrompt: DEFAULT_BOXING_PROMPT,
             onlyReformatWithoutLlm: false,
             isRunning: false,
+            hasInitializedFromSettings: false,
+            descriptionMaxLineWidth: 59,
+            descriptionMaxRows: 2,
+            removeNewlinesBeforeWrappingMaxCount: 0,
         });
     }
 
@@ -219,12 +250,16 @@ class BoxingService {
             return;
         }
 
-        this.state.showAllTypes = false;
-        this.state.selection = {};
+        if (!this.state.hasInitializedFromSettings) {
+            const initialSettings = readInitialBoxingSettings(runtime);
+            this.state.descriptionMaxLineWidth = initialSettings.descriptionMaxLineWidth;
+            this.state.descriptionMaxRows = initialSettings.descriptionMaxRows;
+            this.state.removeNewlinesBeforeWrappingMaxCount =
+                initialSettings.removeNewlinesBeforeWrappingMaxCount;
+            this.state.hasInitializedFromSettings = true;
+        }
+
         this.refreshTypeStats(runtime);
-        this.state.llmPrompt = DEFAULT_BOXING_PROMPT;
-        this.state.onlyReformatWithoutLlm = false;
-        this.state.isRunning = false;
         this.state.dialogVisible = true;
     }
 
@@ -232,10 +267,10 @@ class BoxingService {
         this.state.dialogVisible = false;
     }
 
-    runLocalReformat(runtime, selectedTypes) {
+    runLocalReformat(runtime, selectedTypes, boxingSettings) {
         const typeSet = new Set(selectedTypes);
-        const widthInChars = runtime.descriptionMaxLineWidth || runtime.maxLineWidth || 59;
-        const removeShortCount = Number(runtime.removeNewlinesBeforeWrappingMaxCount);
+        const widthInChars = boxingSettings.descriptionMaxLineWidth;
+        const removeShortCount = boxingSettings.removeNewlinesBeforeWrappingMaxCount;
         let updatedCount = 0;
 
         for (const [cacheKey, value] of runtime.translationCache.entries()) {
@@ -278,12 +313,12 @@ class BoxingService {
         runtime.notify('info', `Reformatted ${updatedCount} cached descriptions without LLM.`);
     }
 
-    async runLlmBoxing(runtime, selectedTypes, widthInChars, maxRows) {
+    async runLlmBoxing(runtime, selectedTypes, boxingSettings) {
         const boxingSystemMessage = buildBoxingSystemMessage(
             this.state.llmPrompt,
             selectedTypes,
-            widthInChars,
-            maxRows
+            boxingSettings.descriptionMaxLineWidth,
+            boxingSettings.descriptionMaxRows
         );
 
         if (!runtime.beginNonOtfTranslationProcess('descriptions cleanup')) {
@@ -292,6 +327,17 @@ class BoxingService {
 
         this.state.isRunning = true;
         this.state.dialogVisible = false;
+
+        const previousSettings = {
+            descriptionMaxLineWidth: runtime.descriptionMaxLineWidth,
+            descriptionMaxRows: runtime.descriptionMaxRows,
+            removeNewlinesBeforeWrappingMaxCount: runtime.removeNewlinesBeforeWrappingMaxCount,
+        };
+
+        runtime.descriptionMaxLineWidth = boxingSettings.descriptionMaxLineWidth;
+        runtime.descriptionMaxRows = boxingSettings.descriptionMaxRows;
+        runtime.removeNewlinesBeforeWrappingMaxCount =
+            boxingSettings.removeNewlinesBeforeWrappingMaxCount;
 
         try {
             if (!runtime.batchManager) {
@@ -318,17 +364,21 @@ class BoxingService {
             const message = error instanceof Error ? error.message : String(error);
             runtime.notify('error', 'Boxing failed: ' + message);
         } finally {
+            runtime.descriptionMaxLineWidth = previousSettings.descriptionMaxLineWidth;
+            runtime.descriptionMaxRows = previousSettings.descriptionMaxRows;
+            runtime.removeNewlinesBeforeWrappingMaxCount =
+                previousSettings.removeNewlinesBeforeWrappingMaxCount;
             this.state.isRunning = false;
             runtime.endNonOtfTranslationProcess();
         }
     }
 
-    runLocalBoxing(runtime, selectedTypes) {
+    runLocalBoxing(runtime, selectedTypes, boxingSettings) {
         this.state.isRunning = true;
         this.state.dialogVisible = false;
 
         try {
-            this.runLocalReformat(runtime, selectedTypes);
+            this.runLocalReformat(runtime, selectedTypes, boxingSettings);
         } catch (error) {
             console.error('[BoxingService] Local reformat failed', error);
             const message = error instanceof Error ? error.message : String(error);
@@ -362,15 +412,30 @@ class BoxingService {
             return;
         }
 
-        const widthInChars = runtime.descriptionMaxLineWidth || 59;
-        const maxRows = runtime.descriptionMaxRows || 2;
+        const boxingSettings = {
+            descriptionMaxLineWidth: normalizePositiveInteger(
+                this.state.descriptionMaxLineWidth,
+                59,
+                20
+            ),
+            descriptionMaxRows: normalizePositiveInteger(this.state.descriptionMaxRows, 2, 1),
+            removeNewlinesBeforeWrappingMaxCount: normalizeNonNegativeInteger(
+                this.state.removeNewlinesBeforeWrappingMaxCount,
+                0
+            ),
+        };
+
+        this.state.descriptionMaxLineWidth = boxingSettings.descriptionMaxLineWidth;
+        this.state.descriptionMaxRows = boxingSettings.descriptionMaxRows;
+        this.state.removeNewlinesBeforeWrappingMaxCount =
+            boxingSettings.removeNewlinesBeforeWrappingMaxCount;
 
         if (this.state.onlyReformatWithoutLlm) {
-            this.runLocalBoxing(runtime, selectedTypes);
+            this.runLocalBoxing(runtime, selectedTypes, boxingSettings);
             return;
         }
 
-        await this.runLlmBoxing(runtime, selectedTypes, widthInChars, maxRows);
+        await this.runLlmBoxing(runtime, selectedTypes, boxingSettings);
     }
 }
 
@@ -490,6 +555,23 @@ export default {
             style="flex: 0 0 120px; max-width: 120px;">
           </v-text-field>
         </div>
+                <div class="d-flex align-center mt-2" style="gap: 8px;">
+                    <v-text-field
+                        v-model.number="removeNewlinesBeforeWrappingMaxCount"
+                        label="Remove existing newlines before wrapping if there are"
+                        outlined
+                        dense
+                        type="number"
+                        min="0"
+                        max="20"
+                        hide-details
+                        background-color="grey darken-3"
+                        @keydown.self.stop
+                        @focus="$event.target.select()"
+                        style="flex: 0 0 auto; width: 80px;">
+                    </v-text-field>
+                    <span class="caption grey--text text--lighten-1" style="white-space: nowrap;">or less in a row</span>
+                </div>
       </v-card-text>
 
       <v-card-actions>
@@ -549,34 +631,27 @@ export default {
         },
         descriptionMaxLineWidth: {
             get() {
-                try {
-                    return ensureTranslationRuntime().descriptionMaxLineWidth;
-                } catch {
-                    return 59;
-                }
+                return BOXING_SERVICE.state.descriptionMaxLineWidth;
             },
             set(v) {
-                try {
-                    ensureTranslationRuntime().descriptionMaxLineWidth = v;
-                } catch {
-                    /* ignore */
-                }
+                BOXING_SERVICE.state.descriptionMaxLineWidth = normalizePositiveInteger(v, 59, 20);
             },
         },
         descriptionMaxRows: {
             get() {
-                try {
-                    return ensureTranslationRuntime().descriptionMaxRows;
-                } catch {
-                    return 2;
-                }
+                return BOXING_SERVICE.state.descriptionMaxRows;
             },
             set(v) {
-                try {
-                    ensureTranslationRuntime().descriptionMaxRows = v;
-                } catch {
-                    /* ignore */
-                }
+                BOXING_SERVICE.state.descriptionMaxRows = normalizePositiveInteger(v, 2, 1);
+            },
+        },
+        removeNewlinesBeforeWrappingMaxCount: {
+            get() {
+                return BOXING_SERVICE.state.removeNewlinesBeforeWrappingMaxCount;
+            },
+            set(v) {
+                BOXING_SERVICE.state.removeNewlinesBeforeWrappingMaxCount =
+                    normalizeNonNegativeInteger(v, 0);
             },
         },
         hasSelection() {
