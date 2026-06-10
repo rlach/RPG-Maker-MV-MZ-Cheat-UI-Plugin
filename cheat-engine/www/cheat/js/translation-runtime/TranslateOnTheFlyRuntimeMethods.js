@@ -713,6 +713,23 @@ export const translateOnTheFlyRuntimeMethods = {
             const useCacheOnly =
                 (translationEnabled && skipping) || (!translationEnabled && self.enableTranslation);
 
+            if (translationEnabled && skipping) {
+                if (self.isRealtimeAbortRequested()) {
+                    self.clearRealtimeAbortRequest();
+                }
+
+                if (
+                    self.isForegroundDialogBatchActive() ||
+                    (self.pendingTranslations instanceof Map && self.pendingTranslations.size > 0)
+                ) {
+                    self.requestBatchQueueAbort();
+                }
+
+                // Keep current message exactly as it is while skip is held.
+                this._translationApplied = true;
+                return originalCanStart;
+            }
+
             if (translationEnabled && allowTranslation && !$gameMessage._translateOriginalText) {
                 // Lightweight trace to confirm hook runs after restart
                 // console.log('[TranslateOnTheFly] canStart hook engaged, allowTranslation');
@@ -1097,6 +1114,10 @@ export const translateOnTheFlyRuntimeMethods = {
                     (translationEnabled && skipping) ||
                     (!translationEnabled && self.enableTranslation);
 
+                if (translationEnabled && skipping) {
+                    return result;
+                }
+
                 if (!allowTranslation && !useCacheOnly) {
                     return result;
                 }
@@ -1219,6 +1240,10 @@ export const translateOnTheFlyRuntimeMethods = {
             const useCacheOnly =
                 (translationEnabled && skipping) || (!translationEnabled && self.enableTranslation);
 
+            if (translationEnabled && skipping) {
+                return;
+            }
+
             if (!allowTranslation && !useCacheOnly) {
                 return;
             }
@@ -1326,6 +1351,19 @@ export const translateOnTheFlyRuntimeMethods = {
             const allowTranslation = translationEnabled && !skipping;
             const useCacheOnly =
                 (translationEnabled && skipping) || (!translationEnabled && self.enableTranslation);
+
+            if (translationEnabled && skipping) {
+                if (self.isRealtimeAbortRequested()) {
+                    self.clearRealtimeAbortRequest();
+                }
+
+                if (self.isForegroundDialogBatchActive()) {
+                    self.requestBatchQueueAbort();
+                }
+
+                this._translationApplied = true;
+                return Window_Message.prototype._originalStartInput.call(this);
+            }
 
             const originalText = getSafeCurrentMessageText();
             const hasText = !!(originalText && originalText.trim().length > 0);

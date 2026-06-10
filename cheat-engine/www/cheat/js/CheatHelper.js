@@ -1033,6 +1033,15 @@ export class MessageCheat {
             GameSpeedCheat.setGameSpeed(gameSpeed, GameSpeedCheat.sceneOptions().all);
         }
 
+        try {
+            const runtime = ensureTranslationRuntime();
+            if (runtime && typeof runtime.requestBatchQueueAbort === 'function') {
+                runtime.requestBatchQueueAbort();
+            }
+        } catch (err) {
+            console.warn('[MessageCheat] Failed to abort OTF on skip start', err);
+        }
+
         this.skip = true;
     }
 

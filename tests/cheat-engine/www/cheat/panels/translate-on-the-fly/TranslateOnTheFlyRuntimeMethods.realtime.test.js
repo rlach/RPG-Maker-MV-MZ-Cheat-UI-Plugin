@@ -204,7 +204,12 @@ function createRuntime({
     translationEnabled = true,
     cacheEntries = [],
     requestForegroundDialogBatch = null,
+    skipActive = false,
 } = {}) {
+    const skipState = {
+        active: !!skipActive,
+    };
+
     const replaceMessageText = vi.fn((translatedText) => {
         globalThis.$gameMessage._texts = String(translatedText || '').split('\n');
     });
@@ -277,11 +282,14 @@ function createRuntime({
             return value;
         },
         notify: vi.fn(),
+        setSkipActive(active) {
+            skipState.active = !!active;
+        },
     };
 
     Object.assign(runtime, translateOnTheFlyCoreMethods, translateOnTheFlyRuntimeMethods);
     runtime.isTranslationEnabled = () => translationEnabled;
-    runtime.isSkippingMessages = () => false;
+    runtime.isSkippingMessages = () => skipState.active;
 
     return runtime;
 }
@@ -385,7 +393,7 @@ describe('TranslateOnTheFly realtime flow', () => {
         expect(runtime.requestForegroundDialogBatch).not.toHaveBeenCalled();
     });
 
-    it('if user aborts OTF cancel current OTF task and show untranslated text', () => {
+    it('if user aborts OTF while skip is held it cancels and keeps current text as-is', () => {
         installRpgMakerGlobals({ messageLines: ['JP line 1'], speaker: '' });
 
         const runtime = createRuntime();
@@ -404,13 +412,81 @@ describe('TranslateOnTheFly realtime flow', () => {
         expect(firstCanStart).toBe(false);
         expect(runtime.requestForegroundDialogBatch).toHaveBeenCalled();
 
-        const abortRequested = runtime.requestBatchQueueAbort();
-        expect(abortRequested).toBe(true);
-        expect(runtime.engine.cancelActiveRequest).toHaveBeenCalledWith('request_aborted');
+        runtime.setSkipActive(true);
 
         const secondCanStart = windowMessage.canStart();
 
         expect(secondCanStart).toBe(true);
-        expect(runtime.replaceMessageText).toHaveBeenCalledWith('JP line 1');
+        expect(runtime.engine.cancelActiveRequest).toHaveBeenCalledWith('request_aborted');
+        expect(runtime.replaceMessageText).not.toHaveBeenCalledWith('JP line 1');
+    });
+
+    it('does not start new OTF requests while skip is held and resumes on next normal message', () => {
+        installRpgMakerGlobals({ messageLines: ['JP line 1'], speaker: '' });
+
+        const runtime = createRuntime();
+        runtime._testInterpreter = createMessageInterpreterWithThreeMessages();
+
+        runtime.requestForegroundDialogBatch = vi.fn((payload) => {
+            runtime.pendingTranslations.set(payload.cacheKey, true);
+            return Promise.resolve(null);
+        });
+
+        translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
+
+        const windowMessage = new globalThis.Window_Message();
+        expect(windowMessage.canStart()).toBe(false);
+        expect(runtime.requestForegroundDialogBatch).toHaveBeenCalledTimes(1);
+
+        runtime.setSkipActive(true);
+        expect(windowMessage.canStart()).toBe(true);
+        expect(runtime.requestForegroundDialogBatch).toHaveBeenCalledTimes(1);
+
+        runtime.pendingTranslations.clear();
+        runtime.failedTranslations.clear();
+        runtime._foregroundDialogBatchState.active = false;
+        windowMessage.terminateMessage();
+
+        globalThis.$gameMessage._texts = ['JP line 2'];
+        globalThis.$gameMessage._translateOriginalText = undefined;
+        globalThis.$gameMessage._translateOriginalChoices = undefined;
+        globalThis.$gameMessage._translateOriginalSpeaker = undefined;
+
+        const skipHeldCanStart = windowMessage.canStart();
+        expect(skipHeldCanStart).toBe(true);
+        expect(runtime.requestForegroundDialogBatch).toHaveBeenCalledTimes(1);
+
+        runtime.setSkipActive(false);
+        windowMessage.terminateMessage();
+
+        globalThis.$gameMessage._texts = ['JP line 3'];
+        globalThis.$gameMessage._translateOriginalText = undefined;
+        globalThis.$gameMessage._translateOriginalChoices = undefined;
+        globalThis.$gameMessage._translateOriginalSpeaker = undefined;
+
+        const afterReleaseCanStart = windowMessage.canStart();
+        expect(afterReleaseCanStart).toBe(false);
+        expect(runtime.requestForegroundDialogBatch).toHaveBeenCalledTimes(2);
+    });
+
+    it('preserves already translated landing text while skip is held', () => {
+        installRpgMakerGlobals({ messageLines: ['EN line 1'], speaker: '' });
+
+        const runtime = createRuntime();
+        runtime._testInterpreter = createMessageInterpreterWithThreeMessages();
+
+        const messageKey = runtime.getMessageCacheKey('JP line 1', { hasPortrait: false });
+        runtime.pendingTranslations.set(messageKey, true);
+
+        translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
+
+        const windowMessage = new globalThis.Window_Message();
+        runtime.setSkipActive(true);
+
+        const canStart = windowMessage.canStart();
+
+        expect(canStart).toBe(true);
+        expect(globalThis.$gameMessage._texts.join('\n')).toBe('EN line 1');
+        expect(runtime.requestForegroundDialogBatch).not.toHaveBeenCalled();
     });
 });
