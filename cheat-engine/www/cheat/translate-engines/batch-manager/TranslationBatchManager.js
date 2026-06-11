@@ -688,6 +688,8 @@ export class TranslationBatchManager {
                     break;
                 }
 
+                this.runtime?.markQueueCompletionItemsProcessed?.(batch);
+
                 processed += batch.length;
                 this.progressTracker.updateStep(translationPhaseLabel, processed, safeItems.length);
                 this.progressTracker.updateCurrentStepErrors(phaseFailures, processed);
@@ -836,11 +838,6 @@ export class TranslationBatchManager {
                 ) {
                     continue;
                 }
-
-                this.runtime?.markQueueCompletionItemsProcessed?.([
-                    ...(translated?.successes || []),
-                    ...(translated?.failures || []),
-                ]);
 
                 safeQueueEntries.shift();
             }

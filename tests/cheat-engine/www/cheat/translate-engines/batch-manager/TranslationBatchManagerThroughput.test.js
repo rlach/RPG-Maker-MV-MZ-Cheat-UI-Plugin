@@ -1,23 +1,23 @@
 import { describe, expect, it } from 'vitest';
 
 import { TranslationBatchManager } from '../../../../../../cheat-engine/www/cheat/translate-engines/batch-manager/TranslationBatchManager.js';
+import { translateOnTheFlyFlowMethods } from '../../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslateOnTheFlyFlowMethods.js';
 
 function createRuntimeStub() {
-    return {
+    const runtime = {
         sourceLang: 'ja',
         targetLang: 'en',
         translationCache: new Map(),
         batchThroughputSamples: [],
         recordCalls: [],
+        progressLines: [],
+        dryRunExecutedAtLeastOnce: true,
         showSpinner() {},
         hideSpinner() {},
         hideProgressBox() {},
-        updateProgressBox() {},
-        getOverallTranslationCompletionLine() {
-            return '';
+        updateProgressBox(title, message, totalCompletionLine) {
+            this.progressLines.push(totalCompletionLine || '');
         },
-        clearQueueCompletionScope() {},
-        startQueueCompletionScope() {},
         clearBatchThroughputSamples() {
             this.batchThroughputSamples = [];
         },
@@ -55,6 +55,11 @@ function createRuntimeStub() {
         batchTranslateWithBackgroundRetry(batch) {
             return this.engine.batchTranslate(batch);
         },
+    };
+
+    return {
+        ...translateOnTheFlyFlowMethods,
+        ...runtime,
     };
 }
 
@@ -164,5 +169,67 @@ describe('TranslationBatchManager throughput sampling', () => {
 
         expect(runtime.recordCalls).toHaveLength(0);
         expect(runtime.batchThroughputSamples).toEqual([]);
+    });
+
+    it('updates total queue progress after each batch in a single entry', async () => {
+        const originalAlert = globalThis.alert;
+        globalThis.alert = () => {};
+
+        const runtime = createRuntimeStub();
+        runtime.engine.batchTranslate = async (batch) => ({
+            successes: [
+                {
+                    ...batch[0],
+                    translated: `${batch[0].value}-translated`,
+                },
+            ],
+            failures: [],
+        });
+
+        const manager = new TranslationBatchManager(runtime);
+        manager.register({
+            getKind() {
+                return 'throughput';
+            },
+            async createEntries() {
+                return [
+                    {
+                        items: [
+                            {
+                                type: 'message',
+                                cacheKey: 'message:ja-en-aaaaa',
+                                value: 'aaaaa',
+                            },
+                            {
+                                type: 'message',
+                                cacheKey: 'message:ja-en-bbbbb',
+                                value: 'bbbbb',
+                            },
+                        ],
+                    },
+                ];
+            },
+        });
+
+        try {
+            await manager.runBatchedTranslation([
+                {
+                    kind: 'throughput',
+                    backgroundJob: false,
+                    itemLimit: 10,
+                    charLimit: 5,
+                },
+            ]);
+        } finally {
+            if (typeof originalAlert === 'function') {
+                globalThis.alert = originalAlert;
+            } else {
+                delete globalThis.alert;
+            }
+        }
+
+        expect(runtime.progressLines.some((line) => line.startsWith('total 50.0% complete'))).toBe(
+            true
+        );
     });
 });
