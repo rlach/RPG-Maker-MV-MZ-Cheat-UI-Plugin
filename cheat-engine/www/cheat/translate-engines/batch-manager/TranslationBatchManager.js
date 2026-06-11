@@ -7,9 +7,10 @@ import { PLUGIN_TRANSLATOR_REGISTRY } from '../plugins/PluginTranslatorRegistry.
 export class TranslationBatchManager {
     constructor(runtime, options = {}) {
         this.runtime = runtime;
+        this.progressChannel = options.progressChannel || 'main';
         this.errorRecovery = new ErrorRecoveryStrategy('default');
         const progressUi = options.progressUi || runtime;
-        this.progressTracker = new BatchProgressTracker(runtime, progressUi);
+        this.progressTracker = new BatchProgressTracker(runtime, progressUi, this.progressChannel);
         this.kindRegistry = new Map();
     }
 
@@ -336,13 +337,13 @@ export class TranslationBatchManager {
 
     async runBatchedTranslation(items, options = {}) {
         if (this.runtime) {
-            this.runtime.clearQueueCompletionScope();
+            this.runtime.clearQueueCompletionScope(this.progressChannel);
         }
 
         const queueEntries = [];
         const queueScopeCacheTypes = new Set();
-        if (this.runtime) {
-            this.runtime.clearBatchThroughputSamples?.();
+        if (this.runtime && this.progressChannel === 'main') {
+            this.runtime.clearBatchThroughputSamples?.(this.progressChannel);
         }
         const safeRequests = Array.isArray(items) ? items : [];
         const hasOnlyKindRequests = safeRequests.every((item) => {
@@ -649,7 +650,8 @@ export class TranslationBatchManager {
                 if (!dryRun && this.runtime && !this.isAbortBatchResult(failures, batch.length)) {
                     this.runtime.recordBatchThroughputSample(
                         batchRequestedChars,
-                        Date.now() - batchStartedAt
+                        Date.now() - batchStartedAt,
+                        this.progressChannel
                     );
                 }
 
@@ -688,7 +690,7 @@ export class TranslationBatchManager {
                     break;
                 }
 
-                this.runtime?.markQueueCompletionItemsProcessed?.(batch);
+                this.runtime?.markQueueCompletionItemsProcessed?.(batch, this.progressChannel);
 
                 processed += batch.length;
                 this.progressTracker.updateStep(translationPhaseLabel, processed, safeItems.length);
@@ -749,7 +751,8 @@ export class TranslationBatchManager {
         if (this.runtime) {
             this.runtime.startQueueCompletionScope(
                 Array.from(queueScopeCacheTypes),
-                countQueueRequestedChars(queueEntries)
+                countQueueRequestedChars(queueEntries),
+                this.progressChannel
             );
         }
 
@@ -844,7 +847,7 @@ export class TranslationBatchManager {
         } finally {
             this.progressTracker.endQueue();
             if (this.runtime) {
-                this.runtime.clearQueueCompletionScope();
+                this.runtime.clearQueueCompletionScope(this.progressChannel);
             }
         }
 

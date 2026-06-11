@@ -1,9 +1,10 @@
 import { BatchSummaryReporter } from './BatchSummaryReporter.js';
 
 export class BatchProgressTracker {
-    constructor(runtime, progressUi = runtime) {
+    constructor(runtime, progressUi = runtime, progressChannel = 'main') {
         this.runtime = runtime;
         this.progressUi = progressUi;
+        this.progressChannel = progressChannel;
         this.currentStepLabel = '';
         this.currentProcessed = 0;
         this.currentTotal = 0;
@@ -134,7 +135,8 @@ export class BatchProgressTracker {
         const title = this.paused
             ? `${activeTitle} (paused for ${this.pauseReason || 'OTF'})`
             : activeTitle;
-        const totalCompletionLine = this.runtime?.getOverallTranslationCompletionLine?.() || null;
+        const totalCompletionLine =
+            this.runtime?.getOverallTranslationCompletionLine?.(this.progressChannel) || null;
         const progress = BatchSummaryReporter.buildProgress({
             title,
             processed: this.currentProcessed,

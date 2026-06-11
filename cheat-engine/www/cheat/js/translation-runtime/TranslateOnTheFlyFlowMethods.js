@@ -5,6 +5,57 @@ import { createTranslationBatchManager } from '../../translate-engines/batch-man
 import { CurrentEvent } from '../../translate-engines/translation-phases/CurrentEvent.js';
 
 export const translateOnTheFlyFlowMethods = {
+    normalizeProgressChannel(progressChannel = 'main') {
+        return progressChannel === 'foreground' ? 'foreground' : 'main';
+    },
+
+    syncMainQueueLegacyState(queueState) {
+        if (!queueState || typeof queueState !== 'object') {
+            return;
+        }
+
+        this.batchThroughputSamples = queueState.batchThroughputSamples;
+        this.queueCompletionScope = queueState.queueCompletionScope;
+    },
+
+    getQueueProgressState(progressChannel = 'main') {
+        const channel = this.normalizeProgressChannel(progressChannel);
+
+        if (
+            !this._queueProgressStateByChannel ||
+            typeof this._queueProgressStateByChannel !== 'object'
+        ) {
+            this._queueProgressStateByChannel = {};
+        }
+
+        let queueState = this._queueProgressStateByChannel[channel];
+        if (!queueState || typeof queueState !== 'object') {
+            queueState = {
+                batchThroughputSamples:
+                    channel === 'main' && Array.isArray(this.batchThroughputSamples)
+                        ? [...this.batchThroughputSamples]
+                        : [],
+                queueCompletionScope:
+                    channel === 'main' &&
+                    this.queueCompletionScope &&
+                    typeof this.queueCompletionScope === 'object'
+                        ? this.queueCompletionScope
+                        : null,
+            };
+            this._queueProgressStateByChannel[channel] = queueState;
+        }
+
+        if (!Array.isArray(queueState.batchThroughputSamples)) {
+            queueState.batchThroughputSamples = [];
+        }
+
+        if (channel === 'main') {
+            this.syncMainQueueLegacyState(queueState);
+        }
+
+        return queueState;
+    },
+
     normalizeQueueScopeTypes(cacheTypes) {
         const result = [];
         const seen = new Set();
@@ -27,12 +78,17 @@ export const translateOnTheFlyFlowMethods = {
         return result;
     },
 
-    clearQueueCompletionScope() {
-        this.queueCompletionScope = null;
+    clearQueueCompletionScope(progressChannel = 'main') {
+        const queueState = this.getQueueProgressState(progressChannel);
+        queueState.queueCompletionScope = null;
+
+        if (this.normalizeProgressChannel(progressChannel) === 'main') {
+            this.syncMainQueueLegacyState(queueState);
+        }
     },
 
-    startQueueCompletionScope(cacheTypes, totalChars = null) {
-        this.clearQueueCompletionScope();
+    startQueueCompletionScope(cacheTypes, totalChars = null, progressChannel = 'main') {
+        this.clearQueueCompletionScope(progressChannel);
 
         if (!this.dryRunExecutedAtLeastOnce) {
             return;
@@ -43,15 +99,21 @@ export const translateOnTheFlyFlowMethods = {
             return;
         }
 
-        this.queueCompletionScope = {
+        const queueState = this.getQueueProgressState(progressChannel);
+        queueState.queueCompletionScope = {
             cacheTypes: normalizedTypes,
             totalChars: Math.max(0, Number(totalChars) || 0),
             processedChars: 0,
         };
+
+        if (this.normalizeProgressChannel(progressChannel) === 'main') {
+            this.syncMainQueueLegacyState(queueState);
+        }
     },
 
-    getQueueScopedCompletionStats() {
-        const scope = this.queueCompletionScope;
+    getQueueScopedCompletionStats(progressChannel = 'main') {
+        const queueState = this.getQueueProgressState(progressChannel);
+        const scope = queueState.queueCompletionScope;
         if (!scope || !Array.isArray(scope.cacheTypes) || !scope.cacheTypes.length) {
             return null;
         }
@@ -80,8 +142,9 @@ export const translateOnTheFlyFlowMethods = {
         return String(value).length;
     },
 
-    accountQueueCompletionItems(items) {
-        const scope = this.queueCompletionScope;
+    accountQueueCompletionItems(items, progressChannel = 'main') {
+        const queueState = this.getQueueProgressState(progressChannel);
+        const scope = queueState.queueCompletionScope;
         if (!scope || !Array.isArray(items) || items.length === 0) {
             return;
         }
@@ -91,8 +154,9 @@ export const translateOnTheFlyFlowMethods = {
         }
     },
 
-    markQueueCompletionItemsProcessed(items) {
-        const scope = this.queueCompletionScope;
+    markQueueCompletionItemsProcessed(items, progressChannel = 'main') {
+        const queueState = this.getQueueProgressState(progressChannel);
+        const scope = queueState.queueCompletionScope;
         if (!scope || !Array.isArray(items) || items.length === 0) {
             return;
         }
@@ -102,19 +166,21 @@ export const translateOnTheFlyFlowMethods = {
         }
     },
 
-    getBatchThroughputSamples() {
-        if (!Array.isArray(this.batchThroughputSamples)) {
-            this.batchThroughputSamples = [];
+    getBatchThroughputSamples(progressChannel = 'main') {
+        const queueState = this.getQueueProgressState(progressChannel);
+        return queueState.batchThroughputSamples;
+    },
+
+    clearBatchThroughputSamples(progressChannel = 'main') {
+        const queueState = this.getQueueProgressState(progressChannel);
+        queueState.batchThroughputSamples = [];
+
+        if (this.normalizeProgressChannel(progressChannel) === 'main') {
+            this.syncMainQueueLegacyState(queueState);
         }
-
-        return this.batchThroughputSamples;
     },
 
-    clearBatchThroughputSamples() {
-        this.batchThroughputSamples = [];
-    },
-
-    recordBatchThroughputSample(requestedChars, durationMs) {
+    recordBatchThroughputSample(requestedChars, durationMs, progressChannel = 'main') {
         const chars = Math.max(0, Number(requestedChars) || 0);
         const elapsedMs = Math.max(0, Number(durationMs) || 0);
         if (chars <= 0 || elapsedMs <= 0) {
@@ -126,7 +192,7 @@ export const translateOnTheFlyFlowMethods = {
             return;
         }
 
-        const samples = this.getBatchThroughputSamples();
+        const samples = this.getBatchThroughputSamples(progressChannel);
         samples.push(charsPerSecond);
 
         const maxSamples = 10;
@@ -135,8 +201,8 @@ export const translateOnTheFlyFlowMethods = {
         }
     },
 
-    getAverageBatchCharsPerSecond() {
-        const samples = this.getBatchThroughputSamples().filter(
+    getAverageBatchCharsPerSecond(progressChannel = 'main') {
+        const samples = this.getBatchThroughputSamples(progressChannel).filter(
             (sample) => Number.isFinite(sample) && sample > 0
         );
         if (samples.length === 0) {
@@ -182,18 +248,19 @@ export const translateOnTheFlyFlowMethods = {
         });
     },
 
-    getOverallTranslationCompletionLine() {
+    getOverallTranslationCompletionLine(progressChannel = 'main') {
         if (!this.dryRunExecutedAtLeastOnce) {
             return null;
         }
 
         const stats =
-            this.getQueueScopedCompletionStats() || this.getOverallTranslationCompletionStats();
+            this.getQueueScopedCompletionStats(progressChannel) ||
+            this.getOverallTranslationCompletionStats();
         const remainingChars = Math.max(
             0,
             Number(stats.totalChars || 0) - Number(stats.processedChars || 0)
         );
-        const avgCharsPerSecond = this.getAverageBatchCharsPerSecond();
+        const avgCharsPerSecond = this.getAverageBatchCharsPerSecond(progressChannel);
 
         if (remainingChars <= 0) {
             return `total ${stats.completionPercent.toFixed(1)}% complete (ETA 0s)`;

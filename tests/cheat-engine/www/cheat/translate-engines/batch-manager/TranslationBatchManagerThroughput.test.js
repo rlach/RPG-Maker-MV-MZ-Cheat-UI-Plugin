@@ -8,7 +8,6 @@ function createRuntimeStub() {
         sourceLang: 'ja',
         targetLang: 'en',
         translationCache: new Map(),
-        batchThroughputSamples: [],
         recordCalls: [],
         progressLines: [],
         dryRunExecutedAtLeastOnce: true,
@@ -17,9 +16,6 @@ function createRuntimeStub() {
         hideProgressBox() {},
         updateProgressBox(title, message, totalCompletionLine) {
             this.progressLines.push(totalCompletionLine || '');
-        },
-        clearBatchThroughputSamples() {
-            this.batchThroughputSamples = [];
         },
         isBatchQueueAbortRequested() {
             return false;
@@ -34,10 +30,6 @@ function createRuntimeStub() {
             this.translationCache.set(cacheKey, value);
         },
         persistCache() {},
-        recordBatchThroughputSample(requestedChars, durationMs) {
-            this.recordCalls.push({ requestedChars, durationMs });
-            this.batchThroughputSamples.push(requestedChars / Math.max(1, durationMs));
-        },
         markBatchFailuresAsUntranslated() {},
         engine: {
             async batchTranslate(batch) {
@@ -57,10 +49,18 @@ function createRuntimeStub() {
         },
     };
 
-    return {
+    const instance = {
         ...translateOnTheFlyFlowMethods,
         ...runtime,
     };
+
+    const originalRecordBatchThroughputSample = instance.recordBatchThroughputSample.bind(instance);
+    instance.recordBatchThroughputSample = (requestedChars, durationMs, progressChannel = 'main') => {
+        instance.recordCalls.push({ requestedChars, durationMs, progressChannel });
+        return originalRecordBatchThroughputSample(requestedChars, durationMs, progressChannel);
+    };
+
+    return instance;
 }
 
 function createThroughputDefinition() {
@@ -97,7 +97,7 @@ describe('TranslationBatchManager throughput sampling', () => {
         globalThis.alert = () => {};
 
         const runtime = createRuntimeStub();
-        runtime.batchThroughputSamples = [999];
+        runtime.getBatchThroughputSamples('main').push(999);
 
         const manager = new TranslationBatchManager(runtime);
         manager.register(createThroughputDefinition());
@@ -120,8 +120,8 @@ describe('TranslationBatchManager throughput sampling', () => {
             }
         }
 
-        expect(runtime.batchThroughputSamples).toHaveLength(1);
-        expect(runtime.batchThroughputSamples[0]).not.toBe(999);
+        expect(runtime.getBatchThroughputSamples('main')).toHaveLength(1);
+        expect(runtime.getBatchThroughputSamples('main')[0]).not.toBe(999);
         expect(runtime.recordCalls).toHaveLength(1);
     });
 
@@ -168,7 +168,7 @@ describe('TranslationBatchManager throughput sampling', () => {
         }
 
         expect(runtime.recordCalls).toHaveLength(0);
-        expect(runtime.batchThroughputSamples).toEqual([]);
+        expect(runtime.getBatchThroughputSamples('main')).toEqual([]);
     });
 
     it('updates total queue progress after each batch in a single entry', async () => {
@@ -231,5 +231,56 @@ describe('TranslationBatchManager throughput sampling', () => {
         expect(runtime.progressLines.some((line) => line.startsWith('total 50.0% complete'))).toBe(
             true
         );
+    });
+
+    it('foreground queue does not reset main queue ETA/progress state', async () => {
+        const originalNow = Date.now;
+        let now = 5000;
+        Date.now = () => {
+            now += 100;
+            return now;
+        };
+
+        const originalAlert = globalThis.alert;
+        globalThis.alert = () => {};
+
+        const runtime = createRuntimeStub();
+
+        const mainManager = new TranslationBatchManager(runtime, { progressChannel: 'main' });
+        const foregroundManager = new TranslationBatchManager(runtime, {
+            progressChannel: 'foreground',
+        });
+        mainManager.register(createThroughputDefinition());
+        foregroundManager.register(createThroughputDefinition());
+
+        runtime.startQueueCompletionScope(['message'], 100);
+        runtime.markQueueCompletionItemsProcessed([{ value: 'x'.repeat(20) }]);
+        runtime.getBatchThroughputSamples('main').push(10, 20);
+
+        const beforeLine = runtime.getOverallTranslationCompletionLine();
+
+        try {
+            await foregroundManager.runBatchedTranslation([
+                {
+                    kind: 'throughput',
+                    backgroundJob: false,
+                    itemLimit: 50,
+                    charLimit: 10000,
+                },
+            ]);
+        } finally {
+            Date.now = originalNow;
+            if (typeof originalAlert === 'function') {
+                globalThis.alert = originalAlert;
+            } else {
+                delete globalThis.alert;
+            }
+        }
+
+        const afterLine = runtime.getOverallTranslationCompletionLine();
+
+        expect(beforeLine).toContain('total 20.0% complete');
+        expect(afterLine).toContain('total 20.0% complete');
+        expect(runtime.getBatchThroughputSamples('main').length).toBeGreaterThanOrEqual(2);
     });
 });
