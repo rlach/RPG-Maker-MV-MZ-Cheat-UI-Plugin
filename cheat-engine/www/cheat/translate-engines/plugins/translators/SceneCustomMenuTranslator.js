@@ -20,11 +20,6 @@ function resolveCachedText(runtime, text, cacheType) {
         return null;
     }
 
-    console.log(
-        '[SceneCustomMenuTranslator] Resolving cache for text:',
-        normalizedText,
-        !TranslatedTexts.has(normalizedText)
-    );
     const cacheKey = runtime.getCacheKey(normalizedText, cacheType);
     runtime.trackCacheKeyUsage(cacheKey, {
         harvestMissing: !TranslatedTexts.has(normalizedText),
