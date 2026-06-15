@@ -165,7 +165,9 @@ export default {
         },
 
         emptyMessage() {
-            if (this.totalUnknownTagsCount > 0 && this.activeFilterCount === 0) {
+            const total = this.unknownTagsList.length;
+            const active = this.filteredUnknownTagsList.length;
+            if (total > 0 && active === 0) {
                 return 'No tags matching current filter';
             }
             return `No unknown tags found. Click "Scan cache" to scan for unrecognized tag patterns in the translation cache. Cache size: ${this.unknownTagsCacheStringCount} strings`;
@@ -178,7 +180,6 @@ export default {
                 return;
             }
 
-            this.unknownTagStyleFilter = 'both';
             this.unknownTagsCacheStringCount = getUnknownTagsCacheStringCount(
                 this.runtime?.translationCache
             );

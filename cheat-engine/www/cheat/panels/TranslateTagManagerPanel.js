@@ -183,6 +183,7 @@ export default {
             },
             pendingUnknownTagPattern: null,
             resolvedUnknownPattern: '',
+            reopenUnknownTagsAfterCustomDialog: false,
 
             // Static options (populated from runtime engine or fallback defaults)
             tagStyleOptions: [
@@ -458,6 +459,7 @@ export default {
         openAddCustomTagDialog() {
             this.customTagEditIndex = -1;
             this.customTagReadOnlyMode = false;
+            this.reopenUnknownTagsAfterCustomDialog = false;
             this.fixedTagEditContext = {
                 tagSource: 'default',
                 pluginName: '',
@@ -482,6 +484,7 @@ export default {
         openEditCustomTagDialog(tag, index) {
             this.customTagEditIndex = index;
             this.customTagReadOnlyMode = false;
+            this.reopenUnknownTagsAfterCustomDialog = false;
             this.fixedTagEditContext = {
                 tagSource: 'default',
                 pluginName: '',
@@ -507,6 +510,7 @@ export default {
             const tag = item.tag || {};
             this.customTagEditIndex = -1;
             this.customTagReadOnlyMode = true;
+            this.reopenUnknownTagsAfterCustomDialog = false;
             this.fixedTagEditContext = {
                 tagSource: item.tagSource,
                 pluginName: item.pluginName || '',
@@ -568,6 +572,13 @@ export default {
                 pluginName: '',
                 tagConfig: null,
             };
+
+            if (this.reopenUnknownTagsAfterCustomDialog) {
+                this.reopenUnknownTagsAfterCustomDialog = false;
+                this.$nextTick(() => {
+                    this.findUnknownTagsVisible = true;
+                });
+            }
         },
 
         saveCustomTag() {
@@ -618,6 +629,7 @@ export default {
 
         openAddCustomTagFromUnknown(payload) {
             this.pendingUnknownTagPattern = payload.pattern;
+            this.reopenUnknownTagsAfterCustomDialog = true;
             this.customTagEditIndex = -1;
             this.customTagReadOnlyMode = false;
             this.fixedTagEditContext = {
@@ -626,7 +638,13 @@ export default {
                 tagConfig: null,
             };
             this.customTagForm = { ...payload.form };
-            this.customTagDialogVisible = true;
+
+            // Vuetify focus trap can recurse with two dialogs open at once.
+            // Close unknown modal first, then open custom tag dialog.
+            this.findUnknownTagsVisible = false;
+            this.$nextTick(() => {
+                this.customTagDialogVisible = true;
+            });
         },
     },
 };
