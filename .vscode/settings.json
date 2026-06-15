@@ -62,5 +62,8 @@
     },
     "files.watcherExclude": {
         "**/cheat-engine/www/cheat/libs/**": true
+    },
+    "chat.tools.terminal.autoApprove": {
+        "npx eslint": true
     }
 }

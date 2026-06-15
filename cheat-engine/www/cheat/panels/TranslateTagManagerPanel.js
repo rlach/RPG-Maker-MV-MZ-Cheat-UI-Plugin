@@ -1,6 +1,8 @@
 import { getRowsPerPage, setRowsPerPage as setTableRowsPerPage } from '../js/TableSettings.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
-import { TAG_CONFIGS, TAG_OVERRIDABLE_FIELDS } from '../translate-engines/ai-engine/constants.js';
+import { TAG_CONFIGS } from '../translate-engines/ai-engine/constants.js';
+import UnknownTagsModal from './translate-tag-manager/UnknownTagsModal.js';
+import CustomTagDialog from './translate-tag-manager/CustomTagDialog.js';
 
 const tagManagerTableStateMemory = {
     sortBy: 'description',
@@ -9,11 +11,13 @@ const tagManagerTableStateMemory = {
     searchInput: '',
     selectedTypeFilter: '',
 };
-
-let unknownTagsMemory = [];
-
 export default {
     name: 'TranslateTagManagerPanel',
+
+    components: {
+        UnknownTagsModal,
+        CustomTagDialog,
+    },
 
     template: `
 <v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
@@ -104,199 +108,27 @@ export default {
         </template>
     </v-data-table>
 
-    <!-- Add / Edit custom tag dialog -->
-    <v-dialog v-model="customTagDialogVisible" max-width="560" scrollable @keydown.stop>
-        <v-card dark class="pt-2">
-            <v-card-title class="subtitle-1 font-weight-bold">
-                {{
-                    customTagReadOnlyMode
-                        ? 'Edit Tag Overrides'
-                        : customTagEditIndex >= 0
-                            ? 'Edit Custom Tag'
-                            : 'Add Custom Tag'
-                }}
-            </v-card-title>
-            <v-card-text style="max-height: 62vh; overflow-y: auto;">
-                <v-text-field
-                    v-model="customTagForm.description"
-                    label="Description"
-                    outlined
-                    dense
-                    hide-details
-                    :disabled="isFieldDisabled('description')"
-                    @keydown.stop
-                    class="mb-2"
-                ></v-text-field>
+    <custom-tag-dialog
+        :visible="customTagDialogVisible"
+        :form="customTagForm"
+        :edit-index="customTagEditIndex"
+        :read-only-mode="customTagReadOnlyMode"
+        :tag-style-options="tagStyleOptions"
+        :tag-type-options="tagTypeOptions"
+        :tag-bracket-options="tagBracketOptions"
+        @update:visible="customTagDialogVisible = $event"
+        @cancel="closeCustomTagDialog"
+        @save="saveTagDialog">
+    </custom-tag-dialog>
 
-                <v-text-field
-                    v-model="customTagForm.tagSymbol"
-                    label="Tag Symbol"
-                    outlined
-                    dense
-                    hide-details
-                    :disabled="isFieldDisabled('tagSymbol')"
-                    @keydown.stop
-                    class="mb-2"
-                ></v-text-field>
-
-                <v-select
-                    v-model="customTagForm.style"
-                    :items="tagStyleOptions"
-                    label="Style"
-                    outlined
-                    dense
-                    hide-details
-                    :disabled="isFieldDisabled('style')"
-                    @keydown.stop
-                    class="mb-2"
-                ></v-select>
-
-                <v-select
-                    v-model="customTagForm.type"
-                    :items="tagTypeOptions"
-                    label="Type"
-                    outlined
-                    dense
-                    hide-details
-                    :disabled="isFieldDisabled('type')"
-                    @keydown.stop
-                    class="mb-2"
-                ></v-select>
-
-                <v-checkbox
-                    v-model="customTagForm.requiredConsistency"
-                    label="Required consistency"
-                    hide-details
-                    :disabled="isFieldDisabled('requiredConsistency')"
-                    class="mt-0 mb-2"
-                ></v-checkbox>
-
-                <v-text-field
-                    v-model.number="customTagForm.reservedWidth"
-                    type="number"
-                    min="0"
-                    step="1"
-                    label="Reserved width"
-                    outlined
-                    dense
-                    hide-details
-                    @keydown.stop
-                    class="mb-2"
-                ></v-text-field>
-
-                <v-textarea
-                    v-model="customTagForm.extraPromptForLlm"
-                    label="Extra prompt for LLM"
-                    outlined
-                    dense
-                    hide-details
-                    rows="3"
-                    auto-grow
-                    @keydown.stop
-                    class="mb-2"
-                ></v-textarea>
-                <div class="caption grey--text text--lighten-1 mb-2">
-                    Tag name will be listed before the description.
-                </div>
-
-                <template v-if="customTagForm.type === 'withCustomParameter'">
-                    <v-select
-                        v-model="customTagForm.bracket"
-                        :items="customTagBracketOptionsForStyle"
-                        label="Bracket"
-                        outlined
-                        dense
-                        hide-details
-                        :disabled="isFieldDisabled('bracket')"
-                        @keydown.stop
-                        class="mb-2"
-                    ></v-select>
-
-                    <v-checkbox
-                        v-model="customTagForm.maskValue"
-                        label="Mask value (preserve exact value, LLM cannot change it)"
-                        hide-details
-                        :disabled="isFieldDisabled('maskValue')"
-                        class="mt-0 mb-2"
-                    ></v-checkbox>
-
-                    <v-checkbox
-                        v-model="customTagForm.alwaysTranslate"
-                        :disabled="customTagForm.maskValue || isFieldDisabled('alwaysTranslate')"
-                        label="Prompt LLM to always translate"
-                        hide-details
-                        class="mt-0 mb-2"
-                    ></v-checkbox>
-
-                    <v-checkbox
-                        v-model="customTagForm.alwaysAddToKnowledgeBase"
-                        :disabled="customTagForm.maskValue || isFieldDisabled('alwaysAddToKnowledgeBase')"
-                        label="Ask LLM to always add translations to knowledge base"
-                        hide-details
-                        class="mt-0 mb-2"
-                    ></v-checkbox>
-                </template>
-            </v-card-text>
-            <v-card-actions>
-                <v-spacer></v-spacer>
-                <v-btn text color="grey" @click="closeCustomTagDialog">Cancel</v-btn>
-                <v-btn text color="primary" @click="saveTagDialog">Save</v-btn>
-            </v-card-actions>
-        </v-card>
-    </v-dialog>
-
-    <!-- Find Unknown Tags modal -->
-    <v-dialog v-model="findUnknownTagsVisible" max-width="700" @keydown.stop>
-        <v-card dark class="pt-2">
-            <v-card-title class="subtitle-1 font-weight-bold d-flex align-center">
-                <span>Find Possible Unknown Tags</span>
-                <v-spacer></v-spacer>
-                <v-btn
-                    small
-                    outlined
-                    color="primary"
-                    :loading="isScanning"
-                    @click="scanCacheForUnknownTags">
-                    <v-icon small left>mdi-refresh</v-icon>
-                    Scan cache
-                </v-btn>
-            </v-card-title>
-
-            <v-card-text class="pb-1">
-                <div v-if="unknownTagsList.length === 0 && !isScanning" class="caption grey--text text--lighten-1">
-                    No unknown tags found. Click "Scan cache" to scan for unrecognized tag patterns in the translation cache.
-                </div>
-            </v-card-text>
-
-            <v-data-table
-                v-if="unknownTagsList.length > 0"
-                :headers="unknownTagsHeaders"
-                :items="unknownTagsList"
-                :items-per-page="20"
-                :sort-by="'count'"
-                :sort-desc="true"
-                dense
-                class="mx-4"
-                style="background: transparent;">
-                <template v-slot:item.pattern="{ item }">
-                    <span class="caption font-weight-bold" style="font-family: monospace;">{{ item.pattern }}</span>
-                </template>
-                <template v-slot:item.count="{ item }">
-                    <span class="caption">{{ item.count }}</span>
-                </template>
-                <template v-slot:item.add="{ item }">
-                    <v-btn icon x-small color="primary" @click="openAddCustomTagFromUnknown(item)">
-                        <v-icon small>mdi-plus</v-icon>
-                    </v-btn>
-                </template>
-            </v-data-table>
-
-            <v-card-actions>
-                <v-spacer></v-spacer>
-                <v-btn text color="grey" @click="findUnknownTagsVisible = false">Close</v-btn>
-            </v-card-actions>
-        </v-card>
-    </v-dialog>
+    <unknown-tags-modal
+        :visible="findUnknownTagsVisible"
+        :runtime="_runtime"
+        :resolved-pattern="resolvedUnknownPattern"
+        @update:visible="findUnknownTagsVisible = $event"
+        @create-custom-tag="openAddCustomTagFromUnknown"
+        @closed="refreshEntries">
+    </unknown-tags-modal>
 </v-card>
   `,
 
@@ -350,7 +182,7 @@ export default {
                 alwaysAddToKnowledgeBase: false,
             },
             pendingUnknownTagPattern: null,
-            returnToUnknownTagsAfterCustomDialog: false,
+            resolvedUnknownPattern: '',
 
             // Static options (populated from runtime engine or fallback defaults)
             tagStyleOptions: [
@@ -370,15 +202,7 @@ export default {
                 { text: 'none (xml :value)', value: 'none' },
             ],
 
-            // Find unknown tags
             findUnknownTagsVisible: false,
-            unknownTagsList: [],
-            isScanning: false,
-            unknownTagsHeaders: [
-                { text: 'Pattern', value: 'pattern' },
-                { text: 'Count', value: 'count', width: 90 },
-                { text: 'Add', value: 'add', width: 60, sortable: false },
-            ],
         };
     },
 
@@ -386,7 +210,6 @@ export default {
         this._runtime = ensureTranslationRuntime();
         this.loadTableState();
         this.refreshEntries();
-        this.unknownTagsList = this.loadUnknownTagsFromStorage();
     },
 
     activated() {
@@ -452,20 +275,22 @@ export default {
             }
             return result;
         },
-
-        customTagBracketOptionsForStyle() {
-            const all = this.tagBracketOptions;
-            if (this.customTagForm.style === 'xml') return all;
-            return all.filter((o) => o.value !== 'none');
-        },
     },
 
     methods: {
         refreshEntries() {
             const entries = [];
-
-            // 1. Default tags from TAG_CONFIGS
             const engine = this._runtime?.engine;
+
+            this.appendDefaultTagEntries(entries, engine);
+            this.appendPluginTagEntries(entries, engine);
+            this.appendCustomTagEntries(entries);
+
+            this.entries = entries;
+            this.syncTagOptionsFromEngine(engine);
+        },
+
+        appendDefaultTagEntries(entries, engine) {
             const defaultTagsForUi =
                 engine && typeof engine.getDefaultTagConfigsForUi === 'function'
                     ? engine.getDefaultTagConfigsForUi()
@@ -483,8 +308,9 @@ export default {
                     customIndex: -1,
                 });
             }
+        },
 
-            // 2. Plugin tags (only exist on AI engine)
+        appendPluginTagEntries(entries, engine) {
             if (engine && Array.isArray(engine.pluginTags)) {
                 for (const tag of engine.pluginTags) {
                     const pluginName = tag._pluginName || 'unknown';
@@ -501,8 +327,9 @@ export default {
                     });
                 }
             }
+        },
 
-            // 3. Custom tags (bound via runtime proxy aiCustomTags)
+        appendCustomTagEntries(entries) {
             const customTags =
                 this._runtime && Array.isArray(this._runtime.aiCustomTags)
                     ? this._runtime.aiCustomTags
@@ -518,10 +345,9 @@ export default {
                     customIndex: idx,
                 });
             });
+        },
 
-            this.entries = entries;
-
-            // Sync option arrays from engine if available
+        syncTagOptionsFromEngine(engine) {
             if (engine) {
                 if (Array.isArray(engine.customTagStyleOptions)) {
                     this.tagStyleOptions = engine.customTagStyleOptions;
@@ -558,14 +384,6 @@ export default {
             return `\\${sym}`;
         },
 
-        isFieldOverridable(fieldName) {
-            return TAG_OVERRIDABLE_FIELDS.includes(fieldName);
-        },
-
-        isFieldDisabled(fieldName) {
-            return this.customTagReadOnlyMode && !this.isFieldOverridable(fieldName);
-        },
-
         callRuntime(methodName, ...args) {
             if (!this._runtime) {
                 this._runtime = ensureTranslationRuntime();
@@ -587,6 +405,11 @@ export default {
                 this.searchDebounceTimer = null;
                 this.search = value;
             }, 220);
+        },
+
+        openFindUnknownTags() {
+            this.findUnknownTagsVisible = true;
+            this.resolvedUnknownPattern = '';
         },
 
         loadTableState() {
@@ -745,11 +568,6 @@ export default {
                 pluginName: '',
                 tagConfig: null,
             };
-
-            if (this.returnToUnknownTagsAfterCustomDialog) {
-                this.returnToUnknownTagsAfterCustomDialog = false;
-                this.findUnknownTagsVisible = true;
-            }
         },
 
         saveCustomTag() {
@@ -785,12 +603,8 @@ export default {
             }
             this.callRuntime('bindEngineConfigTo', this._runtime);
 
-            // If this save was triggered from unknown-tag flow, remove matched pattern
             if (this.pendingUnknownTagPattern !== null) {
-                this.unknownTagsList = this.unknownTagsList.filter(
-                    (u) => u.pattern !== this.pendingUnknownTagPattern
-                );
-                this.saveUnknownTagsToStorage(this.unknownTagsList);
+                this.resolvedUnknownPattern = this.pendingUnknownTagPattern;
                 this.pendingUnknownTagPattern = null;
             }
 
@@ -802,127 +616,17 @@ export default {
             this.callRuntime('bindEngineConfigTo', this._runtime);
         },
 
-        // ---- Find Unknown Tags ----
-
-        openFindUnknownTags() {
-            this.findUnknownTagsVisible = true;
-        },
-
-        loadUnknownTagsFromStorage() {
-            return Array.isArray(unknownTagsMemory)
-                ? unknownTagsMemory.map((item) => ({ ...item }))
-                : [];
-        },
-
-        saveUnknownTagsToStorage(list) {
-            unknownTagsMemory = Array.isArray(list) ? list.map((item) => ({ ...item })) : [];
-        },
-
-        scanCacheForUnknownTags() {
-            if (!this._runtime) return;
-            const engine = this._runtime.engine;
-            if (!engine || typeof engine.scanForUnknownTags !== 'function') return;
-
-            this.isScanning = true;
-            this.unknownTagsList = [];
-
-            // Use setTimeout to allow UI to update (show loading) before potentially heavy scan
-            setTimeout(() => {
-                try {
-                    const cache = this._runtime.translationCache;
-                    const results = engine.scanForUnknownTags(cache || new Map());
-                    this.unknownTagsList = results;
-                    this.saveUnknownTagsToStorage(results);
-                } catch (err) {
-                    console.warn('[TagManager] scanForUnknownTags failed:', err);
-                } finally {
-                    this.isScanning = false;
-                }
-            }, 0);
-        },
-
-        guessConfigFromPattern(pattern) {
-            // XML style: <SYM>, <SYM:N>, <SYM:…>
-            const xmlMatch = /^<([A-Za-z][A-Za-z0-9]*)(?::(.+))?>$/.exec(pattern);
-            if (xmlMatch) {
-                const sym = xmlMatch[1];
-                const val = xmlMatch[2];
-                let type = 'withoutParameter';
-                if (val === 'N') type = 'withNumericParameter';
-                else if (val === '…') type = 'withCustomParameter';
-                return {
-                    description: sym.toLowerCase(),
-                    tagSymbol: sym,
-                    style: 'xml',
-                    type,
-                    bracket: 'none',
-                    maskValue: false,
-                    requiredConsistency: false,
-                    reservedWidth: 0,
-                    extraPromptForLlm: '',
-                };
-            }
-
-            // Escape style: \SYM, \SYM[N], \SYM[…], \SYM<…>, \SYM(…), \SYM{…}
-            const escMatch = /^\\([A-Za-z${}|.!><^][A-Za-z0-9]*)(.*)$/.exec(pattern);
-            if (escMatch) {
-                const sym = escMatch[1];
-                const rest = escMatch[2] || '';
-                let type = 'withoutParameter';
-                let bracket = '';
-                if (rest === '[N]') {
-                    type = 'withNumericParameter';
-                } else if (rest === '[…]') {
-                    type = 'withCustomParameter';
-                    bracket = '[';
-                } else if (rest === '<…>') {
-                    type = 'withCustomParameter';
-                    bracket = '<';
-                } else if (rest === '(…)') {
-                    type = 'withCustomParameter';
-                    bracket = '(';
-                } else if (rest === '{…}') {
-                    type = 'withCustomParameter';
-                    bracket = '{';
-                }
-                return {
-                    description: sym.toLowerCase(),
-                    tagSymbol: sym,
-                    style: 'escape',
-                    type,
-                    bracket,
-                    maskValue: false,
-                    requiredConsistency: false,
-                    reservedWidth: 0,
-                    extraPromptForLlm: '',
-                };
-            }
-
-            return {
-                description: '',
-                tagSymbol: '',
-                style: 'escape',
-                type: 'withNumericParameter',
-                bracket: '<',
-                maskValue: false,
-                requiredConsistency: false,
-                reservedWidth: 0,
-                extraPromptForLlm: '',
-            };
-        },
-
-        openAddCustomTagFromUnknown(unknownTag) {
-            this.pendingUnknownTagPattern = unknownTag.pattern;
-            this.returnToUnknownTagsAfterCustomDialog = true;
-            const guessed = this.guessConfigFromPattern(unknownTag.pattern);
+        openAddCustomTagFromUnknown(payload) {
+            this.pendingUnknownTagPattern = payload.pattern;
             this.customTagEditIndex = -1;
-            this.customTagForm = guessed;
-
-            // Avoid nested focus traps from two active dialogs (Vuetify can recurse on focusin).
-            this.findUnknownTagsVisible = false;
-            this.$nextTick(() => {
-                this.customTagDialogVisible = true;
-            });
+            this.customTagReadOnlyMode = false;
+            this.fixedTagEditContext = {
+                tagSource: 'default',
+                pluginName: '',
+                tagConfig: null,
+            };
+            this.customTagForm = { ...payload.form };
+            this.customTagDialogVisible = true;
         },
     },
 };
