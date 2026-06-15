@@ -15,6 +15,101 @@ body::-webkit-scrollbar {
     scrollbar-width: none;
 }
 
+/*
+ * Force visible system cursor for cheat UI even if game CSS uses cursor:none.
+ * Use explicit cursor values instead of `revert`, which can inherit hidden cursors.
+ */
+#app,
+#app *,
+.v-dialog__content,
+.v-dialog__content *,
+.v-menu__content,
+.v-menu__content *,
+.v-tooltip__content,
+.v-tooltip__content *,
+.v-autocomplete__content,
+.v-autocomplete__content *,
+.v-select-list,
+.v-select-list *,
+.v-overlay__content,
+.v-overlay__content * {
+    cursor: default !important;
+}
+
+/* Pointer for clickable controls. */
+#app button,
+#app [role='button'],
+#app a,
+#app label,
+#app .v-btn,
+#app .v-tab,
+#app .v-list-item,
+#app .v-input--selection-controls__input,
+#app .v-input--selection-controls__ripple,
+.v-dialog__content button,
+.v-dialog__content [role='button'],
+.v-dialog__content a,
+.v-dialog__content label,
+.v-dialog__content .v-btn,
+.v-dialog__content .v-tab,
+.v-dialog__content .v-list-item,
+.v-dialog__content .v-input--selection-controls__input,
+.v-dialog__content .v-input--selection-controls__ripple,
+.v-menu__content button,
+.v-menu__content [role='button'],
+.v-menu__content a,
+.v-menu__content label,
+.v-menu__content .v-btn,
+.v-menu__content .v-list-item,
+.v-menu__content .v-input--selection-controls__input,
+.v-menu__content .v-input--selection-controls__ripple,
+.v-autocomplete__content button,
+.v-autocomplete__content [role='button'],
+.v-autocomplete__content a,
+.v-autocomplete__content label,
+.v-autocomplete__content .v-list-item,
+.v-select-list button,
+.v-select-list [role='button'],
+.v-select-list a,
+.v-select-list label,
+.v-select-list .v-list-item,
+.v-overlay__content button,
+.v-overlay__content [role='button'],
+.v-overlay__content a,
+.v-overlay__content label,
+.v-overlay__content .v-btn,
+.v-overlay__content .v-list-item {
+    cursor: pointer !important;
+}
+
+/* Text cursor for editable fields. */
+#app input,
+#app textarea,
+#app [contenteditable='true'],
+#app .v-input input,
+#app .v-text-field input,
+#app .v-textarea textarea,
+.v-dialog__content input,
+.v-dialog__content textarea,
+.v-dialog__content [contenteditable='true'],
+.v-dialog__content .v-input input,
+.v-dialog__content .v-text-field input,
+.v-dialog__content .v-textarea textarea,
+.v-menu__content input,
+.v-menu__content textarea,
+.v-menu__content [contenteditable='true'],
+.v-autocomplete__content input,
+.v-autocomplete__content textarea,
+.v-autocomplete__content [contenteditable='true'],
+.v-select-list input,
+.v-select-list textarea,
+.v-select-list [contenteditable='true'],
+.v-overlay__content input,
+.v-overlay__content textarea,
+.v-overlay__content [contenteditable='true'] {
+    cursor: text !important;
+}
+
 .opaque-on-mouseover {
     transition: opacity 0.3s;
     opacity: 0.3;
