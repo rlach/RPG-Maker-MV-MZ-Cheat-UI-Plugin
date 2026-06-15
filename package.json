@@ -1,7 +1,7 @@
 {
     "name": "rpg-maker-mv-mz-cheat-ui-plugin",
     "private": true,
-    "version": "1.29.9",
+    "version": "1.29.10",
     "scripts": {
         "prepare": "husky",
         "deploy": "python ./deploy/main.py",

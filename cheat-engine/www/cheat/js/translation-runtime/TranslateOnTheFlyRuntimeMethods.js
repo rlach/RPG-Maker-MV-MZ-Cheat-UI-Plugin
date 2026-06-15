@@ -9,16 +9,28 @@ export const translateOnTheFlyRuntimeMethods = {
     setupTranslationHook() {
         const self = this;
 
-        setTimeout(() => {
+        let localeSetupAttempts = 0;
+        const maxLocaleSetupAttempts = 20;
+        const applyLocaleWithRetry = () => {
+            localeSetupAttempts += 1;
+
             try {
                 $dataSystem.locale = self.targetLang || 'en';
+                return;
             } catch (error) {
-                console.log(
-                    '[TranslateOnTheFly] Failed to set $dataSystem.locale, continuing without it',
-                    error
-                );
+                if (localeSetupAttempts >= maxLocaleSetupAttempts) {
+                    console.log(
+                        '[TranslateOnTheFly] Failed to set $dataSystem.locale, continuing without it',
+                        error
+                    );
+                    return;
+                }
             }
-        }, 1000);
+
+            setTimeout(applyLocaleWithRetry, 1000);
+        };
+
+        setTimeout(applyLocaleWithRetry, 1000);
 
         const markCurrentMessageAsEventOrigin = (kind, interpreter) => {
             if (!window.$gameMessage) {
