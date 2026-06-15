@@ -148,7 +148,26 @@ export default {
             return filterUnknownTagsListByStyle(this.unknownTagsList, this.unknownTagStyleFilter);
         },
 
+        escapeStyleCount() {
+            return filterUnknownTagsListByStyle(this.unknownTagsList, 'escape').length;
+        },
+
+        xmlStyleCount() {
+            return filterUnknownTagsListByStyle(this.unknownTagsList, 'xml').length;
+        },
+
+        totalUnknownTagsCount() {
+            return this.unknownTagsList.length;
+        },
+
+        activeFilterCount() {
+            return this.filteredUnknownTagsList.length;
+        },
+
         emptyMessage() {
+            if (this.totalUnknownTagsCount > 0 && this.activeFilterCount === 0) {
+                return 'No tags matching current filter';
+            }
             return `No unknown tags found. Click "Scan cache" to scan for unrecognized tag patterns in the translation cache. Cache size: ${this.unknownTagsCacheStringCount} strings`;
         },
     },
@@ -236,9 +255,9 @@ export default {
                 mandatory
                 dense
                 class="mb-2">
-                <v-btn small value="escape">Escape style</v-btn>
-                <v-btn small value="xml">XML style</v-btn>
-                <v-btn small value="both">Both</v-btn>
+                <v-btn small value="escape">Escape style ({{ escapeStyleCount }})</v-btn>
+                <v-btn small value="xml">XML style ({{ xmlStyleCount }})</v-btn>
+                <v-btn small value="both">Both ({{ totalUnknownTagsCount }})</v-btn>
             </v-btn-toggle>
 
             <div v-if="filteredUnknownTagsList.length === 0 && !isScanning" class="caption grey--text text--lighten-1">
