@@ -48,9 +48,7 @@ function setMapDataLoadMethod(method) {
 }
 
 const DEFAULT_OBJECT_TRANSLATION_TYPE_DEFS = Object.freeze([
-    { id: 'mapEvents', label: 'Map events' },
-    { id: 'commonEvents', label: 'CommonEvents' },
-    { id: 'variables', label: 'Variables (setup in variables runtime)' },
+    { id: 'systemCommands', label: 'system commands' },
     { id: 'items', label: 'items' },
     { id: 'skills', label: 'skills' },
     { id: 'classes', label: 'classes' },
@@ -58,13 +56,15 @@ const DEFAULT_OBJECT_TRANSLATION_TYPE_DEFS = Object.freeze([
     { id: 'armors', label: 'armors' },
     { id: 'weapons', label: 'weapons' },
     { id: 'maps', label: 'Map names' },
+    { id: 'states', label: 'states' },
+    { id: 'mapEvents', label: 'Map events' },
+    { id: 'commonEvents', label: 'CommonEvents' },
+    { id: 'variables', label: 'Variables (setup in variables runtime)' },
     { id: 'actors', label: 'actors' },
     { id: 'systemMessages', label: 'system messages' },
-    { id: 'systemCommands', label: 'system commands' },
-    { id: 'states', label: 'states' },
-    { id: 'otherStrings', label: 'other strings' },
     { id: 'gameArrays', label: 'game arrays (terms, types, elements)' },
     { id: 'troops', label: 'Troops' },
+    { id: 'otherStrings', label: 'other strings' },
     { id: 'koharu', label: 'Koharu' },
     { id: 'plugins', label: 'Plugins' },
     {
