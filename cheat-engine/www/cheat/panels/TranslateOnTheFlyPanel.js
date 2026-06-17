@@ -22,7 +22,7 @@ const runtimeStateProxyComputed = TRANSLATION_RUNTIME_STATE_KEYS.reduce((acc, ke
 export default {
     name: 'TranslateOnTheFlyPanel',
 
-    template: `
+    template: String.raw`
 <v-card flat class="ma-0 pa-0">
     <v-card-subtitle class="pb-0 font-weight-bold">Translate Messages</v-card-subtitle>
     <v-card-text class="pb-0">
@@ -199,7 +199,7 @@ export default {
             </v-text-field>
             <v-text-field
                 :value="textWrapLevel1RegularWidth"
-                label="size +1 \\{"
+                label="size +1 \{"
                 outlined
                 dense
                 type="number"
@@ -210,7 +210,7 @@ export default {
             </v-text-field>
             <v-text-field
                 :value="textWrapLevel2RegularWidth"
-                label="size +2 \\{\\{"
+                label="size +2 \{\{"
                 outlined
                 dense
                 type="number"
@@ -219,6 +219,12 @@ export default {
                 readonly
                 style="flex: 0 0 110px; max-width: 110px;">
             </v-text-field>
+        </div>
+
+        <div
+            v-if="amountOfPortraitMessages > 0"
+            class="caption orange--text text--darken-2 mb-1">
+            Cache contains {{amountOfPortraitMessages}} messages with portraits
         </div>
 
         <div
@@ -245,7 +251,7 @@ export default {
             </v-text-field>
             <v-text-field
                 :value="textWrapLevel1PortraitWidth"
-                label="size +1 \\{"
+                label="size +1 \{"
                 outlined
                 dense
                 type="number"
@@ -256,7 +262,7 @@ export default {
             </v-text-field>
             <v-text-field
                 :value="textWrapLevel2PortraitWidth"
-                label="size +2 \\{\\{"
+                label="size +2 \{\{"
                 outlined
                 dense
                 type="number"
@@ -338,9 +344,10 @@ export default {
         </v-checkbox>
 
         <div class="d-flex align-center mt-2" style="gap: 8px;">
+            <span class="caption grey--text text--lighten-1" style="white-space: nowrap;">Remove existing newlines before wrapping if there are</span>
             <v-text-field
                 v-model.number="removeNewlinesBeforeWrappingMaxCount"
-                label="Remove existing newlines before wrapping if there are"
+                label="newlines"
                 outlined
                 dense
                 type="number"
@@ -358,7 +365,7 @@ export default {
 
         <v-text-field
             v-model="textWrapFontScaleMultiplier"
-            label="Text scale width multiplier per \\{ level"
+            label="Text scale width multiplier per \{ level"
             outlined
             dense
             type="number"
@@ -477,24 +484,25 @@ export default {
             return this._translationCache ? this._translationCache.size : 0;
         },
 
-        hasMessagePortraitCacheEntries() {
+        amountOfPortraitMessages() {
             void this.stateVersion;
 
             if (!this._translationCache) {
-                return false;
+                return 0;
             }
 
+            let count = 0;
             for (const cacheKey of this._translationCache.keys()) {
                 if (cacheKey.startsWith('message_portrait:')) {
-                    return true;
+                    count++;
                 }
             }
 
-            return false;
+            return count;
         },
 
         showNoPortraitMessagesDetectedInfo() {
-            return this.dryRunExecutedAtLeastOnce && !this.hasMessagePortraitCacheEntries;
+            return this.dryRunExecutedAtLeastOnce && this.amountOfPortraitMessages === 0;
         },
 
         normalizedTextWrapFontScaleMultiplier() {
