@@ -29,6 +29,8 @@ import {
 import { stripThinkBlocks, preprocessPayloadForLlm } from './utils.js';
 import {
     findRelevantEntries,
+    nameCacheMapToEntries,
+    mergeEntriesByKey,
     buildKnowledgeHints,
     buildKbaseInstruction,
     extractKbaseEntries,
@@ -925,7 +927,20 @@ class AIEngine extends BaseTranslationEngine {
             );
             const knowledgeEntries = getKnowledgeEntries();
             const relevantKnowledge = findRelevantEntries(knowledgeEntries, preprocessedTexts);
-            const knowledgeHints = buildKnowledgeHints(relevantKnowledge);
+            const nameCacheEntries = nameCacheMapToEntries(
+                this.runtime?.translationCache,
+                this.runtime?.sourceLang,
+                this.runtime?.targetLang
+            );
+            const relevantNameCacheEntries = findRelevantEntries(
+                nameCacheEntries,
+                preprocessedTexts
+            );
+            const mergedKnowledgeEntries = mergeEntriesByKey(
+                relevantKnowledge,
+                relevantNameCacheEntries
+            );
+            const knowledgeHints = buildKnowledgeHints(mergedKnowledgeEntries);
 
             let knowledgePromptPart = '';
             if (knowledgeHints) {

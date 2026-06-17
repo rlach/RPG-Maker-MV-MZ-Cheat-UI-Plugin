@@ -7,6 +7,8 @@ import {
     mergeEntryIntoMap,
     mergeEntriesIntoMap,
     findRelevantEntries,
+    nameCacheMapToEntries,
+    mergeEntriesByKey,
     buildKnowledgeHints,
     buildKbaseInstruction,
     extractKbaseEntries,
@@ -295,6 +297,74 @@ describe('findRelevantEntries', () => {
         const texts = ['THE FORCE IS STRONG'];
         const relevant = findRelevantEntries(entries, texts);
         expect(relevant.map((e) => e.key)).toContain('Force');
+    });
+});
+
+describe('nameCacheMapToEntries', () => {
+    it('returns only *_name entries for current language pair and excludes actor_name', () => {
+        const translationCache = new Map([
+            ['item_name:ja-en-Phoenix Down', 'Pióro Feniksa'],
+            ['armor_name:ja-en-Leather Armor', 'Skorzana Zbroja'],
+            ['actor_name:ja-en-Harold', 'Harold'],
+            ['item_name:ja-fr-Phoenix Down', 'Queue de phenix'],
+            ['text:ja-en-Phoenix Down', 'Pióro Feniksa'],
+        ]);
+
+        const entries = nameCacheMapToEntries(translationCache, 'ja', 'en');
+        expect(entries).toEqual([
+            { key: 'Phoenix Down', translation: 'Pióro Feniksa', info: '', plugin: '' },
+            {
+                key: 'Leather Armor',
+                translation: 'Skorzana Zbroja',
+                info: '',
+                plugin: '',
+            },
+        ]);
+    });
+
+    it('skips entries with empty keys or translations', () => {
+        const translationCache = new Map([
+            ['item_name:ja-en-  ', 'Feniks'],
+            ['item_name:ja-en-Phoenix Down', '  '],
+            ['item_name:ja-en-Hi-Potion', 'Mega Mikstura'],
+        ]);
+
+        const entries = nameCacheMapToEntries(translationCache, 'ja', 'en');
+        expect(entries).toEqual([
+            { key: 'Hi-Potion', translation: 'Mega Mikstura', info: '', plugin: '' },
+        ]);
+    });
+});
+
+describe('mergeEntriesByKey', () => {
+    it('keeps primary entry when duplicate key exists in secondary list', () => {
+        const primary = [{ key: 'Phoenix Down', translation: 'Pióro Feniksa', info: 'KB', plugin: '' }];
+        const secondary = [
+            { key: 'Phoenix Down', translation: 'Phoenix Revive', info: '', plugin: '' },
+            { key: 'Leather Armor', translation: 'Skorzana Zbroja', info: '', plugin: '' },
+        ];
+
+        const merged = mergeEntriesByKey(primary, secondary);
+        expect(merged).toEqual([
+            { key: 'Phoenix Down', translation: 'Pióro Feniksa', info: 'KB', plugin: '' },
+            { key: 'Leather Armor', translation: 'Skorzana Zbroja', info: '', plugin: '' },
+        ]);
+    });
+});
+
+describe('name cache relevance flow', () => {
+    it('matches cache key in input text and builds hint like knowledge base entry', () => {
+        const translationCache = new Map([
+            ['item_name:ja-en-Phoenix Down', 'Pióro Feniksa'],
+            ['actor_name:ja-en-Harold', 'Harold'],
+        ]);
+        const preprocessedTexts = ['You found Phoenix Down'];
+
+        const nameEntries = nameCacheMapToEntries(translationCache, 'ja', 'en');
+        const relevantNameEntries = findRelevantEntries(nameEntries, preprocessedTexts);
+        const hints = buildKnowledgeHints(relevantNameEntries);
+
+        expect(hints).toBe('Phoenix Down: Pióro Feniksa');
     });
 });
 

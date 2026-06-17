@@ -251,6 +251,100 @@ export function findRelevantEntries(entries, preprocessedTexts) {
     return result;
 }
 
+/**
+ * Convert translation cache entries from *_name categories to knowledge-entry shape.
+ *
+ * Rules:
+ *  - include only categories ending with `_name`
+ *  - exclude `actor_name` (already sent separately via name hints)
+ *  - include only current language pair entries
+ *  - include only non-empty original key and translation
+ *
+ * @param {Map<string, string>} translationCache
+ * @param {string} sourceLang
+ * @param {string} targetLang
+ * @returns {Array<{ key: string, translation: string, info: string, plugin: string }>}
+ */
+export function nameCacheMapToEntries(translationCache, sourceLang, targetLang) {
+    if (!(translationCache instanceof Map)) {
+        return [];
+    }
+
+    const normalizedSourceLang = trimString(sourceLang) || 'ja';
+    const normalizedTargetLang = trimString(targetLang) || 'en';
+    const langPrefix = `${normalizedSourceLang}-${normalizedTargetLang}-`;
+
+    const result = [];
+    for (const [cacheKey, rawTranslation] of translationCache.entries()) {
+        if (typeof cacheKey !== 'string' || !cacheKey) {
+            continue;
+        }
+
+        const separatorIndex = cacheKey.indexOf(':');
+        if (separatorIndex <= 0) {
+            continue;
+        }
+
+        const category = cacheKey.slice(0, separatorIndex);
+        if (!category.endsWith('_name') || category === 'actor_name') {
+            continue;
+        }
+
+        const keyBody = cacheKey.slice(separatorIndex + 1);
+        if (!keyBody.startsWith(langPrefix)) {
+            continue;
+        }
+
+        const key = trimString(keyBody.slice(langPrefix.length));
+        const translation = trimString(rawTranslation);
+        if (!key || !translation) {
+            continue;
+        }
+
+        result.push({ key, translation, info: '', plugin: '' });
+    }
+
+    return result;
+}
+
+/**
+ * Merge two entry lists by key (case-insensitive), preserving order and
+ * preferring the first list when duplicates exist.
+ *
+ * @param {Array<{ key: string, translation: string, info: string, plugin?: string }>} primaryEntries
+ * @param {Array<{ key: string, translation: string, info: string, plugin?: string }>} secondaryEntries
+ * @returns {Array<{ key: string, translation: string, info: string, plugin: string }>}
+ */
+export function mergeEntriesByKey(primaryEntries, secondaryEntries) {
+    const merged = [];
+    const seenKeys = new Set();
+
+    const append = (entries) => {
+        if (!Array.isArray(entries)) {
+            return;
+        }
+
+        for (const entry of entries) {
+            const key = trimString(entry?.key).toLowerCase();
+            if (!key || seenKeys.has(key)) {
+                continue;
+            }
+            seenKeys.add(key);
+            merged.push({
+                key: trimString(entry.key),
+                translation: trimString(entry.translation),
+                info: trimString(entry.info),
+                plugin: trimString(entry.plugin),
+            });
+        }
+    };
+
+    append(primaryEntries);
+    append(secondaryEntries);
+
+    return merged;
+}
+
 // ---------------------------------------------------------------------------
 // Prompt building helpers
 // ---------------------------------------------------------------------------
