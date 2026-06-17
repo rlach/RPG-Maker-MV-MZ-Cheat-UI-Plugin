@@ -6,10 +6,6 @@ import {
     STREAM_OPEN_BRACE_MAX_CHARS,
 } from '../../../../../../cheat-engine/www/cheat/translate-engines/ai-engine/constants.js';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 const keys2 = ['m0', 'm1'];
 
 function makeState(expectedKeys = keys2, options = {}) {
@@ -19,10 +15,6 @@ function makeState(expectedKeys = keys2, options = {}) {
 function check(state, text, force = true) {
     return StreamGuardrails.checkGuardrails(state, text, force);
 }
-
-// ---------------------------------------------------------------------------
-// normalizeBannedPhrases
-// ---------------------------------------------------------------------------
 
 describe('normalizeBannedPhrases', () => {
     it('returns empty array for non-array input', () => {
@@ -44,10 +36,6 @@ describe('normalizeBannedPhrases', () => {
         expect(result).toEqual([{ phrase: 'ok', key: 'ok' }]);
     });
 });
-
-// ---------------------------------------------------------------------------
-// findBannedPhraseInJsonText
-// ---------------------------------------------------------------------------
 
 describe('findBannedPhraseInJsonText', () => {
     const phrases = StreamGuardrails.normalizeBannedPhrases(['tool_call', 'JSON']);
@@ -73,10 +61,6 @@ describe('findBannedPhraseInJsonText', () => {
     });
 });
 
-// ---------------------------------------------------------------------------
-// findBannedPhraseInScan
-// ---------------------------------------------------------------------------
-
 describe('findBannedPhraseInScan', () => {
     const phrases = StreamGuardrails.normalizeBannedPhrases(['badword']);
 
@@ -101,9 +85,117 @@ describe('findBannedPhraseInScan', () => {
     });
 });
 
-// ---------------------------------------------------------------------------
-// extractInFlightTopLevelKey
-// ---------------------------------------------------------------------------
+describe('countPhraseOccurrences', () => {
+    it('returns 0 for empty or missing input', () => {
+        expect(StreamGuardrails.countPhraseOccurrences('', 'json')).toBe(0);
+        expect(StreamGuardrails.countPhraseOccurrences(null, 'json')).toBe(0);
+        expect(StreamGuardrails.countPhraseOccurrences('hello', '')).toBe(0);
+        expect(StreamGuardrails.countPhraseOccurrences('hello', null)).toBe(0);
+    });
+
+    it('counts non-overlapping case-insensitive occurrences', () => {
+        expect(StreamGuardrails.countPhraseOccurrences('JSON json JSON', 'json')).toBe(3);
+        expect(StreamGuardrails.countPhraseOccurrences('no match here', 'json')).toBe(0);
+        expect(StreamGuardrails.countPhraseOccurrences('JSONjson', 'json')).toBe(2);
+    });
+
+    it('handles adjacent non-overlapping occurrences', () => {
+        expect(StreamGuardrails.countPhraseOccurrences('aaa', 'aa')).toBe(1);
+    });
+});
+
+describe('buildBannedPhrasesAllowedCounts', () => {
+    const phrases = StreamGuardrails.normalizeBannedPhrases(['JSON', 'tool_call']);
+
+    it('returns empty object for non-array phrases', () => {
+        expect(StreamGuardrails.buildBannedPhrasesAllowedCounts(null, 'JSON')).toEqual({});
+    });
+
+    it('counts zero when inputText is empty or missing', () => {
+        const result = StreamGuardrails.buildBannedPhrasesAllowedCounts(phrases, '');
+        expect(result['json']).toBe(0);
+        expect(result['tool_call']).toBe(0);
+    });
+
+    it('counts occurrences in inputText case-insensitively', () => {
+        const result = StreamGuardrails.buildBannedPhrasesAllowedCounts(
+            phrases,
+            'Please return JSON. Also JSON. Use tool_call.'
+        );
+        expect(result['json']).toBe(2);
+        expect(result['tool_call']).toBe(1);
+    });
+
+    it('treats missing inputText as empty (all counts 0)', () => {
+        const result = StreamGuardrails.buildBannedPhrasesAllowedCounts(phrases, null);
+        expect(result['json']).toBe(0);
+        expect(result['tool_call']).toBe(0);
+    });
+});
+
+describe('countPhraseOccurrencesInScan', () => {
+    const phraseItem = { phrase: 'JSON', key: 'json' };
+
+    it('returns 0 for null scan or null phraseItem', () => {
+        expect(StreamGuardrails.countPhraseOccurrencesInScan(null, phraseItem)).toBe(0);
+        expect(StreamGuardrails.countPhraseOccurrencesInScan({}, null)).toBe(0);
+        expect(StreamGuardrails.countPhraseOccurrencesInScan({}, { phrase: 'x', key: '' })).toBe(0);
+    });
+
+    it('counts across complete objects and partial text', () => {
+        const scan = {
+            objects: [
+                { text: '{"m0":"JSON object","m1":"json again"}' },
+                { text: '{"m2":"no match"}' },
+            ],
+            partialObjectText: '{"m3":"JSON',
+        };
+        // objects[0]: 2, objects[1]: 0, partial: 1 → total 3
+        expect(StreamGuardrails.countPhraseOccurrencesInScan(scan, phraseItem)).toBe(3);
+    });
+
+    it('returns 0 when no match anywhere', () => {
+        const scan = {
+            objects: [{ text: '{"m0":"clean text"}' }],
+            partialObjectText: '{"m1":"also clean',
+        };
+        expect(StreamGuardrails.countPhraseOccurrencesInScan(scan, phraseItem)).toBe(0);
+    });
+});
+
+describe('findExcessBannedPhrase', () => {
+    const phrases = StreamGuardrails.normalizeBannedPhrases(['JSON']);
+
+    it('returns null for null scan or empty phrases', () => {
+        expect(StreamGuardrails.findExcessBannedPhrase(null, phrases, {})).toBe(null);
+        expect(StreamGuardrails.findExcessBannedPhrase({}, [], {})).toBe(null);
+    });
+
+    it('cancels when occurrence count exceeds allowed (default 0)', () => {
+        const scan = { objects: [{ text: '{"m0":"JSON result"}' }], partialObjectText: '' };
+        expect(StreamGuardrails.findExcessBannedPhrase(scan, phrases, { json: 0 })).toBe('JSON');
+    });
+
+    it('does not cancel when occurrence count equals allowed', () => {
+        // input had 1 "JSON", response has 1 "JSON"
+        const scan = { objects: [{ text: '{"m0":"JSON result"}' }], partialObjectText: '' };
+        expect(StreamGuardrails.findExcessBannedPhrase(scan, phrases, { json: 1 })).toBe(null);
+    });
+
+    it('cancels when occurrence count exceeds allowed threshold', () => {
+        // input had 2, response has 3
+        const scan = {
+            objects: [{ text: '{"m0":"JSON and JSON and JSON"}' }],
+            partialObjectText: '',
+        };
+        expect(StreamGuardrails.findExcessBannedPhrase(scan, phrases, { json: 2 })).toBe('JSON');
+    });
+
+    it('does not cancel when missing allowedCounts entry treats allowed as 0 but no occurrence', () => {
+        const scan = { objects: [{ text: '{"m0":"clean"}' }], partialObjectText: '' };
+        expect(StreamGuardrails.findExcessBannedPhrase(scan, phrases, {})).toBe(null);
+    });
+});
 
 describe('extractInFlightTopLevelKey', () => {
     it('returns null for non-string / empty input', () => {
@@ -131,10 +223,6 @@ describe('extractInFlightTopLevelKey', () => {
     });
 });
 
-// ---------------------------------------------------------------------------
-// isExpectedKeyProgress
-// ---------------------------------------------------------------------------
-
 describe('isExpectedKeyProgress', () => {
     it('returns true when expectedKeys is empty or not an array', () => {
         expect(StreamGuardrails.isExpectedKeyProgress([], 'm0', true)).toBe(true);
@@ -151,10 +239,6 @@ describe('isExpectedKeyProgress', () => {
         expect(StreamGuardrails.isExpectedKeyProgress(['m0', 'm1'], 'x', false)).toBe(false);
     });
 });
-
-// ---------------------------------------------------------------------------
-// buildValueLengthSettings
-// ---------------------------------------------------------------------------
 
 describe('buildValueLengthSettings', () => {
     it('applies default multiplier=3 and minimum=30', () => {
@@ -176,10 +260,6 @@ describe('buildValueLengthSettings', () => {
     });
 });
 
-// ---------------------------------------------------------------------------
-// extractInFlightTopLevelValueString
-// ---------------------------------------------------------------------------
-
 describe('extractInFlightTopLevelValueString', () => {
     it('returns null for non-string / empty input', () => {
         expect(StreamGuardrails.extractInFlightTopLevelValueString(null)).toBe(null);
@@ -192,9 +272,7 @@ describe('extractInFlightTopLevelValueString', () => {
     });
 
     it('returns null when value string is closed', () => {
-        const result = StreamGuardrails.extractInFlightTopLevelValueString(
-            '{"m0": "hello world"'
-        );
+        const result = StreamGuardrails.extractInFlightTopLevelValueString('{"m0": "hello world"');
         expect(result).toBe(null);
     });
 
@@ -205,10 +283,6 @@ describe('extractInFlightTopLevelValueString', () => {
         expect(result).toEqual({ key: 'm0', valueLength: 3 });
     });
 });
-
-// ---------------------------------------------------------------------------
-// isMapComplete / countMatchedKeys
-// ---------------------------------------------------------------------------
 
 describe('isMapComplete', () => {
     it('returns false for null/non-object map', () => {
@@ -235,16 +309,10 @@ describe('countMatchedKeys', () => {
     });
 
     it('counts matching keys', () => {
-        expect(StreamGuardrails.countMatchedKeys({ m0: 'a', m1: 'b', extra: 'c' }, keys2)).toBe(
-            2
-        );
+        expect(StreamGuardrails.countMatchedKeys({ m0: 'a', m1: 'b', extra: 'c' }, keys2)).toBe(2);
         expect(StreamGuardrails.countMatchedKeys({ m0: 'a' }, keys2)).toBe(1);
     });
 });
-
-// ---------------------------------------------------------------------------
-// updateBestState
-// ---------------------------------------------------------------------------
 
 describe('updateBestState', () => {
     it('updates bestMap when score improves', () => {
@@ -270,10 +338,6 @@ describe('updateBestState', () => {
     });
 });
 
-// ---------------------------------------------------------------------------
-// createMonitorState
-// ---------------------------------------------------------------------------
-
 describe('createMonitorState', () => {
     it('initializes all fields', () => {
         const state = makeState(['m0'], { bannedPhrases: ['bad'] });
@@ -288,17 +352,23 @@ describe('createMonitorState', () => {
         expect(state.cancelReason).toBe(null);
         expect(state.cancelMeta).toBe(null);
     });
+
+    it('stores bannedPhrasesAllowedCounts as all-zeros when no inputText', () => {
+        const state = makeState(['m0'], { bannedPhrases: ['JSON'] });
+        expect(state.bannedPhrasesAllowedCounts).toEqual({ json: 0 });
+    });
+
+    it('stores bannedPhrasesAllowedCounts counted from inputText', () => {
+        const state = makeState(['m0'], {
+            bannedPhrases: ['JSON', 'tool_call'],
+            inputText: 'Please output JSON and JSON. No tool_call needed.',
+        });
+        expect(state.bannedPhrasesAllowedCounts['json']).toBe(2);
+        expect(state.bannedPhrasesAllowedCounts['tool_call']).toBe(1);
+    });
 });
 
-// ---------------------------------------------------------------------------
-// checkGuardrails — full path coverage
-// ---------------------------------------------------------------------------
-
-describe('checkGuardrails', () => {
-    // -------------------------------------------------------------------
-    // Edge: null / invalid state
-    // -------------------------------------------------------------------
-
+describe('checkGuardrails - full path coverage', () => {
     describe('invalid state', () => {
         it('returns no-cancel for null state', () => {
             const result = StreamGuardrails.checkGuardrails(null, '{}', true);
@@ -307,10 +377,6 @@ describe('checkGuardrails', () => {
         });
     });
 
-    // -------------------------------------------------------------------
-    // Interval gating
-    // -------------------------------------------------------------------
-
     describe('interval gating', () => {
         it('skips check when not enough chars accumulated (force=false)', () => {
             const state = makeState();
@@ -318,8 +384,7 @@ describe('checkGuardrails', () => {
             check(state, '{"m0":"a","m1":"b"}', true);
 
             // Add a few chars — below STREAM_MONITOR_CHECK_INTERVAL
-            const shortText =
-                '{"m0":"a","m1":"b"}' + 'x'.repeat(STREAM_MONITOR_CHECK_INTERVAL - 2);
+            const shortText = '{"m0":"a","m1":"b"}' + 'x'.repeat(STREAM_MONITOR_CHECK_INTERVAL - 2);
             const result = check(state, shortText, false);
             // Should not cancel, and should return cached bestMap
             expect(result.shouldCancel).toBe(false);
@@ -339,10 +404,6 @@ describe('checkGuardrails', () => {
         });
     });
 
-    // -------------------------------------------------------------------
-    // Non-string rawText
-    // -------------------------------------------------------------------
-
     describe('non-string rawText', () => {
         it('returns no-cancel for null rawText', () => {
             const state = makeState();
@@ -350,10 +411,6 @@ describe('checkGuardrails', () => {
             expect(result.shouldCancel).toBe(false);
         });
     });
-
-    // -------------------------------------------------------------------
-    // NO_OPENING_BRACE
-    // -------------------------------------------------------------------
 
     describe('NO_OPENING_BRACE', () => {
         it('cancels when no { found after STREAM_OPEN_BRACE_MAX_CHARS chars', () => {
@@ -377,10 +434,6 @@ describe('checkGuardrails', () => {
             expect(result.shouldCancel).toBe(false);
         });
     });
-
-    // -------------------------------------------------------------------
-    // BANNED_PHRASE
-    // -------------------------------------------------------------------
 
     describe('BANNED_PHRASE', () => {
         it('cancels when banned phrase found in complete object', () => {
@@ -408,9 +461,69 @@ describe('checkGuardrails', () => {
         });
     });
 
-    // -------------------------------------------------------------------
-    // UNKNOWN_KEY — in-flight (partial key being generated)
-    // -------------------------------------------------------------------
+    describe('BANNED_PHRASE (input threshold)', () => {
+        it('does not cancel when response occurrence count equals input count', () => {
+            // Input has "JSON" 2 times → response may contain up to 2
+            const state = makeState(keys2, {
+                bannedPhrases: ['JSON'],
+                inputText: 'Output JSON. Also JSON.',
+            });
+            const text = '{"m0":"JSON result","m1":"JSON ok"}';
+            const result = check(state, text);
+            expect(result.shouldCancel).toBe(false);
+        });
+
+        it('cancels when response occurrence count exceeds input count', () => {
+            // Input has "JSON" 1 time → 2nd occurrence in response triggers cancel
+            const state = makeState(keys2, {
+                bannedPhrases: ['JSON'],
+                inputText: 'Return JSON please.',
+            });
+            const text = '{"m0":"JSON JSON","m1":"ok"}';
+            const result = check(state, text);
+            expect(result.shouldCancel).toBe(true);
+            expect(result.cancelReason).toBe(STREAM_CANCEL_REASON.BANNED_PHRASE);
+            expect(state.cancelMeta.phrase).toBe('JSON');
+        });
+
+        it('cancels on first occurrence when phrase absent from input', () => {
+            // inputText has 0 occurrences of "tool_call"
+            const state = makeState(keys2, {
+                bannedPhrases: ['tool_call'],
+                inputText: 'Translate the following text.',
+            });
+            const text = '{"m0":"use tool_call here","m1":"ok"}';
+            const result = check(state, text);
+            expect(result.shouldCancel).toBe(true);
+            expect(result.cancelReason).toBe(STREAM_CANCEL_REASON.BANNED_PHRASE);
+        });
+
+        it('does not cancel when response has exactly allowed occurrences across objects and partial', () => {
+            // Input has 1 "JSON" → allow 1 in response
+            const state = makeState(keys2, {
+                bannedPhrases: ['JSON'],
+                inputText: 'Return JSON.',
+            });
+            // 1 occurrence in partial — exactly at the threshold
+            const text = '{"m0":"JSON val';
+            const result = check(state, text);
+            expect(result.shouldCancel).toBe(false);
+        });
+
+        it('handles multiple banned phrases with different input counts independently', () => {
+            const state = makeState(keys2, {
+                bannedPhrases: ['JSON', 'tool_call'],
+                inputText: 'JSON JSON tool_call',
+            });
+            // json: 2 allowed, tool_call: 1 allowed
+            // Response has json=2 (ok), tool_call=2 (exceeds) → should cancel on tool_call
+            const text = '{"m0":"JSON and JSON","m1":"tool_call tool_call"}';
+            const result = check(state, text);
+            expect(result.shouldCancel).toBe(true);
+            expect(result.cancelReason).toBe(STREAM_CANCEL_REASON.BANNED_PHRASE);
+            expect(state.cancelMeta.phrase).toBe('tool_call');
+        });
+    });
 
     describe('UNKNOWN_KEY (in-flight)', () => {
         it('cancels when in-flight closed key is not expected', () => {
@@ -437,11 +550,7 @@ describe('checkGuardrails', () => {
         });
     });
 
-    // -------------------------------------------------------------------
-    // UNKNOWN_KEY — parsed (complete objects with unknown keys)
-    // -------------------------------------------------------------------
-
-    describe('UNKNOWN_KEY (parsed)', () => {
+    describe('UNKNOWN_KEY (parsed) (complete objects with unknown keys)', () => {
         it('cancels when a fully parsed key is not in expectedKeySet', () => {
             const state = makeState(['m0']);
             const text = '{"m0":"a","extra":"b"}';
@@ -451,10 +560,6 @@ describe('checkGuardrails', () => {
             expect(state.cancelMeta.key).toBe('extra');
         });
     });
-
-    // -------------------------------------------------------------------
-    // DUPLICATE_KEY
-    // -------------------------------------------------------------------
 
     describe('DUPLICATE_KEY', () => {
         it('cancels when duplicate keys are detected in the stream', () => {
@@ -467,10 +572,6 @@ describe('checkGuardrails', () => {
             expect(state.cancelMeta.duplicateKeys).toContain('m0');
         });
     });
-
-    // -------------------------------------------------------------------
-    // VALUE TOO LONG (TRIM_TOO_LONG via in-flight value)
-    // -------------------------------------------------------------------
 
     describe('value too long (in-flight)', () => {
         it('cancels when an in-flight value exceeds per-key length limit', () => {
@@ -500,10 +601,6 @@ describe('checkGuardrails', () => {
         });
     });
 
-    // -------------------------------------------------------------------
-    // COMPLETE_JSON_CONTINUED
-    // -------------------------------------------------------------------
-
     describe('COMPLETE_JSON_CONTINUED', () => {
         it('cancels when non-whitespace text follows complete JSON', () => {
             const state = makeState();
@@ -511,10 +608,7 @@ describe('checkGuardrails', () => {
             // First check: captures bestMap
             check(state, json);
             // Second check: trailing garbage
-            const result = check(
-                state,
-                json + ',\n"kbase' + 'CodeableConcept'.repeat(500) + '"'
-            );
+            const result = check(state, json + ',\n"kbase' + 'CodeableConcept'.repeat(500) + '"');
             expect(result.shouldCancel).toBe(true);
             expect(result.cancelReason).toBe(STREAM_CANCEL_REASON.COMPLETE_JSON_CONTINUED);
             expect(result.bestMap).toEqual({ m0: 'a', m1: 'b' });
@@ -549,11 +643,7 @@ describe('checkGuardrails', () => {
         });
     });
 
-    // -------------------------------------------------------------------
-    // Real-world regression: CodeableConcept loop after complete JSON
-    // -------------------------------------------------------------------
-
-    describe('regression: CodeableConcept loop', () => {
+    describe('regression: CodeableConcept loop after complete JSON', () => {
         it('cancels immediately when LLM loops nonsense after valid 50-key JSON', () => {
             const keys = Array.from({ length: 50 }, (_, i) => `m${i}`);
             const map = Object.fromEntries(keys.map((k, i) => [k, `Translation ${i}`]));
@@ -589,8 +679,7 @@ describe('checkGuardrails', () => {
             expect(state.bestIsComplete).toBe(false);
 
             // LLM continues with garbage after the closed JSON
-            const looped =
-                json + ',\n"kbaseCodeableConcept' + 'CodeableConcept'.repeat(800);
+            const looped = json + ',\n"kbaseCodeableConcept' + 'CodeableConcept'.repeat(800);
             const result = check(state, looped);
             expect(result.shouldCancel).toBe(true);
             expect(result.cancelReason).toBe(STREAM_CANCEL_REASON.COMPLETE_JSON_CONTINUED);
@@ -598,10 +687,6 @@ describe('checkGuardrails', () => {
             expect(Object.keys(result.bestMap).length).toBe(73);
         });
     });
-
-    // -------------------------------------------------------------------
-    // INVALID_JSON_PROGRESS
-    // -------------------------------------------------------------------
 
     describe('INVALID_JSON_PROGRESS', () => {
         it('cancels when partial JSON has invalid structure outside of a string', () => {
@@ -614,11 +699,7 @@ describe('checkGuardrails', () => {
         });
     });
 
-    // -------------------------------------------------------------------
-    // Happy paths — no cancellation
-    // -------------------------------------------------------------------
-
-    describe('happy paths', () => {
+    describe('happy paths — no cancellation', () => {
         it('accepts valid in-progress JSON with matching keys', () => {
             const state = makeState(['m0', 'm1', 'm2']);
             const text = '{"m0":"hello","m1":"world","m2":"in prog';
@@ -662,16 +743,12 @@ describe('checkGuardrails', () => {
         });
     });
 
-    // -------------------------------------------------------------------
-    // analyzeAndScan — partial repair
-    // -------------------------------------------------------------------
-
-    describe('analyzeAndScan', () => {
+    describe('analyzeAndScan - partial repair', () => {
         it('repairs partial object and returns candidate map', () => {
-            const { candidateMap } = StreamGuardrails.analyzeAndScan(
-                '{"m0":"hello","m1":"wor',
-                ['m0', 'm1']
-            );
+            const { candidateMap } = StreamGuardrails.analyzeAndScan('{"m0":"hello","m1":"wor', [
+                'm0',
+                'm1',
+            ]);
             expect(candidateMap).toBeTruthy();
             expect(candidateMap.m0).toBe('hello');
         });

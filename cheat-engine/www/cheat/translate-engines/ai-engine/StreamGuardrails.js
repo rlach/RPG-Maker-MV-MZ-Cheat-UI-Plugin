@@ -373,18 +373,108 @@ export class StreamGuardrails {
     }
 
     /**
+     * Count non-overlapping case-insensitive occurrences of phraseKey in text.
+     * @param {string} text
+     * @param {string} phraseKey - already-lowercased phrase
+     * @returns {number}
+     */
+    static countPhraseOccurrences(text, phraseKey) {
+        if (!text || !phraseKey) {
+            return 0;
+        }
+        const lowerText = text.toLowerCase();
+        let count = 0;
+        let pos = 0;
+        while ((pos = lowerText.indexOf(phraseKey, pos)) !== -1) {
+            count++;
+            pos += phraseKey.length;
+        }
+        return count;
+    }
+
+    /**
+     * For each normalized banned phrase, count occurrences in inputText.
+     * These become the allowed counts — the response may contain up to this many
+     * before triggering a cancel.
+     * @param {Array<{phrase: string, key: string}>} normalizedPhrases
+     * @param {string|null} inputText - Text sent to the LLM
+     * @returns {Object} Map of phraseKey → allowed count
+     */
+    static buildBannedPhrasesAllowedCounts(normalizedPhrases, inputText) {
+        const counts = {};
+        if (!Array.isArray(normalizedPhrases)) {
+            return counts;
+        }
+        const text = typeof inputText === 'string' ? inputText : '';
+        for (const item of normalizedPhrases) {
+            counts[item.key] = this.countPhraseOccurrences(text, item.key);
+        }
+        return counts;
+    }
+
+    /**
+     * Count occurrences of a phrase across all scan objects and the partial object text.
+     * @param {Object} scan - Result from StreamJsonParser.scanTopLevelObjects
+     * @param {{phrase: string, key: string}} phraseItem
+     * @returns {number}
+     */
+    static countPhraseOccurrencesInScan(scan, phraseItem) {
+        if (!scan || !phraseItem || !phraseItem.key) {
+            return 0;
+        }
+        let count = 0;
+        if (Array.isArray(scan.objects)) {
+            for (const obj of scan.objects) {
+                count += this.countPhraseOccurrences(obj?.text, phraseItem.key);
+            }
+        }
+        count += this.countPhraseOccurrences(scan.partialObjectText, phraseItem.key);
+        return count;
+    }
+
+    /**
+     * Returns the first banned phrase whose occurrence count in the scan exceeds
+     * the allowed count derived from the input text.
+     * @param {Object} scan - Result from StreamJsonParser.scanTopLevelObjects
+     * @param {Array<{phrase: string, key: string}>} normalizedPhrases
+     * @param {Object} allowedCounts - Map of phraseKey → allowed count
+     * @returns {string|null} The offending phrase, or null
+     */
+    static findExcessBannedPhrase(scan, normalizedPhrases, allowedCounts) {
+        if (!scan || !Array.isArray(normalizedPhrases) || normalizedPhrases.length === 0) {
+            return null;
+        }
+        for (const item of normalizedPhrases) {
+            const allowed =
+                allowedCounts && typeof allowedCounts[item.key] === 'number'
+                    ? allowedCounts[item.key]
+                    : 0;
+            const occurrences = this.countPhraseOccurrencesInScan(scan, item);
+            if (occurrences > allowed) {
+                return item.phrase;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Create initial stream monitor state
      * @param {string[]} expectedKeys - Keys expected in JSON response
      * @returns {Object} Monitor state
      */
     static createMonitorState(expectedKeys, options = {}) {
         const bannedPhrases = this.normalizeBannedPhrases(options.bannedPhrases);
+        const bannedPhrasesAllowedCounts = this.buildBannedPhrasesAllowedCounts(
+            bannedPhrases,
+            options.inputText
+        );
         const valueLengthSettings = this.buildValueLengthSettings(expectedKeys, options);
 
         return {
             expectedKeys: Array.isArray(expectedKeys) ? expectedKeys : [],
             expectedKeySet: new Set(expectedKeys || []),
             bannedPhrases,
+            bannedPhrasesAllowedCounts,
             valueLengthLimitsByKey: valueLengthSettings.valueLengthLimitsByKey,
             lengthMultiplierForMaxLength: valueLengthSettings.lengthMultiplierForMaxLength,
             minimumMaxLength: valueLengthSettings.minimumMaxLength,
@@ -595,7 +685,11 @@ export class StreamGuardrails {
             repairTrimLimit: state.maxValueLengthLimit,
         });
 
-        const bannedPhrase = this.findBannedPhraseInScan(analysis.scan, state.bannedPhrases);
+        const bannedPhrase = this.findExcessBannedPhrase(
+            analysis.scan,
+            state.bannedPhrases,
+            state.bannedPhrasesAllowedCounts
+        );
         if (bannedPhrase) {
             state.cancelReason = STREAM_CANCEL_REASON.BANNED_PHRASE;
             state.cancelMeta = { phrase: bannedPhrase };

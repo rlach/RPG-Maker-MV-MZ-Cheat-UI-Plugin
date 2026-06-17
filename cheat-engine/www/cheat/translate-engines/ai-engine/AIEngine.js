@@ -1424,11 +1424,15 @@ class AIEngine extends BaseTranslationEngine {
                 }
 
                 // Parse streaming response
+                const inputText = (processedPayload.messages || [])
+                    .map((m) => (typeof m?.content === 'string' ? m.content : ''))
+                    .join('\n');
                 const monitorState = StreamGuardrails.createMonitorState(expectedKeys, {
                     bannedPhrases: this.getBannedPhrasesList(),
                     expectedValueLengthsByKey,
                     lengthMultiplierForMaxLength: this.lengthMultiplierForMaxLength,
                     minimumMaxLength: this.minimumMaxLength,
+                    inputText,
                 });
                 let contentText = ''; // accumulated assistant content only
                 let sseBuffer = ''; // buffer for partial SSE lines
