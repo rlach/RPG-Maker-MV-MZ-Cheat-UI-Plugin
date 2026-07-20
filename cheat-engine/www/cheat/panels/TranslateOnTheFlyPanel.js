@@ -685,6 +685,18 @@ export default {
             return this.callRuntime('onChangeUseJsonFixer', v);
         },
 
+        onChangeAiReasoningOpenToken(v) {
+            return this.callRuntime('onChangeAiReasoningOpenToken', v);
+        },
+
+        onChangeAiReasoningCloseToken(v) {
+            return this.callRuntime('onChangeAiReasoningCloseToken', v);
+        },
+
+        onChangeAiReasoningEffort(v) {
+            return this.callRuntime('onChangeAiReasoningEffort', v);
+        },
+
         onChangeTextWrapping() {
             return this.callRuntime('onChangeTextWrapping');
         },

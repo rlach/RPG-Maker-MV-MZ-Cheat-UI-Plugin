@@ -16,6 +16,10 @@ import { ConfigManager } from './ConfigManager.js';
 import {
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_BANNED_PHRASES_TEXT,
+    DEFAULT_REASONING_OPEN_TOKEN,
+    DEFAULT_REASONING_CLOSE_TOKEN,
+    DEFAULT_REASONING_EFFORT,
+    AI_REASONING_EFFORT_OPTIONS,
     TYPE_TO_TAG,
     TAG_CONFIGS,
     TAG_BRACKET_OPTIONS,
@@ -63,6 +67,9 @@ class AIEngine extends BaseTranslationEngine {
         this.useJsonFixer = true;
         this.bannedPhrasesText = DEFAULT_BANNED_PHRASES_TEXT;
         this._aiFixRecursionMaxDepth = 0;
+        this.reasoningOpenToken = DEFAULT_REASONING_OPEN_TOKEN;
+        this.reasoningCloseToken = DEFAULT_REASONING_CLOSE_TOKEN;
+        this.reasoningEffort = DEFAULT_REASONING_EFFORT;
         this.customTags = [];
         this.pluginTags = []; // auto-registered by plugin translators, not user-editable
         this.tagOverrides = {};
@@ -186,6 +193,30 @@ class AIEngine extends BaseTranslationEngine {
                 set: (v) => {
                     this._aiFixRecursionMaxDepth = Number(v) || 0;
                 },
+            },
+            aiReasoningOpenToken: {
+                get: () => this.reasoningOpenToken,
+                set: (v) => {
+                    this.reasoningOpenToken =
+                        typeof v === 'string' ? v : DEFAULT_REASONING_OPEN_TOKEN;
+                },
+            },
+            aiReasoningCloseToken: {
+                get: () => this.reasoningCloseToken,
+                set: (v) => {
+                    this.reasoningCloseToken =
+                        typeof v === 'string' ? v : DEFAULT_REASONING_CLOSE_TOKEN;
+                },
+            },
+            aiReasoningEffort: {
+                get: () => this.reasoningEffort,
+                set: (v) => {
+                    this.reasoningEffort =
+                        typeof v === 'string' && v ? v : DEFAULT_REASONING_EFFORT;
+                },
+            },
+            aiReasoningEffortOptions: {
+                get: () => AI_REASONING_EFFORT_OPTIONS,
             },
             aiCustomTags: {
                 get: () => this.customTags,
@@ -1407,6 +1438,9 @@ class AIEngine extends BaseTranslationEngine {
             try {
                 // Preprocess payload
                 const processedPayload = preprocessPayloadForLlm(payload);
+                if (this.reasoningEffort && this.reasoningEffort !== 'none') {
+                    processedPayload.reasoning_effort = this.reasoningEffort;
+                }
                 const preservedFetch =
                     typeof window !== 'undefined' ? window['chromiumFetch'] : undefined;
                 const requestFetch = typeof preservedFetch === 'function' ? preservedFetch : fetch;
@@ -1428,7 +1462,10 @@ class AIEngine extends BaseTranslationEngine {
                 if (!isEventStream) {
                     const rawBodyText = await response.text();
                     const assistantText = this.extractAssistantTextFromApiResponse(rawBodyText);
-                    const { text: cleanedText } = stripThinkBlocks(assistantText);
+                    const { text: cleanedText } = stripThinkBlocks(assistantText, {
+                        openToken: this.reasoningOpenToken,
+                        closeToken: this.reasoningCloseToken,
+                    });
 
                     return {
                         text: cleanedText,
@@ -1500,7 +1537,10 @@ class AIEngine extends BaseTranslationEngine {
                 }
 
                 // Strip think blocks if present
-                const { text: cleanedText } = stripThinkBlocks(contentText);
+                const { text: cleanedText } = stripThinkBlocks(contentText, {
+                    openToken: this.reasoningOpenToken,
+                    closeToken: this.reasoningCloseToken,
+                });
 
                 return {
                     text: cleanedText,

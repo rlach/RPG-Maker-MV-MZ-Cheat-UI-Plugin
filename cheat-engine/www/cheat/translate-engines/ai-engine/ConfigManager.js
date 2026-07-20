@@ -238,6 +238,39 @@ export class ConfigManager {
                @change="onChangeAiSystemPrompt"
                class="mb-2"
              ></v-textarea>
+
+             <v-text-field
+               v-model="aiReasoningOpenToken"
+               label="Reasoning open token (e.g. <think>)"
+               outlined
+               dense
+               hide-details
+               @keydown.stop
+               @change="onChangeAiReasoningOpenToken"
+               class="mb-2"
+             ></v-text-field>
+
+             <v-text-field
+               v-model="aiReasoningCloseToken"
+               label="Reasoning close token (e.g. </think>)"
+               outlined
+               dense
+               hide-details
+               @keydown.stop
+               @change="onChangeAiReasoningCloseToken"
+               class="mb-2"
+             ></v-text-field>
+
+             <v-select
+               v-model="aiReasoningEffort"
+               :items="aiReasoningEffortOptions"
+               label="Reasoning effort"
+               outlined
+               dense
+               hide-details
+               @change="onChangeAiReasoningEffort"
+               class="mb-2"
+             ></v-select>
              </div>
     `;
     }
@@ -288,6 +321,10 @@ export class ConfigManager {
             aiCustomTagTypeOptions: this.aiEngine.customTagTypeOptions,
             aiCustomTagBracketOptions: this.aiEngine.customTagBracketOptions,
             aiCustomTagStyleOptions: this.aiEngine.customTagStyleOptions,
+            aiReasoningOpenToken: this.aiEngine.reasoningOpenToken,
+            aiReasoningCloseToken: this.aiEngine.reasoningCloseToken,
+            aiReasoningEffort: this.aiEngine.reasoningEffort,
+            aiReasoningEffortOptions: this.aiEngine.aiReasoningEffortOptions,
         };
     }
 
@@ -340,6 +377,15 @@ export class ConfigManager {
             }),
             onChangeUseJsonFixer: this._createPersistedHandler((v) => {
                 this.aiEngine.useJsonFixer = v;
+            }),
+            onChangeAiReasoningOpenToken: this._createPersistedHandler((v) => {
+                this.aiEngine.reasoningOpenToken = typeof v === 'string' ? v : '';
+            }),
+            onChangeAiReasoningCloseToken: this._createPersistedHandler((v) => {
+                this.aiEngine.reasoningCloseToken = typeof v === 'string' ? v : '';
+            }),
+            onChangeAiReasoningEffort: this._createPersistedHandler((v) => {
+                this.aiEngine.reasoningEffort = v || 'none';
             }),
             addAiCustomTag: this._createPersistedHandler(
                 (tagConfig) => {

@@ -188,6 +188,19 @@ export const DEFAULT_BOXING_PROMPT =
 export const DEFAULT_BANNED_PHRASES = Object.freeze(['tool_call', 'JSON']);
 export const DEFAULT_BANNED_PHRASES_TEXT = DEFAULT_BANNED_PHRASES.join('\n');
 
+export const DEFAULT_REASONING_OPEN_TOKEN = '<think>';
+export const DEFAULT_REASONING_CLOSE_TOKEN = '</think>';
+
+export const DEFAULT_REASONING_EFFORT = 'none';
+export const AI_REASONING_EFFORT_OPTIONS = Object.freeze([
+    { text: 'None (do not send)', value: 'none' },
+    { text: 'Low', value: 'low' },
+    { text: 'Medium', value: 'medium' },
+    { text: 'High', value: 'high' },
+    { text: 'X-High', value: 'xhigh' },
+    { text: 'Max', value: 'max' },
+]);
+
 export const TYPE_TO_TAG = {
     text: 'm',
     message: 'm',

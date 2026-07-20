@@ -1,6 +1,10 @@
 import {
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_BANNED_PHRASES_TEXT,
+    DEFAULT_REASONING_OPEN_TOKEN,
+    DEFAULT_REASONING_CLOSE_TOKEN,
+    DEFAULT_REASONING_EFFORT,
+    AI_REASONING_EFFORT_OPTIONS,
 } from '../../translate-engines/ai-engine/constants.js';
 import { isRpgMakerMv } from '../RpgMakerRuntime.js';
 
@@ -112,6 +116,10 @@ export const TRANSLATION_RUNTIME_STATE_KEYS = Object.freeze([
     'aiCustomTagTypeOptions',
     'aiCustomTagBracketOptions',
     'aiCustomTagStyleOptions',
+    'aiReasoningOpenToken',
+    'aiReasoningCloseToken',
+    'aiReasoningEffort',
+    'aiReasoningEffortOptions',
     'objectTranslationSelectedMapIds',
     'objectTranslationTypeOrder',
     'enabledPluginTranslators',
@@ -212,6 +220,9 @@ export const UI_SYNC_STATE_KEYS = Object.freeze([
     'aiCustomTagTypeOptions',
     'aiCustomTagBracketOptions',
     'aiCustomTagStyleOptions',
+    'aiReasoningOpenToken',
+    'aiReasoningCloseToken',
+    'aiReasoningEffort',
     'objectTranslationSelectedMapIds',
     'objectTranslationTypeOrder',
     'enabledPluginTranslators',
@@ -226,6 +237,7 @@ export const UI_SYNC_TO_ONLY_STATE_KEYS = Object.freeze([
     'aiCustomTagTypeOptions',
     'aiCustomTagBracketOptions',
     'aiCustomTagStyleOptions',
+    'aiReasoningEffortOptions',
 ]);
 
 const cloneOptions = (items) =>
@@ -292,6 +304,10 @@ export function createTranslationRuntimeStateDefaults(engineOptions = []) {
         currentGameMessage: null,
         useJsonFixer: true,
         aiFixRecursionMaxDepth: 0,
+        aiReasoningOpenToken: DEFAULT_REASONING_OPEN_TOKEN,
+        aiReasoningCloseToken: DEFAULT_REASONING_CLOSE_TOKEN,
+        aiReasoningEffort: DEFAULT_REASONING_EFFORT,
+        aiReasoningEffortOptions: cloneOptions(AI_REASONING_EFFORT_OPTIONS),
         aiCustomTags: [],
         aiCustomTagTypeOptions: [],
         aiCustomTagBracketOptions: [],

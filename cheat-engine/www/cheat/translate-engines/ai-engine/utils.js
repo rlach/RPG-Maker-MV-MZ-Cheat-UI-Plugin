@@ -57,18 +57,26 @@ export const limitConsecutiveIdenticalChars = (
 };
 
 /**
- * Strip <think>...</think> blocks from LLM output (reasoning models)
+ * Strip reasoning/think blocks (e.g. <think>...</think>) from LLM output.
+ * Open/close tokens can be customized to support other reasoning models.
  * @param {string} text - Text to process
- * @returns {Object} {text: cleaned text, hasOpenThink: boolean}
+ * @param {Object} [options]
+ * @param {string} [options.openToken='<think>']
+ * @param {string} [options.closeToken='</think>']
+ * @returns {{text: string, hasOpenThink: boolean}}
  */
-export const stripThinkBlocks = (text) => {
+export const stripThinkBlocks = (text, { openToken = '<think>', closeToken = '</think>' } = {}) => {
     if (typeof text !== 'string' || !text) {
         return { text: '', hasOpenThink: false };
     }
 
-    const openToken = '<think>';
-    const closeToken = '</think>';
+    if (!openToken || !closeToken) {
+        return { text, hasOpenThink: false };
+    }
+
     const lower = text.toLowerCase();
+    openToken = openToken.toLowerCase();
+    closeToken = closeToken.toLowerCase();
     let cursor = 0;
     let output = '';
 
