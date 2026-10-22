@@ -5,6 +5,8 @@
  */
 
 import { StreamJsonParser } from './StreamJsonParser.js';
+import { buildRequestSettingsForContent } from './constants.js';
+import { stripThinkBlocks } from './utils.js';
 
 export class RetryHandler {
     constructor(aiEngine) {
@@ -82,6 +84,10 @@ export class RetryHandler {
      * @returns {Promise<Object>} {ok, repaired?, error?}
      */
     async retryJsonRepair(invalidJsonText, depth = 0, isBackgroundJob = false) {
+        const candidate = this.getJsonRepairCandidate(invalidJsonText);
+        if (!candidate) {
+            return { ok: false, error: 'NO_JSON_TO_REPAIR' };
+        }
         const maxDepth = this.aiEngine._aiFixRecursionMaxDepth || 0;
 
         // Depth 0 = no limit, otherwise check depth
@@ -91,34 +97,56 @@ export class RetryHandler {
 
         try {
             const payload = {
+                ...buildRequestSettingsForContent(candidate),
+                model: this.aiEngine.selectedModel,
                 messages: [
                     {
                         role: 'user',
-                        content: `Fix this malformed JSON and return ONLY valid JSON, nothing else:\n\n${invalidJsonText}`,
+                        content: `Fix this malformed JSON and return ONLY valid JSON, nothing else:\n\n${candidate}`,
                     },
                 ],
             };
 
             const result = await this.aiEngine.requestChatCompletion(payload, {
                 isBackgroundJob,
+                // Repair does not have the original batch schema. The request
+                // output budget still applies independently of JSON validation.
+                monitorJson: false,
             });
 
             if (!result || !result.text) {
                 return { ok: false, error: 'EMPTY_RESPONSE' };
             }
 
+            const repairedCandidate = this.getJsonRepairCandidate(result.text);
+            if (!repairedCandidate) {
+                return { ok: false, error: 'NO_JSON_TO_REPAIR' };
+            }
+
             // Try to parse
             try {
-                const extracted = StreamJsonParser.extractJsonLike(result.text);
+                const extracted = StreamJsonParser.extractJsonLike(repairedCandidate);
                 const parsed = StreamJsonParser.parseObjectStrict(extracted);
                 return { ok: true, repaired: parsed };
             } catch (e) {
+                if (result.cancelledByGuardrail) {
+                    return { ok: false, error: result.cancelReason || 'REQUEST_ABORTED' };
+                }
                 // Still invalid, retry recursively
                 return this.retryJsonRepair(result.text, depth + 1, isBackgroundJob);
             }
         } catch (e) {
             return { ok: false, error: e.message };
         }
+    }
+
+    getJsonRepairCandidate(text) {
+        const { text: content } = stripThinkBlocks(text, {
+            openToken: this.aiEngine.reasoningOpenToken,
+            closeToken: this.aiEngine.reasoningCloseToken,
+        });
+        const scan = StreamJsonParser.scanTopLevelObjects(content);
+        return scan.objects?.[0]?.text || scan.partialObjectText || '';
     }
 
     /**

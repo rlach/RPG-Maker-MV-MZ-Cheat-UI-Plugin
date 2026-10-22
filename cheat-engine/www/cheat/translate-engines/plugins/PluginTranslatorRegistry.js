@@ -49,6 +49,7 @@ import { MogSceneItemTranslator } from './translators/MogSceneItemTranslator.js'
 import { MogBattleCommandsTranslator } from './translators/MogBattleCommandsTranslator.js';
 import { MogEventTextTranslator } from './translators/MogEventTextTranslator.js';
 import { MessageWindowPopupTranslator } from './translators/MessageWindowPopupTranslator.js';
+import { MessageWindowNarrowTranslator } from './translators/MessageWindowNarrowTranslator.js';
 import { NameBoxNoUseTranslator } from './translators/NameBoxNoUseTranslator.js';
 import { MppChoiceExTranslator } from './translators/MppChoiceExTranslator.js';
 import { MppRemovoEquipTextTranslator } from './translators/MppRemovoEquipTextTranslator.js';
@@ -209,6 +210,7 @@ class PluginTranslatorRegistry {
             MogSceneMenuTranslator,
             MogSceneItemTranslator,
             MessageWindowPopupTranslator,
+            MessageWindowNarrowTranslator,
             MogBattleCommandsTranslator,
             MessagePExRiruTranslator,
             MiniInformationWindowTranslator,

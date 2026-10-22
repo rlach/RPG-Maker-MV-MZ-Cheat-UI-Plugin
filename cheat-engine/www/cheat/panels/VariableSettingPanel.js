@@ -1,9 +1,12 @@
 import { TRANSLATE_SETTINGS, TRANSLATOR } from '../js/TranslateHelper.js';
 import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
+import { tableSessionMixin } from '../js/TableSessionState.js';
+import { getPinnedVariableIds, setVariablePinned } from '../js/VariablePins.js';
 
 export default {
     name: 'VariableSettingPanel',
+    mixins: [tableSessionMixin('variables')],
 
     template: `
 <v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
@@ -36,14 +39,24 @@ export default {
                 hide-details
                 label="Hide Nameless Items">
             </v-checkbox>
+            <v-spacer></v-spacer>
+            <v-checkbox
+                v-model="onlyPinned"
+                dense
+                hide-details
+                label="Only Pinned">
+            </v-checkbox>
         </div>
     </v-card-text>
     <v-data-table
-        v-if="tableHeaders"
+        v-if="tableReady && tableHeaders"
         class="table-with-sticky-footer"
         :headers="tableHeaders"
         :items="filteredTableItems"
-        :items-per-page.sync="rowsPerPage">
+        :items-per-page.sync="rowsPerPage"
+        :page.sync="page"
+        :sort-by.sync="tableSession.sortBy"
+        :sort-desc.sync="tableSession.sortDesc">
         <template v-slot:item.name="{ item }">
             <div style="width: 100%;">{{ item.name }}</div>
         </template>
@@ -66,6 +79,16 @@ export default {
         </template>
         <template v-slot:item.actions="{ item }">
             <div class="d-flex align-center justify-center">
+                <v-tooltip bottom>
+                    <span>{{ item.pinned ? 'Unpin variable' : 'Pin variable' }}</span>
+                    <template v-slot:activator="{ on, attrs }">
+                        <v-btn icon x-small
+                            :color="item.pinned ? 'cyan' : 'grey'"
+                            v-bind="attrs" v-on="on" @click="togglePin(item)">
+                            <v-icon small>{{ item.pinned ? 'mdi-pin' : 'mdi-pin-outline' }}</v-icon>
+                        </v-btn>
+                    </template>
+                </v-tooltip>
                 <v-tooltip bottom>
                     <span>Mark as safe for translate</span>
                     <template v-slot:activator="{ on, attrs }">
@@ -109,10 +132,6 @@ export default {
 
     data() {
         return {
-            search: '',
-            excludeNameless: false,
-            onlySafeForTranslate: false,
-
             rowsPerPage: getRowsPerPage(),
 
             variableNames: [],
@@ -137,7 +156,7 @@ export default {
                     text: 'Actions',
                     value: 'actions',
                     sortable: false,
-                    width: 92,
+                    width: 112,
                     align: 'center',
                 },
             ],
@@ -169,6 +188,7 @@ export default {
     computed: {
         filteredTableItems() {
             return this.tableItems.filter((item) => {
+                if (this.onlyPinned && !item.pinned) return false;
                 const matchesNameless = !this.excludeNameless || !!item.name;
                 const matchesSafeFilter = !this.onlySafeForTranslate || !!item.safeForTranslate;
                 const search = (this.search || '').trim().toLowerCase();
@@ -184,6 +204,7 @@ export default {
     methods: {
         async initializeVariables() {
             this.variableNames = await this.getVariableNames();
+            const pinnedIds = new Set(getPinnedVariableIds());
 
             this.tableItems = this.variableNames.map((varName, idx) => {
                 return {
@@ -191,8 +212,15 @@ export default {
                     name: this.getDisplayVariableName(varName),
                     value: this.getRawVariableValue(idx),
                     safeForTranslate: this.isSafeForTranslate(idx),
+                    pinned: pinnedIds.has(idx),
                 };
             });
+            this.tableReady = true;
+        },
+
+        togglePin(item) {
+            const pinnedIds = setVariablePinned(item.id, !item.pinned);
+            item.pinned = pinnedIds.includes(item.id);
         },
 
         async getVariableNames() {

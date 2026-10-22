@@ -2,6 +2,12 @@ import { TranslateOnTheFlyState } from '../TranslateOnTheFlyState.js';
 import { createEngine } from '../../translate-engines/index.js';
 import { ensureKnowledgeForLangPair } from '../KnowledgeBaseRuntime.js';
 import {
+    GameTranslationSettings,
+    GAME_TRANSLATION_SETTINGS_KEYS,
+    GAME_TAG_SETTINGS_KEYS,
+    pickGameTranslationSettings,
+} from '../GameTranslationSettings.js';
+import {
     createPersistedTranslationSettingsDefaults,
     getDefaultEngineSpecificSettings,
     normalizePersistedTranslationSettings,
@@ -11,7 +17,12 @@ import {
 const sanitizeEngineConfigForPersistence = (engineConfig = {}) => {
     const sanitized = {};
     for (const [key, value] of Object.entries(engineConfig)) {
-        if (/Options$/i.test(key) || key === 'aiApiKey') {
+        if (
+            /Options$/i.test(key) ||
+            key === 'aiApiKey' ||
+            GAME_TAG_SETTINGS_KEYS.includes(key) ||
+            GAME_TRANSLATION_SETTINGS_KEYS.includes(key)
+        ) {
             continue;
         }
         sanitized[key] = value;
@@ -52,12 +63,57 @@ export const translateOnTheFlySettingsMethods = {
         }
 
         Object.assign(this, normalized);
+        this.loadGameTranslationSettings();
 
         if (this.linkDescriptionMaxWidthToDialogue) {
             this.descriptionMaxLineWidth = this.maxLineWidth;
         }
 
         TranslateOnTheFlyState.setEnabled(this.enabled, { notify: false });
+    },
+
+    getGameTranslationSettingsStore() {
+        return new GameTranslationSettings(this.getSplitCacheDirectoryPath());
+    },
+
+    loadGameTranslationSettings() {
+        const store = this.getGameTranslationSettingsStore();
+        const settings = store.updateSection('translation', pickGameTranslationSettings(this), {
+            missingOnly: true,
+        });
+        Object.assign(this, pickGameTranslationSettings(settings));
+        const legacy = this.engineSettings?.openApi || this.engineSettings?.gpt4all || {};
+        store.updateSection(
+            'tags',
+            {
+                customTags: legacy.aiCustomTags ?? legacy.customTags ?? this.aiCustomTags ?? [],
+                tagOverrides: legacy.aiTagOverrides ?? legacy.tagOverrides ?? {},
+            },
+            { missingOnly: true }
+        );
+    },
+
+    applyGameTranslationEngineSettings() {
+        const tags = this.getGameTranslationSettingsStore().read().tags || {};
+        this.engine?.setCustomTags?.(tags.customTags || []);
+        this.engine?.setTagOverrides?.(tags.tagOverrides || {});
+    },
+
+    restoreTranslationEngineSettings() {
+        const localSettings = this.engineSettings?.[this.translationEngine] || {};
+        Object.assign(this.engine, sanitizeEngineConfigForPersistence(localSettings));
+        this.applyGameTranslationEngineSettings();
+    },
+
+    saveGameTranslationSettings() {
+        const store = this.getGameTranslationSettingsStore();
+        store.updateSection('translation', pickGameTranslationSettings(this));
+        if (this.engine?.setCustomTags) {
+            store.updateSection('tags', {
+                customTags: this.engine.customTags,
+                tagOverrides: this.engine.tagOverrides,
+            });
+        }
     },
 
     /** @this {any} */
@@ -97,6 +153,7 @@ export const translateOnTheFlySettingsMethods = {
     },
 
     saveSettings() {
+        this.saveGameTranslationSettings();
         // Collect engine-specific settings before saving
         if (this.engine) {
             const engineConfig = sanitizeEngineConfigForPersistence({
@@ -113,6 +170,10 @@ export const translateOnTheFlySettingsMethods = {
             enabled: TranslateOnTheFlyState.isEnabled(),
             engineSettings: this.engineSettings || {},
         });
+        for (const key of GAME_TRANSLATION_SETTINGS_KEYS) delete data[key];
+        for (const [engineId, config] of Object.entries(data.engineSettings || {})) {
+            data.engineSettings[engineId] = sanitizeEngineConfigForPersistence(config);
+        }
         this.kvStorage.setAll(data);
     },
 
@@ -181,24 +242,21 @@ export const translateOnTheFlySettingsMethods = {
     },
 
     onChangeTranslationEngine() {
+        this.saveGameTranslationSettings();
         // Save current engine's configuration before switching
         if (this.engine) {
             const currentConfig = sanitizeEngineConfigForPersistence(this.engine.getConfigData());
             if (!this.engineSettings) {
                 this.engineSettings = {};
             }
-            this.engineSettings[this.translationEngine] = currentConfig;
+            this.engineSettings[this.engine.getId()] = currentConfig;
         }
 
         // Create new engine instance
         this.engine = createEngine(this.translationEngine, this);
 
         // Restore settings for new engine if available
-        if (this.engineSettings && this.engineSettings[this.translationEngine]) {
-            const engineConfig = this.engineSettings[this.translationEngine];
-            Object.assign(this.engine, engineConfig);
-            this.engine.setCustomTags?.(this.engine.customTags || []);
-        }
+        this.restoreTranslationEngineSettings();
 
         // Bind new engine config data to runtime
         const engineConfigData = this.engine.getConfigData();

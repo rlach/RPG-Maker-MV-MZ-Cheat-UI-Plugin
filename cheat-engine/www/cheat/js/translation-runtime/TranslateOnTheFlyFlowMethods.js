@@ -154,6 +154,12 @@ export const translateOnTheFlyFlowMethods = {
         }
     },
 
+    adjustQueueCompletionTotalChars(delta, progressChannel = 'main') {
+        const scope = this.getQueueProgressState(progressChannel).queueCompletionScope;
+        if (!scope || !Number.isFinite(delta)) return;
+        scope.totalChars = Math.max(scope.processedChars, scope.totalChars + delta);
+    },
+
     markQueueCompletionItemsProcessed(items, progressChannel = 'main') {
         const queueState = this.getQueueProgressState(progressChannel);
         const scope = queueState.queueCompletionScope;
@@ -241,11 +247,16 @@ export const translateOnTheFlyFlowMethods = {
     },
 
     getOverallTranslationCompletionStats() {
-        return computeLangPairCompletionByKeyLength({
+        const stats = computeLangPairCompletionByKeyLength({
             translationCache: this.translationCache,
             sourceLang: this.sourceLang,
             targetLang: this.targetLang,
         });
+        return {
+            ...stats,
+            totalChars: stats.totalKeyLength,
+            processedChars: stats.translatedKeyLength,
+        };
     },
 
     getOverallTranslationCompletionLine(progressChannel = 'main') {
@@ -261,17 +272,20 @@ export const translateOnTheFlyFlowMethods = {
             Number(stats.totalChars || 0) - Number(stats.processedChars || 0)
         );
         const avgCharsPerSecond = this.getAverageBatchCharsPerSecond(progressChannel);
+        // Rounding must not announce completion while work remains.
+        const completionPercent =
+            remainingChars > 0 ? Math.min(99.9, stats.completionPercent) : stats.completionPercent;
 
         if (remainingChars <= 0) {
-            return `total ${stats.completionPercent.toFixed(1)}% complete (ETA 0s)`;
+            return `total ${completionPercent.toFixed(1)}% complete (ETA 0s)`;
         }
 
         if (avgCharsPerSecond > 0) {
             const etaSeconds = remainingChars / avgCharsPerSecond;
-            return `total ${stats.completionPercent.toFixed(1)}% complete (ETA ${this.formatEtaFromSeconds(etaSeconds)})`;
+            return `total ${completionPercent.toFixed(1)}% complete (ETA ${this.formatEtaFromSeconds(etaSeconds)})`;
         }
 
-        return `total ${stats.completionPercent.toFixed(1)}% complete`;
+        return `total ${completionPercent.toFixed(1)}% complete`;
     },
 
     hasPendingDialogTranslation() {

@@ -29,6 +29,7 @@ import {
     TAG_OVERRIDABLE_FIELDS,
     buildRequestSettingsForContent,
     REQUEST_CANCEL_REASON,
+    STREAM_CANCEL_REASON,
 } from './constants.js';
 import { stripThinkBlocks, preprocessPayloadForLlm } from './utils.js';
 import {
@@ -1432,12 +1433,31 @@ class AIEngine extends BaseTranslationEngine {
             const isBackgroundJob = !!options.isBackgroundJob;
 
             const controller = new AbortController();
+            let guardrailCancelReason = null;
             this._activeAbortController = controller;
             this._activeRequestMeta = { isBackgroundJob, startedAt: Date.now() };
 
             try {
                 // Preprocess payload
                 const processedPayload = preprocessPayloadForLlm(payload);
+                // Every request, including recovery requests, needs a finite
+                // output cap. PolyStrata counts reasoning within this cap.
+                const requestedLimit = Number(
+                    processedPayload.max_completion_tokens ?? processedPayload.max_tokens
+                );
+                const outputTokenLimit =
+                    Number.isFinite(requestedLimit) && requestedLimit >= 1
+                        ? Math.floor(requestedLimit)
+                        : buildRequestSettingsForContent(
+                              (processedPayload.messages || [])
+                                  .map((message) => message.content || '')
+                                  .join('\n')
+                          ).max_tokens;
+                if (processedPayload.max_completion_tokens !== undefined) {
+                    processedPayload.max_completion_tokens = outputTokenLimit;
+                } else {
+                    processedPayload.max_tokens = outputTokenLimit;
+                }
                 if (this.reasoningEffort && this.reasoningEffort !== 'none') {
                     processedPayload.reasoning_effort = this.reasoningEffort;
                 }
@@ -1488,6 +1508,8 @@ class AIEngine extends BaseTranslationEngine {
                 });
                 let contentText = ''; // accumulated assistant content only
                 let sseBuffer = ''; // buffer for partial SSE lines
+                let generatedChars = 0;
+                let completionTokens = 0;
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
@@ -1511,21 +1533,52 @@ class AIEngine extends BaseTranslationEngine {
                             const dataPayload = trimmed.slice(5).trim();
                             if (!dataPayload || dataPayload === '[DONE]') continue;
                             const json = JSON.parse(dataPayload);
-                            const delta = json?.choices?.[0]?.delta?.content;
+                            const eventDelta = json?.choices?.[0]?.delta;
+                            const delta = eventDelta?.content;
                             if (typeof delta === 'string') {
                                 contentText += delta;
+                                generatedChars += delta.length;
                             }
+                            // Reasoning is output too, but must never be parsed
+                            // as the translation JSON.
+                            const reasoning =
+                                eventDelta?.reasoning_content ?? eventDelta?.reasoning;
+                            if (typeof reasoning === 'string') generatedChars += reasoning.length;
+                            completionTokens = Math.max(
+                                completionTokens,
+                                Number(json?.usage?.completion_tokens) || 0
+                            );
                         } catch (e) {
                             // skip malformed SSE line
                         }
                     }
 
+                    // Token usage is authoritative when supplied. Without the
+                    // server tokenizer, eight characters per token is only a
+                    // generous runaway-output fallback, not an exact counter.
+                    if (
+                        completionTokens > outputTokenLimit ||
+                        generatedChars > outputTokenLimit * 8
+                    ) {
+                        monitorState.cancelReason = STREAM_CANCEL_REASON.OUTPUT_BUDGET_EXCEEDED;
+                        guardrailCancelReason = monitorState.cancelReason;
+                        controller.abort();
+                        await reader.cancel();
+                        break;
+                    }
+
                     // Check guardrails on accumulated content
-                    const guardrailResult = StreamGuardrails.checkGuardrails(
-                        monitorState,
-                        contentText,
-                        false
-                    );
+                    const guardrailResult =
+                        options.monitorJson === false
+                            ? { shouldCancel: false }
+                            : StreamGuardrails.checkGuardrails(
+                                  monitorState,
+                                  stripThinkBlocks(contentText, {
+                                      openToken: this.reasoningOpenToken,
+                                      closeToken: this.reasoningCloseToken,
+                                  }).text,
+                                  false
+                              );
                     if (guardrailResult.shouldCancel) {
                         console.warn(
                             '[AIEngine] Stream guardrail triggered:',
@@ -1556,6 +1609,7 @@ class AIEngine extends BaseTranslationEngine {
                             : null;
                     const cancelReason =
                         externalCancelReason ||
+                        guardrailCancelReason ||
                         (isBackgroundJob
                             ? REQUEST_CANCEL_REASON.BACKGROUND_PREEMPTED
                             : REQUEST_CANCEL_REASON.REQUEST_ABORTED);
@@ -1603,11 +1657,11 @@ class AIEngine extends BaseTranslationEngine {
             }
 
             if (!parsed || typeof parsed !== 'object') {
-                return rawBodyText;
+                return parsed == null ? '' : rawBodyText;
             }
 
-            if (parsed.message && typeof parsed.message.content === 'string') {
-                return parsed.message.content;
+            if (parsed.message && typeof parsed.message === 'object') {
+                return typeof parsed.message.content === 'string' ? parsed.message.content : '';
             }
 
             if (typeof parsed.response === 'string') {
@@ -1636,7 +1690,10 @@ class AIEngine extends BaseTranslationEngine {
                 if (textContent !== null) {
                     return textContent;
                 }
+                // An API envelope with null content is not a JSON translation.
+                return '';
             }
+            if (Array.isArray(parsed.choices)) return '';
         } catch (e) {
             // Not a JSON envelope, treat body as direct text response.
         }

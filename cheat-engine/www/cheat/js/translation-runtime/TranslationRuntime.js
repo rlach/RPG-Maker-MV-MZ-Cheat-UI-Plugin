@@ -79,14 +79,7 @@ class TranslationRuntime {
         this.engine = createEngine(this.translationEngine, this);
         this.batchManager = createTranslationBatchManager(this);
 
-        if (this.engineSettings && this.engineSettings[this.translationEngine]) {
-            const engineConfig = this.engineSettings[this.translationEngine];
-            Object.assign(this.engine, engineConfig);
-            if (typeof this.engine.setCustomTags === 'function') {
-                this.engine.setCustomTags(this.engine.customTags || []);
-            }
-        }
-
+        this.restoreTranslationEngineSettings();
         this.bindEngineConfigTo(this);
         this.loadAiApiKeyFromSecureStore().catch((error) => {
             console.warn(

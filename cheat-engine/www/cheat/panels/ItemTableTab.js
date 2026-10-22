@@ -1,7 +1,9 @@
 import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
+import { tableSessionMixin } from '../js/TableSessionState.js';
 
 export default {
     name: 'ItemTableTab',
+    mixins: [tableSessionMixin()],
 
     template: `
 <v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
@@ -35,13 +37,16 @@ export default {
         </div>
     </v-card-text>
     <v-data-table
-        v-if="tableHeaders"
+        v-if="tableReady && tableHeaders"
         class="table-with-sticky-footer"
         :headers="tableHeaders"
         :items="filteredTableItems"
         :search="search"
         :custom-filter="tableItemFilter"
-        :items-per-page.sync="rowsPerPage">
+        :items-per-page.sync="rowsPerPage"
+        :page.sync="page"
+        :sort-by.sync="tableSession.sortBy"
+        :sort-desc.sync="tableSession.sortDesc">
         <template
             v-slot:item.amount="{ item }">
             <v-text-field
@@ -86,9 +91,6 @@ export default {
 
     data() {
         return {
-            search: '',
-            excludeNameless: false,
-            onlyOwnedItems: false,
             rowsPerPage: getRowsPerPage(),
             tableHeaders: [],
             tableItems: [],
@@ -96,6 +98,7 @@ export default {
     },
 
     props: {
+        tableStateKey: { type: String, required: true },
         items: [],
         headers: {
             type: Array,
@@ -167,6 +170,7 @@ export default {
 
                     return tableItem;
                 });
+            this.tableReady = true;
         },
 
         onItemChange(item) {

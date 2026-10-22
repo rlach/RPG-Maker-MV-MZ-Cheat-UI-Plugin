@@ -1,4 +1,5 @@
 import { KeyValueStorage } from './KeyValueStorage.js';
+import { GameTranslationSettings } from './GameTranslationSettings.js';
 import {
     ensureRootWindowStateValue,
     getRootWindow,
@@ -102,11 +103,15 @@ class HacksRuntime {
     _load() {
         try {
             const json = HACKS_STORAGE.getItem(STORAGE_KEY);
-            if (!json) {
-                return;
-            }
-
-            const data = JSON.parse(json);
+            const legacy = json ? JSON.parse(json) : {};
+            const data = new GameTranslationSettings().updateSection(
+                'hacks',
+                {
+                    ...this.state,
+                    ...legacy,
+                },
+                { missingOnly: true }
+            );
             if (data && typeof data === 'object') {
                 if (hasOwn(data, BITMAP_GET_PIXEL_LONG_FIX_KEY)) {
                     this.state[BITMAP_GET_PIXEL_LONG_FIX_KEY] =
@@ -123,7 +128,7 @@ class HacksRuntime {
 
     _save() {
         try {
-            HACKS_STORAGE.setItem(STORAGE_KEY, JSON.stringify(this.state));
+            new GameTranslationSettings().updateSection('hacks', this.state);
         } catch (err) {
             console.warn('[HacksRuntime] Failed to save settings', err);
         }

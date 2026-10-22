@@ -238,6 +238,7 @@ export const STREAM_CANCEL_REASON = Object.freeze({
     TRIM_TOO_LONG: 'trim_too_long',
     COMPLETE_JSON_CONTINUED: 'complete_json_continued',
     BANNED_PHRASE: 'banned_phrase',
+    OUTPUT_BUDGET_EXCEEDED: 'output_budget_exceeded',
 });
 
 export const REQUEST_CANCEL_REASON = Object.freeze({

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { TranslationBatchManager } from '../../../../../../cheat-engine/www/cheat/translate-engines/batch-manager/TranslationBatchManager.js';
 import { translateOnTheFlyFlowMethods } from '../../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslateOnTheFlyFlowMethods.js';
+import { CacheEmptyStrings } from '../../../../../../cheat-engine/www/cheat/translate-engines/translation-phases/CacheEmptyStrings.js';
 
 function createRuntimeStub() {
     const runtime = {
@@ -24,7 +25,9 @@ function createRuntimeStub() {
             return 0;
         },
         hasUsableCacheValue(cacheKey) {
-            return this.translationCache.has(cacheKey) && this.translationCache.get(cacheKey) !== '';
+            return (
+                this.translationCache.has(cacheKey) && this.translationCache.get(cacheKey) !== ''
+            );
         },
         setCacheValue(cacheKey, value) {
             this.translationCache.set(cacheKey, value);
@@ -55,7 +58,11 @@ function createRuntimeStub() {
     };
 
     const originalRecordBatchThroughputSample = instance.recordBatchThroughputSample.bind(instance);
-    instance.recordBatchThroughputSample = (requestedChars, durationMs, progressChannel = 'main') => {
+    instance.recordBatchThroughputSample = (
+        requestedChars,
+        durationMs,
+        progressChannel = 'main'
+    ) => {
         instance.recordCalls.push({ requestedChars, durationMs, progressChannel });
         return originalRecordBatchThroughputSample(requestedChars, durationMs, progressChannel);
     };
@@ -85,6 +92,132 @@ function createThroughputDefinition() {
 }
 
 describe('TranslationBatchManager throughput sampling', () => {
+    it('keeps remaining work in the ETA across repeated empty-string passes', async () => {
+        const runtime = createRuntimeStub();
+        runtime.translationCache = new Map([
+            ['message:ja-en-aaaaa', ''],
+            ['message:ja-en-bbbbb', ''],
+        ]);
+        let attempts = 0;
+        const observed = [];
+        runtime.engine.batchTranslate = async (batch) => {
+            attempts++;
+            runtime.getBatchThroughputSamples().push(5);
+            observed.push(runtime.getQueueScopedCompletionStats());
+            expect(runtime.getOverallTranslationCompletionLine()).not.toContain('ETA 0s');
+            return attempts < 3
+                ? {
+                      successes: [],
+                      failures: batch.map((item) => ({ ...item, rejectReason: 'invalid_json' })),
+                  }
+                : { successes: batch.map((item) => ({ ...item, translated: 'ok' })), failures: [] };
+        };
+        const manager = new TranslationBatchManager(runtime);
+        manager.register(new CacheEmptyStrings());
+        await manager.runBatchedTranslation(
+            [
+                {
+                    kind: 'cacheEmptyStrings',
+                    repeatUntilSuccess: true,
+                    backgroundJob: false,
+                    itemLimit: 50,
+                    charLimit: 10000,
+                },
+            ],
+            { showSummary: false }
+        );
+        expect(attempts).toBe(3);
+        expect(observed.map((stats) => stats.totalChars - stats.processedChars)).toEqual([
+            10, 10, 10,
+        ]);
+    });
+
+    it('adds work discovered by a later phase and includes it on every retry', async () => {
+        const runtime = createRuntimeStub();
+        let attempts = 0;
+        const observed = [];
+        runtime.engine.batchTranslate = async (batch) => {
+            attempts++;
+            observed.push(runtime.getQueueScopedCompletionStats());
+            return attempts === 1
+                ? {
+                      successes: [],
+                      failures: batch.map((item) => ({ ...item, rejectReason: 'invalid_json' })),
+                  }
+                : { successes: batch.map((item) => ({ ...item, translated: 'ok' })), failures: [] };
+        };
+        const manager = new TranslationBatchManager(runtime);
+        manager.register({
+            getKind: () => 'discover',
+            createEntries: async () => [
+                {
+                    execute: async () => {
+                        runtime.translationCache.set('message:ja-en-new work', '');
+                        return { successes: [], failures: [] };
+                    },
+                },
+            ],
+        });
+        manager.register(new CacheEmptyStrings());
+        await manager.runBatchedTranslation(
+            [
+                { kind: 'discover' },
+                { kind: 'cacheEmptyStrings', repeatUntilSuccess: true, backgroundJob: false },
+            ],
+            { showSummary: false }
+        );
+        expect(observed.map((stats) => stats.totalChars - stats.processedChars)).toEqual([8, 8]);
+    });
+
+    it('counts lazily created strategy work before its first request', async () => {
+        const runtime = createRuntimeStub();
+        const manager = new TranslationBatchManager(runtime);
+        const observed = [];
+        runtime.engine.batchTranslate = async (batch) => {
+            observed.push(runtime.getQueueScopedCompletionStats());
+            return {
+                successes: batch.map((item) => ({ ...item, translated: 'ok' })),
+                failures: [],
+            };
+        };
+        manager.register({
+            getKind: () => 'mapEvents',
+            createEntries: async () => [
+                {
+                    createStrategy: async () => ({
+                        getTranslationPhaseLabel: () => 'lazy map',
+                        collectUntranslated: () => [
+                            { type: 'message', value: 'abcde', cacheKey: 'message:ja-en-abcde' },
+                        ],
+                        setData() {},
+                    }),
+                },
+            ],
+        });
+        await manager.runBatchedTranslation([{ kind: 'mapEvents', backgroundJob: false }], {
+            showSummary: false,
+        });
+        expect(observed[0]).toMatchObject({ totalChars: 5, processedChars: 0 });
+    });
+
+    it('uses actual cache character totals when there is no queue scope', () => {
+        const runtime = createRuntimeStub();
+        runtime.translationCache = new Map([
+            ['message:ja-en-aaaaa', 'done'],
+            ['message:ja-en-bbbbb', ''],
+        ]);
+        runtime.getBatchThroughputSamples().push(1);
+        expect(runtime.getOverallTranslationCompletionLine()).toBe('total 50.0% complete (ETA 5s)');
+    });
+
+    it('does not round unfinished work to 100 percent or zero seconds', () => {
+        const runtime = createRuntimeStub();
+        runtime.startQueueCompletionScope(['message'], 10000);
+        runtime.markQueueCompletionItemsProcessed([{ value: 'x'.repeat(9999) }]);
+        runtime.getBatchThroughputSamples().push(1000);
+        expect(runtime.getOverallTranslationCompletionLine()).toBe('total 99.9% complete (ETA 1s)');
+    });
+
     it('clears old throughput samples when a queue starts', async () => {
         const originalNow = Date.now;
         let now = 1000;

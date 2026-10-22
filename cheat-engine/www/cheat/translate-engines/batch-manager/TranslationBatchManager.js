@@ -391,6 +391,16 @@ export class TranslationBatchManager {
         const mergeStats = (stats) => {
             BatchSummaryReporter.mergeErrorStats(aggregatedErrorStats, stats);
         };
+        const remainingCharsByEntry = new Map();
+        const reconcileEntryChars = (entry, items) => {
+            const remainingChars = this.countBatchRequestedChars(items);
+            const previousChars = remainingCharsByEntry.get(entry) || 0;
+            this.runtime?.adjustQueueCompletionTotalChars?.(
+                remainingChars - previousChars,
+                this.progressChannel
+            );
+            remainingCharsByEntry.set(entry, remainingChars);
+        };
         const countQueueRequestedChars = (entries) => {
             let total = 0;
 
@@ -400,7 +410,9 @@ export class TranslationBatchManager {
                 }
 
                 if (Array.isArray(entry.items)) {
-                    total += this.countBatchRequestedChars(entry.items);
+                    const chars = this.countBatchRequestedChars(entry.items);
+                    remainingCharsByEntry.set(entry, chars);
+                    total += chars;
                     continue;
                 }
 
@@ -416,12 +428,14 @@ export class TranslationBatchManager {
                     typeof strategy.toTranslationBatchItems === 'function'
                         ? strategy.toTranslationBatchItems(pendingItems || [])
                         : pendingItems || [];
-                total += this.countBatchRequestedChars(batchItems);
+                const chars = this.countBatchRequestedChars(batchItems);
+                remainingCharsByEntry.set(entry, chars);
+                total += chars;
             }
 
             return total;
         };
-        const executeEntry = async (entryItems, entryOptions = {}) => {
+        const executeEntry = async (entryItems, entryOptions = {}, queueEntry) => {
             const strategy = entryOptions.strategy;
             const hasStrategy = !!strategy;
             let pendingItems = null;
@@ -465,6 +479,11 @@ export class TranslationBatchManager {
                     ? entryOptions.onTranslationBatchCompleted
                     : null;
             const startedAt = Date.now();
+
+            // Strategies can discover new work, lose cached work, or be retried.
+            // Reconcile against this entry's remaining estimate, not the initial
+            // queue snapshot, before rendering or submitting another batch.
+            reconcileEntryChars(queueEntry, safeItems);
 
             this.errorRecovery.reset(translationPhaseLabel);
 
@@ -691,6 +710,10 @@ export class TranslationBatchManager {
                 }
 
                 this.runtime?.markQueueCompletionItemsProcessed?.(batch, this.progressChannel);
+                remainingCharsByEntry.set(
+                    queueEntry,
+                    Math.max(0, (remainingCharsByEntry.get(queueEntry) || 0) - batchRequestedChars)
+                );
 
                 processed += batch.length;
                 this.progressTracker.updateStep(translationPhaseLabel, processed, safeItems.length);
@@ -795,25 +818,29 @@ export class TranslationBatchManager {
                         typeof entry.createStrategy === 'function'
                             ? await entry.createStrategy()
                             : entry.strategy;
-                    translated = await executeEntry(entry.items || [], {
-                        ...(entry.executionOptions || {}),
-                        strategy,
-                        priorityMapId: Number(entry.priorityMapId) || 0,
-                        allowCurrentMapMidPhaseSwitch,
-                        shouldInterruptForCurrentMap: () => {
-                            if (!allowCurrentMapMidPhaseSwitch) {
-                                return false;
-                            }
+                    translated = await executeEntry(
+                        entry.items || [],
+                        {
+                            ...(entry.executionOptions || {}),
+                            strategy,
+                            priorityMapId: Number(entry.priorityMapId) || 0,
+                            allowCurrentMapMidPhaseSwitch,
+                            shouldInterruptForCurrentMap: () => {
+                                if (!allowCurrentMapMidPhaseSwitch) {
+                                    return false;
+                                }
 
-                            const freshCurrentMapId =
-                                this.runtime.getCurrentMapIdForPhasePriority();
-                            const freshCurrentMapEntryIndex = this.getCurrentMapEntryIndex(
-                                safeQueueEntries,
-                                freshCurrentMapId
-                            );
-                            return freshCurrentMapEntryIndex > 0;
+                                const freshCurrentMapId =
+                                    this.runtime.getCurrentMapIdForPhasePriority();
+                                const freshCurrentMapEntryIndex = this.getCurrentMapEntryIndex(
+                                    safeQueueEntries,
+                                    freshCurrentMapId
+                                );
+                                return freshCurrentMapEntryIndex > 0;
+                            },
                         },
-                    });
+                        entry
+                    );
                 }
 
                 for (const success of translated.successes || []) {
@@ -839,6 +866,15 @@ export class TranslationBatchManager {
                         executionOptions: entry.executionOptions || {},
                     })
                 ) {
+                    if (entry.strategy) {
+                        const pending = entry.strategy.collectUntranslated({
+                            runtime: this.runtime,
+                        });
+                        const retryItems = entry.strategy.toTranslationBatchItems
+                            ? entry.strategy.toTranslationBatchItems(pending)
+                            : pending;
+                        reconcileEntryChars(entry, retryItems);
+                    }
                     continue;
                 }
 

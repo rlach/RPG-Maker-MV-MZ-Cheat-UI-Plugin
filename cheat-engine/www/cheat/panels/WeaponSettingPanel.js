@@ -10,6 +10,7 @@ export default {
     template: `
 <v-card flat class="ma-0 pa-0 fill-height">
     <item-table-tab
+        table-state-key="weapons"
         class="fill-height"
         :items="items"
         :headers="headers"

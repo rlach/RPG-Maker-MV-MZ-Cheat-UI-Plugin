@@ -2,9 +2,11 @@ import { ConfirmDialog } from '../js/DialogHelper.js';
 import { TRANSLATOR } from '../js/TranslateHelper.js';
 import { TRANSLATE_SETTINGS } from '../js/TranslateHelper.js';
 import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
+import { tableSessionMixin } from '../js/TableSessionState.js';
 
 export default {
     name: 'SwitchSettingPanel',
+    mixins: [tableSessionMixin('switches')],
 
     template: `
 <v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
@@ -45,13 +47,16 @@ export default {
         </div>
     </v-card-text>
     <v-data-table
-        v-if="tableHeaders"
+        v-if="tableReady && tableHeaders"
         class="table-with-sticky-footer"
         :headers="tableHeaders"
         :items="filteredTableItems"
         :search="search"
         :custom-filter="tableItemFilter"
-        :items-per-page.sync="rowsPerPage">
+        :items-per-page.sync="rowsPerPage"
+        :page.sync="page"
+        :sort-by.sync="tableSession.sortBy"
+        :sort-desc.sync="tableSession.sortDesc">
         <template
             v-slot:item.value="{ item }">
             <v-switch
@@ -89,9 +94,6 @@ export default {
 
     data() {
         return {
-            search: '',
-            excludeNameless: false,
-
             rowsPerPage: getRowsPerPage(),
 
             switchNames: [],
@@ -170,6 +172,7 @@ export default {
                     value: $gameSwitches.value(idx),
                 };
             });
+            this.tableReady = true;
         },
 
         async getSwitchNames() {
