@@ -5,9 +5,6 @@ export class OtherStrings extends BasePhase {
 
     static FIELD_DEFINITIONS = [
         { id: 'gameTitle', path: ['gameTitle'] },
-        { id: 'airshipCharacterName', path: ['airship', 'characterName'] },
-        { id: 'boatCharacterName', path: ['boat', 'characterName'] },
-        { id: 'shipCharacterName', path: ['ship', 'characterName'] },
         { id: 'currencyUnit', path: ['currencyUnit'] },
     ];
 
@@ -253,11 +250,39 @@ export class OtherStrings extends BasePhase {
             return false;
         }
 
-        let appliedAny = false;
+        let appliedAny = this.restoreLegacyVehicleImages(runtime);
         for (const field of OtherStrings.FIELD_DEFINITIONS) {
             appliedAny = this.applyCachedDataForField({ runtime, field }) || appliedAny;
         }
 
         return appliedAny;
+    }
+
+    restoreLegacyVehicleImages(runtime) {
+        const dataSystem = this.getSystemData();
+        let restored = false;
+        // Older versions translated these asset identifiers as "other" strings.
+        // Repair only exact known translations, preserving event-selected graphics
+        // and vehicle positions, including vehicles restored from a saved game.
+        for (const type of ['airship', 'boat', 'ship']) {
+            const data = dataSystem[type];
+            const source =
+                dataSystem._translationOriginalOtherStrings?.[`${type}CharacterName`] ??
+                data?.characterName;
+            if (typeof source !== 'string' || !source) continue;
+            const key = this.getFieldCacheKey(runtime, source);
+            const translated = runtime.translationCache.get(key);
+            if (typeof translated !== 'string' || translated === source) continue;
+            if (data?.characterName === translated) {
+                data.characterName = source;
+                restored = true;
+            }
+            const vehicle = globalThis.$gameMap?.vehicle(type);
+            if (vehicle?.characterName() === translated) {
+                vehicle.setImage(source, vehicle.characterIndex());
+                restored = true;
+            }
+        }
+        return restored;
     }
 }

@@ -331,6 +331,9 @@ export class StreamJsonParser {
      * @throws Error if not valid JSON object
      */
     static parseObjectStrict(text) {
+        const keys = this.parseTopLevelKeys(text);
+        if (keys.duplicateKeys.length) throw new Error('duplicate_key: ' + keys.duplicateKeys[0]);
+
         const parsed = JSON.parse(text);
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
             throw new Error('not_json_object');

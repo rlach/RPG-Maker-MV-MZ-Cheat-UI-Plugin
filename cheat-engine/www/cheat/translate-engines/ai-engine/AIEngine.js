@@ -12,6 +12,7 @@ import { StreamGuardrails } from './StreamGuardrails.js';
 import { ValidationService } from './ValidationService.js';
 import { RetryHandler } from './RetryHandler.js';
 import { ApiClient } from './ApiClient.js';
+import { structuredRequestParameters } from './StructuredOutput.js';
 import { ConfigManager } from './ConfigManager.js';
 import {
     DEFAULT_SYSTEM_PROMPT,
@@ -71,6 +72,7 @@ class AIEngine extends BaseTranslationEngine {
         this.reasoningOpenToken = DEFAULT_REASONING_OPEN_TOKEN;
         this.reasoningCloseToken = DEFAULT_REASONING_CLOSE_TOKEN;
         this.reasoningEffort = DEFAULT_REASONING_EFFORT;
+        this.useStrataConstrained = false;
         this.customTags = [];
         this.pluginTags = []; // auto-registered by plugin translators, not user-editable
         this.tagOverrides = {};
@@ -214,6 +216,12 @@ class AIEngine extends BaseTranslationEngine {
                 set: (v) => {
                     this.reasoningEffort =
                         typeof v === 'string' && v ? v : DEFAULT_REASONING_EFFORT;
+                },
+            },
+            aiUseStrataConstrained: {
+                get: () => this.useStrataConstrained,
+                set: (value) => {
+                    this.useStrataConstrained = value === true;
                 },
             },
             aiReasoningEffortOptions: {
@@ -752,6 +760,23 @@ class AIEngine extends BaseTranslationEngine {
     }
 
     parseTranslatedMapFromText(text, expectedKeys = []) {
+        if (typeof text === 'string') {
+            const scan = StreamJsonParser.scanTopLevelObjects(text);
+            const seen = new Set();
+            for (const fragment of [
+                ...scan.objects.map((entry) => entry.text),
+                scan.partialObjectText,
+            ].filter(Boolean)) {
+                const keys = StreamJsonParser.parseTopLevelKeys(fragment);
+                for (const key of keys.keys) {
+                    if (seen.has(key)) throw new Error('duplicate_key: ' + key);
+                    seen.add(key);
+                    if (expectedKeys.length && key !== 'kbase' && !expectedKeys.includes(key)) {
+                        throw new Error('unknown_key: ' + key);
+                    }
+                }
+            }
+        }
         const merged = StreamJsonParser.mergeTopLevelObjects(text);
         if (merged && typeof merged === 'object') {
             return merged;
@@ -1038,7 +1063,7 @@ class AIEngine extends BaseTranslationEngine {
                                               tagExceptions.length > 0
                                                   ? `, with exception of: ${tagExceptions.map((t) => `[b=${t.tagSymbol}] (${t.reservedWidth} chars)`).join(', ')}`
                                                   : '';
-                                          descBoxingPart = ` Keys ending with d are descriptions. They need to fit into ${maxRows} lines, each with up to ${widthInChars} chars. Tag [b=sn] represents newlines, and doesn't count to limit. Other tags have 0 width${exceptionsStr}.`;
+                                          descBoxingPart = ` Keys ending with d are descriptions. They need to fit into ${maxRows} lines, each with up to ${widthInChars} chars. Tag [b=sn] represents newlines, and doesn't count to limit. Treat [b=sn] like white character when determining next word case and grammar of the sentence. Other tags have 0 width${exceptionsStr}.`;
                                       }
                                   }
                                   return `Translate video game text from ${sourceName} to ${targetName}. ${this.systemPrompt}${additionalTagInfoPart} Official name translations, they HAVE to be used for consistency with existing material, don't make up your own translations: ${nameHints}.${knowledgePromptPart} The names might contain additional info, like gender, in brackets. Use it for additional context.${alwaysTranslatePart}${kbaseInstructionPart}${alwaysKbasePart}${descBoxingPart}`;
@@ -1317,10 +1342,8 @@ class AIEngine extends BaseTranslationEngine {
 
                 if (rawSlice === undefined || rawSlice === null) {
                     failures.push({
-                        type: itemD.type,
-                        id: itemD.id,
-                        value: itemD.value,
-                        cacheKey: itemD.cacheKey,
+                        ...itemD,
+                        translatedValue: rawSlice,
                         rejectReason: 'Missing key',
                         cancelReason: shouldPreserveCancelReason ? cancelReason : null,
                     });
@@ -1330,6 +1353,7 @@ class AIEngine extends BaseTranslationEngine {
                 if (typeof rawSlice !== 'string') {
                     failures.push({
                         ...itemD,
+                        translatedValue: rawSlice,
                         rejectReason: `Value for "${key}" is not a string`,
                         cancelReason: shouldPreserveCancelReason ? cancelReason : null,
                     });
@@ -1340,6 +1364,7 @@ class AIEngine extends BaseTranslationEngine {
                 if (bannedPhraseHit) {
                     failures.push({
                         ...itemD,
+                        translatedValue: rawSlice,
                         rejectReason: `Contains banned phrase: ${bannedPhraseHit}`,
                         cancelReason: shouldPreserveCancelReason ? cancelReason : null,
                     });
@@ -1355,6 +1380,9 @@ class AIEngine extends BaseTranslationEngine {
                 if (!postprocessResult.valid) {
                     failures.push({
                         ...itemD,
+                        translatedValue: rawSlice,
+                        postprocessedValue: postprocessResult.text,
+                        unresolvedTags: postprocessResult.unresolvedTags,
                         rejectReason: postprocessResult.errorReason || 'Tag count mismatch',
                         cancelReason: shouldPreserveCancelReason ? cancelReason : null,
                     });
@@ -1365,6 +1393,7 @@ class AIEngine extends BaseTranslationEngine {
                 if (!newlineValidation.valid) {
                     failures.push({
                         ...itemD,
+                        translatedValue: rawSlice,
                         rejectReason: newlineValidation.errorReason,
                         cancelReason: shouldPreserveCancelReason ? cancelReason : null,
                     });
@@ -1390,6 +1419,11 @@ class AIEngine extends BaseTranslationEngine {
                     '[AIEngine] Batch item failures:',
                     failures.map((failure) => ({
                         key: failure.jsonKey || failure.id || failure.cacheKey || failure.type,
+                        originalValue: failure.value,
+                        translatedValue: failure.translatedValue,
+                        preprocessedValue: failure.preprocessed,
+                        postprocessedValue: failure.postprocessedValue,
+                        unresolvedTags: failure.unresolvedTags,
                         reason: failure.rejectReason || 'unknown',
                     }))
                 );
@@ -1458,9 +1492,12 @@ class AIEngine extends BaseTranslationEngine {
                 } else {
                     processedPayload.max_tokens = outputTokenLimit;
                 }
-                if (this.reasoningEffort && this.reasoningEffort !== 'none') {
-                    processedPayload.reasoning_effort = this.reasoningEffort;
-                }
+                processedPayload.reasoning_effort = this.reasoningEffort || 'none';
+                Object.assign(
+                    processedPayload,
+                    structuredRequestParameters(this, processedPayload, options)
+                );
+                processedPayload.model ||= this.selectedModel;
                 const preservedFetch =
                     typeof window !== 'undefined' ? window['chromiumFetch'] : undefined;
                 const requestFetch = typeof preservedFetch === 'function' ? preservedFetch : fetch;

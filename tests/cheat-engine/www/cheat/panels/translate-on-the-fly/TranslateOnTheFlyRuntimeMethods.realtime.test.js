@@ -43,6 +43,7 @@ vi.mock('../../../../../../cheat-engine/www/cheat/js/TranslateOnTheFlyState.js',
 
 import { translateOnTheFlyCoreMethods } from '../../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslateOnTheFlyCoreMethods.js';
 import { translateOnTheFlyRuntimeMethods } from '../../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslateOnTheFlyRuntimeMethods.js';
+import { PLUGIN_TRANSLATOR_REGISTRY } from '../../../../../../cheat-engine/www/cheat/translate-engines/plugins/PluginTranslatorRegistry.js';
 
 function installRpgMakerGlobals({ messageLines = ['JP line 1'], speaker = 'NPC' } = {}) {
     globalThis.window = globalThis;
@@ -312,6 +313,9 @@ function createMessageInterpreterWithThreeMessages() {
 
 describe('TranslateOnTheFly realtime flow', () => {
     beforeEach(() => {
+        PLUGIN_TRANSLATOR_REGISTRY.resolveMessageCacheSourceText.mockImplementation(
+            ({ text }) => text
+        );
         vi.spyOn(console, 'log').mockImplementation(() => {});
         vi.spyOn(console, 'warn').mockImplementation(() => {});
         vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -337,6 +341,37 @@ describe('TranslateOnTheFly realtime flow', () => {
         delete globalThis.Scene_Title;
         delete globalThis.Scene_Load;
     });
+
+    it.each([true, false])(
+        'uses plugin-normalized text for cache lookup, seen tracking and new requests (cached=%s)',
+        (cached) => {
+            const source = 'Original♡';
+            const displayed = 'Original\\I[12]';
+            installRpgMakerGlobals({ messageLines: [displayed], speaker: '' });
+            const runtime = createRuntime({
+                cacheEntries: cached ? [['message:ja-en-' + source, 'Translated♡']] : [],
+            });
+            PLUGIN_TRANSLATOR_REGISTRY.resolveMessageCacheSourceText.mockImplementation(
+                ({ text }) => (text === displayed ? source : text)
+            );
+            runtime.setupTranslationHook();
+            new Window_Message().canStart();
+            expect($gameMessage._translateOriginalText).toBe(source);
+            expect(runtime.translationCache.has('message:ja-en-' + displayed)).toBe(false);
+            if (cached) {
+                expect(runtime.replaceMessageText).toHaveBeenCalledWith('Translated♡');
+                expect(runtime.lastSeenByCacheKey.has('message:ja-en-' + source)).toBe(true);
+                expect(runtime.requestForegroundDialogBatch).not.toHaveBeenCalled();
+            } else {
+                expect(runtime.requestForegroundDialogBatch).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        currentText: source,
+                        cacheKey: 'message:ja-en-' + source,
+                    })
+                );
+            }
+        }
+    );
 
     it('correctly translates text realtime when it encounters untranslated event', async () => {
         installRpgMakerGlobals({ messageLines: ['JP line 1'], speaker: '' });

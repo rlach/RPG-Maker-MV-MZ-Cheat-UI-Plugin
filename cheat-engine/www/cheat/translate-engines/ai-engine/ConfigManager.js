@@ -27,12 +27,10 @@ export class ConfigManager {
         }
     }
 
-    _createPersistedHandler(handler, { syncPanel = false } = {}) {
+    _createPersistedHandler(handler) {
         return async (...args) => {
             const result = await Promise.resolve(handler(...args));
-            if (syncPanel) {
-                this._syncPanelEngineConfig();
-            }
+            this._syncPanelEngineConfig();
             this._savePanelSettings();
             return result;
         };
@@ -261,6 +259,15 @@ export class ConfigManager {
                class="mb-2"
              ></v-text-field>
 
+             <v-checkbox
+               v-if="aiProvider === 'openApi'"
+               v-model="aiUseStrataConstrained"
+               label="Experimental: Use strata constrained"
+               hint="Sends the expected JSON Schema and forces reasoning effort to none for JSON requests. Requires a compatible PolyStrata build."
+               persistent-hint
+               @change="onChangeAiUseStrataConstrained"
+               class="mb-2"
+             ></v-checkbox>
              <v-select
                v-model="aiReasoningEffort"
                :items="aiReasoningEffortOptions"
@@ -324,6 +331,7 @@ export class ConfigManager {
             aiReasoningOpenToken: this.aiEngine.reasoningOpenToken,
             aiReasoningCloseToken: this.aiEngine.reasoningCloseToken,
             aiReasoningEffort: this.aiEngine.reasoningEffort,
+            aiUseStrataConstrained: this.aiEngine.useStrataConstrained,
             aiReasoningEffortOptions: this.aiEngine.aiReasoningEffortOptions,
         };
     }
@@ -335,9 +343,7 @@ export class ConfigManager {
     getMethods() {
         return {
             fetchAiModels: () => this._fetchAiModels(),
-            onChangeAiProvider: this._createPersistedHandler((v) => this._onChangeAiProvider(v), {
-                syncPanel: true,
-            }),
+            onChangeAiProvider: this._createPersistedHandler((v) => this._onChangeAiProvider(v)),
             onChangeAiHost: this._createPersistedHandler((v) => {
                 this.aiEngine.host = v;
             }),
@@ -384,39 +390,30 @@ export class ConfigManager {
             onChangeAiReasoningCloseToken: this._createPersistedHandler((v) => {
                 this.aiEngine.reasoningCloseToken = typeof v === 'string' ? v : '';
             }),
+            onChangeAiUseStrataConstrained: this._createPersistedHandler((value) => {
+                this.aiEngine.useStrataConstrained = value === true;
+            }),
             onChangeAiReasoningEffort: this._createPersistedHandler((v) => {
                 this.aiEngine.reasoningEffort = v || 'none';
             }),
             addAiCustomTag: this._createPersistedHandler(
                 (tagConfig) => {
                     this.aiEngine.addCustomTag(tagConfig);
-                },
-                {
-                    syncPanel: true,
                 }
             ),
             updateAiCustomTag: this._createPersistedHandler(
                 (index, tagConfig) => {
                     this.aiEngine.updateCustomTag(index, tagConfig);
-                },
-                {
-                    syncPanel: true,
                 }
             ),
             removeAiCustomTag: this._createPersistedHandler(
                 (index) => {
                     this.aiEngine.removeCustomTag(index);
-                },
-                {
-                    syncPanel: true,
                 }
             ),
             updateAiTagOverrides: this._createPersistedHandler(
                 (source, tagConfig, overrides, pluginName = '') => {
                     this.aiEngine.setOverrides(tagConfig, source, pluginName, overrides);
-                },
-                {
-                    syncPanel: true,
                 }
             ),
         };

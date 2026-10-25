@@ -23,6 +23,7 @@ declare const $dataCommonEvents: any;
 declare const $dataSystem: any;
 
 declare const SceneManager: any;
+declare const Scene_Shop: any;
 declare const DataManager: any;
 declare const BattleManager: any;
 declare const ImageManager: any;
@@ -158,6 +159,7 @@ declare interface Window {
     SceneCheat?: any;
     Scene_Base?: any;
     Scene_Menu?: any;
+    Scene_Shop?: any;
     Scene_Message?: any;
     SceneManager?: any;
     MessageCheat?: any;

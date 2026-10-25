@@ -693,6 +693,10 @@ export default {
             return this.callRuntime('onChangeAiReasoningCloseToken', v);
         },
 
+        onChangeAiUseStrataConstrained(v) {
+            return this.callRuntime('onChangeAiUseStrataConstrained', v);
+        },
+
         onChangeAiReasoningEffort(v) {
             return this.callRuntime('onChangeAiReasoningEffort', v);
         },

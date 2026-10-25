@@ -806,16 +806,33 @@ export class TagManager {
             }
         }
         if (hasUnresolvedEscapedTag) {
+            // Keep every occurrence, including malformed/unclosed tokens. Offsets
+            // refer to the postprocessed text and distinguish repeated tags.
+            const starts = [...result.matchAll(/\[b=/gi)].map((match) => match.index);
+            const unresolvedTags = starts.map((index, occurrence) => {
+                const next = starts[occurrence + 1] ?? result.length;
+                const closing = result.indexOf(']', index);
+                const end = closing >= 0 && closing < next ? closing + 1 : next;
+                return {
+                    tag: result.slice(index, end),
+                    index,
+                    context: result.slice(
+                        Math.max(0, index - 40),
+                        Math.min(result.length, end + 40)
+                    ),
+                };
+            });
             if (!suppressUnresolvedWarning) {
-                console.warn(
-                    '[TagManager] Unresolved escaped tags found in postprocessed text:',
-                    result
-                );
+                console.warn('[TagManager] Unresolved escaped tags found in postprocessed text:', {
+                    text: result,
+                    unresolvedTags,
+                });
             }
             return {
                 text: result,
                 valid: false,
                 errorReason: 'Unresolved escaped tags left in output ([b=...)',
+                unresolvedTags,
                 expectedCounts: tagCounts,
                 actualCounts,
             };

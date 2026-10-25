@@ -4,6 +4,8 @@
  * Checks shape, language, and prevents hallucinations
  */
 
+import { languageValidationSchema } from './StructuredOutput.js';
+
 export class ValidationService {
     constructor(aiEngine) {
         this.aiEngine = aiEngine; // Reference to AIEngine for requestChatCompletion
@@ -38,6 +40,7 @@ export class ValidationService {
         const errors = [];
         const missingKeys = [];
         const nonStringKeys = [];
+        const unknownKeys = [];
 
         if (!translatedMap || typeof translatedMap !== 'object') {
             errors.push('Response is not a JSON object');
@@ -45,6 +48,14 @@ export class ValidationService {
         }
 
         const normalizedMap = this.normalizeTranslatedMapKeys(translatedMap);
+
+        const expected = new Set(itemData.map((item) => item.jsonKey || item.id));
+        for (const key of Object.keys(normalizedMap)) {
+            if (!expected.has(key)) {
+                errors.push(`Unknown key: ${key}`);
+                unknownKeys.push(key);
+            }
+        }
 
         // Check that all expected keys are present
         for (const item of itemData) {
@@ -64,6 +75,7 @@ export class ValidationService {
             missingKeys,
             nonStringKeys,
             normalizedMap,
+            unknownKeys,
         };
     }
 
@@ -93,17 +105,20 @@ export class ValidationService {
                 messages: [
                     {
                         role: 'user',
-                        content: `Is this text translated to ${targetLangName}? Or is it still mostly ${sourceLangName}? Answer only with "yes" or "no".\n\n${validationText}`,
+                        content: `Is this text translated to ${targetLangName}? Or is it still mostly ${sourceLangName}? Return only compact JSON {"isTranslated":true} if translated, otherwise {"isTranslated":false}.\n\n${validationText}`,
                     },
                 ],
             };
 
             const result = await this.aiEngine.requestChatCompletion(payload, {
                 isBackgroundJob,
+                responseSchema: languageValidationSchema,
+                monitorJson: false,
             });
-            const text = result?.text?.toLowerCase() || '';
-
-            const isTranslated = text.includes('yes');
+            const text = result?.text || '';
+            const answer = JSON.parse(text);
+            if (typeof answer.isTranslated !== 'boolean') throw new Error('Invalid language validation response');
+            const isTranslated = answer.isTranslated;
             return { isTranslated, confidence: 0.8 };
         } catch (e) {
             console.warn('[ValidationService] Language validation error:', e.message);

@@ -517,7 +517,6 @@ export class StreamGuardrails {
         if (scan.objects && scan.objects.length > 0) {
             for (const obj of scan.objects) {
                 try {
-                    const parsed = StreamJsonParser.parseObjectStrict(obj.text);
                     const keyParsing = StreamJsonParser.parseTopLevelKeys(obj.text);
 
                     analysis.foundObjects.push({
@@ -526,6 +525,7 @@ export class StreamGuardrails {
                         duplicateKeys: keyParsing.duplicateKeys,
                     });
 
+                    const parsed = StreamJsonParser.parseObjectStrict(obj.text);
                     if (keyParsing.duplicateKeys.length === 0) {
                         candidateMap = parsed;
                     }

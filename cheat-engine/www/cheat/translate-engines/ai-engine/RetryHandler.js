@@ -7,6 +7,7 @@
 import { StreamJsonParser } from './StreamJsonParser.js';
 import { buildRequestSettingsForContent } from './constants.js';
 import { stripThinkBlocks } from './utils.js';
+import { translationResponseSchema } from './StructuredOutput.js';
 
 export class RetryHandler {
     constructor(aiEngine) {
@@ -35,7 +36,7 @@ export class RetryHandler {
         }
 
         if (strategy === 'askAIToFix') {
-            return this.retryJsonRepair(previousResponse, 0, isBackgroundJob);
+            return this.retryJsonRepair(previousResponse, 0, isBackgroundJob, (itemData || []).map((item) => item.jsonKey || item.id));
         }
 
         if (strategy === 'useJsonFixer') {
@@ -68,7 +69,12 @@ export class RetryHandler {
                 },
             ];
 
-            const result = await this.aiEngine.requestChatCompletion(feedbackPayload);
+            const originalInput = [...(payload.messages || [])].reverse().find((message) =>
+                message.role === 'user' && typeof message.content === 'string');
+            const source = StreamJsonParser.scanTopLevelObjects(originalInput?.content || '');
+            const expectedKeys = [...new Set(source.objects.flatMap((entry) =>
+                StreamJsonParser.parseTopLevelKeys(entry.text).keys))];
+            const result = await this.aiEngine.requestChatCompletion(feedbackPayload, { expectedKeys });
             return { ok: !!result, response: result };
         } catch (e) {
             return { ok: false, error: e.message };
@@ -83,7 +89,7 @@ export class RetryHandler {
      * @param {boolean} isBackgroundJob - Background request flag
      * @returns {Promise<Object>} {ok, repaired?, error?}
      */
-    async retryJsonRepair(invalidJsonText, depth = 0, isBackgroundJob = false) {
+    async retryJsonRepair(invalidJsonText, depth = 0, isBackgroundJob = false, expectedKeys = []) {
         const candidate = this.getJsonRepairCandidate(invalidJsonText);
         if (!candidate) {
             return { ok: false, error: 'NO_JSON_TO_REPAIR' };
@@ -112,6 +118,9 @@ export class RetryHandler {
                 // Repair does not have the original batch schema. The request
                 // output budget still applies independently of JSON validation.
                 monitorJson: false,
+                responseSchema: translationResponseSchema(expectedKeys.length ? expectedKeys : StreamJsonParser.parseTopLevelKeys(candidate).keys, {
+                    allowKnowledgeBase: !!this.aiEngine.runtime?.askLlmToAddToKnowledge,
+                }),
             });
 
             if (!result || !result.text) {
@@ -133,7 +142,7 @@ export class RetryHandler {
                     return { ok: false, error: result.cancelReason || 'REQUEST_ABORTED' };
                 }
                 // Still invalid, retry recursively
-                return this.retryJsonRepair(result.text, depth + 1, isBackgroundJob);
+                return this.retryJsonRepair(result.text, depth + 1, isBackgroundJob, expectedKeys);
             }
         } catch (e) {
             return { ok: false, error: e.message };

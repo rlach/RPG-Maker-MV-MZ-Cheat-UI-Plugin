@@ -217,6 +217,7 @@ export const translateOnTheFlyRuntimeMethods = {
 
                 return {
                     activeKey,
+                    sourceText: keySourceText,
                     lookupKeys: dedupedLookupKeys,
                     ready: true,
                     translated: self.translationCache.get(key),
@@ -226,6 +227,7 @@ export const translateOnTheFlyRuntimeMethods = {
 
             return {
                 activeKey,
+                sourceText: keySourceText,
                 lookupKeys: dedupedLookupKeys,
                 ready: false,
                 translated: null,
@@ -757,7 +759,7 @@ export const translateOnTheFlyRuntimeMethods = {
                 return originalCanStart;
             }
 
-            const originalText = getSafeCurrentMessageText();
+            let originalText = getSafeCurrentMessageText();
             const hasText = !!(originalText && originalText.trim().length > 0);
 
             // Remember original text (even empty) for later key lookups (startInput)
@@ -776,6 +778,10 @@ export const translateOnTheFlyRuntimeMethods = {
                       resolvedKey: null,
                   };
             const cacheKey = textCacheState.activeKey;
+            // Use the same plugin-normalized source for foreground requests and
+            // their stored original context as for cache lookup and harvesting.
+            originalText = textCacheState.sourceText ?? originalText;
+            $gameMessage._translateOriginalText = originalText;
             const choices = ($gameMessage.choices && $gameMessage.choices()) || [];
             // Freeze source choices once so translated replacements never become cache keys.
             if (
