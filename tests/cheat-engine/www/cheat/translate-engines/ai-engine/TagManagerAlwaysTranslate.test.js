@@ -176,21 +176,24 @@ describe('getAlwaysTranslateTagIds', () => {
 
     it('returns empty array when flag tags are not present in texts', () => {
         const tm = createTagManager([TAG_ALWAYS_TRANSLATE_CUSTOM_PARAM]);
-        const ids = tm.getAlwaysTranslateTagIds(['some random text without any b= tags']);
+        const ids = tm.getAlwaysTranslateTagIds(['some random text without any encoded tags']);
         expect(ids).toEqual([]);
     });
 
     it('returns tag id when tag is present in preprocessed text', () => {
         const tm = createTagManager([TAG_ALWAYS_TRANSLATE_CUSTOM_PARAM]);
-        // Preprocess a text that contains \NW[Hero] so we get [b=nw[Hero]]
+        // Preprocess a text that contains \NW[Hero] so we get ⟪TAG:nw[Hero]⟫
         const { preprocessedText } = tm.preprocessTags('\\NW[Hero] said hello');
         const ids = tm.getAlwaysTranslateTagIds([preprocessedText]);
         expect(ids.length).toBe(1);
-        expect(ids[0]).toMatch(/^b=/);
+        expect(ids[0]).toMatch(/^⟪TAG:/);
     });
 
     it('returns multiple tag ids when multiple alwaysTranslate tags are present', () => {
-        const tm = createTagManager([TAG_ALWAYS_TRANSLATE_CUSTOM_PARAM, TAG_ALWAYS_TRANSLATE_WITHOUT_PARAM]);
+        const tm = createTagManager([
+            TAG_ALWAYS_TRANSLATE_CUSTOM_PARAM,
+            TAG_ALWAYS_TRANSLATE_WITHOUT_PARAM,
+        ]);
         const { preprocessedText: t1 } = tm.preprocessTags('\\NW[Hero] text');
         const { preprocessedText: t2 } = tm.preprocessTags('\\XP rest');
         const ids = tm.getAlwaysTranslateTagIds([t1, t2]);
@@ -206,20 +209,25 @@ describe('getAlwaysTranslateTagIds', () => {
     });
 
     it('returns id only for tags present in the batch, not all registered alwaysTranslate tags', () => {
-        const tm = createTagManager([TAG_ALWAYS_TRANSLATE_CUSTOM_PARAM, TAG_ALWAYS_TRANSLATE_WITHOUT_PARAM]);
+        const tm = createTagManager([
+            TAG_ALWAYS_TRANSLATE_CUSTOM_PARAM,
+            TAG_ALWAYS_TRANSLATE_WITHOUT_PARAM,
+        ]);
         // Only preprocess text with NW, not XP
         const { preprocessedText } = tm.preprocessTags('\\NW[Alice] speaks');
         const ids = tm.getAlwaysTranslateTagIds([preprocessedText]);
         expect(ids.length).toBe(1);
-        expect(ids[0]).toMatch(/^b=/);
+        expect(ids[0]).toMatch(/^⟪TAG:/);
         // XP is not in the text so it should not appear
         const nwEntry = tm.tagEntries.find((e) => e.tagSymbol === 'NW');
-        expect(ids[0]).toBe(`b=${nwEntry.tagId}`);
+        expect(ids[0]).toBe(`⟪TAG:${nwEntry.tagId}⟫`);
     });
 
     it('handles null and non-string items in preprocessedTexts gracefully', () => {
         const tm = createTagManager([TAG_ALWAYS_TRANSLATE_CUSTOM_PARAM]);
-        expect(() => tm.getAlwaysTranslateTagIds([null, undefined, 42, 'plain text'])).not.toThrow();
+        expect(() =>
+            tm.getAlwaysTranslateTagIds([null, undefined, 42, 'plain text'])
+        ).not.toThrow();
     });
 });
 
@@ -245,7 +253,7 @@ describe('getAlwaysAddToKnowledgeBaseTagIds', () => {
         const ids = tm.getAlwaysAddToKnowledgeBaseTagIds([preprocessedText]);
         expect(ids.length).toBe(1);
         const catEntry = tm.tagEntries.find((e) => e.tagSymbol === 'CAT');
-        expect(ids[0]).toBe(`b=${catEntry.tagId}`);
+        expect(ids[0]).toBe(`⟪TAG:${catEntry.tagId}⟫`);
     });
 
     it('does not return masked tag ids', () => {
@@ -280,12 +288,12 @@ describe('getAdditionalTagPromptInfos', () => {
         expect(infos).toEqual([]);
     });
 
-    it('returns compact b=tagId entry with normalized whitespace when tag is present', () => {
+    it('returns compact TAG identifier with normalized whitespace when tag is present', () => {
         const tm = createTagManager([TAG_WITH_EXTRA_PROMPT]);
         const entry = tm.tagEntries.find((e) => e.tagSymbol === 'NP');
         const { preprocessedText } = tm.preprocessTags('before \\NP[3] after');
         const infos = tm.getAdditionalTagPromptInfos([preprocessedText]);
-        expect(infos).toEqual([`b=${entry.tagId} - first line second line`]);
+        expect(infos).toEqual([`⟪TAG:${entry.tagId}⟫ - first line second line`]);
     });
 
     it('ignores tags with empty extra prompt', () => {
@@ -334,7 +342,7 @@ describe('XML-style alwaysTranslate tag detection', () => {
         const ids = tm.getAlwaysTranslateTagIds([preprocessedText]);
         expect(ids.length).toBe(1);
         const entry = tm.tagEntries.find((e) => e.tagSymbol === 'SGカテゴリ');
-        expect(ids[0]).toBe(`b=${entry.tagId}`);
+        expect(ids[0]).toBe(`⟪TAG:${entry.tagId}⟫`);
     });
 
     it('returns tag id in getAlwaysAddToKnowledgeBaseTagIds when XML tag appears in preprocessed text', () => {
@@ -343,7 +351,7 @@ describe('XML-style alwaysTranslate tag detection', () => {
         const ids = tm.getAlwaysAddToKnowledgeBaseTagIds([preprocessedText]);
         expect(ids.length).toBe(1);
         const entry = tm.tagEntries.find((e) => e.tagSymbol === 'SGカテゴリ');
-        expect(ids[0]).toBe(`b=${entry.tagId}`);
+        expect(ids[0]).toBe(`⟪TAG:${entry.tagId}⟫`);
     });
 });
 

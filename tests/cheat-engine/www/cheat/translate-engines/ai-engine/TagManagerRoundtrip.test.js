@@ -258,9 +258,9 @@ describe(
 
                     // BUG regression: encoded output must preserve a fully closed NI parameter block.
                     // Nested encoded tags can legitimately produce "]]]" in the packed form.
-                    expect(preprocessedText).toMatch(/\[b=[a-z0-9]{2}\[[^\]]*\]\]/i);
+                    expect(preprocessedText).toMatch(/⟪TAG:[a-z0-9]{2}\[[^\]]*\⟫\]/i);
                     // The packed tag should still be fully closed before the following text.
-                    expect(preprocessedText).toMatch(/\]\s*を/);
+                    expect(preprocessedText).toMatch(/⟫\s*を/);
 
                     const postResult = tagManager.postprocessTags(
                         preprocessedText,
@@ -394,7 +394,7 @@ describe('TagManager postprocess escape tag spacing', () => {
         const tagEntry = tagManager.tagEntries.find((entry) => entry.tagSymbol === 'c');
 
         const postResult = tagManager.postprocessTags(
-            `[b=${tagEntry.tagId}]test`,
+            `⟪TAG:${tagEntry.tagId}⟫test`,
             tagCounts,
             caseMap
         );
@@ -410,7 +410,7 @@ describe('TagManager postprocess escape tag spacing', () => {
         const dTagEntry = tagManager.tagEntries.find((entry) => entry.tagSymbol === 'd');
 
         const postResult = tagManager.postprocessTags(
-            `[b=${cTagEntry.tagId}][b=${dTagEntry.tagId}3]test`,
+            `⟪TAG:${cTagEntry.tagId}⟫⟪TAG:${dTagEntry.tagId}3⟫test`,
             tagCounts,
             caseMap
         );
@@ -420,10 +420,10 @@ describe('TagManager postprocess escape tag spacing', () => {
     });
 });
 
-const SG_INPUT_REAL = String.raw`<SG種別:2>[b=sg<プリテンド>]<SG説明4:コ、1。
+const SG_INPUT_REAL = String.raw`<SG種別:2>⟪TAG:sg<プリテンド>⟫<SG説明4:コ、1。
 キ、原><SGピクチャ5:プリテンド>`;
 
-const LLM_OUTPUT_REAL = `<SG種別:2>[b=sg<Pretend>][b=sx<H, b, o.[b=sn]W, t><SGピクチャ5:プリテンド>`;
+const LLM_OUTPUT_REAL = `<SG種別:2>⟪TAG:sg<Pretend>⟫⟪TAG:sx<H, b, o.⟪TAG:sn⟫W, t><SGピクチャ5:プリテンド>`;
 
 const SG_INPUT_REAL_2 = String.raw`<SG種別:2>
 <SG説明:blah
@@ -452,4 +452,4 @@ blah
 blah>
 <SGピクチャ5:プリテンド> `;
 
-const LLM_OUTPUT_REAL_2 = `<SG種別:2> [b=sn][b=sg<blah[b=sn]blah[b=sn]blah[b=sn]blah[b=sn][b=sn]blah>][b=sn][b=sn][b=si<blah[b=sn]blah[b=sn]blah[b=sn][b=sn]blah[b=sn]blah>[b=sn][b=sn][b=sq<blah[b=sn]blah[b=sn]blah[b=sn]blah[b=sn][b=sn]blah[b=sn]blah[b=sn]>][b=sn][b=sn][b=sx<blah[b=sn]blah>[b=sn]<SGピクチャ5:プリテンド>`;
+const LLM_OUTPUT_REAL_2 = `<SG種別:2> ⟪TAG:sn⟫⟪TAG:sg<blah⟪TAG:sn⟫blah⟪TAG:sn⟫blah⟪TAG:sn⟫blah⟪TAG:sn⟫⟪TAG:sn⟫blah>⟫⟪TAG:sn⟫⟪TAG:sn⟫⟪TAG:si<blah⟪TAG:sn⟫blah⟪TAG:sn⟫blah⟪TAG:sn⟫⟪TAG:sn⟫blah⟪TAG:sn⟫blah>⟪TAG:sn⟫⟪TAG:sn⟫⟪TAG:sq<blah⟪TAG:sn⟫blah⟪TAG:sn⟫blah⟪TAG:sn⟫blah⟪TAG:sn⟫⟪TAG:sn⟫blah⟪TAG:sn⟫blah⟪TAG:sn⟫>⟫⟪TAG:sn⟫⟪TAG:sn⟫⟪TAG:sx<blah⟪TAG:sn⟫blah>⟪TAG:sn⟫<SGピクチャ5:プリテンド>`;

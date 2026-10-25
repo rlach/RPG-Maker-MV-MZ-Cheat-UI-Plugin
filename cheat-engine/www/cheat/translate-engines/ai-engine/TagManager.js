@@ -1,7 +1,7 @@
 /**
  * TagManager
  * Game script tag escaping/unescaping
- * Handles preprocessing \V[5] -> [b=xy5] and postprocessing [b=xy5] -> \V[5]
+ * Handles preprocessing \V[5] -> ⟪TAG:xy5⟫ and postprocessing ⟪TAG:xy5⟫ -> \V[5]
  */
 
 import {
@@ -11,6 +11,7 @@ import {
     TAG_STYLE,
     TAG_TYPE,
 } from './constants.js';
+import { TagSyntax } from './TagSyntax.js';
 import { ensureTranslateCacheRuntime } from '../../js/TranslateCacheRuntime.js';
 
 const BRACKET_CLOSE_BY_OPEN = Object.freeze({
@@ -24,7 +25,7 @@ const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 const ESCAPE_PREFIX_PATTERN = String.raw`(?:\\|\u001b)`;
 const SPACE_RUN_TRIGGER_THRESHOLD = LLM_MAX_CONSECUTIVE_IDENTICAL_CHARS + 1;
 const ESCAPE_TAG_SYMBOL_START_CLASS = 'A-Za-z${}|.!><^';
-const PROTECTED_B_TAG_PREFIX = '__protected_b_tag__';
+const PROTECTED_TAG_PREFIX = '__protected_encoded_tag__';
 const LONG_RUN_TAG_CONFIGS = Object.freeze([
     { tagId: 'sp', character: ' ' },
     { tagId: 'sw', character: '　' },
@@ -44,6 +45,7 @@ const cloneTagConfig = (config) => ({ ...config });
 export class TagManager {
     constructor(runtime) {
         this.runtime = runtime;
+        this.syntax = new TagSyntax();
         this.tagEntries = [];
         this.customParameterEntries = [];
         this.longRunEntries = [];
@@ -56,7 +58,7 @@ export class TagManager {
             reservedWidth: 0,
             extraPromptForLlm: SIMPLE_NEWLINE_PROMPT_DEFAULT,
             prePattern: /\n/g,
-            postPattern: /\[b=sn\]/g,
+            postPattern: this.syntax.pattern('sn', 'g'),
         };
         this.simpleNConfig = {
             requiredConsistency: true,
@@ -66,6 +68,13 @@ export class TagManager {
         this.spaceRunEntry = null;
         this.baseTagConfigs = TAG_CONFIGS.map(cloneTagConfig);
         this.customTagConfigs = [];
+        this.initializeTagRegistry();
+    }
+
+    setTagFormat(format) {
+        const syntax = new TagSyntax(format);
+        if (syntax.format === this.syntax.format) return;
+        this.syntax = syntax;
         this.initializeTagRegistry();
     }
 
@@ -133,7 +142,7 @@ export class TagManager {
             character,
             requiredConsistency: true,
             prePattern: new RegExp(`${escapedCharacter}{${SPACE_RUN_TRIGGER_THRESHOLD},}`, 'g'),
-            postPattern: new RegExp(String.raw`\[b=${tagId}(\d+)\]`, 'gi'),
+            postPattern: this.syntax.pattern(String.raw`${tagId}(\d+)`),
         };
     }
 
@@ -245,7 +254,7 @@ export class TagManager {
             reservedWidth: this.simpleNConfig.reservedWidth,
             extraPromptForLlm: this.simpleNConfig.extraPromptForLlm,
             prePattern: /\n/g,
-            postPattern: new RegExp(String.raw`\[b=${simpleNId}\]`, 'g'),
+            postPattern: this.syntax.pattern(simpleNId, 'g'),
         };
 
         this.longRunEntries = longRunTagConfigs.map((config, index) => {
@@ -388,8 +397,8 @@ export class TagManager {
                 tagId,
                 // Matches <Symbol:123>
                 prePattern: new RegExp(String.raw`<${escapedSymbol}:(\d+)>`, 'gi'),
-                // Same encoded form as escape-style numeric: [b=idN]
-                postPattern: new RegExp(String.raw`\[b=${tagId}(\d+)\]`, 'gi'),
+                // Same encoded form as escape-style numeric: ⟪TAG:idN⟫
+                postPattern: this.syntax.pattern(String.raw`${tagId}(\d+)`),
             };
         }
 
@@ -400,13 +409,13 @@ export class TagManager {
                 tagId,
                 // Matches <Symbol>
                 prePattern: new RegExp(`<${escapedSymbol}>`, 'gi'),
-                // Same encoded form as escape-style no-param: [b=id]
-                postPattern: new RegExp(String.raw`\[b=${tagId}\]`, 'gi'),
+                // Same encoded form as escape-style no-param: ⟪TAG:id⟫
+                postPattern: this.syntax.pattern(tagId),
             };
         }
 
         if (isXml && config.type === TAG_TYPE.WITH_CUSTOM_PARAMETER) {
-            // Original: <Symbol:value>  Encoded: [b=id<value>] (angle brackets for encoding)
+            // Original: <Symbol:value>  Encoded: ⟪TAG:id<value>⟫ (angle brackets for encoding)
             return {
                 ...config,
                 key,
@@ -415,7 +424,7 @@ export class TagManager {
                 bracketClose: '>', // encoding bracket close
                 // Matches <Symbol:anything-except-> >
                 prePattern: new RegExp(`<${escapedSymbol}:([^>]*)>`, 'gi'),
-                postPattern: new RegExp(String.raw`\[b=${tagId}<([^>]*)>\]`, 'gi'),
+                postPattern: this.syntax.pattern(`${tagId}<([^>]*)>`),
             };
         }
 
@@ -430,7 +439,7 @@ export class TagManager {
                     String.raw`${ESCAPE_PREFIX_PATTERN}${escapedSymbol}\[(\d+)\]`,
                     'gi'
                 ),
-                postPattern: new RegExp(String.raw`\[b=${tagId}(\d+)\]`, 'gi'),
+                postPattern: this.syntax.pattern(String.raw`${tagId}(\d+)`),
             };
         }
 
@@ -440,7 +449,7 @@ export class TagManager {
                 key,
                 tagId,
                 prePattern: new RegExp(`${ESCAPE_PREFIX_PATTERN}${escapedSymbol}`, 'gi'),
-                postPattern: new RegExp(String.raw`\[b=${tagId}\]`, 'gi'),
+                postPattern: this.syntax.pattern(tagId),
             };
         }
 
@@ -459,9 +468,8 @@ export class TagManager {
                     `${ESCAPE_PREFIX_PATTERN}${escapedSymbol}${escapedOpen}${valueCapture}${escapedClose}`,
                     'gi'
                 ),
-                postPattern: new RegExp(
-                    String.raw`\[b=${tagId}${escapedOpen}${valueCapture}${escapedClose}\]`,
-                    'gi'
+                postPattern: this.syntax.pattern(
+                    `${tagId}${escapedOpen}${valueCapture}${escapedClose}`
                 ),
             };
         }
@@ -473,7 +481,7 @@ export class TagManager {
                 key,
                 tagId,
                 prePattern: new RegExp(`<${escapedSymbol}>`, 'gi'),
-                postPattern: new RegExp(`\\[b=${tagId}\\]`, 'gi'),
+                postPattern: this.syntax.pattern(tagId),
             };
         }
 
@@ -488,9 +496,10 @@ export class TagManager {
         let result = text;
         const tagCounts = {};
         const caseMap = {
+            tagFormat: this.syntax.format,
             maskedByTagKey: {},
             expectedMaskedIdsByTagKey: {},
-            hasLiteralClosingBTag: text.includes('[/b]'),
+            hasLiteralClosingTag: text.includes(this.syntax.closingTag),
         };
 
         for (const entry of this.tagEntries) {
@@ -499,14 +508,14 @@ export class TagManager {
 
             if (entry.type === TAG_TYPE.WITH_NUMERIC_PARAMETER) {
                 result = result.replace(entry.prePattern, (_, param) => {
-                    return `[b=${entry.tagId}${param}]`;
+                    return this.syntax.encode(`${entry.tagId}${param}`);
                 });
                 continue;
             }
 
             if (entry.type === TAG_TYPE.WITHOUT_PARAMETER) {
                 result = result.replace(entry.prePattern, () => {
-                    return `[b=${entry.tagId}]`;
+                    return this.syntax.encode(`${entry.tagId}`);
                 });
                 continue;
             }
@@ -520,12 +529,16 @@ export class TagManager {
                         count: (result.match(entry.prePattern) || []).length,
                         text: result.replace(entry.prePattern, (_, paramValue) => {
                             if (!entry.maskValue) {
-                                return `[b=${entry.tagId}${entry.bracket}${paramValue}${entry.bracketClose}]`;
+                                return this.syntax.encode(
+                                    `${entry.tagId}${entry.bracket}${paramValue}${entry.bracketClose}`
+                                );
                             }
 
                             const nextMaskId = maskedValues.length;
                             maskedValues.push(paramValue);
-                            return `[b=${entry.tagId}${entry.bracket}${nextMaskId}${entry.bracketClose}]`;
+                            return this.syntax.encode(
+                                `${entry.tagId}${entry.bracket}${nextMaskId}${entry.bracketClose}`
+                            );
                         }),
                     };
                 } else {
@@ -534,12 +547,16 @@ export class TagManager {
                         entry,
                         (paramValue) => {
                             if (!entry.maskValue) {
-                                return `[b=${entry.tagId}${entry.bracket}${paramValue}${entry.bracketClose}]`;
+                                return this.syntax.encode(
+                                    `${entry.tagId}${entry.bracket}${paramValue}${entry.bracketClose}`
+                                );
                             }
 
                             const nextMaskId = maskedValues.length;
                             maskedValues.push(paramValue);
-                            return `[b=${entry.tagId}${entry.bracket}${nextMaskId}${entry.bracketClose}]`;
+                            return this.syntax.encode(
+                                `${entry.tagId}${entry.bracket}${nextMaskId}${entry.bracketClose}`
+                            );
                         }
                     );
                 }
@@ -557,13 +574,18 @@ export class TagManager {
             }
 
             if (entry.type === TAG_TYPE.XML) {
-                result = result.replace(entry.prePattern, () => `[b=${entry.tagId}]`);
+                result = result.replace(entry.prePattern, () =>
+                    this.syntax.encode(`${entry.tagId}`)
+                );
             }
         }
 
         const newlineMatches = result.match(this.simpleNEntry.prePattern) || [];
         tagCounts[this.simpleNEntry.key] = newlineMatches.length;
-        result = result.replace(this.simpleNEntry.prePattern, `[b=${this.simpleNEntry.tagId}]`);
+        result = result.replace(
+            this.simpleNEntry.prePattern,
+            this.syntax.encode(`${this.simpleNEntry.tagId}`)
+        );
 
         caseMap.expectedLongRunLengthsByTagKey = {};
         for (const entry of this.longRunEntries) {
@@ -572,7 +594,7 @@ export class TagManager {
             tagCounts[entry.key] = runMatches.length;
             result = result.replace(entry.prePattern, (run) => {
                 expectedRunLengths.push(run.length);
-                return `[b=${entry.tagId}${run.length}]`;
+                return this.syntax.encode(`${entry.tagId}${run.length}`);
             });
             caseMap.expectedLongRunLengthsByTagKey[entry.key] = expectedRunLengths;
         }
@@ -581,6 +603,13 @@ export class TagManager {
     }
 
     postprocessTags(text, tagCounts, caseMap) {
+        if (caseMap?.tagFormat && caseMap.tagFormat !== this.syntax.format) {
+            const parser = Object.create(this);
+            parser.syntax = new TagSyntax(caseMap.tagFormat);
+            parser.initializeTagRegistry();
+            return parser.postprocessTags(text, tagCounts, caseMap);
+        }
+
         if (typeof text !== 'string') {
             return {
                 text,
@@ -598,7 +627,7 @@ export class TagManager {
 
         if (
             strictResult.valid ||
-            strictResult.errorReason !== 'Unresolved escaped tags left in output ([b=...)'
+            strictResult.errorReason !== 'Unresolved encoded tags left in output'
         ) {
             return strictResult;
         }
@@ -610,7 +639,7 @@ export class TagManager {
                 continue;
             }
 
-            const tokenPrefix = `[b=${entry.tagId}${entry.bracket}`.toLowerCase();
+            const tokenPrefix = `${this.syntax.open}${entry.tagId}${entry.bracket}`.toLowerCase();
             const expectedCount = Number(tagCounts?.[entry.key] || 0);
             if (
                 expectedCount > 0 ||
@@ -654,7 +683,7 @@ export class TagManager {
             result = this.protectEncodedTagsInRanges(
                 result,
                 malformedCustomRanges,
-                PROTECTED_B_TAG_PREFIX
+                PROTECTED_TAG_PREFIX
             );
         }
 
@@ -754,7 +783,7 @@ export class TagManager {
 
         // LLMs sometimes insert raw line wraps inside escape-command chains
         // (e.g. "\\AA[FFF]\n\\FH[OFF]"). Remove only those literal wraps;
-        // intended newlines are still encoded as [b=..] at this stage.
+        // intended newlines are still encoded as ⟪TAG:…⟫ at this stage.
         result = this.repairLiteralLineWrapsAroundEscapeTags(result);
 
         // Keep only newlines that were explicitly preserved as safe tags.
@@ -784,13 +813,13 @@ export class TagManager {
             actualLongRunLengthsByTagKey[entry.key] = actualRunLengths;
         }
 
-        const originalHadClosingBTag = !!caseMap?.hasLiteralClosingBTag;
-        result = this.restoreProtectedEncodedTags(result, PROTECTED_B_TAG_PREFIX);
-        if (!originalHadClosingBTag && /\[\/b\]/i.test(result)) {
-            result = result.replace(/\[\/b\]/gi, '');
+        const originalHadClosingTag = !!caseMap?.hasLiteralClosingTag;
+        result = this.restoreProtectedEncodedTags(result, PROTECTED_TAG_PREFIX);
+        if (!originalHadClosingTag) {
+            result = result.replace(this.syntax.closingPattern(), '');
         }
 
-        let hasUnresolvedEscapedTag = /\[b=/i.test(result);
+        let hasUnresolvedEscapedTag = this.syntax.prefixPattern().test(result);
         if (hasUnresolvedEscapedTag && onlyLooseXmlTagIds instanceof Set) {
             hasUnresolvedEscapedTag = false;
             for (const entry of this.customParameterEntries) {
@@ -798,7 +827,8 @@ export class TagManager {
                     continue;
                 }
 
-                const tokenPrefix = `[b=${entry.tagId}${entry.bracket}`.toLowerCase();
+                const tokenPrefix =
+                    `${this.syntax.open}${entry.tagId}${entry.bracket}`.toLowerCase();
                 if (result.toLowerCase().includes(tokenPrefix)) {
                     hasUnresolvedEscapedTag = true;
                     break;
@@ -808,11 +838,18 @@ export class TagManager {
         if (hasUnresolvedEscapedTag) {
             // Keep every occurrence, including malformed/unclosed tokens. Offsets
             // refer to the postprocessed text and distinguish repeated tags.
-            const starts = [...result.matchAll(/\[b=/gi)].map((match) => match.index);
+            const completeTokens = new Map(
+                this.syntax.tokens(result).map((token) => [token.index, token])
+            );
+            const starts = [...result.matchAll(this.syntax.prefixPattern())].map(
+                (match) => match.index
+            );
             const unresolvedTags = starts.map((index, occurrence) => {
                 const next = starts[occurrence + 1] ?? result.length;
-                const closing = result.indexOf(']', index);
-                const end = closing >= 0 && closing < next ? closing + 1 : next;
+                const closing = result.indexOf(this.syntax.close, index);
+                const end =
+                    completeTokens.get(index)?.end ??
+                    (closing >= 0 && closing < next ? closing + 1 : next);
                 return {
                     tag: result.slice(index, end),
                     index,
@@ -831,7 +868,7 @@ export class TagManager {
             return {
                 text: result,
                 valid: false,
-                errorReason: 'Unresolved escaped tags left in output ([b=...)',
+                errorReason: 'Unresolved encoded tags left in output',
                 unresolvedTags,
                 expectedCounts: tagCounts,
                 actualCounts,
@@ -914,7 +951,7 @@ export class TagManager {
     }
 
     /**
-     * Validate that no unknown [b=...] tags were hallucinated
+     * Validate that no unknown ⟪TAG:…⟫ tags were hallucinated
      * @param {string} rawText - Original text with escape codes
      * @param {Object} originalPreprocessed - Original preprocessed result
      * @returns {Object} {valid, unknownTags[]}
@@ -924,21 +961,16 @@ export class TagManager {
             return { valid: true, unknownTags: [] };
         }
 
-        const originalTagPattern = /\[b=([^\]]+)\]/g;
-        const originalTags = new Set();
-        let match;
-        while ((match = originalTagPattern.exec(originalPreprocessed.preprocessedText)) !== null) {
-            originalTags.add(this.normalizeTagIdentity(match[1]));
-        }
-
-        const unknownTags = [];
-        const currentTagPattern = /\[b=([^\]]+)\]/g;
-        while ((match = currentTagPattern.exec(rawText)) !== null) {
-            const tag = match[1];
-            if (!originalTags.has(this.normalizeTagIdentity(tag))) {
-                unknownTags.push(tag);
-            }
-        }
+        const syntax = new TagSyntax(originalPreprocessed.caseMap?.tagFormat || this.syntax.format);
+        const originalTags = new Set(
+            syntax
+                .tokens(originalPreprocessed.preprocessedText)
+                .map((token) => this.normalizeTagIdentity(token.payload))
+        );
+        const unknownTags = syntax
+            .tokens(rawText)
+            .map((token) => token.payload)
+            .filter((tag) => !originalTags.has(this.normalizeTagIdentity(tag)));
 
         return {
             valid: unknownTags.length === 0,
@@ -980,7 +1012,7 @@ export class TagManager {
             return { text, count: 0 };
         }
 
-        const tokenPrefix = `[b=${entry.tagId}${entry.bracket}`.toLowerCase();
+        const tokenPrefix = `${this.syntax.open}${entry.tagId}${entry.bracket}`.toLowerCase();
         const source = text;
         const sourceLower = source.toLowerCase();
         const open = entry.bracket;
@@ -1000,7 +1032,8 @@ export class TagManager {
             output += source.slice(cursor, tokenStart);
             const openIndex = tokenStart + tokenPrefix.length - 1;
             const balanced = this.readBalancedValue(source, openIndex, open, close);
-            const hasStrictClosing = balanced && source[balanced.closeIndex + 1] === ']';
+            const hasStrictClosing =
+                balanced && source[balanced.closeIndex + 1] === this.syntax.close;
             const hasLooseXmlClosing =
                 allowLooseXmlCustomTagClosing &&
                 entry.style === TAG_STYLE.XML &&
@@ -1072,7 +1105,7 @@ export class TagManager {
         const allowLooseXmlCustomTagClosing = options?.allowLooseXmlCustomTagClosing === true;
 
         for (const entry of entries) {
-            const tokenPrefix = `[b=${entry.tagId}${entry.bracket}`.toLowerCase();
+            const tokenPrefix = `${this.syntax.open}${entry.tagId}${entry.bracket}`.toLowerCase();
             const source = text;
             const sourceLower = source.toLowerCase();
             const open = entry.bracket;
@@ -1087,7 +1120,8 @@ export class TagManager {
 
                 const openIndex = tokenStart + tokenPrefix.length - 1;
                 const balanced = this.readBalancedValue(source, openIndex, open, close);
-                const hasStrictClosing = balanced && source[balanced.closeIndex + 1] === ']';
+                const hasStrictClosing =
+                    balanced && source[balanced.closeIndex + 1] === this.syntax.close;
                 const hasLooseXmlClosing =
                     allowLooseXmlCustomTagClosing &&
                     entry.style === TAG_STYLE.XML &&
@@ -1147,7 +1181,7 @@ export class TagManager {
         for (const range of ranges) {
             output += text.slice(cursor, range.start);
             const segment = text.slice(range.start, range.end);
-            output += segment.replace(/\[b=/gi, `[${marker}=`);
+            output += segment.replace(this.syntax.prefixPattern(), `[${marker}=`);
             cursor = range.end;
         }
 
@@ -1161,7 +1195,7 @@ export class TagManager {
         }
 
         const restorePattern = new RegExp(String.raw`\[${escapeRegExp(marker)}=`, 'gi');
-        return text.replace(restorePattern, '[b=');
+        return text.replace(restorePattern, this.syntax.open);
     }
 
     replaceRawCustomTags(text, entry, replacementFactory) {
@@ -1283,7 +1317,7 @@ export class TagManager {
     /**
      * Get all tag entries whose `alwaysTranslate` flag is set and whose encoded pattern
      * appears in at least one of the provided preprocessed texts.
-     * Returns an array of `b=tagId` strings for use in the LLM prompt.
+     * Returns an array of `⟪TAG:tagId⟫` strings for use in the LLM prompt.
      * @param {string[]} preprocessedTexts
      * @returns {string[]}
      */
@@ -1294,9 +1328,9 @@ export class TagManager {
             if (!entry.alwaysTranslate) {
                 continue;
             }
-            const needle = `[b=${entry.tagId}`;
+            const needle = `${this.syntax.open}${entry.tagId}`;
             if (texts.some((t) => typeof t === 'string' && t.includes(needle))) {
-                result.push(`b=${entry.tagId}`);
+                result.push(this.syntax.encode(entry.tagId));
             }
         }
         return result;
@@ -1305,7 +1339,7 @@ export class TagManager {
     /**
      * Get all tag entries whose `alwaysAddToKnowledgeBase` flag is set and whose encoded
      * pattern appears in at least one of the provided preprocessed texts.
-     * Returns an array of `b=tagId` strings for use in the LLM prompt.
+     * Returns an array of `⟪TAG:tagId⟫` strings for use in the LLM prompt.
      * @param {string[]} preprocessedTexts
      * @returns {string[]}
      */
@@ -1316,9 +1350,9 @@ export class TagManager {
             if (!entry.alwaysAddToKnowledgeBase) {
                 continue;
             }
-            const needle = `[b=${entry.tagId}`;
+            const needle = `${this.syntax.open}${entry.tagId}`;
             if (texts.some((t) => typeof t === 'string' && t.includes(needle))) {
-                result.push(`b=${entry.tagId}`);
+                result.push(this.syntax.encode(entry.tagId));
             }
         }
         return result;
@@ -1326,7 +1360,7 @@ export class TagManager {
 
     /**
      * Collect additional prompt entries for tags that are present in preprocessed texts.
-     * Returns values formatted as "b=tagId - extraPromptText".
+     * Returns values formatted as "⟪TAG:tagId⟫ - extraPromptText".
      * @param {string[]} preprocessedTexts
      * @returns {string[]}
      */
@@ -1341,13 +1375,15 @@ export class TagManager {
                 continue;
             }
 
-            const needle = `[b=${entry.tagId}`;
+            const needle = `${this.syntax.open}${entry.tagId}`;
             if (!texts.some((t) => typeof t === 'string' && t.includes(needle))) {
                 continue;
             }
 
             const compactPrompt = extraPrompt.replace(/\s+/g, ' ').trim();
-            result.push(`b=${entry.tagId} - ${compactPrompt}`);
+            result.push(
+                `${this.syntax.encode(entry.tagId)} - ${this.syntax.formatPrompt(compactPrompt)}`
+            );
         }
 
         const newlinePrompt =
@@ -1356,10 +1392,16 @@ export class TagManager {
                 : '';
         if (
             newlinePrompt &&
-            texts.some((t) => typeof t === 'string' && t.includes(`[b=${this.simpleNEntry.tagId}]`))
+            texts.some(
+                (t) =>
+                    typeof t === 'string' &&
+                    t.includes(this.syntax.encode(`${this.simpleNEntry.tagId}`))
+            )
         ) {
             const compactPrompt = newlinePrompt.replace(/\s+/g, ' ').trim();
-            result.push(`b=${this.simpleNEntry.tagId} - ${compactPrompt}`);
+            result.push(
+                `${this.syntax.encode(this.simpleNEntry.tagId)} - ${this.syntax.formatPrompt(compactPrompt)}`
+            );
         }
 
         return result;

@@ -22,7 +22,7 @@ describe('TagManager simpleN stability', () => {
         expect(conflictEntry.tagId).not.toBe('sn');
     });
 
-    it('processes [b=sn] from llm output into a real newline', () => {
+    it('processes ⟪TAG:sn⟫ from llm output into a real newline', () => {
         const tagManager = new TagManager(null);
         tagManager.setCustomTagConfigs([
             {
@@ -34,7 +34,7 @@ describe('TagManager simpleN stability', () => {
         ]);
 
         const { tagCounts, caseMap } = tagManager.preprocessTags('Original line');
-        const post = tagManager.postprocessTags('Strike[b=sn]again', tagCounts, caseMap);
+        const post = tagManager.postprocessTags('Strike⟪TAG:sn⟫again', tagCounts, caseMap);
 
         expect(post.valid).toBe(true);
         expect(post.text).toBe('Strike\nagain');

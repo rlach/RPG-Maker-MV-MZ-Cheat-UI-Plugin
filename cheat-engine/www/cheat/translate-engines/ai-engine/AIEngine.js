@@ -1,3 +1,4 @@
+import { TagSyntax } from './TagSyntax.js';
 /**
  * AIEngine - Refactored Orchestrator
  * Coordinates translation pipeline using modular services
@@ -177,6 +178,12 @@ class AIEngine extends BaseTranslationEngine {
                         Number.isFinite(nextValue) && nextValue > 0
                             ? Math.max(1, Math.floor(nextValue))
                             : 30;
+                },
+            },
+            aiTagFormat: {
+                get: () => this.tagManager.syntax.format,
+                set: (value) => {
+                    this.tagManager.setTagFormat(value);
                 },
             },
             aiSystemPrompt: {
@@ -1061,21 +1068,25 @@ class AIEngine extends BaseTranslationEngine {
                                           );
                                           const exceptionsStr =
                                               tagExceptions.length > 0
-                                                  ? `, with exception of: ${tagExceptions.map((t) => `[b=${t.tagSymbol}] (${t.reservedWidth} chars)`).join(', ')}`
+                                                  ? `, with exception of: ${tagExceptions.map((t) => `⟪TAG:${t.tagSymbol}⟫ (${t.reservedWidth} chars)`).join(', ')}`
                                                   : '';
-                                          descBoxingPart = ` Keys ending with d are descriptions. They need to fit into ${maxRows} lines, each with up to ${widthInChars} chars. Tag [b=sn] represents newlines, and doesn't count to limit. Treat [b=sn] like white character when determining next word case and grammar of the sentence. Other tags have 0 width${exceptionsStr}.`;
+                                          descBoxingPart = ` Keys ending with d are descriptions. They need to fit into ${maxRows} lines, each with up to ${widthInChars} chars. Tag ⟪TAG:sn⟫ represents newlines, and doesn't count to limit. Treat ⟪TAG:sn⟫ like white character when determining next word case and grammar of the sentence. Other tags have 0 width${exceptionsStr}.`;
                                       }
                                   }
-                                  return `Translate video game text from ${sourceName} to ${targetName}. ${this.systemPrompt}${additionalTagInfoPart} Official name translations, they HAVE to be used for consistency with existing material, don't make up your own translations: ${nameHints}.${knowledgePromptPart} The names might contain additional info, like gender, in brackets. Use it for additional context.${alwaysTranslatePart}${kbaseInstructionPart}${alwaysKbasePart}${descBoxingPart}`;
+                                  return new TagSyntax(
+                                      itemData[0]?.caseMap?.tagFormat
+                                  ).formatPrompt(
+                                      `Translate video game text from ${sourceName} to ${targetName}. ${this.systemPrompt}${additionalTagInfoPart} Official name translations, they HAVE to be used for consistency with existing material, don't make up your own translations: ${nameHints}.${knowledgePromptPart} The names might contain additional info, like gender, in brackets. Use it for additional context.${alwaysTranslatePart}${kbaseInstructionPart}${alwaysKbasePart}${descBoxingPart}`
+                                  );
                               })(),
                     },
                     // {
                     //     role: 'user',
-                    //     content: `{"${TYPE_TO_TAG.text}0":"[b=na<テスト>]それはいいですね","${TYPE_TO_TAG.text}1":"[b=na<テスト>]情報\\nありがとうございます。"}`,
+                    //     content: `{"${TYPE_TO_TAG.text}0":"⟪TAG:na<テスト>⟫それはいいですね","${TYPE_TO_TAG.text}1":"⟪TAG:na<テスト>⟫情報\\nありがとうございます。"}`,
                     // },
                     // {
                     //     role: 'assistant',
-                    //     content: `{"${TYPE_TO_TAG.text}0":"[b=na<Test>]That's great","${TYPE_TO_TAG.text}1":"[b=na<Test>]Thank you for the information"}`,
+                    //     content: `{"${TYPE_TO_TAG.text}0":"⟪TAG:na<Test>⟫That's great","${TYPE_TO_TAG.text}1":"⟪TAG:na<Test>⟫Thank you for the information"}`,
                     // },
                     {
                         role: 'user',

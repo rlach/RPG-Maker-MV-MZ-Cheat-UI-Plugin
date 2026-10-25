@@ -27,8 +27,8 @@ describe('TagManager custom bracket balancing', () => {
         const { preprocessedText, tagCounts, caseMap } = tagManager.preprocessTags(input);
 
         // The malformed "\\N[11" must stay malformed; only valid "\\N[12]" should be encoded.
-        expect(preprocessedText.includes(String.raw`\N[11[b=wa12]`)).toBe(true);
-        expect(preprocessedText).not.toContain(String.raw`[b=cn[11[b=wa12]]`);
+        expect(preprocessedText.includes(String.raw`\N[11⟪TAG:wa12⟫`)).toBe(true);
+        expect(preprocessedText).not.toContain(String.raw`⟪TAG:cn[11⟪TAG:wa12⟫]`);
 
         const postResult = tagManager.postprocessTags(preprocessedText, tagCounts, caseMap);
 
@@ -64,19 +64,18 @@ describe('TagManager custom bracket balancing', () => {
             (entry) => entry.tagSymbol === 'N' && entry.bracket === '['
         );
         const numericNEntry = tagManager.tagEntries.find(
-            (entry) =>
-                entry.tagSymbol === 'N' && entry.type === TAG_TYPE.WITH_NUMERIC_PARAMETER
+            (entry) => entry.tagSymbol === 'N' && entry.type === TAG_TYPE.WITH_NUMERIC_PARAMETER
         );
 
         expect(customNEntry).toBeTruthy();
         expect(numericNEntry).toBeTruthy();
 
-        const malformedPacked = String.raw`"! [b=${customNEntry.tagId}[11[b=${numericNEntry.tagId}12]] ...!`;
+        const malformedPacked = String.raw`"! ⟪TAG:${customNEntry.tagId}[11⟪TAG:${numericNEntry.tagId}12⟫] ...!`;
         const postResult = tagManager.postprocessTags(malformedPacked, {}, {});
 
         expect(postResult.valid).toBe(false);
         expect(postResult.text).toContain(
-            String.raw`[b=${customNEntry.tagId}[11[b=${numericNEntry.tagId}12]]`
+            String.raw`⟪TAG:${customNEntry.tagId}[11⟪TAG:${numericNEntry.tagId}12⟫]`
         );
         expect(postResult.text).not.toContain(String.raw`\N[12]`);
     });

@@ -1,3 +1,4 @@
+import { TagSyntax } from '../translate-engines/ai-engine/TagSyntax.js';
 import { parseCacheKeyForLangPair } from '../js/TranslateCacheRuntime.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
 import { DEFAULT_BOXING_PROMPT, TAG_CONFIGS } from '../translate-engines/ai-engine/constants.js';
@@ -70,18 +71,18 @@ function makeObservable(value) {
     return value;
 }
 
-function buildBtagInfo() {
+function buildTagInfo() {
     // Find tags with reservedWidth > 0 (excluding simpleN/sn which is handled separately)
     const withWidth = TAG_CONFIGS.filter(
         (t) => typeof t.reservedWidth === 'number' && t.reservedWidth > 0
     );
 
     let base =
-        'You must not edit [b=...] tags. Tags with a <value> part (e.g. [b=na<Name>]) count as the length of their <value> in characters. All other [b=...] tags count as 0 characters';
+        'You must not edit ⟪TAG:...⟫ tags. Tags with a <value> part (e.g. ⟪TAG:na<Name>⟫) count as the length of their <value> in characters. All other ⟪TAG:...⟫ tags count as 0 characters';
 
     if (withWidth.length > 0) {
         const exceptions = withWidth
-            .map((t) => `[b=${t.tagSymbol}] (${t.reservedWidth} chars)`)
+            .map((t) => `⟪TAG:${t.tagSymbol}⟫ (${t.reservedWidth} chars)`)
             .join(', ');
         base += `, with exception of: ${exceptions}`;
     }
@@ -89,7 +90,13 @@ function buildBtagInfo() {
     return base + '.';
 }
 
-function buildBoxingSystemMessage(basePrompt, cacheTypes, widthInChars, maxRows) {
+function buildBoxingSystemMessage(
+    basePrompt,
+    cacheTypes,
+    widthInChars,
+    maxRows,
+    tagFormat = 'tags'
+) {
     const presentTypes = cacheTypes.filter((t) => t.endsWith('_description'));
 
     // Build type prefix hints for types present in the request
@@ -101,15 +108,15 @@ function buildBoxingSystemMessage(basePrompt, cacheTypes, widthInChars, maxRows)
         })
         .join(', ');
 
-    const btagInfo = buildBtagInfo();
+    const tagInfo = buildTagInfo();
 
     const dynamicSuffix =
         `\n\nBox size for descriptions is ${widthInChars}x${maxRows}.` +
         (typeHints ? `\n${typeHints}.` : '') +
-        `\n\n${btagInfo}`;
+        `\n\n${tagInfo}`;
 
     const promptBase = typeof basePrompt === 'string' ? basePrompt : DEFAULT_BOXING_PROMPT;
-    return promptBase + dynamicSuffix;
+    return new TagSyntax(tagFormat).formatPrompt(promptBase + dynamicSuffix);
 }
 
 function removeShortNewlines(text, maxCount) {
@@ -318,7 +325,8 @@ class BoxingService {
             this.state.llmPrompt,
             selectedTypes,
             boxingSettings.descriptionMaxLineWidth,
-            boxingSettings.descriptionMaxRows
+            boxingSettings.descriptionMaxRows,
+            runtime.engine.aiTagFormat
         );
 
         if (!runtime.beginNonOtfTranslationProcess('descriptions cleanup')) {

@@ -1,3 +1,4 @@
+import { TagSyntax, TAG_FORMAT_OPTIONS } from '../translate-engines/ai-engine/TagSyntax.js';
 import { getRowsPerPage, setRowsPerPage as setTableRowsPerPage } from '../js/TableSettings.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
 import { TAG_CONFIGS } from '../translate-engines/ai-engine/constants.js';
@@ -45,6 +46,19 @@ export default {
             Add tag
         </v-btn>
     </v-card-title>
+
+    <v-select
+        v-if="isAiEngine"
+        :value="_runtime.aiTagFormat"
+        :items="tagFormatOptions"
+        label="LLM tag format"
+        item-text="text"
+        item-value="value"
+        class="mx-4 mt-2"
+        dense outlined hide-details
+        @change="changeTagFormat"
+        @keydown.self.stop>
+    </v-select>
 
     <v-data-table
         class="mt-1 table-with-sticky-footer"
@@ -152,6 +166,7 @@ export default {
                 { text: 'Actions', value: 'actions', width: 80, sortable: false },
             ],
 
+            tagFormatOptions: TAG_FORMAT_OPTIONS,
             typeFilterOptions: [
                 { text: 'All', value: '' },
                 { text: 'default', value: 'default' },
@@ -279,6 +294,9 @@ export default {
     },
 
     methods: {
+        changeTagFormat(value) {
+            return this.callRuntime('onChangeAiTagFormat', value);
+        },
         refreshEntries() {
             const entries = [];
             const engine = this._runtime?.engine;
@@ -364,7 +382,7 @@ export default {
 
         formatTagDisplay(tag) {
             if (tag?._isSimpleNTag) {
-                return '[b=sn]';
+                return new TagSyntax(this._runtime?.engine?.aiTagFormat).encode('sn');
             }
 
             const sym = tag.tagSymbol || '?';

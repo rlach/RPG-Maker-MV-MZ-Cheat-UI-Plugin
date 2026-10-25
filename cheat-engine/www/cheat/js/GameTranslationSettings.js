@@ -21,6 +21,7 @@ export const GAME_TRANSLATION_SETTINGS_KEYS = Object.freeze([
 ]);
 
 export const GAME_TAG_SETTINGS_KEYS = Object.freeze([
+    'aiTagFormat',
     'aiCustomTags',
     'aiTagOverrides',
     'customTags',

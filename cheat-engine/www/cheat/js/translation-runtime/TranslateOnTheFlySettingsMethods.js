@@ -86,6 +86,7 @@ export const translateOnTheFlySettingsMethods = {
         store.updateSection(
             'tags',
             {
+                tagFormat: legacy.aiTagFormat ?? 'tags',
                 customTags: legacy.aiCustomTags ?? legacy.customTags ?? this.aiCustomTags ?? [],
                 tagOverrides: legacy.aiTagOverrides ?? legacy.tagOverrides ?? {},
             },
@@ -95,6 +96,7 @@ export const translateOnTheFlySettingsMethods = {
 
     applyGameTranslationEngineSettings() {
         const tags = this.getGameTranslationSettingsStore().read().tags || {};
+        if (this.engine?.tagManager) this.engine.aiTagFormat = tags.tagFormat || 'tags';
         this.engine?.setCustomTags?.(tags.customTags || []);
         this.engine?.setTagOverrides?.(tags.tagOverrides || {});
     },
@@ -110,6 +112,7 @@ export const translateOnTheFlySettingsMethods = {
         store.updateSection('translation', pickGameTranslationSettings(this));
         if (this.engine?.setCustomTags) {
             store.updateSection('tags', {
+                tagFormat: this.engine.aiTagFormat,
                 customTags: this.engine.customTags,
                 tagOverrides: this.engine.tagOverrides,
             });

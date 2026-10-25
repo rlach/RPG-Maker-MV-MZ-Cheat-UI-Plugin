@@ -3,13 +3,13 @@ import { TagManager } from '../../../../../../cheat-engine/www/cheat/translate-e
 
 it('identifies each unresolved occurrence including repeated and unclosed tags', () => {
     const manager = new TagManager(null);
-    const text = 'First [b=unknown] second [b=unknown] tail [B=broken';
+    const text = 'First ⟪TAG:unknown⟫ second ⟪TAG:unknown⟫ tail ⟪TAG:broken';
     const result = manager.postprocessTags(text, {}, {});
     expect(result.valid).toBe(false);
     expect(result.unresolvedTags.map(({ tag, index }) => ({ tag, index }))).toEqual([
-        { tag: '[b=unknown]', index: 6 },
-        { tag: '[b=unknown]', index: 25 },
-        { tag: '[B=broken', index: 42 },
+        { tag: '⟪TAG:unknown⟫', index: 6 },
+        { tag: '⟪TAG:unknown⟫', index: 27 },
+        { tag: '⟪TAG:broken', index: 46 },
     ]);
     for (const entry of result.unresolvedTags) {
         expect(result.text.slice(entry.index, entry.index + entry.tag.length)).toBe(entry.tag);

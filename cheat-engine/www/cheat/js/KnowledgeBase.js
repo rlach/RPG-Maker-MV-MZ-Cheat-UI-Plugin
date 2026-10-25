@@ -14,6 +14,8 @@
  * so it can be unit-tested without mocks.
  */
 
+import { containsTransportTags } from '../translate-engines/ai-engine/TagSyntax.js';
+
 // ---------------------------------------------------------------------------
 // Entry normalization
 // ---------------------------------------------------------------------------
@@ -397,6 +399,7 @@ export function buildKbaseInstruction() {
         'JSON it will be REJECTED. Add description only if you have additional ' +
         'context from the dialogue. Main focus should be key:translation pairs to ensure ' +
         'consistent naming convention. Description is optional and should be short, like ' +
+        'Never include escaped transport tags in a knowledge key, translation or description. ' +
         '"Capital name of SampleCountry".\n' +
         'Example:\n' +
         '"kbase": [{"key": "例題技法：例示的技法", "translation": "Example Technique of Examplatory Example", "description": "Special technique used by LLM ninja"}]'
@@ -432,14 +435,17 @@ export function extractKbaseEntries(translatedMap) {
         }
 
         const key = trimString(item.key);
-        if (!key) {
+        if (
+            !key ||
+            [item.key, item.translation, item.info, item.description].some(containsTransportTags)
+        ) {
             continue;
         }
 
         result.push({
             key,
             translation: trimString(item.translation),
-            info: trimString(item.description),
+            info: trimString(item.description) || trimString(item.info),
         });
     }
 

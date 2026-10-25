@@ -223,6 +223,6 @@ describe('AIEngine.addPluginTags: alwaysTranslate survives the full pipeline', (
         const ids = engine.tagManager.getAlwaysTranslateTagIds([preprocessedText]);
         expect(ids.length).toBe(1);
         const entry = engine.tagManager.tagEntries.find((e) => e.tagSymbol === 'NW');
-        expect(ids[0]).toBe(`b=${entry.tagId}`);
+        expect(ids[0]).toBe(`⟪TAG:${entry.tagId}⟫`);
     });
 });

@@ -338,7 +338,9 @@ describe('nameCacheMapToEntries', () => {
 
 describe('mergeEntriesByKey', () => {
     it('keeps primary entry when duplicate key exists in secondary list', () => {
-        const primary = [{ key: 'Phoenix Down', translation: 'Pióro Feniksa', info: 'KB', plugin: '' }];
+        const primary = [
+            { key: 'Phoenix Down', translation: 'Pióro Feniksa', info: 'KB', plugin: '' },
+        ];
         const secondary = [
             { key: 'Phoenix Down', translation: 'Phoenix Revive', info: '', plugin: '' },
             { key: 'Leather Armor', translation: 'Skorzana Zbroja', info: '', plugin: '' },
@@ -428,9 +430,7 @@ describe('extractKbaseEntries', () => {
             ],
         };
         const entries = extractKbaseEntries(translatedMap);
-        expect(entries).toEqual([
-            { key: 'NewName', translation: 'NewTrans', info: 'desc' },
-        ]);
+        expect(entries).toEqual([{ key: 'NewName', translation: 'NewTrans', info: 'desc' }]);
     });
 
     it('returns empty array when kbase is missing', () => {
@@ -506,4 +506,42 @@ describe('getKnowledgeFileName', () => {
     it('trims whitespace', () => {
         expect(getKnowledgeFileName(' ja ', ' en ')).toBe('knowledge.ja-en.json');
     });
+});
+
+describe('LLM knowledge transport-tag rejection', () => {
+    for (const field of ['key', 'translation', 'info', 'description']) {
+        it.each([
+            '[b=Name]',
+            '[B=Name',
+            '[/b]',
+            'b=Name',
+            '⟪TAG:Name⟫',
+            '⟪/TAG⟫',
+            '<<TAG:Name>>',
+            '<<tag:broken',
+        ])(`skips only an entry with ${field} containing %s`, (tag) => {
+            const response = {
+                m0: 'A valid translated message',
+                kbase: [
+                    { key: 'Bad', translation: 'Bad', [field]: `Before ${tag} after` },
+                    {
+                        key: '【カンディダ＝ローザ】',
+                        translation: '【Candida Rosa】',
+                        info: 'Light magic',
+                    },
+                    { key: 'Good', translation: 'Correct', description: 'A proper name' },
+                ],
+            };
+            expect(extractKbaseEntries(response)).toEqual([
+                {
+                    key: '【カンディダ＝ローザ】',
+                    translation: '【Candida Rosa】',
+                    info: 'Light magic',
+                },
+                { key: 'Good', translation: 'Correct', info: 'A proper name' },
+            ]);
+            stripKbaseFromMap(response);
+            expect(response).toEqual({ m0: 'A valid translated message' });
+        });
+    }
 });

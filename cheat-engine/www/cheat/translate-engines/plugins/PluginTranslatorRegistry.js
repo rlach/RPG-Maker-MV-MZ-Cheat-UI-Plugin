@@ -53,6 +53,7 @@ import { MessageWindowNarrowTranslator } from './translators/MessageWindowNarrow
 import { MessageAutoReplaceTranslator } from './translators/MessageAutoReplaceTranslator.js';
 import { SoRBattleRingCommandTranslator } from './translators/SoRBattleRingCommandTranslator.js';
 import { LLMenuScreenShopTranslator } from './translators/LLMenuScreenShopTranslator.js';
+import { CageOfOrderTranslator } from './translators/CageOfOrderTranslator.js';
 import { NameBoxNoUseTranslator } from './translators/NameBoxNoUseTranslator.js';
 import { MppChoiceExTranslator } from './translators/MppChoiceExTranslator.js';
 import { MppRemovoEquipTextTranslator } from './translators/MppRemovoEquipTextTranslator.js';
@@ -217,6 +218,7 @@ class PluginTranslatorRegistry {
             MessageAutoReplaceTranslator,
             SoRBattleRingCommandTranslator,
             LLMenuScreenShopTranslator,
+            CageOfOrderTranslator,
             MogBattleCommandsTranslator,
             MessagePExRiruTranslator,
             MiniInformationWindowTranslator,

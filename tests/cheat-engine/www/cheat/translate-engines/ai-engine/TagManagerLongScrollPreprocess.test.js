@@ -4,7 +4,7 @@ import { TagManager } from '../../../../../../cheat-engine/www/cheat/translate-e
 import { preprocessPayloadForLlm } from '../../../../../../cheat-engine/www/cheat/translate-engines/ai-engine/utils.js';
 
 describe('TagManager preprocess long scroll payload', () => {
-    it('builds JSON payload with m0 and shortens value after preprocessing', () => {
+    it('builds JSON payload with m0 and compresses long whitespace runs', () => {
         const sourceText = readFileSync(
             new URL('../../mocks/longScroll.mock.txt', import.meta.url),
             'utf8'
@@ -24,7 +24,10 @@ describe('TagManager preprocess long scroll payload', () => {
         const countWideSpaces = (str) => (str.match(/　/g) || []).length;
         expect(parsedPayload).toHaveProperty('m0');
         expect(typeof parsedPayload.m0).toBe('string');
-        expect(parsedPayload.m0.length).toBeLessThan(sourceText.length);
+        const uncompressedManager = new TagManager(null);
+        uncompressedManager.longRunEntries = [];
+        const uncompressed = uncompressedManager.preprocessTags(sourceText).preprocessedText;
+        expect(parsedPayload.m0.length).toBeLessThan(uncompressed.length);
         expect(countWideSpaces(sourceText)).to.eql(954);
         expect(countWideSpaces(parsedPayload.m0)).to.eql(14);
     });
@@ -34,10 +37,12 @@ describe('TagManager preprocess long scroll payload', () => {
         const tagManager = new TagManager(null);
 
         const { preprocessedText, tagCounts, caseMap } = tagManager.preprocessTags(sourceText);
-        const fullWidthSpaceEntry = tagManager.longRunEntries.find((entry) => entry.character === '　');
+        const fullWidthSpaceEntry = tagManager.longRunEntries.find(
+            (entry) => entry.character === '　'
+        );
 
         expect(fullWidthSpaceEntry).toBeTruthy();
-        expect(preprocessedText.includes(`[b=${fullWidthSpaceEntry.tagId}8]`)).toBe(true);
+        expect(preprocessedText.includes(`⟪TAG:${fullWidthSpaceEntry.tagId}8⟫`)).toBe(true);
 
         const postprocessed = tagManager.postprocessTags(preprocessedText, tagCounts, caseMap);
         expect(postprocessed.valid).toBe(true);

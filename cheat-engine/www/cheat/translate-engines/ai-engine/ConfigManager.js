@@ -1,3 +1,4 @@
+import { TAG_FORMAT_OPTIONS } from './TagSyntax.js';
 /**
  * ConfigManager
  * Configuration management and UI binding
@@ -323,6 +324,8 @@ export class ConfigManager {
             aiSystemPrompt: this.aiEngine.systemPrompt,
             aiFixRecursionMaxDepth: this.aiEngine._aiFixRecursionMaxDepth,
             useJsonFixer: this.aiEngine.useJsonFixer,
+            aiTagFormat: this.aiEngine.aiTagFormat,
+            aiTagFormatOptions: TAG_FORMAT_OPTIONS,
             aiCustomTags: this.aiEngine.customTags,
             aiTagOverrides: this.aiEngine.tagOverrides,
             aiCustomTagTypeOptions: this.aiEngine.customTagTypeOptions,
@@ -396,21 +399,18 @@ export class ConfigManager {
             onChangeAiReasoningEffort: this._createPersistedHandler((v) => {
                 this.aiEngine.reasoningEffort = v || 'none';
             }),
-            addAiCustomTag: this._createPersistedHandler(
-                (tagConfig) => {
-                    this.aiEngine.addCustomTag(tagConfig);
-                }
-            ),
-            updateAiCustomTag: this._createPersistedHandler(
-                (index, tagConfig) => {
-                    this.aiEngine.updateCustomTag(index, tagConfig);
-                }
-            ),
-            removeAiCustomTag: this._createPersistedHandler(
-                (index) => {
-                    this.aiEngine.removeCustomTag(index);
-                }
-            ),
+            onChangeAiTagFormat: this._createPersistedHandler((value) => {
+                this.aiEngine.aiTagFormat = value;
+            }),
+            addAiCustomTag: this._createPersistedHandler((tagConfig) => {
+                this.aiEngine.addCustomTag(tagConfig);
+            }),
+            updateAiCustomTag: this._createPersistedHandler((index, tagConfig) => {
+                this.aiEngine.updateCustomTag(index, tagConfig);
+            }),
+            removeAiCustomTag: this._createPersistedHandler((index) => {
+                this.aiEngine.removeCustomTag(index);
+            }),
             updateAiTagOverrides: this._createPersistedHandler(
                 (source, tagConfig, overrides, pluginName = '') => {
                     this.aiEngine.setOverrides(tagConfig, source, pluginName, overrides);

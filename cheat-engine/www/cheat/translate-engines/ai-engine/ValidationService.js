@@ -117,7 +117,8 @@ export class ValidationService {
             });
             const text = result?.text || '';
             const answer = JSON.parse(text);
-            if (typeof answer.isTranslated !== 'boolean') throw new Error('Invalid language validation response');
+            if (typeof answer.isTranslated !== 'boolean')
+                throw new Error('Invalid language validation response');
             const isTranslated = answer.isTranslated;
             return { isTranslated, confidence: 0.8 };
         } catch (e) {
@@ -127,7 +128,7 @@ export class ValidationService {
     }
 
     /**
-     * Validate that no unknown [b=...] tags were hallucinated
+     * Validate that no unknown encoded tags were hallucinated
      * @param {string} rawText - Final response text
      * @param {Object} originalPreprocessed - Original preprocessing result
      * @returns {Object} {valid, hallucinations[]}
@@ -137,29 +138,8 @@ export class ValidationService {
             return { valid: true, hallucinations: [] };
         }
 
-        // Extract all [b=...] tags from original preprocessed text
-        const originalTags = new Set();
-        const originalPattern = /\[b=([^\]]+)\]/g;
-        let match;
-
-        while ((match = originalPattern.exec(originalPreprocessed.preprocessedText)) !== null) {
-            originalTags.add(match[1]);
-        }
-
-        // Find any [b=...] tags in final text that weren't in original
-        const hallucinations = [];
-        const currentPattern = /\[b=([^\]]+)\]/g;
-        while ((match = currentPattern.exec(rawText)) !== null) {
-            const tag = match[1];
-            if (!originalTags.has(tag)) {
-                hallucinations.push(tag);
-            }
-        }
-
-        return {
-            valid: hallucinations.length === 0,
-            hallucinations,
-        };
+        const result = this.aiEngine.tagManager.validateUnknownTags(rawText, originalPreprocessed);
+        return { valid: result.valid, hallucinations: result.unknownTags };
     }
 
     /**

@@ -7,7 +7,7 @@ import { TAG_TYPE } from '../../../../../../cheat-engine/www/cheat/translate-eng
  * 1. \FF[...] is already registered (from LL_StandingPicture plugin)
  * 2. Text contains \FF\FF[nin_base] (bare \FF followed by \FF[nin_base])
  * 3. After preprocessing, bare \FF survives and the detector wrongly suggests \FF[…]
- *    by greedily consuming the encoded [b=...] bracket that follows
+ *    by greedily consuming the encoded ⟪TAG:...⟫ bracket that follows
  *
  * The detector should NOT suggest tags that already exist in the active tag config.
  * Additionally, when \FF[...] is known, \FF\FF[value] should parse the first \FF
@@ -162,9 +162,7 @@ describe('Unknown tag detector with LL_StandingPicture tags', () => {
 
         // Full scan pipeline (with filtering) should not report \FF[…]
         const results = scanForUnknownTags(tagManager, [input]);
-        const ffBracket = results.find(
-            (r) => r.pattern === '\\FF[…]' || r.pattern === '\\FF[N]'
-        );
+        const ffBracket = results.find((r) => r.pattern === '\\FF[…]' || r.pattern === '\\FF[N]');
         expect(ffBracket).toBeUndefined();
     });
 });
