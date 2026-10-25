@@ -1,4 +1,5 @@
 import { parse } from '../../../libs/acorn.js';
+import { parseJsonSafely } from './TranslatorHelpers.js';
 
 // Acorn 8.16.0 (MIT) reads syntax only. Never evaluate or rewrite game scripts.
 const JAPANESE = /[\u3040-\u30ff\u3400-\u9fff]/;
@@ -72,6 +73,8 @@ export function extractJavaScriptTextCatalog(source) {
 
     function add(text, parts = null) {
         if (typeof text !== 'string' || !text.trim()) return;
+        const nested = parseJsonSafely(text, text);
+        if (nested && typeof nested === 'object') return;
         if (
             /\.(?:png|webp|jpg|ogg|m4a|json|js)(?:$|[?#])/i.test(text) ||
             /^(?:img|audio|story)\//i.test(text)

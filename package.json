@@ -11,6 +11,7 @@
         "lint:fix": "eslint ./cheat-engine/www --ext .js,.vue --fix",
         "check:duplicates": "node ./scripts/check-duplicates.mjs",
         "check:duplicates:strict": "node ./scripts/check-duplicates.mjs --strict",
+        "check:translators": "node ./scripts/check-translators.mjs",
         "test": "vitest run",
         "test:watch": "vitest"
     },

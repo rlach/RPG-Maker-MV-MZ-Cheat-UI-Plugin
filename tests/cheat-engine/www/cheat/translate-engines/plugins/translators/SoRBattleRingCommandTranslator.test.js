@@ -29,6 +29,19 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 it.each([
+    ['Magic', '魔法'],
+    ['Special Move', '必殺技'],
+])('ignores harvested identity command entries for %s', (translated, original) => {
+    runtime.translationCache.set(`command:ja-en-${translated}`, translated);
+    translator.enablePluginTranslation();
+    for (const suffix of ['', '_disabled']) {
+        expect(ImageManager.loadBattleCommandSprite(`Com_${translated}${suffix}`).filename).toBe(
+            `Com_${original}${suffix}`
+        );
+    }
+});
+
+it.each([
     ['Attack', '攻撃'],
     ['Defend', '防御'],
     ['Run', '逃げる'],

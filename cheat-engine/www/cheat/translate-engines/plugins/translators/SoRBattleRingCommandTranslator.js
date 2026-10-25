@@ -29,6 +29,10 @@ export class SoRBattleRingCommandTranslator extends BasePluginTranslator {
                 if (!key.startsWith(prefix) || !this.isUsableText(translated)) continue;
                 const source = key.slice(prefix.length);
                 if (!source || translated.trim() !== name.trim()) continue;
+                // Command harvesting can record an already translated skill
+                // label as an identity entry (Magic -> Magic). It is not a
+                // reverse mapping and must not conflict with 魔法 -> Magic.
+                if (source.trim() === translated.trim()) continue;
                 // A shared translated label must not select an arbitrary asset.
                 if (original !== undefined && original !== source) return name;
                 original = source;

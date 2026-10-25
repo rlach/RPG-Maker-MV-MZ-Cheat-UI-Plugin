@@ -36,7 +36,12 @@ export class RetryHandler {
         }
 
         if (strategy === 'askAIToFix') {
-            return this.retryJsonRepair(previousResponse, 0, isBackgroundJob, (itemData || []).map((item) => item.jsonKey || item.id));
+            return this.retryJsonRepair(
+                previousResponse,
+                0,
+                isBackgroundJob,
+                (itemData || []).map((item) => item.jsonKey || item.id)
+            );
         }
 
         if (strategy === 'useJsonFixer') {
@@ -69,12 +74,20 @@ export class RetryHandler {
                 },
             ];
 
-            const originalInput = [...(payload.messages || [])].reverse().find((message) =>
-                message.role === 'user' && typeof message.content === 'string');
+            const originalInput = [...(payload.messages || [])]
+                .reverse()
+                .find((message) => message.role === 'user' && typeof message.content === 'string');
             const source = StreamJsonParser.scanTopLevelObjects(originalInput?.content || '');
-            const expectedKeys = [...new Set(source.objects.flatMap((entry) =>
-                StreamJsonParser.parseTopLevelKeys(entry.text).keys))];
-            const result = await this.aiEngine.requestChatCompletion(feedbackPayload, { expectedKeys });
+            const expectedKeys = [
+                ...new Set(
+                    source.objects.flatMap(
+                        (entry) => StreamJsonParser.parseTopLevelKeys(entry.text).keys
+                    )
+                ),
+            ];
+            const result = await this.aiEngine.requestChatCompletion(feedbackPayload, {
+                expectedKeys,
+            });
             return { ok: !!result, response: result };
         } catch (e) {
             return { ok: false, error: e.message };
@@ -118,9 +131,14 @@ export class RetryHandler {
                 // Repair does not have the original batch schema. The request
                 // output budget still applies independently of JSON validation.
                 monitorJson: false,
-                responseSchema: translationResponseSchema(expectedKeys.length ? expectedKeys : StreamJsonParser.parseTopLevelKeys(candidate).keys, {
-                    allowKnowledgeBase: !!this.aiEngine.runtime?.askLlmToAddToKnowledge,
-                }),
+                responseSchema: translationResponseSchema(
+                    expectedKeys.length
+                        ? expectedKeys
+                        : StreamJsonParser.parseTopLevelKeys(candidate).keys,
+                    {
+                        allowKnowledgeBase: !!this.aiEngine.runtime?.askLlmToAddToKnowledge,
+                    }
+                ),
             });
 
             if (!result || !result.text) {
