@@ -1,5 +1,12 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
+import { TAG_TYPE } from '../../ai-engine/constants.js';
+import {
+    withTranslatedNotification,
+    isNotificationTranslationHandled,
+    isKnownDisplayTranslation,
+    rememberDisplayTranslation,
+} from '../NotificationTranslationContext.js';
 
 const CACHE_TYPE = 'plugin_torigoya_notify_message';
 const RUNTIME_HOOK_GUARD = '__CHEAT_TORIGOYA_NOTIFY_MESSAGE_TRANSLATOR_HOOKED__';
@@ -33,24 +40,16 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
     }
 
     translateRuntimeText(text, runtime) {
-        if (typeof text !== 'string' || !text.trim()) {
+        if (
+            !this.isUsableText(text) ||
+            !this.isRuntimeTranslationActive(runtime) ||
+            isNotificationTranslationHandled() ||
+            isKnownDisplayTranslation(runtime, text)
+        )
             return text;
-        }
-
-        if (!runtime) {
-            return text;
-        }
-
-        const cacheKey = runtime.getCacheKey(text, this.getCacheType());
-
-        runtime.trackCacheKeyUsage(cacheKey);
-
-        if (!runtime.hasUsableCacheValue(cacheKey)) {
-            return text;
-        }
-
-        const cached = runtime.translationCache.get(cacheKey);
-        return typeof cached === 'string' && cached.trim() ? cached : text;
+        const translated = this.resolveRuntimeTranslation(text, runtime);
+        if (translated !== text) rememberDisplayTranslation(runtime, translated);
+        return translated;
     }
 
     enablePluginTranslation() {
@@ -58,35 +57,91 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
             return true;
         }
 
-        const notifyWindowClass =
-            window.Torigoya?.NotifyMessageZ?.Window || window.Torigoya?.NotifyMessage?.Window;
+        const namespace = window.Torigoya?.NotifyMessageZ || window.Torigoya?.NotifyMessage;
+        const notifyWindowClass = namespace?.Window;
+        const manager = namespace?.Manager;
+        const addon = namespace?.Addons?.GetItem;
+        const addonEnabled =
+            this.findPluginEntry('TorigoyaMZ_NotifyMessage_AddonGetItem')?.status ||
+            this.findPluginEntry('TorigoyaMZ_NotifyMessageZ_AddonGetItem')?.status;
 
         if (
             !notifyWindowClass?.prototype ||
-            typeof notifyWindowClass.prototype.setup !== 'function'
+            typeof notifyWindowClass.prototype.setup !== 'function' ||
+            typeof manager?.notify !== 'function' ||
+            (addonEnabled &&
+                (typeof addon?.notifyGainItem !== 'function' ||
+                    typeof addon?.notifyGainMoney !== 'function'))
         ) {
             return false;
         }
 
+        this.registerPluginCustomTags(
+            ['name', 'count', 'gold'].map((tagSymbol) => ({
+                tagSymbol,
+                type: TAG_TYPE.WITHOUT_PARAMETER,
+                requiredConsistency: true,
+                description:
+                    'Torigoya GetItem formatter token; replaced before notification rendering.',
+            }))
+        );
         const originalSetup = notifyWindowClass.prototype.setup;
         const getTranslatedText = (text) => this.translateRuntimeText(text, this.getRuntime());
-
-        // setup receives the raw notify item right before rendering.
-        // Translating only the message payload here keeps command names untouched.
+        // Render a view with a stable message while openness and other animation
+        // properties continue to refer to the original item. Never overwrite it.
         notifyWindowClass.prototype.setup = function (notifyItem) {
-            try {
-                if (typeof notifyItem?.message === 'string' && notifyItem.message.trim()) {
-                    notifyItem.message = getTranslatedText(notifyItem.message);
-                }
-            } catch (error) {
-                console.warn(
-                    '[TorigoyaNotifyMessageTranslator] Failed to apply cached translation',
-                    error
-                );
-            }
-
-            return originalSetup.call(this, notifyItem);
+            if (!notifyItem) return originalSetup.call(this, notifyItem);
+            let message = getTranslatedText(notifyItem.message);
+            const view = new Proxy(notifyItem, {
+                get(target, key, receiver) {
+                    return key === 'message' ? message : Reflect.get(target, key, receiver);
+                },
+                set(target, key, value, receiver) {
+                    if (key === 'message') {
+                        message = value;
+                        return true;
+                    }
+                    return Reflect.set(target, key, value, receiver);
+                },
+            });
+            return originalSetup.call(this, view);
         };
+
+        // Translate the complete source before modified builds split it into lines.
+        const notify = manager.notify;
+        manager.notify = function (item, ...args) {
+            if (!item) return notify.call(this, item, ...args);
+            const source = item.message;
+            item.message = getTranslatedText(source);
+            try {
+                return withTranslatedNotification(() => notify.call(this, item, ...args));
+            } finally {
+                item.message = source;
+            }
+        };
+        if (addon) {
+            for (const [method, fields] of [
+                ['notifyGainItem', ['baseGainSingleMessage', 'baseGainMultiMessage']],
+                ['notifyGainMoney', ['baseGainMoneyMessage']],
+            ]) {
+                if (typeof addon[method] !== 'function') continue;
+                const original = addon[method];
+                addon[method] = function (...args) {
+                    const selected = fields.length === 2 ? [fields[args[1] === 1 ? 0 : 1]] : fields;
+                    const source = selected.map((field) => this.parameter[field]);
+                    selected.forEach((field, index) => {
+                        this.parameter[field] = getTranslatedText(source[index]);
+                    });
+                    try {
+                        return withTranslatedNotification(() => original.apply(this, args));
+                    } finally {
+                        selected.forEach((field, index) => {
+                            this.parameter[field] = source[index];
+                        });
+                    }
+                };
+            }
+        }
 
         window[RUNTIME_HOOK_GUARD] = true;
         return true;
@@ -122,6 +177,16 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
 
     async buildScanEntries() {
         const entries = [];
+        const addon = (window.Torigoya?.NotifyMessageZ || window.Torigoya?.NotifyMessage)?.Addons
+            ?.GetItem;
+        for (const field of [
+            'baseGainSingleMessage',
+            'baseGainMultiMessage',
+            'baseGainMoneyMessage',
+        ]) {
+            const text = addon?.parameter?.[field];
+            if (this.isUsableText(text)) entries.push({ text, source: { scope: 'addon', field } });
+        }
         this.collectCommonEventEntries(entries);
         this.collectTroopEntries(entries);
         await this.collectMapEntries(entries);
@@ -256,7 +321,10 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
 
     extractMZNotifyEntry(cmd) {
         const parameters = Array.isArray(cmd.parameters) ? cmd.parameters : [];
-        const pluginName = String(parameters[0] || '').trim();
+        const pluginName = String(parameters[0] || '')
+            .trim()
+            .split(/[\\/]/)
+            .pop();
         const commandName = String(parameters[1] || '').trim();
         const args = this.normalizeArgsObject(parameters[3]);
         const message = args && typeof args.message === 'string' ? args.message : '';

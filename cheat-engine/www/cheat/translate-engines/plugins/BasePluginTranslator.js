@@ -456,6 +456,19 @@ export class BasePluginTranslator extends BasePhase {
         return missValue;
     }
 
+    /** Resolve custom message windows through the standard portrait/legacy lookup. */
+    resolveRuntimeMessageTranslation(text, runtime = this.getRuntime(), options = {}) {
+        if (!this.isUsableText(text) || !this.isRuntimeTranslationActive(runtime)) return text;
+        const preferred = runtime.getPreferredMessageCacheEntry(text, options);
+        if (this.isUsableText(preferred?.value)) return preferred.value;
+        runtime.trackCacheKeyUsage(runtime.getMessageCacheKey(text, options));
+        return options.fallbackCacheTypes?.length
+            ? this.resolveRuntimeTranslation(text, runtime, options.fallbackCacheTypes, {
+                  harvestMissing: false,
+              })
+            : text;
+    }
+
     isRuntimeTranslationActive(runtime = this.getRuntime()) {
         if (!runtime) {
             return false;

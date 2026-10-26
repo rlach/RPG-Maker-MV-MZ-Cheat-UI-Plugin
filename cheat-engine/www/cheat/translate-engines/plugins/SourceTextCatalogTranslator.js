@@ -1,6 +1,5 @@
 import { BasePluginTranslator } from './BasePluginTranslator.js';
 import { parseJsonSafely, walkNestedJsonLike } from './translators/TranslatorHelpers.js';
-import { loadMapDataById } from '../../js/translation-runtime/ObjectTranslationModalMethods.js';
 import { TAG_TYPE, TAG_STYLE, TAG_BRACKET } from '../ai-engine/constants.js';
 
 const DYNAMIC_VALUE_TAG = {
@@ -42,7 +41,7 @@ export class SourceTextCatalogTranslator extends BasePluginTranslator {
                 if (!plugin?.status) return;
                 const response = await fetch(`js/plugins/${plugin.name}.js`);
                 if (!response.ok) throw new Error(`Cannot read ${plugin.name}: ${response.status}`);
-                const catalog = extractJavaScriptTextCatalog(await response.text());
+                const catalog = this.collectSourceCatalog(await response.text(), name);
                 for (const entry of catalog.entries)
                     if (!this.entries.has(entry.text))
                         this.entries.set(entry.text, { ...entry, plugin: name });
@@ -51,28 +50,34 @@ export class SourceTextCatalogTranslator extends BasePluginTranslator {
         );
         // Detection can precede database initialization. Read source files in
         // that case instead of permanently caching an empty event scan.
-        const [commonEvents, mapInfos] = await Promise.all(
-            [
-                ['CommonEvents', window.$dataCommonEvents],
-                ['MapInfos', window.$dataMapInfos],
-            ].map(async ([name, existing]) => {
-                if (Array.isArray(existing)) return existing;
-                const response = await fetch(`data/${name}.json`);
-                if (!response.ok) throw new Error(`Cannot read ${name}: ${response.status}`);
-                const data = parseJsonSafely(await response.text());
-                if (!Array.isArray(data)) throw new Error(`Invalid ${name} data`);
-                return data;
-            })
-        );
-        for (const event of commonEvents) this.collectCommandTexts(event?.list);
-        for (const mapInfo of mapInfos) {
-            if (!mapInfo?.id) continue;
-            const map = await loadMapDataById(mapInfo.id);
-            for (const text of [mapInfo.name, map.displayName]) {
-                if (this.isUsableText(text)) this.entries.set(text, { text });
+        if (this.shouldScanEventData()) {
+            // Keep registry initialization independent of the object-translation
+            // UI/batch-manager module graph. Loading map data is scan-time work.
+            const { loadMapDataById } =
+                await import('../../js/translation-runtime/ObjectTranslationModalMethods.js');
+            const [commonEvents, mapInfos] = await Promise.all(
+                [
+                    ['CommonEvents', window.$dataCommonEvents],
+                    ['MapInfos', window.$dataMapInfos],
+                ].map(async ([name, existing]) => {
+                    if (Array.isArray(existing)) return existing;
+                    const response = await fetch(`data/${name}.json`);
+                    if (!response.ok) throw new Error(`Cannot read ${name}: ${response.status}`);
+                    const data = parseJsonSafely(await response.text());
+                    if (!Array.isArray(data)) throw new Error(`Invalid ${name} data`);
+                    return data;
+                })
+            );
+            for (const event of commonEvents) this.collectCommandTexts(event?.list);
+            for (const mapInfo of mapInfos) {
+                if (!mapInfo?.id) continue;
+                const map = await loadMapDataById(mapInfo.id);
+                for (const text of [mapInfo.name, map.displayName]) {
+                    if (this.isUsableText(text)) this.entries.set(text, { text });
+                }
+                for (const event of map.events || [])
+                    for (const page of event?.pages || []) this.collectCommandTexts(page.list);
             }
-            for (const event of map.events || [])
-                for (const page of event?.pages || []) this.collectCommandTexts(page.list);
         }
         await this.collectAdditionalTexts();
         this.templates = [...this.entries.values()]
@@ -85,13 +90,19 @@ export class SourceTextCatalogTranslator extends BasePluginTranslator {
                 fixedLength: entry.parts.join('').length,
             }))
             .sort((a, b) => b.fixedLength - a.fixedLength);
-        const fragments = [...this.entries.keys()].filter(
-            (text) => !text.includes('\n') && !text.includes('\\COT[') && text.length >= 2
-        );
+        const fragments = [...this.entries.keys()].filter((text) => this.isDisplayFragment(text));
         fragments.sort((a, b) => b.length - a.length);
         this.fragmentPattern = fragments.length
             ? new RegExp(fragments.map(escapeCatalogPattern).join('|'), 'g')
             : null;
+    }
+
+    isDisplayFragment(text) {
+        return !text.includes('\n') && !text.includes('\\COT[') && text.length >= 2;
+    }
+
+    shouldScanEventData() {
+        return true;
     }
 
     collectParameterTexts(parameters) {
@@ -107,6 +118,10 @@ export class SourceTextCatalogTranslator extends BasePluginTranslator {
             if (parseJsonSafely(value, value) !== value) return;
             this.entries.set(value, { text: value });
         });
+    }
+
+    collectSourceCatalog(source) {
+        return this.extractCatalog(source);
     }
 
     async collectAdditionalTexts() {

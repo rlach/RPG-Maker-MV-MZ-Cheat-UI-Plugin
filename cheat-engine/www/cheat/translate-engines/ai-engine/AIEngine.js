@@ -296,12 +296,11 @@ class AIEngine extends BaseTranslationEngine {
             .filter(Boolean);
     }
 
-    findFirstBannedPhrase(text, bannedPhrases = this.getBannedPhrasesList()) {
+    findFirstBannedPhrase(text, bannedPhrases = this.getBannedPhrasesList(), sourceText = '') {
         if (typeof text !== 'string' || !text || !Array.isArray(bannedPhrases)) {
             return null;
         }
 
-        const lower = text.toLowerCase();
         for (const phrase of bannedPhrases) {
             if (typeof phrase !== 'string') {
                 continue;
@@ -310,7 +309,11 @@ class AIEngine extends BaseTranslationEngine {
             if (!normalized) {
                 continue;
             }
-            if (lower.includes(normalized.toLowerCase())) {
+            const key = normalized.toLowerCase();
+            if (
+                StreamGuardrails.countPhraseOccurrences(text, key) >
+                StreamGuardrails.countPhraseOccurrences(sourceText, key)
+            ) {
                 return normalized;
             }
         }
@@ -1371,7 +1374,11 @@ class AIEngine extends BaseTranslationEngine {
                     continue;
                 }
 
-                const bannedPhraseHit = this.findFirstBannedPhrase(rawSlice, bannedPhrases);
+                const bannedPhraseHit = this.findFirstBannedPhrase(
+                    rawSlice,
+                    bannedPhrases,
+                    itemD.preprocessed
+                );
                 if (bannedPhraseHit) {
                     failures.push({
                         ...itemD,

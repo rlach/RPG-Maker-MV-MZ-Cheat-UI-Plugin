@@ -16,6 +16,12 @@ import { FtkrItemCompositionSystemTranslator } from './translators/FtkrItemCompo
 import { FtkrSkillExpansionTranslator } from './translators/FTKRSkillExpansionTranslator.js';
 import { FtkrSkillTreeSystemTranslator } from './translators/FtkrSkillTreeSystemTranslator.js';
 import { FtkrMessageWindowLinesTranslator } from './translators/FTKRMessageWindowLinesTranslator.js';
+import { FtkrExMessageWindowTranslator } from './translators/FtkrExMessageWindowTranslator.js';
+import { FtkrPopupSpriteMessageTranslator } from './translators/FtkrPopupSpriteMessageTranslator.js';
+import { TmSimpleWindowTranslator } from './translators/TmSimpleWindowTranslator.js';
+import { AyatamQuestTranslator } from './translators/AyatamQuestTranslator.js';
+import { EventUiTextTranslator } from './translators/EventUiTextTranslator.js';
+import { InazumaForestiaTranslator } from './translators/InazumaForestiaTranslator.js';
 import { CbrEroStatusMvTranslator } from './translators/CbrEroStatusMvTranslator.js';
 import { DarkPlasmaCharacterTextTranslator } from './translators/DarkPlasmaCharacterTextTranslator.js';
 import { DescriptionExtendTranslator } from './translators/DescriptionExtendTranslator.js';
@@ -174,6 +180,12 @@ class PluginTranslatorRegistry {
             FtkrSkillExpansionTranslator,
             FtkrSkillTreeSystemTranslator,
             FtkrMessageWindowLinesTranslator,
+            FtkrExMessageWindowTranslator,
+            FtkrPopupSpriteMessageTranslator,
+            TmSimpleWindowTranslator,
+            AyatamQuestTranslator,
+            EventUiTextTranslator,
+            InazumaForestiaTranslator,
             CbrEroStatusMvTranslator,
             DarkPlasmaCharacterTextTranslator,
             DescriptionExtendTranslator,

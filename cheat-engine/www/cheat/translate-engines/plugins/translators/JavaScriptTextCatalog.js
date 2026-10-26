@@ -15,6 +15,36 @@ const keyName = (node) => node?.name ?? node?.value ?? '';
 const memberName = (node) => (node?.type === 'MemberExpression' ? keyName(node.property) : '');
 export const escapeCatalogPattern = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/** Read literal tables only; calls, getters and computed expressions are never executed. */
+export function readJavaScriptLiteralData(source, names) {
+    const bindings = {};
+    const objects = [];
+    function literal(node) {
+        if (node?.type === 'Literal') return node.value;
+        if (node?.type === 'ArrayExpression') return node.elements.map(literal);
+        if (node?.type !== 'ObjectExpression') return undefined;
+        const result = Object.create(null);
+        for (const property of node.properties) {
+            if (property.type !== 'Property' || property.computed || property.kind !== 'init')
+                continue;
+            result[keyName(property.key)] = literal(property.value);
+        }
+        return result;
+    }
+    function visit(node) {
+        if (!node || typeof node !== 'object') return;
+        if (node.type === 'VariableDeclarator' && names.includes(node.id.name))
+            bindings[node.id.name] = literal(node.init);
+        if (node.type === 'ObjectExpression') objects.push(literal(node));
+        for (const child of Object.values(node)) {
+            if (Array.isArray(child)) child.forEach(visit);
+            else if (child && typeof child === 'object') visit(child);
+        }
+    }
+    visit(parse(source, { ecmaVersion: 'latest', allowReturnOutsideFunction: true }));
+    return { bindings, objects };
+}
+
 function excluded(ancestors) {
     return ancestors.some((node) => {
         if (node.type === 'Property')

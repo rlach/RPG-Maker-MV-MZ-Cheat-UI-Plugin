@@ -3,9 +3,17 @@ import {
     extractMessageEntryAt,
 } from '../../../js/EventCommandTraversal.js';
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
+import { parseJsonSafely } from './TranslatorHelpers.js';
 
 const SCENARIO_FILE_NAME = 'Scenario.json';
 
+/**
+ * Saba SimpleScenario (MV) and its Nore_Tes MZ port (RJ01036605, March 2023).
+ * Both execute named event-command lists from $dataScenario. Nore loads the
+ * compiled scenario/Scenario.json rather than data/Scenario.json; scenarioFolder
+ * configures authoring sources, not the compiled runtime database location.
+ * Use standard message/choice/speaker cache types so existing translations work.
+ */
 export class SabaSimpleScenarioTranslator extends BasePluginTranslator {
     constructor() {
         super();
@@ -21,7 +29,11 @@ export class SabaSimpleScenarioTranslator extends BasePluginTranslator {
     }
 
     getPluginLabel() {
-        return 'Saba SimpleScenario';
+        return 'Saba SimpleScenario / Nore TES';
+    }
+
+    getPluginAliases() {
+        return [this.getPluginName(), 'Nore_Tes'];
     }
 
     getCacheType() {
@@ -105,10 +117,6 @@ export class SabaSimpleScenarioTranslator extends BasePluginTranslator {
     }
 
     async precomputeCounts() {
-        if (!this.ensureDetection()) {
-            return;
-        }
-
         if (this._scanPrepared) {
             return;
         }
@@ -228,6 +236,13 @@ export class SabaSimpleScenarioTranslator extends BasePluginTranslator {
 
     loadScenarioDataFromDataFile() {
         const dataManager = globalThis.DataManager;
+        if (
+            this.findPluginEntry('Nore_Tes')?.status &&
+            typeof dataManager?.loadScenarioFile === 'function'
+        ) {
+            return this.loadScenarioDataViaDataManager(dataManager, 'loadScenarioFile');
+        }
+        if (this.findPluginEntry('Nore_Tes')?.status) return this.loadScenarioDataViaXhr();
         if (dataManager && typeof dataManager.loadDataFile === 'function') {
             return this.loadScenarioDataViaDataManager(dataManager);
         }
@@ -235,7 +250,7 @@ export class SabaSimpleScenarioTranslator extends BasePluginTranslator {
         return this.loadScenarioDataViaXhr();
     }
 
-    loadScenarioDataViaDataManager(dataManager) {
+    loadScenarioDataViaDataManager(dataManager, method = 'loadDataFile') {
         return new Promise((resolve, reject) => {
             const tempName = `__cheatScenarioLoad_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
             const startedAt = Date.now();
@@ -279,7 +294,7 @@ export class SabaSimpleScenarioTranslator extends BasePluginTranslator {
             };
 
             try {
-                dataManager.loadDataFile(tempName, SCENARIO_FILE_NAME);
+                dataManager[method](tempName, SCENARIO_FILE_NAME);
                 checkLoaded();
             } catch (error) {
                 cleanup();
@@ -291,11 +306,14 @@ export class SabaSimpleScenarioTranslator extends BasePluginTranslator {
     loadScenarioDataViaXhr() {
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
-            xhr.open('GET', `data/${SCENARIO_FILE_NAME}`, true);
+            const folder = this.findPluginEntry('Nore_Tes')?.status ? 'scenario' : 'data';
+            xhr.open('GET', `${folder}/${SCENARIO_FILE_NAME}`, true);
             xhr.onload = () => {
                 if (xhr.status >= 200 && xhr.status < 300) {
                     try {
-                        const parsed = JSON.parse(xhr.responseText);
+                        const parsed = parseJsonSafely(xhr.responseText);
+                        if (!parsed || typeof parsed !== 'object')
+                            throw new Error('Invalid scenario database');
                         resolve(parsed && typeof parsed === 'object' ? parsed : null);
                     } catch (error) {
                         reject(error);
@@ -337,24 +355,24 @@ export class SabaSimpleScenarioTranslator extends BasePluginTranslator {
         return Array.from(byCacheKey.values());
     }
 
-    collectUntranslated({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+    collectUntranslated({ runtime }) {
+        if (!runtime) {
             return [];
         }
 
-        const items = this.buildUniquePendingItems(panel);
-        return items.filter((item) => !panel.hasUsableCacheValue(item.cacheKey));
+        const items = this.buildUniquePendingItems(runtime);
+        return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
 
-    getCachedCountsSync({ panel }) {
-        if (!panel || typeof panel.getCacheKey !== 'function') {
+    getCachedCountsSync({ runtime }) {
+        if (!runtime) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 
-        const items = this.buildUniquePendingItems(panel);
+        const items = this.buildUniquePendingItems(runtime);
         const totalStrings = items.length;
         const leftStrings = items.filter(
-            (item) => !panel.hasUsableCacheValue(item.cacheKey)
+            (item) => !runtime.hasUsableCacheValue(item.cacheKey)
         ).length;
 
         return {

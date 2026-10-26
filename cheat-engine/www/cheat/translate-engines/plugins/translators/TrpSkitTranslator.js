@@ -1,5 +1,6 @@
 import { TAG_BRACKET, TAG_TYPE } from '../../ai-engine/constants.js';
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
+import { parseJsonSafely } from './TranslatorHelpers.js';
 
 // TRP_Skit prepends a display-name control sequence (e.g. \N<CharacterName>) to message
 // lines whose raw text starts with a known actor inputName.
@@ -7,6 +8,8 @@ import { BasePluginTranslator } from '../BasePluginTranslator.js';
 // We keep using standard `message` / `message_portrait` cache types, but normalize scanned
 // command text in collection mode so cache keys and LLM payloads contain the same prefixed
 // form that appears at runtime.
+// Also supports the TRP_SkitMZ build bundled with Forestia v1.4.4: nested plugin
+// paths and configurable pose/expression/motion/animation escape controls.
 
 const TRP_SKIT_PLUGIN_TAGS = [
     {
@@ -20,7 +23,6 @@ const TRP_SKIT_PLUGIN_TAGS = [
     },
 ];
 
-const TRP_SKIT_PLUGIN_NAMES = new Set(['trp_skit', 'trp_skitmz']);
 const TRP_SKIT_CONFIG_PLUGIN_NAMES = new Set([
     'trp_skitconfig',
     'trp_skit_config',
@@ -42,17 +44,8 @@ export class TRPSkitTranslator extends BasePluginTranslator {
         return 'TRP Skit (MV/MZ)';
     }
 
-    detectPlugin() {
-        if (!Array.isArray(window.$plugins)) {
-            return false;
-        }
-
-        return window.$plugins.some((plugin) => {
-            const normalizedName = String(plugin?.name || '')
-                .trim()
-                .toLowerCase();
-            return TRP_SKIT_PLUGIN_NAMES.has(normalizedName);
-        });
+    getPluginAliases() {
+        return ['TRP_Skit', 'TRP_SkitMZ'];
     }
 
     enablePluginTranslation() {
@@ -60,6 +53,28 @@ export class TRPSkitTranslator extends BasePluginTranslator {
             return false;
         }
         this.registerPluginCustomTags(TRP_SKIT_PLUGIN_TAGS);
+        // MV/MZ skit commands also work when plugin files live in subdirectories.
+        // Their payloads are technical pose/motion/expression/animation names.
+        const plugin = this.findPluginEntry('TRP_SkitMZ') || this.findPluginEntry('TRP_Skit');
+        const codes =
+            window.TRP_CORE?.skitParameters?.controlCharacters ||
+            parseJsonSafely(plugin?.parameters?.controlCharacters, {}) ||
+            {};
+        this.registerPluginCustomTags(
+            [
+                ['pose', 'SP'],
+                ['expression', 'SE'],
+                ['motion', 'SM'],
+                ['animation', 'SA'],
+            ].map(([key, symbol]) => ({
+                tagSymbol: codes[key] || symbol,
+                type: TAG_TYPE.WITH_CUSTOM_PARAMETER,
+                bracket: TAG_BRACKET.SQUARE,
+                maskValue: true,
+                requiredConsistency: true,
+                description: `TRP Skit ${key} command; preserve its technical argument.`,
+            }))
+        );
         return true;
     }
 
@@ -207,6 +222,8 @@ export class TRPSkitTranslator extends BasePluginTranslator {
         const configPlugin = window.$plugins.find((plugin) =>
             TRP_SKIT_CONFIG_PLUGIN_NAMES.has(
                 String(plugin?.name || '')
+                    .split('/')
+                    .pop()
                     .trim()
                     .toLowerCase()
             )
