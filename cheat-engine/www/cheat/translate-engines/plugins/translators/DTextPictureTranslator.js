@@ -52,6 +52,12 @@ function addTagWithCustomParameter(tagSymbol, description) {
 }
 
 const PLUGIN_TAGS = [
+    ...['I', 'ITEM', 'WEAPON', 'ARMOR', 'SKILL', 'STATE'].map((symbol) =>
+        addTagWithCustomParameter(
+            symbol,
+            'DTextPicture icon/database reference; supports nested variable escape arguments'
+        )
+    ),
     addTagWithNumericParameter('ITEM', 'Item information for item number (icon + name)'),
     addTagWithNumericParameter('WEAPON', 'Weapon information for weapon number (icon + name)'),
     addTagWithNumericParameter('ARMOR', 'Armor information for armor number (icon + name)'),

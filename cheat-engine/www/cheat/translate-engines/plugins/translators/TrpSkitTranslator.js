@@ -10,6 +10,8 @@ import { parseJsonSafely } from './TranslatorHelpers.js';
 // form that appears at runtime.
 // Also supports the TRP_SkitMZ build bundled with Forestia v1.4.4: nested plugin
 // paths and configurable pose/expression/motion/animation escape controls.
+// MV distribution in Seed Presser v1.0.8 uses TRP_SkitConfig with FA/PO/MA/ANI;
+// read that separate config even before TRP_CORE finishes parsing its parameters.
 
 const TRP_SKIT_PLUGIN_TAGS = [
     {
@@ -52,16 +54,24 @@ export class TRPSkitTranslator extends BasePluginTranslator {
         if (!this._installSpeakerNameRuntimeHook()) {
             return false;
         }
-        this.registerPluginCustomTags(TRP_SKIT_PLUGIN_TAGS);
         // MV/MZ skit commands also work when plugin files live in subdirectories.
         // Their payloads are technical pose/motion/expression/animation names.
         const plugin = this.findPluginEntry('TRP_SkitMZ') || this.findPluginEntry('TRP_Skit');
+        const configPlugin = (window.$plugins || []).find(
+            (entry) =>
+                entry.status &&
+                TRP_SKIT_CONFIG_PLUGIN_NAMES.has(entry.name.split('/').pop().toLowerCase())
+        );
         const codes =
-            window.TRP_CORE?.skitParameters?.controlCharacters ||
+            parseJsonSafely(window.TRP_CORE?.skitParameters?.controlCharacters, null) ||
+            parseJsonSafely(configPlugin?.parameters?.controlCharacters, null) ||
             parseJsonSafely(plugin?.parameters?.controlCharacters, {}) ||
             {};
-        this.registerPluginCustomTags(
-            [
+        // Registration replaces all tags owned by this plugin. Submit speaker
+        // and control tags together so the second group cannot erase \N<...>.
+        this.registerPluginCustomTags([
+            ...TRP_SKIT_PLUGIN_TAGS,
+            ...[
                 ['pose', 'SP'],
                 ['expression', 'SE'],
                 ['motion', 'SM'],
@@ -73,8 +83,8 @@ export class TRPSkitTranslator extends BasePluginTranslator {
                 maskValue: true,
                 requiredConsistency: true,
                 description: `TRP Skit ${key} command; preserve its technical argument.`,
-            }))
-        );
+            })),
+        ]);
         return true;
     }
 

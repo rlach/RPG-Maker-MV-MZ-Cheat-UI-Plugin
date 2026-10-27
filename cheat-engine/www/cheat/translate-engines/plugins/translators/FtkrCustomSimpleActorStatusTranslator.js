@@ -1,5 +1,6 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { parseJsonSafely } from './TranslatorHelpers.js';
+import { TAG_TYPE, TAG_STYLE, TAG_BRACKET } from '../../ai-engine/constants.js';
 
 /**
  * FTKR_CustomSimpleActorStatus translator
@@ -191,6 +192,26 @@ export class FtkrCustomSimpleActorStatusTranslator extends BasePluginTranslator 
     }
 
     enablePluginTranslation() {
+        this.registerPluginCustomTags(
+            ['CSS_画像', 'CSS_IMAGE', 'CSS_カスタム', 'CSS_CUSTOM'].flatMap((tagSymbol) => [
+                {
+                    tagSymbol,
+                    description: 'FTKR CSS image or custom status section identifier',
+                    style: TAG_STYLE.XML,
+                    bracket: TAG_BRACKET.NONE,
+                    type: TAG_TYPE.WITH_CUSTOM_PARAMETER,
+                    maskValue: true,
+                    requiredConsistency: true,
+                },
+                {
+                    tagSymbol: `/${tagSymbol}`,
+                    description: 'FTKR CSS section closing delimiter',
+                    style: TAG_STYLE.XML,
+                    type: TAG_TYPE.WITHOUT_PARAMETER,
+                    requiredConsistency: true,
+                },
+            ])
+        );
         const windowBasePrototype = window.Window_Base?.prototype;
         if (!windowBasePrototype) {
             console.log(

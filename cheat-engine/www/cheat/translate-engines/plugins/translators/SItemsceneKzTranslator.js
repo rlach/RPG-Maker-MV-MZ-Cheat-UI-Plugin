@@ -11,14 +11,14 @@ import { BasePluginTranslator } from '../BasePluginTranslator.js';
  * - Plugin displays item note tags `<br:...>` (description) and `<ill:...>` (image file name)
  *   in a custom item info window.
  * - Mass translation is intentionally not re-scanned here: this translator reuses entries already
- *   collected in the standard `item_note` cache.
+ *   collected in the standard item/weapon/armor note caches (including the
+ *   MV fork shipped with Seed Presser v1.0.8).
  * - Runtime hook point is `Scene_Item.prototype.update` after original plugin behavior runs;
  *   we only replace visible description payload in `Window_Info.setText(...)` arguments.
  */
 
 const PLUGIN_NAME = 'S_Itemscene_kz';
 const CACHE_TYPE = 'plugin_s_itemscene_kz';
-const ITEM_NOTE_CACHE_TYPE = 'item_note';
 const RUNTIME_HOOK_FLAG = '__CHEAT_S_ITEMSCENE_KZ_TRANSLATOR_HOOKED__';
 
 const S_ITEMSCENE_KZ_TAGS = [
@@ -136,6 +136,12 @@ export class SItemsceneKzTranslator extends BasePluginTranslator {
                 }
 
                 const item = this.item();
+                const noteCacheType =
+                    window.$dataWeapons?.[item?.id] === item
+                        ? 'weapon_note'
+                        : window.$dataArmors?.[item?.id] === item
+                          ? 'armor_note'
+                          : 'item_note';
                 const currentNote = String(item?.note || '');
                 const sourceDescription = extractNoteTagValue(currentNote, 'br');
                 const sourceIll = extractNoteTagValue(currentNote, 'ill');
@@ -143,14 +149,14 @@ export class SItemsceneKzTranslator extends BasePluginTranslator {
                 let resolvedNote = currentNote;
                 const originalNote = getOriginalItemNote(item);
                 if (isUsableText(originalNote)) {
-                    const cacheKey = runtime.getCacheKey(originalNote, ITEM_NOTE_CACHE_TYPE);
+                    const cacheKey = runtime.getCacheKey(originalNote, noteCacheType);
                     runtime.trackCacheKeyUsage(cacheKey);
 
                     if (isRuntimeTranslationActive(runtime)) {
                         resolvedNote = resolveRuntimeTranslation(
                             originalNote,
                             runtime,
-                            ITEM_NOTE_CACHE_TYPE,
+                            noteCacheType,
                             {
                                 requireRuntimeTranslationActive: true,
                                 missValue: currentNote,

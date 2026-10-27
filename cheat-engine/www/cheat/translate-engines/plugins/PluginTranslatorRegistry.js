@@ -91,6 +91,18 @@ import { RecollectionModeTranslator } from './translators/RecollectionModeTransl
 import { RecollectionModeMZTranslator } from './translators/RecollectionModeMZTranslator.js';
 import { EquipSceneExtensionTranslator } from './translators/EquipScene_ExtensionTranslator.js';
 import { SceneCustomMenuTranslator } from './translators/SceneCustomMenuTranslator.js';
+import { SeedPresserUITranslator } from './translators/SeedPresserUITranslator.js';
+import {
+    MkrControlCharacterExTranslator,
+    EnemyPositionTranslator,
+    MnkrEnemyIconTranslator,
+    FtkrExBattleCommandTranslator,
+    TmEventItemExTranslator,
+    HzRandomChoiceTranslator,
+    PermanentStateTranslator,
+    SkillEffectScriptTranslator,
+    FtkrSkillCounterTranslator,
+} from './translators/GeneralPluginTagsTranslators.js';
 import { SceneGlossaryTranslator } from './translators/SceneGlossaryTranslator.js';
 import { SetMessageFontSizeTranslator } from './translators/SetMessageFontSizeTranslator.js';
 import { SHMessageWindowBgTranslator } from './translators/SHMessageWindowBgTranslator.js';
@@ -280,6 +292,16 @@ class PluginTranslatorRegistry {
             SaveNameInputTranslator,
             SaveLoadConfirmTranslator,
             SceneCustomMenuTranslator,
+            SeedPresserUITranslator,
+            MkrControlCharacterExTranslator,
+            EnemyPositionTranslator,
+            MnkrEnemyIconTranslator,
+            FtkrExBattleCommandTranslator,
+            TmEventItemExTranslator,
+            HzRandomChoiceTranslator,
+            PermanentStateTranslator,
+            SkillEffectScriptTranslator,
+            FtkrSkillCounterTranslator,
             SceneGlossaryTranslator,
             SetMessageFontSizeTranslator,
             SHMessageWindowBgTranslator,

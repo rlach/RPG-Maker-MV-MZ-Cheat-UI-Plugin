@@ -174,12 +174,18 @@ function extractSceneEntries(scene) {
     return entries;
 }
 
+/**
+ * Triacontane SceneCustomMenu MV/MZ, including 1.26.4 (RJ01260762).
+ * Preserve original actor-name metadata keys in data-list filters, while keeping
+ * localized display names and authored gallery unlock conditions unchanged.
+ */
 export class SceneCustomMenuTranslator extends BasePluginTranslator {
     constructor() {
         super();
         this._scanPrepared = false;
         this._scanEntries = [];
         this._scanPromise = null;
+        this._actorSourceNames = new Map();
     }
 
     getPluginName() {
@@ -192,6 +198,76 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
 
     getCacheType() {
         return 'plugin_scene_custom_menu';
+    }
+
+    _loadActorSourceNames() {
+        this._actorNamesPromise ??= (async () => {
+            const response = await fetch('data/Actors.json');
+            if (!response.ok) throw new Error('Cannot read original actor identities');
+            for (const actor of await response.json()) {
+                if (actor) this._actorSourceNames.set(actor.id, actor.name);
+            }
+        })();
+        return this._actorNamesPromise;
+    }
+
+    _installDataListIdentityHooks(proto) {
+        if (!proto || proto.__CHEAT_SCENE_CUSTOM_MENU_IDENTITY_PATCHED__) return;
+        if (typeof proto.isVisible !== 'function' || typeof proto.isEnabledSub !== 'function')
+            return;
+        const visible = proto.isVisible;
+        const translator = this;
+        proto.isVisible = function (item, ...args) {
+            // Some galleries index note metadata by the selected database actor's
+            // name. A display translation must never change that lookup identity.
+            const match =
+                /item\.meta\[\s*(?:\$gameVariables\.value|v)\(\s*(\d+)\s*\)\.name\s*\]/.exec(
+                    this._data?.FilterScript || ''
+                );
+            const variableId = match ? Number(match[1]) : 0;
+            const stored = match ? window.$gameVariables?.value(variableId) : null;
+            // Selection refreshes dependent windows before updateIndexVariable.
+            // On returning from a scene the saved variable can still reference
+            // the previously selected actor. Resolve the live list selection.
+            let selected = stored;
+            this._windowMap?.forEach((win) => {
+                if (Number(win._data?.ItemVariableId) === variableId && variableId) {
+                    selected = win.getItem(win.index()) || selected;
+                }
+            });
+            const sourceName =
+                translator._actorSourceNames.get(selected?.id) ||
+                selected?._translateOriginal?.name ||
+                window.$dataActors?.[selected?.id]?._translateOriginal?.name;
+            if (!item?.meta || typeof sourceName !== 'string')
+                return visible.call(this, item, ...args);
+            const view = new Proxy(selected, {
+                get(target, key, receiver) {
+                    return key === 'name' ? sourceName : Reflect.get(target, key, receiver);
+                },
+            });
+            const variables = window.$gameVariables;
+            const value = variables.value;
+            variables.value = function (id) {
+                return Number(id) === variableId ? view : value.apply(this, arguments);
+            };
+            try {
+                // MV passes a pre-bound v helper as well as permitting direct
+                // $gameVariables access in authored expressions.
+                return visible.call(this, item, variables.value.bind(variables), ...args.slice(1));
+            } finally {
+                variables.value = value;
+            }
+        };
+        const enabled = proto.isEnabledSub;
+        proto.isEnabledSub = function (item, ...args) {
+            // Empty galleries have no current record. Do not execute item.meta
+            // conditions for them, and never manufacture an unlocked entry.
+            return item == null ? false : enabled.call(this, item, ...args);
+        };
+        Object.defineProperty(proto, '__CHEAT_SCENE_CUSTOM_MENU_IDENTITY_PATCHED__', {
+            value: true,
+        });
     }
 
     _resolveWindowCustomMenuCommand() {
@@ -613,6 +689,11 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         let enabled = false;
+        this._installDataListIdentityHooks(window.Window_CustomMenuDataList?.prototype);
+        // Identity repair must work before the first mass-translation scan.
+        this._loadActorSourceNames().catch((error) =>
+            console.warn('[SceneCustomMenuTranslator] Cannot load actor identities', error)
+        );
 
         const WindowCustomMenuCommand = this._resolveWindowCustomMenuCommand();
         if (WindowCustomMenuCommand?.prototype) {
@@ -673,6 +754,7 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
         }
 
         const params = pluginEntry.parameters;
+        await this._loadActorSourceNames();
         const entries = [];
 
         for (let sceneIdx = 1; sceneIdx <= 20; sceneIdx++) {

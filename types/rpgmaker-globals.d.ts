@@ -209,6 +209,7 @@ declare interface Window {
     Window_InfoMenu?: any;
     Window_Help?: any;
     Window_CustomMenuCommand?: any;
+    Window_CustomMenuDataList?: any;
     Window_ChoiceList?: any;
     Window_GalgeChoiceList?: any;
     PluginManager?: any;
