@@ -5,12 +5,14 @@ export default {
 
     template: `
 <v-snackbar
+    :key="activeNotification ? activeNotification.id : 0"
     app
     top
     left
     :color="color"
     v-model="showSnackbar"
-    :timeout="timeout"
+    :timeout="-1"
+    @input="onVisibilityChange"
     class="z-index-cheat-1">
     <span 
         v-for="(line, idx) in text"
@@ -26,7 +28,7 @@ export default {
         color="white"
         icon
         v-bind="attrs"
-        @click="showSnackbar = false">
+        @click="dismiss()">
         <v-icon small>mdi-close</v-icon>
     </v-btn>
     </template>
@@ -39,11 +41,16 @@ export default {
             text: [],
             timeout: 1000,
             color: 'black',
+            notifications: [],
+            activeNotification: null,
+            nextNotificationId: 0,
+            dismissalTimer: null,
         };
     },
 
     mounted() {
-        Alert.alertInternal = (level, msg, err = null, timeout = 1500) => {
+        this.previousAlertHandler = Alert.alertInternal;
+        this.alertHandler = (level, msg, err = null, timeout = 1500) => {
             let color = null;
             switch (level) {
                 case 'success':
@@ -68,9 +75,16 @@ export default {
                 timeout: timeout,
             });
         };
+        Alert.alertInternal = this.alertHandler;
     },
 
-    created() {},
+    beforeDestroy() {
+        clearTimeout(this.dismissalTimer);
+        this.notifications = [];
+        this.activeNotification = null;
+        if (Alert.alertInternal === this.alertHandler)
+            Alert.alertInternal = this.previousAlertHandler;
+    },
 
     methods: {
         normalizeText(text) {
@@ -97,15 +111,36 @@ export default {
         },
 
         show(options) {
-            this.showSnackbar = false;
-
-            this.text = this.normalizeText(options.text);
-            this.timeout = options.timeout;
-            if (options.color) {
-                this.color = options.color;
-            }
-
+            this.notifications.push({
+                ...options,
+                id: ++this.nextNotificationId,
+                text: this.normalizeText(options.text),
+            });
+            this.showNext();
+        },
+        showNext() {
+            if (this.activeNotification || !this.notifications.length) return;
+            const notification = this.notifications.shift();
+            this.activeNotification = notification;
+            this.text = notification.text;
+            this.color = notification.color || 'black';
+            this.timeout = notification.timeout ?? 1500;
             this.showSnackbar = true;
+            this.$nextTick(() => {
+                if (this.activeNotification?.id !== notification.id || this.timeout <= 0) return;
+                this.dismissalTimer = setTimeout(() => this.dismiss(notification.id), this.timeout);
+            });
+        },
+        dismiss(id = this.activeNotification?.id) {
+            if (!this.activeNotification || this.activeNotification.id !== id) return;
+            clearTimeout(this.dismissalTimer);
+            this.dismissalTimer = null;
+            this.showSnackbar = false;
+            this.activeNotification = null;
+            this.$nextTick(() => this.showNext());
+        },
+        onVisibilityChange(visible) {
+            if (!visible) this.dismiss();
         },
     },
 };

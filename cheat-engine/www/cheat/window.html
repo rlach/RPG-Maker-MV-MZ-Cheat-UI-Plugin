@@ -104,8 +104,6 @@
                 'Scene_Map',
                 'Scene_Battle',
                 'Game_Map',
-                'Vue',
-                'Vuetify',
                 'axios',
             ];
 
@@ -134,9 +132,6 @@
             console.log('[CheatWindow] Globals synced from parent');
         </script>
         <!-- <script src="libs/axios.min.js"></script> -->
-        <!-- Load Vue/Vuetify locally in this window so event listeners bind to this document -->
-        <!-- <script src="libs/vue.js"></script> -->
-        <!-- <script src="libs/vuetify.js"></script> -->
     </head>
     <body>
         <div style="position: fixed; top: 5px; right: 5px; z-index: 9999">
@@ -169,6 +164,9 @@
             console.log('[CheatWindow] Module script loading');
             (async function () {
                 // parentWin is already declared in the parent <script> tag and available globally
+                const { loadWindowUiLibraries, isolateWindowComponent } =
+                    await import('./js/WindowUiLibraries.js');
+                await loadWindowUiLibraries(window);
                 if (!window.Vue || !window.Vuetify) {
                     console.error('[CheatWindow] Vue/Vuetify not loaded locally');
                     throw new Error('Vue/Vuetify must be loaded in external window');
@@ -200,7 +198,9 @@
                     const timestamp = Date.now();
 
                     console.log('[CheatWindow] Importing CheatModal...');
-                    const CheatModal = (await import(`./CheatModal.js?t=${timestamp}`)).default;
+                    const CheatModal = isolateWindowComponent(
+                        (await import(`./CheatModal.js?t=${timestamp}`)).default
+                    );
                     console.log('[CheatWindow] CheatModal imported:', CheatModal);
                     console.log(
                         '[CheatWindow] CheatModal components:',
@@ -216,11 +216,15 @@
                     }
 
                     console.log('[CheatWindow] Importing AlertSnackbar...');
-                    const AlertSnackbar = (await import('./components/AlertSnackbar.js')).default;
+                    const AlertSnackbar = isolateWindowComponent(
+                        (await import('./components/AlertSnackbar.js')).default
+                    );
                     console.log('[CheatWindow] AlertSnackbar imported');
 
                     console.log('[CheatWindow] Importing ConfirmDialog...');
-                    const ConfirmDialog = (await import('./components/ConfirmDialog.js')).default;
+                    const ConfirmDialog = isolateWindowComponent(
+                        (await import('./components/ConfirmDialog.js')).default
+                    );
                     console.log('[CheatWindow] ConfirmDialog imported');
 
                     console.log('[CheatWindow] Importing TranslateOnTheFlyPanel...');
@@ -236,17 +240,7 @@
 
                     // Create a Vuetify instance bound to THIS window so overlays/menus/sliders attach here
                     const Vuetify = window.Vuetify;
-                    window.__VUETIFY_INSTANCE__ = new Vuetify({
-                        // Force overlays/menus to attach to this window's body
-                        defaults: {
-                            VMenu: { attach: () => document.body },
-                            VSelect: { attach: () => document.body },
-                            VAutocomplete: { attach: () => document.body },
-                            VCombobox: { attach: () => document.body },
-                            VDialog: { attach: () => document.body },
-                            VOverflowBtn: { attach: () => document.body },
-                        },
-                    });
+                    window.__VUETIFY_INSTANCE__ = new Vuetify({ theme: { dark: true } });
 
                     // Mount Vue app in external window - render CheatModal directly (no overlay needed)
                     const defaultComponent =
@@ -307,13 +301,13 @@
                         },
                     });
 
-                    // Mount without selector first, then manually append to DOM
-                    app.$mount();
-                    const appContainer = document.querySelector('#app');
-                    appContainer.appendChild(app.$el);
+                    // Slider mounted hooks query the live document for [data-app].
+                    // A detached mount leaves their drag event target null forever.
+                    app.$mount('#app');
 
                     // Expose for debugging
                     window.__CHEAT_APP__ = app;
+                    window.addEventListener('beforeunload', () => app.$destroy(), { once: true });
 
                     console.log('[CheatWindow] Vue app mounted in external window, app:', app);
                     console.log('[CheatWindow] App element:', app.$el);

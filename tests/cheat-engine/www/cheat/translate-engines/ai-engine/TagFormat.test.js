@@ -232,6 +232,9 @@ it('exposes a single format selector in Tag Manager and updates its newline prev
         engine.aiTagFormat = format;
         const context = { _runtime: { engine } };
         expect(TagPanel.methods.formatTagDisplay.call(context, { _isSimpleNTag: true })).toBe(
+            '\\n'
+        );
+        expect(TagPanel.methods.formatTagEncoding.call(context, { _isSimpleNTag: true })).toBe(
             new TagSyntax(format).encode('sn')
         );
     }

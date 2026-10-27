@@ -161,6 +161,8 @@ export default {
 
             tableHeaders: [
                 { text: 'Tag', value: 'tagDisplay', width: 160, sortable: true },
+                { text: 'Symbol', value: 'tagSymbol', sortable: true },
+                { text: 'LLM encoding', value: 'tagEncoding', sortable: true },
                 { text: 'Type', value: 'tagSource', width: 90, sortable: true },
                 { text: 'Description', value: 'description' },
                 { text: 'Actions', value: 'actions', width: 80, sortable: false },
@@ -286,7 +288,9 @@ export default {
                 result = result.filter(
                     (e) =>
                         e.description.toLowerCase().includes(q) ||
-                        e.tagDisplay.toLowerCase().includes(q)
+                        e.tagDisplay.toLowerCase().includes(q) ||
+                        e.tagSymbol.toLowerCase().includes(q) ||
+                        e.tagEncoding.toLowerCase().includes(q)
                 );
             }
             return result;
@@ -305,7 +309,11 @@ export default {
             this.appendPluginTagEntries(entries, engine);
             this.appendCustomTagEntries(entries);
 
-            this.entries = entries;
+            this.entries = entries.map((entry) => ({
+                ...entry,
+                tagSymbol: entry.tag.tagSymbol || '',
+                tagEncoding: this.formatTagEncoding(entry.tag),
+            }));
             this.syncTagOptionsFromEngine(engine);
         },
 
@@ -382,7 +390,7 @@ export default {
 
         formatTagDisplay(tag) {
             if (tag?._isSimpleNTag) {
-                return new TagSyntax(this._runtime?.engine?.aiTagFormat).encode('sn');
+                return '\\n';
             }
 
             const sym = tag.tagSymbol || '?';
@@ -401,6 +409,27 @@ export default {
                 return `\\${sym}${open}…${close}`;
             }
             return `\\${sym}`;
+        },
+
+        formatTagEncoding(tag) {
+            const manager = this._runtime?.engine?.tagManager;
+            if (!manager) return '—';
+            const normalized = tag._isSimpleNTag ? tag : manager.validateAndNormalizeConfig(tag, 0);
+            if (normalized.style === 'xml' && normalized.type === 'withCustomParameter')
+                normalized.bracket = '<';
+            const entry = tag._isSimpleNTag
+                ? manager.simpleNEntry
+                : manager.tagEntries.find(
+                      (candidate) =>
+                          manager.getPatternSignature(candidate) ===
+                          manager.getPatternSignature(normalized)
+                  );
+            if (!entry) return '—';
+            let payload = entry.tagId;
+            if (entry.type === 'withNumericParameter') payload += 'N';
+            if (entry.type === 'withCustomParameter')
+                payload += `${entry.bracket}${entry.maskValue ? '0' : '…'}${entry.bracketClose}`;
+            return new TagSyntax(manager.syntax.format).encode(payload);
         },
 
         callRuntime(methodName, ...args) {

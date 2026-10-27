@@ -1009,7 +1009,6 @@ export class MessageCheat {
                 return;
             }
 
-
             MESSAGE_LOG.addEntry(combined, {
                 translated: !!TranslateOnTheFlyState.isEnabled() && !MessageCheat.skip,
                 skipped: !!MessageCheat.skip,

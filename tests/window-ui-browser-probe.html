@@ -1,0 +1,169 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <style>
+            .v-slider {
+                position: relative;
+                width: 500px;
+                height: 50px;
+            }
+            .v-slider__track-container {
+                position: absolute;
+                width: 500px;
+                height: 4px;
+                top: 20px;
+            }
+            .v-slider__thumb-container {
+                position: absolute;
+                top: 20px;
+                width: 20px;
+                height: 20px;
+            }
+            .v-menu__content {
+                position: absolute;
+                background: white;
+            }
+            .v-select {
+                width: 400px;
+                min-height: 40px;
+            }
+            iframe {
+                width: 800px;
+                height: 500px;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="app"></div>
+        <pre id="result">pending</pre>
+        <script type="module">
+            import {
+                loadWindowUiLibraries,
+                isolateWindowComponent,
+            } from '/cheat-engine/www/cheat/js/WindowUiLibraries.js';
+            const read = (path) => fetch('/cheat-engine/www/cheat/' + path).then((r) => r.text());
+            const params = new URLSearchParams(location.search);
+            const child = params.has('child');
+            const detached = params.has('detached');
+            try {
+                if (child) {
+                    window.Vue = parent.Vue;
+                    window.Vuetify = parent.Vuetify;
+                }
+                window.module = { exports: {} };
+                window.exports = {};
+                await loadWindowUiLibraries(window, read);
+                if (!child) {
+                    window.SharedControls = {
+                        data: () => ({ speed: 20, otherSpeed: 30, selection: 'A' }),
+                        template:
+                            '<div><v-select ref="select" v-model="selection" :items="[\'A\',\'B\']"></v-select><v-select ref="second" :items="[\'C\',\'D\']"></v-select><v-slider ref="slider" v-model="speed" min="0" max="100" thumb-label></v-slider><v-slider ref="otherSlider" v-model="otherSpeed" min="0" max="100" thumb-label></v-slider></div>',
+                    };
+                    new Vue({
+                        vuetify: new Vuetify(),
+                        render: (h) => h('v-app', [h(SharedControls)]),
+                    }).$mount('#app');
+                    addEventListener('message', (e) => {
+                        document.querySelector('#result').textContent = JSON.stringify(e.data);
+                        document.body.dataset.finished = 'true';
+                    });
+                    const frame = document.createElement('iframe');
+                    frame.src = location.pathname + '?child' + (detached ? '&detached' : '');
+                    document.body.append(frame);
+                } else {
+                    const Controls = isolateWindowComponent(parent.SharedControls);
+                    const app = new Vue({
+                        vuetify: new Vuetify(),
+                        render: (h) => h('v-app', [h(Controls, { ref: 'controls' })]),
+                    });
+                    if (detached) {
+                        app.$mount();
+                        document.querySelector('#app').appendChild(app.$el);
+                    } else app.$mount('#app');
+                    await Vue.nextTick();
+                    await new Promise((r) => setTimeout(r, 100));
+                    const controls = app.$refs.controls,
+                        select = controls.$refs.select,
+                        slider = controls.$refs.slider;
+                    select.$refs.input.focus();
+                    select.isMenuActive = true;
+                    await Vue.nextTick();
+                    await new Promise((r) => setTimeout(r, 100));
+                    const menu = select.$refs.menu.$refs.content;
+                    const track = slider.$el.querySelector('.v-slider');
+                    const rect = track.getBoundingClientRect();
+                    track.dispatchEvent(
+                        new MouseEvent('mousedown', {
+                            bubbles: true,
+                            clientX: rect.left + 30,
+                            clientY: rect.top + 20,
+                            buttons: 1,
+                        })
+                    );
+                    track.dispatchEvent(
+                        new MouseEvent('mousemove', {
+                            bubbles: true,
+                            clientX: rect.left + 400,
+                            clientY: rect.top + 20,
+                            buttons: 1,
+                        })
+                    );
+                    await Vue.nextTick();
+                    const valueDuringDrag = controls.speed;
+                    const thumbDuringDrag = slider.$refs.thumb.style.left;
+                    track.dispatchEvent(
+                        new MouseEvent('mouseup', {
+                            bubbles: true,
+                            clientX: rect.left + 400,
+                            clientY: rect.top + 20,
+                        })
+                    );
+                    await Vue.nextTick();
+                    const results = {
+                        separateVue: Vue !== parent.Vue,
+                        separateVuetify: Vuetify !== parent.Vuetify,
+                        menuInChild: menu.ownerDocument === document,
+                        menuConnected: document.contains(menu),
+                        sliderStopped: !slider.isActive,
+                        sliderMoved: controls.speed > 50,
+                        value: controls.speed,
+                        sharedConstructorIsolated: Controls._Ctor !== parent.SharedControls._Ctor,
+                        liveDragTarget: slider.app === document.querySelector('[data-app]'),
+                        intermediateValue: valueDuringDrag,
+                        intermediateThumb: thumbDuringDrag,
+                        thumbUpdatedDuringDrag: valueDuringDrag === 80 && thumbDuringDrag === '80%',
+                    };
+                    const otherSlider = controls.$refs.otherSlider;
+                    const otherTrack = otherSlider.$el.querySelector('.v-slider');
+                    const otherRect = otherTrack.getBoundingClientRect();
+                    for (const type of ['mousedown', 'mouseup'])
+                        otherTrack.dispatchEvent(
+                            new MouseEvent(type, {
+                                bubbles: true,
+                                clientX: otherRect.left + 200,
+                                clientY: otherRect.top + 20,
+                            })
+                        );
+                    await Vue.nextTick();
+                    results.previousSliderBlurred = !slider.isFocused && !slider.isActive;
+                    results.secondSliderReleased = !otherSlider.isActive;
+                    const second = controls.$refs.second;
+                    const secondSlot = second.$el.querySelector('.v-input__slot');
+                    for (const type of ['mousedown', 'mouseup', 'click'])
+                        secondSlot.dispatchEvent(new MouseEvent(type, { bubbles: true }));
+                    second.$el.querySelector('input').focus();
+                    await Vue.nextTick();
+                    await new Promise((r) => setTimeout(r, 100));
+                    results.firstMenuDismissed = !select.isMenuActive;
+                    results.secondMenuOpened = second.isMenuActive;
+                    results.sliderBlurred = !slider.isFocused;
+                    parent.postMessage(results, '*');
+                }
+            } catch (error) {
+                (child ? parent : window).postMessage({ error: error.stack }, '*');
+                document.querySelector('#result').textContent = error.stack;
+            }
+        </script>
+    </body>
+</html>

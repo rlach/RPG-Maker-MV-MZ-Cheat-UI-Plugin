@@ -14,7 +14,6 @@ import TranslateOnTheFlyPanel from './panels/TranslateOnTheFlyPanel.js';
 import TranslateNamesPanel from './panels/TranslateNamesPanel.js';
 import TranslateCacheManagerPanel from './panels/TranslateCacheManagerPanel.js';
 import TranslateImagesPanel from './panels/TranslateImagesPanel.js';
-import TranslateImagesKoharuPanel from './panels/TranslateImagesKoharuPanel.js';
 import TranslateKnowledgePanel from './panels/TranslateKnowledgePanel.js';
 import TranslateTagManagerPanel from './panels/TranslateTagManagerPanel.js';
 import TranslatePluginsPanel from './panels/TranslatePluginsPanel.js';
@@ -41,7 +40,6 @@ export default {
         TranslateNamesPanel,
         TranslateCacheManagerPanel,
         TranslateImagesPanel,
-        TranslateImagesKoharuPanel,
         TranslateKnowledgePanel,
         TranslateTagManagerPanel,
         TranslatePluginsPanel,
@@ -216,11 +214,6 @@ export default {
                             name: 'Exporter',
                             icon: 'mdi-export',
                             component: 'translate-images-panel',
-                        },
-                        {
-                            name: 'Koharu',
-                            icon: 'mdi-palette',
-                            component: 'translate-images-koharu-panel',
                         },
                     ],
                 },
