@@ -15,6 +15,18 @@ export default {
     <v-card-subtitle class="mt-3 pb-0 font-weight-bold">Bitmap / Canvas Fixes</v-card-subtitle>
     <v-card-text class="py-0">
         <v-switch
+            v-model="improveFailedResourcesModal"
+            label="Improve failed resources modal"
+            dense hide-details @click.self.stop
+            @change="onImproveFailedResourcesModalChange">
+        </v-switch>
+    </v-card-text>
+    <v-card-text class="pt-2 pb-0 caption grey--text text--lighten-1">
+        Adds Copy path and Cancel next to Retry. Copies the full decoded resource path.
+        Cancel skips that file for this game session, using blank images or silent audio.
+    </v-card-text>
+    <v-card-text class="py-0">
+        <v-switch
             v-model="bitmapGetPixelLongFix"
             label="Fix Bitmap.getPixel getImageData long-type crash"
             dense
@@ -78,6 +90,7 @@ export default {
 
     data() {
         return {
+            improveFailedResourcesModal: false,
             bitmapGetPixelLongFix: false,
             mvLocalSavePathFix: false,
             isMv: false,
@@ -103,6 +116,7 @@ export default {
 
     methods: {
         initializeVariables() {
+            this.improveFailedResourcesModal = HACKS_RUNTIME.isImproveFailedResourcesModalEnabled();
             this.isMv = isRpgMakerMv();
             this.bitmapGetPixelLongFix = HACKS_RUNTIME.isBitmapGetPixelLongFixEnabled();
             this.mvLocalSavePathFix = HACKS_RUNTIME.isMvLocalSavePathFixEnabled();
@@ -114,6 +128,10 @@ export default {
 
         onBitmapGetPixelLongFixChange(enabled) {
             HACKS_RUNTIME.setBitmapGetPixelLongFixEnabled(!!enabled);
+        },
+
+        onImproveFailedResourcesModalChange(enabled) {
+            HACKS_RUNTIME.setImproveFailedResourcesModalEnabled(!!enabled);
         },
 
         onMvLocalSavePathFixChange(enabled) {

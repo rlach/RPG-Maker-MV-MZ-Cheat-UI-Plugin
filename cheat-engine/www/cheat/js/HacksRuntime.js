@@ -1,5 +1,6 @@
 import { KeyValueStorage } from './KeyValueStorage.js';
 import { GameTranslationSettings } from './GameTranslationSettings.js';
+import { FailedResourcesModal } from './FailedResourcesModal.js';
 import {
     ensureRootWindowStateValue,
     getRootWindow,
@@ -94,6 +95,7 @@ function toSwitchId(value) {
 class HacksRuntime {
     constructor() {
         this.state = {
+            improveFailedResourcesModal: false,
             [BITMAP_GET_PIXEL_LONG_FIX_KEY]: false,
             [MV_LOCAL_SAVE_PATH_FIX_KEY]: false,
         };
@@ -113,6 +115,7 @@ class HacksRuntime {
                 { missingOnly: true }
             );
             if (data && typeof data === 'object') {
+                this.state.improveFailedResourcesModal = !!data.improveFailedResourcesModal;
                 if (hasOwn(data, BITMAP_GET_PIXEL_LONG_FIX_KEY)) {
                     this.state[BITMAP_GET_PIXEL_LONG_FIX_KEY] =
                         !!data[BITMAP_GET_PIXEL_LONG_FIX_KEY];
@@ -154,12 +157,30 @@ class HacksRuntime {
     }
 
     applyEnabledHacks() {
+        if (this.state.improveFailedResourcesModal) this.applyFailedResourcesModal();
         if (this.isBitmapGetPixelLongFixEnabled()) {
             this.applyBitmapGetPixelLongFix();
         }
         if (this.isMvLocalSavePathFixEnabled()) {
             this.applyMvLocalSavePathFix();
         }
+    }
+
+    isImproveFailedResourcesModalEnabled() {
+        return !!this.state.improveFailedResourcesModal;
+    }
+
+    setImproveFailedResourcesModalEnabled(enabled) {
+        this.state.improveFailedResourcesModal = !!enabled;
+        this._save();
+        return this.applyFailedResourcesModal();
+    }
+
+    applyFailedResourcesModal() {
+        const root = getRootWindow();
+        this._failedResourcesModal ??= new FailedResourcesModal(root);
+        this._failedResourcesModal.setEnabled(this.state.improveFailedResourcesModal);
+        return this._failedResourcesModal.install();
     }
 
     getMessageSkipForcedSkipSwitchId() {
