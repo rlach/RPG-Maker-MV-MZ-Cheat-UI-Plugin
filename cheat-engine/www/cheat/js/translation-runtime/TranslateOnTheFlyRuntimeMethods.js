@@ -15,6 +15,9 @@ export const translateOnTheFlyRuntimeMethods = {
             localeSetupAttempts += 1;
 
             try {
+                if (self._originalGameLocale === undefined) {
+                    self._originalGameLocale = $dataSystem.locale;
+                }
                 $dataSystem.locale = self.targetLang || 'en';
                 return;
             } catch (error) {
@@ -31,6 +34,25 @@ export const translateOnTheFlyRuntimeMethods = {
         };
 
         setTimeout(applyLocaleWithRetry, 1000);
+
+        // Name-input tables use the system locale. Keep UI localization while
+        // allowing games with full-width passwords to retain their native table.
+        if (typeof Window_NameInput !== 'undefined') {
+            const table =
+                Window_NameInput.prototype._translateOriginalTable ||
+                Window_NameInput.prototype.table;
+            Window_NameInput.prototype._translateOriginalTable = table;
+            Window_NameInput.prototype.table = function (...args) {
+                if (self.autoSwitchNameInputLanguage !== false) return table.apply(this, args);
+                const locale = $dataSystem.locale;
+                try {
+                    $dataSystem.locale = self._originalGameLocale ?? locale;
+                    return table.apply(this, args);
+                } finally {
+                    $dataSystem.locale = locale;
+                }
+            };
+        }
 
         const markCurrentMessageAsEventOrigin = (kind, interpreter) => {
             if (!window.$gameMessage) {
@@ -116,29 +138,15 @@ export const translateOnTheFlyRuntimeMethods = {
             );
         };
 
-        const applyCurrentMapDisplayNameFromCache = () => {
-            if (!window.$dataMap || typeof $dataMap !== 'object') {
-                return;
-            }
-
-            if (typeof $dataMap._translateOriginalDisplayName !== 'string') {
-                $dataMap._translateOriginalDisplayName =
-                    typeof $dataMap.displayName === 'string' ? $dataMap.displayName : '';
-            }
-
-            const originalDisplayName = $dataMap._translateOriginalDisplayName;
+        const observeCurrentMapDisplayName = () => {
+            if (!isTranslationActive(self)) return;
+            const originalDisplayName = window.$dataMap?.displayName;
             if (typeof originalDisplayName !== 'string' || originalDisplayName.trim() === '') {
                 return;
             }
 
             const cacheKey = self.getCacheKey(originalDisplayName, 'map_name');
-            if (self.hasUsableCacheValue(cacheKey)) {
-                $dataMap.displayName = self.translationCache.get(cacheKey);
-                return;
-            }
-
             self.trackCacheKeyUsage(cacheKey);
-            $dataMap.displayName = originalDisplayName;
         };
 
         const getSafeCurrentMessageText = () => {
@@ -1628,8 +1636,31 @@ export const translateOnTheFlyRuntimeMethods = {
 
             Scene_Map.prototype.onMapLoaded = function () {
                 applyLifecycleTranslations('sceneMapOnMapLoaded');
-                applyCurrentMapDisplayNameFromCache();
+                observeCurrentMapDisplayName();
                 return originalOnMapLoaded.call(this);
+            };
+        }
+
+        // Map display names are also logic identifiers in event scripts (for
+        // example RJ01295905 uses them to select transfer/fade-in branches).
+        // Translate only the map-name window's draw argument, never map data or
+        // Game_Map.displayName(), which scripts and plugins can also read.
+        if (typeof Window_MapName !== 'undefined') {
+            const originalDrawText =
+                Window_MapName.prototype._translateOriginalDrawText ||
+                Window_MapName.prototype.drawText;
+            if (!Window_MapName.prototype._translateOriginalDrawText) {
+                Window_MapName.prototype._translateOriginalDrawText = originalDrawText;
+            }
+            Window_MapName.prototype.drawText = function (text, ...args) {
+                if (isTranslationActive(self) && typeof text === 'string' && text.trim()) {
+                    const cacheKey = self.getCacheKey(text, 'map_name');
+                    self.trackCacheKeyUsage(cacheKey);
+                    if (self.hasUsableCacheValue(cacheKey)) {
+                        text = self.translationCache.get(cacheKey);
+                    }
+                }
+                return originalDrawText.call(this, text, ...args);
             };
         }
 

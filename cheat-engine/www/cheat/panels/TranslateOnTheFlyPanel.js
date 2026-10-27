@@ -56,6 +56,14 @@ export default {
             @click.self.stop
             @change="onChangeEnableRealtime">
         </v-switch>
+        <v-switch
+            v-model="autoSwitchNameInputLanguage"
+            label="Use translation language for the name-input keyboard"
+            hint="Disable to keep the game's original characters, including full-width passwords. Saved with this game's translation cache."
+            persistent-hint
+            dense
+            @change="callRuntime('saveSettings')">
+        </v-switch>
     </v-card-text>
 
     <v-card-subtitle class="pb-0 mt-2 font-weight-bold">Real-time options</v-card-subtitle>

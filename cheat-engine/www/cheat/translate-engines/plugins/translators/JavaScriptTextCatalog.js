@@ -8,7 +8,8 @@ const VISIBLE_FIELD =
 const ASSET_FIELD =
     /(?:image|picture|portrait|bitmap|filename|filepath|folder|fontFace|fontFamily|sound|bgm|bgs|audio|windowskin)/i;
 const TECHNICAL_FIELD = /^(?:id|symbol|type|key|pluginName|command|code|tag|meta)$/i;
-const DISPLAY_CALL = /^(?:drawText\w*|setText|addCommand|setSpeakerName|add|fillText)$/;
+const DISPLAY_CALL =
+    /^(?:drawText\w*|setText|addCommand|setSpeakerName|add|addLog|pushGabRightMessage|pushGabLeftMessage|fillText)$/;
 const PLACEHOLDER = (index) => `\\COT[${index}]`;
 
 const keyName = (node) => node?.name ?? node?.value ?? '';

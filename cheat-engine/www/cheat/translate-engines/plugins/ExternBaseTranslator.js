@@ -82,10 +82,11 @@ export class ExternBaseTranslator extends BasePluginTranslator {
                 continue;
             }
 
-            const cacheKey = runtime.getCacheKey(text, this.getCacheType());
+            const cacheType = entry.cacheType || this.getCacheType();
+            const cacheKey = runtime.getCacheKey(text, cacheType);
             if (!byCacheKey.has(cacheKey)) {
                 byCacheKey.set(cacheKey, {
-                    type: this.getCacheType(),
+                    type: cacheType,
                     id: `${this.getEntryIdPrefix()}_${byCacheKey.size}`,
                     value: text,
                     cacheKey,

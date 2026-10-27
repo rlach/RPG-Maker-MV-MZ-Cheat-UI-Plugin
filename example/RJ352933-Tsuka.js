@@ -164,10 +164,20 @@ export class RJ352933TsukaTranslator extends BasePluginTranslator {
         const originalSetupRandomTalk = window.CCUtils.setupRandomTalk;
         const runtimeForHook = () => this.getRuntime();
         const runtimeTranslationEnabled = (runtime) => this.isRuntimeTranslationActive(runtime);
-        const resolveHookTranslation = (text, runtime) =>
-            this.resolveRuntimeTranslation(text, runtime, this.getCacheType(), {
+        const sourceByOutput = new Map();
+        const originalSources = new Set();
+        const resolveHookTranslation = (text, runtime) => {
+            // setupRandomTalk and the gab queue can observe the same output.
+            // Only proven original values may be harvested; never guess a key.
+            if (!sourceByOutput.has(text) && !originalSources.has(text) &&
+                !this._scanEntries.some(entry => entry.text === text)) return text;
+            const source = sourceByOutput.get(text) ?? text;
+            const translated = this.resolveRuntimeTranslation(source, runtime, this.getCacheType(), {
                 requireRuntimeTranslationActive: true,
             });
+            if (translated !== source) sourceByOutput.set(translated, source);
+            return translated;
+        };
 
         const translateGabMessage = (source, runtime) => {
             const message = typeof source === 'string' ? source : String(source ?? '');
@@ -207,10 +217,13 @@ export class RJ352933TsukaTranslator extends BasePluginTranslator {
             }
 
             const targetTalkVariableId = Number(talkVariableId || 884) || 884;
-            const currentText = $gameVariables.value(targetTalkVariableId);
+            const currentText = $gameVariables._data[targetTalkVariableId];
             if (typeof currentText !== 'string' || !currentText.trim()) {
                 return result;
             }
+
+            originalSources.add(currentText);
+            for (const segment of currentText.split('|')) originalSources.add(segment);
 
             const translated = resolveHookTranslation(currentText, runtime);
 

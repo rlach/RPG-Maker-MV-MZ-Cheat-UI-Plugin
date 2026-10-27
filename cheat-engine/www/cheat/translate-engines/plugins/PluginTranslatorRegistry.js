@@ -9,6 +9,7 @@ import { ChangeSlotTranslator } from './translators/ChangeSlotTranslator.js';
 import { CbrEroStatusTranslator } from './translators/CbrEroStatusTranslator.js';
 import { CustomizeConfigItemTranslator } from './translators/CustomizeConfigItemTranslator.js';
 import { ExternMessageTranslator } from './translators/ExternMessageTranslator.js';
+import { LicoUiTranslator } from './translators/LicoUiTranslator.js';
 import { FtkrCssDetailedStatusTranslator } from './translators/FtkrCssDetailedStatusTranslator.js';
 import { FtkrCssShopStatusTranslator } from './translators/FtkrCssShopStatusTranslator.js';
 import { FtkrGdmWindowEditorTranslator } from './translators/FtkrGdmWindowEditorTranslator.js';
@@ -172,6 +173,7 @@ class PluginTranslatorRegistry {
             CommonPopupCoreTranslator,
             CustomizeConfigItemTranslator,
             ExternMessageTranslator,
+            LicoUiTranslator,
             FtkrCssDetailedStatusTranslator,
             FtkrCssShopStatusTranslator,
             FtkrCustomSimpleActorStatusTranslator,

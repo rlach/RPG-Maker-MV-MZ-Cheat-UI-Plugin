@@ -1009,7 +1009,6 @@ export class MessageCheat {
                 return;
             }
 
-            console.log('[MessageCheat] Logging message:', combined);
 
             MESSAGE_LOG.addEntry(combined, {
                 translated: !!TranslateOnTheFlyState.isEnabled() && !MessageCheat.skip,

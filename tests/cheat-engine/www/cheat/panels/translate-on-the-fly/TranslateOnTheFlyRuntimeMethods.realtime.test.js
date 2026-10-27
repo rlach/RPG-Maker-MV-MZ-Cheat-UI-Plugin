@@ -340,7 +340,97 @@ describe('TranslateOnTheFly realtime flow', () => {
         delete globalThis.DataManager;
         delete globalThis.Scene_Title;
         delete globalThis.Scene_Load;
+        delete globalThis.Scene_Map;
+        delete globalThis.Window_MapName;
+        delete globalThis.Window_NameInput;
     });
+
+    it.each([true, false])(
+        'uses the selected keyboard without changing the translated system locale (automatic=%s)',
+        (automatic) => {
+            vi.useFakeTimers();
+            try {
+                installRpgMakerGlobals();
+                $dataSystem.locale = 'ja';
+                globalThis.Window_NameInput = class {
+                    table() {
+                        return $dataSystem.locale === 'ja' ? ['１２３４'] : ['1234'];
+                    }
+                };
+                const runtime = createRuntime();
+                runtime.autoSwitchNameInputLanguage = automatic;
+                runtime.setupTranslationHook();
+                vi.advanceTimersByTime(1000);
+                expect($dataSystem.locale).toBe('en');
+                const input = new Window_NameInput();
+                expect(input.table()).toEqual(automatic ? ['1234'] : ['１２３４']);
+                expect($dataSystem.locale).toBe('en');
+                runtime.autoSwitchNameInputLanguage = !automatic;
+                expect(input.table()).toEqual(automatic ? ['１２３４'] : ['1234']);
+                expect($dataSystem.locale).toBe('en');
+            } finally {
+                vi.useRealTimers();
+            }
+        }
+    );
+
+    it.each(['realtime', 'cache-only', 'off'])(
+        'preserves map identifiers for transfer conditions while drawing translated names (%s)',
+        (mode) => {
+            installRpgMakerGlobals();
+            const source = '贄の儀式';
+            const destination = '贄の住処：サロン';
+            globalThis.$dataMap = { displayName: source };
+            const observed = [];
+            globalThis.Scene_Map = class {
+                onMapLoaded() {
+                    // Same display-name comparison that gates fade-in in the game.
+                    observed.push(
+                        $dataMap.displayName === source || $dataMap.displayName === destination
+                    );
+                }
+            };
+            globalThis.Window_MapName = class {
+                drawText(text, ...args) {
+                    this.drawn = [text, ...args];
+                    return 7;
+                }
+            };
+            const runtime = createRuntime({
+                translationEnabled: mode === 'realtime',
+                cacheEntries: [
+                    ['map_name:ja-en-' + source, 'Offering Ritual'],
+                    ['map_name:ja-en-' + destination, 'Salon'],
+                ],
+            });
+            runtime.enableTranslation = mode === 'cache-only';
+            runtime.setupTranslationHook();
+            const scene = new Scene_Map();
+            scene.onMapLoaded();
+            expect($dataMap).toEqual({ displayName: source });
+            const nameWindow = new Window_MapName();
+            expect(nameWindow.drawText($dataMap.displayName, 0, 0, 300, 'center')).toBe(7);
+            expect(nameWindow.drawn).toEqual([
+                mode === 'off' ? source : 'Offering Ritual',
+                0,
+                0,
+                300,
+                'center',
+            ]);
+            expect($dataMap.displayName).toBe(source);
+            globalThis.$dataMap = { displayName: destination };
+            scene.onMapLoaded();
+            nameWindow.drawText($dataMap.displayName);
+            expect(nameWindow.drawn[0]).toBe(mode === 'off' ? destination : 'Salon');
+            expect($dataMap.displayName).toBe(destination);
+            expect(observed).toEqual([true, true]);
+            expect(runtime.lastSeenByCacheKey.has('map_name:ja-en-' + source)).toBe(mode !== 'off');
+            globalThis.$dataMap = { displayName: 'Uncached map' };
+            scene.onMapLoaded();
+            nameWindow.drawText($dataMap.displayName);
+            expect(nameWindow.drawn[0]).toBe('Uncached map');
+        }
+    );
 
     it.each([true, false])(
         'uses plugin-normalized text for cache lookup, seen tracking and new requests (cached=%s)',

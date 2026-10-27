@@ -13,6 +13,7 @@ export const GAME_TRANSLATION_SETTINGS_KEYS = Object.freeze([
     'removeNewlinesBeforeWrappingMaxCount',
     'textWrapFontScaleMultiplier',
     'enableImageReplacement',
+    'autoSwitchNameInputLanguage',
     'enabledPluginTranslators',
     'nameProfilesByLangPair',
     'namePatternForEnforcing',

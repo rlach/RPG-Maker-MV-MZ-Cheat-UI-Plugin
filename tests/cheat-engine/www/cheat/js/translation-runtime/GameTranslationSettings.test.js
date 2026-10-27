@@ -46,6 +46,7 @@ describe('portable game translation settings', () => {
             descriptionMaxRows: 3,
             enableTextWrapping: false,
             enableImageReplacement: false,
+            autoSwitchNameInputLanguage: false,
             enabledPluginTranslators: { test: false },
             namePatternForEnforcing: 'custom',
             engineSettings: {
@@ -65,6 +66,7 @@ describe('portable game translation settings', () => {
             maxLineWidth: 39,
             descriptionMaxRows: 3,
             enableTextWrapping: false,
+            autoSwitchNameInputLanguage: false,
         });
         expect(store.read().tags).toEqual({
             tagFormat: 'tags',
@@ -73,10 +75,11 @@ describe('portable game translation settings', () => {
         });
         store.updateSection('translation', { maxLineWidth: 21, enableImageReplacement: true });
         store.updateSection('tags', { customTags: [], tagOverrides: {} });
-        const next = runtimeWith(legacy);
+        const next = runtimeWith({ ...legacy, autoSwitchNameInputLanguage: true });
         next.loadSettings();
         expect(next.maxLineWidth).toBe(21);
         expect(next.enableImageReplacement).toBe(true);
+        expect(next.autoSwitchNameInputLanguage).toBe(false);
         expect(store.read().tags.customTags).toEqual([]);
     });
 

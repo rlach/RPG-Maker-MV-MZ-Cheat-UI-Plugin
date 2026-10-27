@@ -13,6 +13,7 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
 import { parseJsonSafely } from './TranslatorHelpers.js';
+import { isKnownDisplayTranslation } from '../NotificationTranslationContext.js';
 
 const CACHE_TYPE = 'plugin_mnkr_tm_log_window_mz';
 const PLUGIN_NAME_ALIASES = ['MNKR_TMLogWindowMZ', 'TMLogWindowMZ'];
@@ -104,6 +105,7 @@ function extractScriptLogTexts(scriptBlock) {
 }
 
 function translateLogTextPayload(translator, text, runtime) {
+    if (runtime && isKnownDisplayTranslation(runtime, text)) return text;
     if (!(typeof text === 'string' && text.trim() !== '')) {
         return text;
     }

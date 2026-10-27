@@ -50,6 +50,8 @@ declare const Game_System: any;
 declare const Game_Variables: any;
 declare const Game_Player: any;
 declare const Game_Map: any;
+declare const Window_MapName: any;
+declare const Window_NameInput: any;
 declare const Game_Screen: any;
 
 declare const Scene_Base: any;
@@ -130,6 +132,7 @@ declare interface Window {
     Vue?: any;
     __CHEAT_EXTERNAL_WINDOW__?: boolean;
     $externMessage?: any;
+    $externMessageCSV?: string;
     $gameMessage?: any;
     $gameTemp?: any;
     $gameParty?: any;
