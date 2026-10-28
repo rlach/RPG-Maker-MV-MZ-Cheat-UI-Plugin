@@ -143,6 +143,7 @@ import { SabaSimpleScenarioTranslator } from './translators/SabaSimpleScenarioTr
 import { SabaTachieTranslator } from './translators/SabaTachieTranslator.js';
 import { SaiScenefileTranslator } from './translators/SaiScenefileTranslator.js';
 import { YepGabWindowTranslator } from './translators/YepGabWindowTranslator.js';
+import { SoRGabWindowTranslator } from './translators/SoRGabWindowTranslator.js';
 import { PHQuestBookTranslator } from './translators/PHQuestBookTranslator.js';
 import { SaveFilePlusTranslator } from './translators/SaveFilePlusTranslator.js';
 import { SaveLoadConfirmTranslator } from './translators/SaveLoadConfirmTranslator.js';
@@ -339,6 +340,7 @@ class PluginTranslatorRegistry {
             YepEquipCoreTranslator,
             YepBattleEngineCoreTranslator,
             YepGabWindowTranslator,
+            SoRGabWindowTranslator,
             YepEventMiniLabelTranslator,
             YepMessageCoreTranslator,
             YepBattleStatisticsTranslator,

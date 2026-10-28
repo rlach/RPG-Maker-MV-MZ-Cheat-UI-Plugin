@@ -16,3 +16,19 @@ it('identifies each unresolved occurrence including repeated and unclosed tags',
         expect(entry.context).toContain(entry.tag);
     }
 });
+
+it.each(['TAG:sn', '.TAG:sn⟫', '<<TAG:sn>', '⟪TAG:sn', 'TAG:sp12'])(
+    'rejects broken known transport marker %s',
+    (text) => {
+        const manager = new TagManager(null);
+        expect(manager.postprocessTags(text, {}, {}).valid).toBe(false);
+    }
+);
+
+it.each(['TAG', 'TAG:', 'TAG:unknown', 'TAG:snow', '<< plain >>'])(
+    'preserves ordinary text %s',
+    (text) => {
+        const manager = new TagManager(null);
+        expect(manager.postprocessTags(text, {}, {}).valid).toBe(true);
+    }
+);

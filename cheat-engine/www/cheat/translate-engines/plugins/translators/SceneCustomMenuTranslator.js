@@ -756,11 +756,42 @@ export class SceneCustomMenuTranslator extends BasePluginTranslator {
         const params = pluginEntry.parameters;
         await this._loadActorSourceNames();
         const entries = [];
+        const fields = new Set();
 
         for (let sceneIdx = 1; sceneIdx <= 20; sceneIdx++) {
             const scene = /** @type {any} */ (parseJsonSafely(params[`Scene${sceneIdx}`], null));
             if (scene && typeof scene.Id === 'string' && scene.Id.trim()) {
                 entries.push(...extractSceneEntries(scene));
+                for (const rawWindow of parseJsonSafely(scene.WindowList, [])) {
+                    const win = parseJsonSafely(rawWindow, {});
+                    for (const script of parseJsonSafely(win.ItemDrawScript, [])) {
+                        for (const match of script.matchAll(
+                            /this\.drawText(?:Ex)?\(\s*`\$\{item\.meta\[['"]([^'"]+)['"]\]\}`/g
+                        )) {
+                            fields.add(match[1]);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Metadata used by presentation scripts is display text, while other
+        // note fields can be identifiers or executable conditions.
+        if (fields.size) {
+            for (const database of ['Items', 'Weapons', 'Armors']) {
+                const response = await fetch(`data/${database}.json`);
+                if (!response.ok) throw new Error(`Cannot read ${database}: ${response.status}`);
+                for (const item of await response.json()) {
+                    for (const match of (item?.note || '').matchAll(/<([^:<>]+):([^<>]*)>/g)) {
+                        if (fields.has(match[1]) && match[2].trim()) {
+                            entries.push({
+                                text: match[2].trim(),
+                                kind: 'metadataText',
+                                source: { database, id: item.id },
+                            });
+                        }
+                    }
+                }
             }
         }
 

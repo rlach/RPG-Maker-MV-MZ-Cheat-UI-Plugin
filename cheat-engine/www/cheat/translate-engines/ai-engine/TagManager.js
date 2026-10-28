@@ -820,6 +820,29 @@ export class TagManager {
         }
 
         let hasUnresolvedEscapedTag = this.syntax.prefixPattern().test(result);
+        const knownIds = [...this.tagEntries, ...this.longRunEntries, this.simpleNEntry]
+            .map((entry) => escapeRegExp(entry.tagId))
+            .filter(Boolean);
+        const brokenTags = [
+            ...result.matchAll(new RegExp(`\\bTAG:(?:${knownIds.join('|')})(?=$|[^a-z])`, 'gi')),
+        ];
+        if (brokenTags.length && !hasUnresolvedEscapedTag) {
+            return {
+                text: result,
+                valid: false,
+                errorReason: 'Broken encoded tags left in output',
+                unresolvedTags: brokenTags.map((match) => ({
+                    tag: match[0],
+                    index: match.index,
+                    context: result.slice(
+                        Math.max(0, match.index - 40),
+                        match.index + match[0].length + 40
+                    ),
+                })),
+                expectedCounts: tagCounts,
+                actualCounts,
+            };
+        }
         if (hasUnresolvedEscapedTag && onlyLooseXmlTagIds instanceof Set) {
             hasUnresolvedEscapedTag = false;
             for (const entry of this.customParameterEntries) {
