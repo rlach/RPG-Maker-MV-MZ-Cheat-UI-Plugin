@@ -128,6 +128,7 @@ declare function require(name: string): any;
 declare const Bitmap: any;
 
 declare interface Window {
+    EventIndicators?: any;
     nw?: any;
     Vue?: any;
     __CHEAT_EXTERNAL_WINDOW__?: boolean;

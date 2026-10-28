@@ -93,6 +93,8 @@ import { EquipSceneExtensionTranslator } from './translators/EquipScene_Extensio
 import { SceneCustomMenuTranslator } from './translators/SceneCustomMenuTranslator.js';
 import { SeedPresserUITranslator } from './translators/SeedPresserUITranslator.js';
 import { GraphicalDesignModeTranslator } from './translators/GraphicalDesignModeTranslator.js';
+import { RJ01716681UITranslator } from './translators/RJ01716681UITranslator.js';
+import { MogEventIndicatorsTranslator } from './translators/MogEventIndicatorsTranslator.js';
 import { CombineCharacterECTranslator } from './translators/CombineCharacterECTranslator.js';
 import {
     MkrControlCharacterExTranslator,
@@ -296,6 +298,8 @@ class PluginTranslatorRegistry {
             SceneCustomMenuTranslator,
             SeedPresserUITranslator,
             GraphicalDesignModeTranslator,
+            RJ01716681UITranslator,
+            MogEventIndicatorsTranslator,
             CombineCharacterECTranslator,
             MkrControlCharacterExTranslator,
             EnemyPositionTranslator,

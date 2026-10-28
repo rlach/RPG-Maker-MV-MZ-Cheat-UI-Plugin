@@ -4,6 +4,8 @@ import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
 import { ConfirmDialog } from '../js/DialogHelper.js';
 import { ensureTranslateCacheRuntime, isMapLike } from '../js/TranslateCacheRuntime.js';
 import { nameIsTag } from '../js/EventCommandTraversal.js';
+import { Alert } from '../js/AlertHelper.js';
+import { previewNamePatternRepair, applyNamePatternRepair } from '../js/NamePatternCacheRepair.js';
 
 export default {
     name: 'TranslateNamesPanel',
@@ -119,6 +121,10 @@ export default {
                 hide-details
                 label="Only actors with original names">
             </v-checkbox>
+            <v-btn small outlined color="teal" class="ml-3"
+                :disabled="translating || !namePattern" @click="previewPatternNameRepair">
+                Repair names in cache
+            </v-btn>
         </div>
         <div class="mt-2 d-flex align-center">
             <v-text-field
@@ -136,6 +142,28 @@ export default {
         </div>
     </v-card-text>
 
+    <v-dialog v-model="nameRepairOpen" max-width="860">
+        <v-card dark>
+            <v-card-title>Repair names in translated cache</v-card-title>
+            <v-card-text v-if="nameRepairError"><v-alert type="error" text>{{ nameRepairError }}</v-alert></v-card-text>
+            <v-card-text v-if="nameRepairPreview">
+                <p>{{ nameRepairPreview.count }} cache entries will be changed. Only capture group 1 of the selected pattern is replaced.</p>
+                <p v-if="!nameRepairPreview.count">No matching names need replacement. Unknown names and already translated names are left unchanged.</p>
+                <template v-if="nameRepairPreview.count">
+                <div class="caption">Example before</div>
+                <pre style="white-space:pre-wrap;word-break:break-word;max-height:200px;overflow:auto">{{ nameRepairPreview.before }}</pre>
+                <div class="caption">Example after</div>
+                <pre style="white-space:pre-wrap;word-break:break-word;max-height:200px;overflow:auto">{{ nameRepairPreview.after }}</pre>
+                Apply these changes?
+                </template>
+            </v-card-text>
+            <v-card-actions>
+                <v-spacer></v-spacer>
+                <v-btn text @click="nameRepairOpen = false">Cancel</v-btn>
+                <v-btn color="primary" :disabled="!nameRepairPreview || !nameRepairPreview.count || !!nameRepairError" @click="applyPatternNameRepair">Apply</v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
     <v-dialog v-model="patternPickerOpen" max-width="860">
         <v-card dark>
             <v-card-title class="subtitle-1 font-weight-bold">
@@ -280,6 +308,9 @@ export default {
             officialNameEnforcementIncludeAllText: false,
             applyOnlyActorsWithOriginalNames: true,
             patternPickerOpen: false,
+            nameRepairOpen: false,
+            nameRepairPreview: null,
+            nameRepairError: '',
             officialNameEnforcementOptions: [
                 {
                     text: 'None',
@@ -697,6 +728,47 @@ export default {
             }
 
             this.refresh();
+        },
+
+        previewPatternNameRepair() {
+            this._namePatternRepairPlan = null;
+            this.nameRepairPreview = null;
+            this.nameRepairError = '';
+            this.nameRepairOpen = true;
+            try {
+                const plan = previewNamePatternRepair(ensureTranslationRuntime(), this.namePattern);
+                if (!plan.changes.length) {
+                    this.nameRepairPreview = { count: 0 };
+                    return;
+                }
+                this._namePatternRepairPlan = plan;
+                const example = plan.changes[0];
+                this.nameRepairPreview = {
+                    count: plan.changes.length,
+                    before: example.before,
+                    after: example.after,
+                };
+                this.nameRepairOpen = true;
+            } catch (error) {
+                this.nameRepairError = `Cannot preview name replacements: ${error.message}`;
+                console.warn('[TranslateNamesPanel] Name replacement preview failed', error);
+            }
+        },
+
+        applyPatternNameRepair() {
+            if (!this._namePatternRepairPlan) return;
+            try {
+                const count = applyNamePatternRepair(
+                    ensureTranslationRuntime(),
+                    this._namePatternRepairPlan
+                );
+                this.nameRepairOpen = false;
+                this._namePatternRepairPlan = null;
+                Alert.info(`Updated ${count} translated cache entries.`);
+                this.refresh();
+            } catch (error) {
+                this.nameRepairError = error.message;
+            }
         },
 
         async translateNames() {

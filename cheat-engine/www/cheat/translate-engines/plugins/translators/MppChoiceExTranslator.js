@@ -2,7 +2,6 @@ import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_MPP_CHOICE_EX_TRANSLATOR_HOOKED__';
-const MPP_CHOICE_EX_PLUGIN_NAME = 'mpp_choiceex';
 const DEFAULT_CHOICE_HELP_COMMANDS = [
     'ChoiceHelp',
     '<ChoiceHelp>',
@@ -62,6 +61,9 @@ function normalizeAsDialogueText(text, runtime) {
  *     no public getter). setChoiceHelpTexts() is the only public mutator.
  *   - Older versions (MV): May expose a helpTexts() getter method instead of
  *     direct _helpTexts property access.
+ *   - ver.4.3.5 (MV/MZ): selected help is copied into the message window by
+ *     updateHelp(), bypassing the normal canStart translation path. Resolve at
+ *     hover time and restore the source help table after presentation.
  */
 export class MppChoiceExTranslator extends BasePluginTranslator {
     constructor() {
@@ -76,18 +78,8 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
         return 'MPP_ChoiceEX';
     }
 
-    detectPlugin() {
-        if (!Array.isArray(runtimeGlobal.$plugins)) {
-            return false;
-        }
-
-        return runtimeGlobal.$plugins.some((plugin) => {
-            const pluginName = normalizeCommandName(plugin?.name);
-            return (
-                pluginName === MPP_CHOICE_EX_PLUGIN_NAME ||
-                pluginName === MPP_CHOICE_EX_OP1_PLUGIN_NAME
-            );
-        });
+    getPluginAliases() {
+        return ['MPP_ChoiceEX', 'MPP_ChoiceEX_Op1'];
     }
 
     getPluginLabel() {
@@ -111,30 +103,36 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
             return true;
         }
 
+        const choices = runtimeGlobal.Window_ChoiceList?.prototype;
         if (
-            !runtimeGlobal.Game_Interpreter ||
-            !Game_Interpreter.prototype ||
-            typeof Game_Interpreter.prototype.setupChoices !== 'function'
+            typeof choices?.updateHelp !== 'function' ||
+            typeof runtimeGlobal.Game_Message?.prototype.setChoiceHelpTexts !== 'function'
         ) {
             return false;
         }
-
-        const originalSetupChoices = Game_Interpreter.prototype.setupChoices;
-        const applyChoiceHelpTranslations = this.applyRuntimeChoiceHelpTranslations.bind(this);
-
-        Game_Interpreter.prototype.setupChoices = function () {
-            const result = originalSetupChoices.apply(this, arguments);
-
+        const translator = this;
+        const updateHelp = choices.updateHelp;
+        choices.updateHelp = function (...args) {
+            const message = runtimeGlobal.$gameMessage;
+            const help =
+                typeof message.helpTexts === 'function' ? message.helpTexts() : message._helpTexts;
+            const index = this.index();
+            const entry = help?.[index];
+            const text = translator.resolveChoiceHelpEntry(entry);
+            if (text === null) return updateHelp.apply(this, args);
+            const replacement = [...help];
+            replacement[index] = splitHelpTextBlock(text);
+            const originalHelp = message._helpTexts;
+            const ownGetter = Object.getOwnPropertyDescriptor(message, 'helpTexts');
+            message._helpTexts = replacement;
+            if (typeof message.helpTexts === 'function') message.helpTexts = () => replacement;
             try {
-                applyChoiceHelpTranslations();
-            } catch (error) {
-                console.warn(
-                    '[MppChoiceExTranslator] Failed to apply runtime choice help translation',
-                    error
-                );
+                return updateHelp.apply(this, args);
+            } finally {
+                message._helpTexts = originalHelp;
+                if (ownGetter) Object.defineProperty(message, 'helpTexts', ownGetter);
+                else delete message.helpTexts;
             }
-
-            return result;
         };
 
         runtimeGlobal[RUNTIME_HOOK_GUARD] = true;
@@ -188,57 +186,18 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
         }
     }
 
-    applyRuntimeChoiceHelpTranslations() {
+    resolveChoiceHelpEntry(entry) {
+        if (!Array.isArray(entry)) return null;
+        const originalBlock = joinHelpTextLines(entry);
+        if (!this.isUsableText(originalBlock)) return null;
         const runtime = this.getRuntime();
-        const gameMessage = runtimeGlobal.$gameMessage;
-        if (!runtime || !gameMessage || typeof gameMessage.setChoiceHelpTexts !== 'function') {
-            return;
-        }
-
-        // Support both older versions (public helpTexts() getter) and v3.7+
-        // (private _helpTexts property, no getter defined).
-        const helpTexts =
-            typeof gameMessage.helpTexts === 'function'
-                ? gameMessage.helpTexts()
-                : gameMessage._helpTexts;
-        if (!Array.isArray(helpTexts) || helpTexts.length === 0) {
-            return;
-        }
-
-        let changed = false;
-        const translatedHelpTexts = helpTexts.map((entry) => {
-            if (!Array.isArray(entry)) {
-                return entry;
-            }
-
-            const originalBlock = joinHelpTextLines(entry);
-            if (!this.isUsableText(originalBlock)) {
-                return entry;
-            }
-
-            const cacheKey = runtime.getCacheKey(originalBlock, this.getChoiceHelpCacheType());
-            runtime.trackCacheKeyUsage(cacheKey);
-
-            if (!runtime.hasUsableCacheValue(cacheKey)) {
-                return entry;
-            }
-
-            const cached = runtime.translationCache.get(cacheKey);
-            if (!this.isUsableText(cached)) {
-                return entry;
-            }
-
-            const normalized = normalizeAsDialogueText(cached, runtime);
-            const translatedLines = splitHelpTextBlock(normalized);
-            if (joinHelpTextLines(translatedLines) !== originalBlock) {
-                changed = true;
-            }
-            return translatedLines;
-        });
-
-        if (changed) {
-            gameMessage.setChoiceHelpTexts(translatedHelpTexts);
-        }
+        const translated = this.resolveRuntimeTranslation(
+            originalBlock,
+            runtime,
+            this.getChoiceHelpCacheType(),
+            { missValue: originalBlock, requireRuntimeTranslationActive: true }
+        );
+        return translated === originalBlock ? null : normalizeAsDialogueText(translated, runtime);
     }
 
     getChoiceHelpCommands() {

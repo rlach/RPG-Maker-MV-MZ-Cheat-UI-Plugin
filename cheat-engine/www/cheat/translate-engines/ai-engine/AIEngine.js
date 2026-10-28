@@ -1,4 +1,5 @@
 import { TagSyntax } from './TagSyntax.js';
+import { buildOfficialNameMap } from '../../js/NamePatternCacheRepair.js';
 /**
  * AIEngine - Refactored Orchestrator
  * Coordinates translation pipeline using modular services
@@ -825,44 +826,7 @@ class AIEngine extends BaseTranslationEngine {
     }
 
     getOfficialNameMap() {
-        const sourceLang = this.runtime?.sourceLang || 'ja';
-        const targetLang = this.runtime?.targetLang || 'en';
-        const pairKey = `${sourceLang}-${targetLang}`;
-        const officialNameMap = new Map();
-
-        const pairProfiles =
-            this.runtime?.nameProfilesByLangPair &&
-            typeof this.runtime.nameProfilesByLangPair[pairKey] === 'object'
-                ? this.runtime.nameProfilesByLangPair[pairKey]
-                : {};
-
-        Object.keys(pairProfiles).forEach((originalName) => {
-            const profile = pairProfiles[originalName];
-            const translation =
-                profile && typeof profile.translation === 'string'
-                    ? profile.translation.trim()
-                    : '';
-            if (originalName && translation) {
-                officialNameMap.set(originalName, translation);
-            }
-        });
-
-        if (this.runtime?.translationCache instanceof Map) {
-            for (const [cacheKey, value] of this.runtime.translationCache.entries()) {
-                const prefix = `actor_name:${sourceLang}-${targetLang}-`;
-                if (!cacheKey.startsWith(prefix)) {
-                    continue;
-                }
-
-                const originalName = cacheKey.slice(prefix.length);
-                const translation = typeof value === 'string' ? value.trim() : '';
-                if (originalName && translation && !officialNameMap.has(originalName)) {
-                    officialNameMap.set(originalName, translation);
-                }
-            }
-        }
-
-        return officialNameMap;
+        return buildOfficialNameMap(this.runtime);
     }
 
     replaceFirstMatchedCapture(text, pattern, replacement) {
