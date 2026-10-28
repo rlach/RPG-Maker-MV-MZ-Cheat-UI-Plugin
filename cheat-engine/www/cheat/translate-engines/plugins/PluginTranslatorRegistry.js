@@ -92,6 +92,8 @@ import { RecollectionModeMZTranslator } from './translators/RecollectionModeMZTr
 import { EquipSceneExtensionTranslator } from './translators/EquipScene_ExtensionTranslator.js';
 import { SceneCustomMenuTranslator } from './translators/SceneCustomMenuTranslator.js';
 import { SeedPresserUITranslator } from './translators/SeedPresserUITranslator.js';
+import { GraphicalDesignModeTranslator } from './translators/GraphicalDesignModeTranslator.js';
+import { CombineCharacterECTranslator } from './translators/CombineCharacterECTranslator.js';
 import {
     MkrControlCharacterExTranslator,
     EnemyPositionTranslator,
@@ -293,6 +295,8 @@ class PluginTranslatorRegistry {
             SaveLoadConfirmTranslator,
             SceneCustomMenuTranslator,
             SeedPresserUITranslator,
+            GraphicalDesignModeTranslator,
+            CombineCharacterECTranslator,
             MkrControlCharacterExTranslator,
             EnemyPositionTranslator,
             MnkrEnemyIconTranslator,

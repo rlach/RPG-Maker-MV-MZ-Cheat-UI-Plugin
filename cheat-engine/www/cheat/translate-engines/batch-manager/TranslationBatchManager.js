@@ -3,6 +3,7 @@ import { ErrorRecoveryStrategy } from './ErrorRecoveryStrategy.js';
 import { BatchProgressTracker } from './BatchProgressTracker.js';
 import { BatchSummaryReporter } from './BatchSummaryReporter.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../plugins/PluginTranslatorRegistry.js';
+import { QueueWorkEstimate } from './QueueWorkEstimate.js';
 
 export class TranslationBatchManager {
     constructor(runtime, options = {}) {
@@ -391,28 +392,36 @@ export class TranslationBatchManager {
         const mergeStats = (stats) => {
             BatchSummaryReporter.mergeErrorStats(aggregatedErrorStats, stats);
         };
-        const remainingCharsByEntry = new Map();
+        const estimate = new QueueWorkEstimate(
+            (item) =>
+                item.cacheKey ||
+                this.runtime.getCacheKey?.(item.value, item.type) ||
+                JSON.stringify([item.type, item.value]),
+            (items) => this.countBatchRequestedChars(items)
+        );
+        let estimatedTotalChars = 0;
+        let scopeStarted = false;
+        const syncEstimate = () => {
+            const total = estimate.totalChars;
+            if (scopeStarted)
+                this.runtime?.adjustQueueCompletionTotalChars?.(
+                    total - estimatedTotalChars,
+                    this.progressChannel
+                );
+            estimatedTotalChars = total;
+        };
         const reconcileEntryChars = (entry, items) => {
-            const remainingChars = this.countBatchRequestedChars(items);
-            const previousChars = remainingCharsByEntry.get(entry) || 0;
-            this.runtime?.adjustQueueCompletionTotalChars?.(
-                remainingChars - previousChars,
-                this.progressChannel
-            );
-            remainingCharsByEntry.set(entry, remainingChars);
+            estimate.setItems(entry, items);
+            syncEstimate();
         };
         const countQueueRequestedChars = (entries) => {
-            let total = 0;
-
             for (const entry of entries || []) {
                 if (!entry) {
                     continue;
                 }
 
                 if (Array.isArray(entry.items)) {
-                    const chars = this.countBatchRequestedChars(entry.items);
-                    remainingCharsByEntry.set(entry, chars);
-                    total += chars;
+                    estimate.setItems(entry, entry.items);
                     continue;
                 }
 
@@ -428,12 +437,11 @@ export class TranslationBatchManager {
                     typeof strategy.toTranslationBatchItems === 'function'
                         ? strategy.toTranslationBatchItems(pendingItems || [])
                         : pendingItems || [];
-                const chars = this.countBatchRequestedChars(batchItems);
-                remainingCharsByEntry.set(entry, chars);
-                total += chars;
+                estimate.setItems(entry, batchItems);
             }
 
-            return total;
+            syncEstimate();
+            return estimatedTotalChars;
         };
         const executeEntry = async (entryItems, entryOptions = {}, queueEntry) => {
             const strategy = entryOptions.strategy;
@@ -710,10 +718,8 @@ export class TranslationBatchManager {
                 }
 
                 this.runtime?.markQueueCompletionItemsProcessed?.(batch, this.progressChannel);
-                remainingCharsByEntry.set(
-                    queueEntry,
-                    Math.max(0, (remainingCharsByEntry.get(queueEntry) || 0) - batchRequestedChars)
-                );
+                estimate.completeBatch(queueEntry, batch, successes);
+                syncEstimate();
 
                 processed += batch.length;
                 this.progressTracker.updateStep(translationPhaseLabel, processed, safeItems.length);
@@ -777,6 +783,7 @@ export class TranslationBatchManager {
                 countQueueRequestedChars(queueEntries),
                 this.progressChannel
             );
+            scopeStarted = true;
         }
 
         this.progressTracker.beginQueue();
@@ -878,6 +885,8 @@ export class TranslationBatchManager {
                     continue;
                 }
 
+                estimate.removeEntry(entry);
+                syncEstimate();
                 safeQueueEntries.shift();
             }
         } finally {
