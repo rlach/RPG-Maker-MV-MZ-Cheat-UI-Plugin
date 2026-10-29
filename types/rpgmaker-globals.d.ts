@@ -32,6 +32,8 @@ declare const Window_MessageEx: any;
 declare const Window_ChoiceListEx: any;
 declare const DataManager: any;
 declare const BattleManager: any;
+declare const Torigoya: any;
+declare const Game_Battler: any;
 declare const ImageManager: any;
 declare const AudioManager: any;
 declare const SoundManager: any;

@@ -8,8 +8,14 @@ const createTagWithoutParam = (description, tagSymbol) => ({
     requiredConsistency: true,
 });
 
+const ALIGNMENT_POSITION_PROMPT =
+    'Keep this at as close to exact spot as it was in original text. If it was at the start of the string keep it at the start. This is not part of grammar, but part of presentation.';
+
 const PLUGIN_TAGS = [
-    createTagWithoutParam('Centers the message', 'AC'),
+    {
+        ...createTagWithoutParam('Centers the message', 'AC'),
+        extraPromptForLlm: ALIGNMENT_POSITION_PROMPT,
+    },
     createTagWithoutParam('Right aligns the message', 'AR'),
     createTagWithoutParam('Aligns the message vertically to center', 'VC'),
     createTagWithoutParam('Aligns the message vertically to bottom', 'VB'),
@@ -19,6 +25,7 @@ const PLUGIN_TAGS = [
         type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
         tagSymbol: 'AC',
         requiredConsistency: true,
+        extraPromptForLlm: ALIGNMENT_POSITION_PROMPT,
     },
 ];
 
