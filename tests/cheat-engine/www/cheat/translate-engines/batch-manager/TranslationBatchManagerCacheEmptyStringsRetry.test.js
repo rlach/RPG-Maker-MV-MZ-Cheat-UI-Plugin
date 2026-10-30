@@ -85,6 +85,40 @@ function createRuntimeStub() {
 }
 
 describe('TranslationBatchManager cacheEmptyStrings repeat behavior', () => {
+    it('stops all chunks, following phases and repeat-until-success on a connection failure', async () => {
+        const runtime = createRuntimeStub();
+        runtime.engine.batchTranslate = async (batch) => {
+            runtime.engine.callCount++;
+            if (runtime.engine.callCount > 1) throw new Error('Unexpected retry');
+            return {
+                successes: [],
+                failures: batch.map((item) => ({
+                    ...item,
+                    cancelReason: 'llm_connection_error',
+                    rejectReason: 'Could not connect to the LLM service',
+                })),
+            };
+        };
+        const manager = new TranslationBatchManager(runtime);
+        manager.register(CacheEmptyStrings.getInstance());
+        await manager.runBatchedTranslation([
+            {
+                kind: 'cacheEmptyStrings',
+                repeatUntilSuccess: true,
+                itemLimit: 1,
+                backgroundJob: false,
+            },
+            {
+                kind: 'cacheEmptyStrings',
+                repeatUntilSuccess: true,
+                itemLimit: 1,
+                backgroundJob: false,
+            },
+        ]);
+        expect(runtime.engine.callCount).toBe(1);
+        expect([...runtime.translationCache.values()]).toEqual(['', '']);
+    });
+
     it('retries only unresolved items and keeps successful ones applied', async () => {
         const originalAlert = globalThis.alert;
         globalThis.alert = () => {};

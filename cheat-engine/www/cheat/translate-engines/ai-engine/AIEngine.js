@@ -1,4 +1,5 @@
 import { TagSyntax } from './TagSyntax.js';
+import { LlmConnectionError, LLM_CONNECTION_ERROR } from './LlmConnectionError.js';
 import { buildOfficialNameMap } from '../../js/NamePatternCacheRepair.js';
 /**
  * AIEngine - Refactored Orchestrator
@@ -1434,6 +1435,7 @@ class AIEngine extends BaseTranslationEngine {
                 failures: items.map((item) => ({
                     ...item,
                     rejectReason: error.message,
+                    cancelReason: error.code === LLM_CONNECTION_ERROR ? LLM_CONNECTION_ERROR : null,
                 })),
             };
         }
@@ -1484,15 +1486,21 @@ class AIEngine extends BaseTranslationEngine {
                     typeof window !== 'undefined' ? window['chromiumFetch'] : undefined;
                 const requestFetch = typeof preservedFetch === 'function' ? preservedFetch : fetch;
 
-                const response = await requestFetch(this.getChatUrl(), {
-                    method: 'POST',
-                    headers: this.getRequestHeaders(),
-                    body: JSON.stringify(processedPayload),
-                    signal: controller.signal,
-                });
+                let response;
+                try {
+                    response = await requestFetch(this.getChatUrl(), {
+                        method: 'POST',
+                        headers: this.getRequestHeaders(),
+                        body: JSON.stringify(processedPayload),
+                        signal: controller.signal,
+                    });
+                } catch (error) {
+                    if (error.name === 'AbortError') throw error;
+                    throw new LlmConnectionError(error.message || String(error));
+                }
 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                    throw new LlmConnectionError(`HTTP ${response.status}`);
                 }
 
                 const contentType = (response.headers.get('content-type') || '').toLowerCase();
@@ -1621,6 +1629,10 @@ class AIEngine extends BaseTranslationEngine {
                     cancelReason: monitorState.cancelReason,
                 };
             } catch (error) {
+                if (error.code === LLM_CONNECTION_ERROR) {
+                    this.runtime?.notify?.('error', error.message);
+                    throw error;
+                }
                 if (error.name === 'AbortError') {
                     const externalCancelReason =
                         this._activeRequestMeta && this._activeRequestMeta.externalCancelReason

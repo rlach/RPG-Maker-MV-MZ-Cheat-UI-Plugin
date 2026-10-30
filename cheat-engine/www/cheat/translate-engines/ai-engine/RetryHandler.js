@@ -5,6 +5,7 @@
  */
 
 import { StreamJsonParser } from './StreamJsonParser.js';
+import { LLM_CONNECTION_ERROR } from './LlmConnectionError.js';
 import { buildRequestSettingsForContent } from './constants.js';
 import { stripThinkBlocks } from './utils.js';
 import { translationResponseSchema } from './StructuredOutput.js';
@@ -90,6 +91,7 @@ export class RetryHandler {
             });
             return { ok: !!result, response: result };
         } catch (e) {
+            if (e.code === LLM_CONNECTION_ERROR) throw e;
             return { ok: false, error: e.message };
         }
     }
@@ -163,6 +165,7 @@ export class RetryHandler {
                 return this.retryJsonRepair(result.text, depth + 1, isBackgroundJob, expectedKeys);
             }
         } catch (e) {
+            if (e.code === LLM_CONNECTION_ERROR) throw e;
             return { ok: false, error: e.message };
         }
     }
@@ -197,6 +200,26 @@ export class RetryHandler {
             const firstResult = await this.aiEngine.batchTranslate(firstHalf, {
                 backgroundJob: isBackgroundJob,
             });
+            if (
+                firstResult.failures?.some(
+                    (failure) => failure.cancelReason === LLM_CONNECTION_ERROR
+                )
+            ) {
+                return {
+                    ok: true,
+                    merged: {
+                        successes: firstResult.successes || [],
+                        failures: [
+                            ...firstResult.failures,
+                            ...secondHalf.map((item) => ({
+                                ...item,
+                                cancelReason: LLM_CONNECTION_ERROR,
+                                rejectReason: firstResult.failures[0].rejectReason,
+                            })),
+                        ],
+                    },
+                };
+            }
             const secondResult = await this.aiEngine.batchTranslate(secondHalf, {
                 backgroundJob: isBackgroundJob,
             });

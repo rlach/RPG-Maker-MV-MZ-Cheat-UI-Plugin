@@ -4,6 +4,7 @@ import { BatchProgressTracker } from './BatchProgressTracker.js';
 import { BatchSummaryReporter } from './BatchSummaryReporter.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../plugins/PluginTranslatorRegistry.js';
 import { QueueWorkEstimate } from './QueueWorkEstimate.js';
+import { LLM_CONNECTION_ERROR } from '../ai-engine/LlmConnectionError.js';
 
 export class TranslationBatchManager {
     constructor(runtime, options = {}) {
@@ -55,7 +56,11 @@ export class TranslationBatchManager {
 
         return failures.every((failure) => {
             const reason = failure && failure.cancelReason;
-            return reason === 'background_preempted' || reason === 'request_aborted';
+            return (
+                reason === 'background_preempted' ||
+                reason === 'request_aborted' ||
+                reason === LLM_CONNECTION_ERROR
+            );
         });
     }
 
@@ -337,6 +342,7 @@ export class TranslationBatchManager {
     }
 
     async runBatchedTranslation(items, options = {}) {
+        let connectionFailed = false;
         if (this.runtime) {
             this.runtime.clearQueueCompletionScope(this.progressChannel);
         }
@@ -612,6 +618,8 @@ export class TranslationBatchManager {
                     failures = batch.map((item) => ({
                         ...item,
                         rejectReason,
+                        cancelReason:
+                            error.code === LLM_CONNECTION_ERROR ? LLM_CONNECTION_ERROR : null,
                     }));
                 }
 
@@ -682,6 +690,11 @@ export class TranslationBatchManager {
                     );
                 }
 
+                if (failures.some((failure) => failure.cancelReason === LLM_CONNECTION_ERROR)) {
+                    connectionFailed = true;
+                    break;
+                }
+
                 if (this.isAbortBatchResult(failures, batch.length)) {
                     const cancelReason = failures[0] && failures[0].cancelReason;
                     const skippedFailures = [];
@@ -737,7 +750,7 @@ export class TranslationBatchManager {
             });
             const stats = this.errorRecovery.getStats();
 
-            if (!interruptedForCurrentMap && hasStrategy) {
+            if (!connectionFailed && !interruptedForCurrentMap && hasStrategy) {
                 strategy.finalizePhase?.({
                     runtime: this.runtime,
                     pendingItems,
@@ -789,7 +802,7 @@ export class TranslationBatchManager {
         this.progressTracker.beginQueue();
         try {
             while (safeQueueEntries.length > 0) {
-                if (this.isQueueAbortRequested()) {
+                if (connectionFailed || this.isQueueAbortRequested()) {
                     break;
                 }
 
@@ -855,10 +868,11 @@ export class TranslationBatchManager {
                 }
                 for (const failure of translated.failures || []) {
                     aggregatedFailures.push(failure);
+                    if (failure.cancelReason === LLM_CONNECTION_ERROR) connectionFailed = true;
                 }
                 mergeStats(translated.stats);
 
-                if (this.isQueueAbortRequested()) {
+                if (connectionFailed || this.isQueueAbortRequested()) {
                     break;
                 }
 
@@ -930,7 +944,7 @@ export class TranslationBatchManager {
         }
 
         const showSummary = options.showSummary !== false;
-        if (showSummary) {
+        if (showSummary && !connectionFailed) {
             BatchSummaryReporter.showAlert(summary);
             BatchSummaryReporter.logSummary(summary);
         }
@@ -940,6 +954,7 @@ export class TranslationBatchManager {
             failures: aggregatedFailures,
             summary,
             stats: aggregatedErrorStats,
+            cancelReason: connectionFailed ? LLM_CONNECTION_ERROR : null,
         };
     }
 

@@ -14,6 +14,8 @@ import { BasePluginTranslator } from '../BasePluginTranslator.js';
  * - Temporarily swap command names back to originals only while
  *   loadBitmapsMain executes.
  * - Restore translated names immediately after the original method returns.
+ * - Translate the location bitmap drawn by createLocation using map_name
+ *   cache entries; preserve Game_Map.displayName() as a logic identifier.
  */
 
 function buildTranslatedToOriginalCommandMap(runtime) {
@@ -105,6 +107,34 @@ export class MogSceneMenuTranslator extends BasePluginTranslator {
 
         const getRuntime = this.getRuntime.bind(this);
         const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
+        const translator = this;
+
+        if (typeof Scene_Menu.prototype.createLocation === 'function') {
+            const createLocation = Scene_Menu.prototype.createLocation;
+            Scene_Menu.prototype.createLocation = function (...args) {
+                const scene = this;
+                const prototype = window.Bitmap.prototype;
+                const drawText = prototype.drawText;
+                prototype.drawText = function (text, ...drawArgs) {
+                    if (this === scene._location?.bitmap) {
+                        text = translator.resolveRuntimeTranslation(
+                            text,
+                            getRuntime(),
+                            'map_name',
+                            {
+                                requireRuntimeTranslationActive: true,
+                            }
+                        );
+                    }
+                    return drawText.call(this, text, ...drawArgs);
+                };
+                try {
+                    return createLocation.apply(this, args);
+                } finally {
+                    prototype.drawText = drawText;
+                }
+            };
+        }
 
         Scene_Menu.prototype.loadBitmapsMain = function () {
             const runtime = getRuntime();
