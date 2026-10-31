@@ -1,46 +1,88 @@
 # Core UI window regressions
 
-Tag Manager displays the source newline as `\n`. Separate Symbol and LLM encoding
-columns show the actual registered transport ID and selected TAG/legacy syntax.
-They are searchable. Masked and XML parameters use the registry's normalized
-transport representation.
+The complete UI uses bundled Vue 3.5.22 and Vuetify 3.9.0. There is no Vue 2
+runtime or prototype mode. Styles and MDI fonts are bundled for offline use.
+Both embedded and separate windows use the same application factory. Each window
+loads its own libraries and compiles its own component templates; game APIs and
+settings remain shared. Shared translation modal state explicitly notifies each
+window and removes its subscription on unmount.
 
-Notifications queue in arrival order. Each starts its own timeout after it is
-displayed, can be dismissed manually, and cannot be closed by an earlier timer.
-Nonpositive timeouts remain visible until dismissed. Teardown clears timers and
-restores the prior alert handler without overwriting a newer handler.
+Compatibility helpers run in the owning document before the libraries load.
+They provide missing array/string methods for older NW.js versions. The slider
+CSS uses physical positioning when logical inset properties are unavailable.
+This preserves the prototype fixes validated with NW.js 0.49.2 and 0.61.0.
 
-Separate Window loads the bundled Vue and Vuetify in its own DOM realm, without
-sharing parent constructors or CommonJS module caches. Imported component options
-are cloned recursively to remove Vue 2's constructor cache, including nested
-components, mixins and extends. Sharing the raw options can otherwise reuse a
-parent constructor even after loading local libraries. Game APIs remain shared.
-Removed the ineffective Vuetify 3 defaults configuration from the Vuetify 2 app.
+Table headers and sort bindings adapt the existing settings representation to
+Vuetify 3 without migrating users' stored sorting preferences. Game actors and
+inventory records retain raw identity when referenced by reactive forms.
 
-Unit tests cover notification timing, dismissal/teardown, TAG and legacy newline
-encoding, masked XML encoding and constructor-cache isolation.
+Tag Manager displays the source newline as `\n`, with separate transport symbol
+and LLM encoding columns. Notifications queue with independent timeouts.
+Koharu remains hidden while its integration service is unavailable.
 
-Browser regression fixture: serve the repository root with a local HTTP server
-and open `/tests/window-ui-browser-probe.html`. It uses the actual bundled
-libraries in two documents and deliberately reuses parent component options.
-The result must report true for distinct Vue/Vuetify instances, menu ownership
-and attachment, first-menu dismissal, second-menu opening, slider movement,
-release, blur and constructor isolation. The fixture passed in headless Chrome
-(the slider moved from 20 to 80). This is a browser DOM integration test, not an
-NW.js game playthrough. Manual QA should also reopen/close Separate Window and
-check General sliders, settings selects, tag display and queued notifications.
+## Automated validation
 
-Separate Window must mount directly onto the live `#app` element. Mounting with
-`$mount()` and appending the root afterward leaves Vuetify sliders' `app` event
-target null: its mounted hook queries the document before `[data-app]` exists.
-The browser fixture now dispatches drag events on the actual slider DOM instead
-of the slider's cached event target, checks thumb position before mouseup, and
-switches between two sliders. With `?detached`, it reproduces the previous bug:
-no live target, no drag update, and sliders remain active after release. The
-normal path reports a live target, 80% thumb position during drag, released
-sliders and cleared previous focus.
+Run `yarn test`, `yarn lint`, `yarn check:translators`, and `yarn format`.
+Vitest excludes generated deployment files and browser profiles.
 
-The Koharu tab and its component registration are temporarily removed from
-CheatModal while the integration service is unavailable. The implementation and
-saved integration settings remain available for a future restoration. A stale
-panel selection falls back through CheatModal's existing navigation handling.
+Serve the repository root over HTTP, open `/tests/ui-browser.html` in headless
+Chrome with remote debugging port 9340, then run `node scripts/probe-ui.mjs`.
+Use `--reload` after edits and `?maker=MZ` for the MZ fixture. The fixture uses
+mock game objects and an in-memory filesystem; it does not modify game saves.
+It compiles nested templates, mounts every panel, and checks slider movement,
+navigation and translation/boxing modal updates. `UI_CDP_URL` overrides the
+remote debugging endpoint. Browser integration checks do not replace actual
+NW.js game QA.
+
+For release QA, install the corresponding MV/MZ archive and launch `nw.exe`.
+Check overlay shortcuts, separate-window reopen/close, sliders during drag,
+settings dropdown ownership, table filtering/sorting/editing, mass translation,
+notification dismissal, and persisted settings after restart.
+
+## Layout regression checks
+
+The 2.0.1 follow-up restores local Roboto fonts, compact unlabelled inline table
+editors, one-row pagination, blue leaf navigation, wrapping action toolbars,
+consistent top-right refresh controls, and warning colors. `CheatTooltip` closes
+on action clicks and deactivation, including when a clicked button disables itself.
+
+With the fixture and debugging endpoint running, use:
+
+```sh
+node scripts/probe-ui.mjs --reload --layout-check
+node scripts/probe-ui.mjs --reload --screenshots
+```
+
+Layout checks use four party members and five inventory rows with realistic
+multiline descriptions. At overlay widths 620 and 760 they verify row visibility,
+footer height, refresh geometry, HP/MP alignment, Names Manager checkbox width,
+export language text, warning colors, and tooltip dismissal after disabling its
+activator. Screenshots go to `deploy/output/ui-review`; `UI_SCREENSHOT_DIR`
+overrides this directory. The checks and screenshot review also ran headlessly
+on Chromium 86 from the copied NW.js 0.49.2 runtime. Game playthrough QA remains
+separate. Browser fixture bootstrap avoids top-level await for that runtime.
+
+The 2.0.2 layout checks also cover placeholder padding, shortcut clear-button
+alignment, variable-editor width, consistent inline editor outlines, switch
+sizes, X/Y alignment, exporter scrolling with 40 folders, the tag-format field
+after resize, teleported tag override editors, unknown-tag table margins, and
+compact mass-translation rows. Common field/table rules apply to both #app and
+Vuetify's overlay container. Dynamic layout-check imports bypass browser cache.
+
+## Keyboard regressions
+
+Run `node scripts/probe-ui.mjs --reload --keyboard-check` against a running
+headless browser endpoint. The fixture registers an RPG Maker-like document
+handler before mounting the UI, including default cancellation of Backspace and
+arrow keys. CDP dispatches actual keyboard input to both embedded and separate
+windows: cursor movement, Backspace, Ctrl+A, numeric up/down stepping, and a plain
+textarea in the teleported overlay container. Editing keys must not reach the
+game handler; an input outside the UI must still reach it. `UiKeyboardGuard`
+stops bubbling from editors after their local handlers, without preventing
+browser defaults. Vuetify field handlers use `.stop` rather than `.self.stop`
+because Vue 3 forwards listeners to wrappers around the native input.
+
+Numeric-only editors (Gold, HP/MP, item quantities, stats and teleport coordinates)
+use native number inputs. Variables retain text inputs so strings stay editable;
+Up/Down steps finite numeric variable values by one and leaves string values
+unchanged. Keyboard QA covers Gold, settings numbers, numeric and text variables.

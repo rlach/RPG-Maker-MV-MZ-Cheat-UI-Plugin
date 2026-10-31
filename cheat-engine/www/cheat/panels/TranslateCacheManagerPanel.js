@@ -26,36 +26,32 @@ export default {
 
     template: `
 <v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
-    <v-card-title class="subtitle-1 font-weight-bold pb-1">
+    <v-card-title class="text-subtitle-1 font-weight-bold pb-1">
         Translation Cache Manager
     </v-card-title>
 
     <v-card-text class="pt-0 pb-1">
         <div class="d-flex align-center justify-space-between">
-            <v-tooltip bottom>
-                <template v-slot:activator="{ on, attrs }">
+            <cheat-tooltip location="bottom">
+                <template v-slot:activator="{ props: activatorProps }">
                     <div
-                        class="caption grey--text text--lighten-1"
-                        v-bind="attrs"
-                        v-on="on">
+                        class="text-caption text-grey-lighten-1"
+                        v-bind="activatorProps"
+                        >
                         {{ activeLanguagePairLabel }}
                     </div>
                 </template>
                 <span>{{ activeLanguagePairTooltip }}</span>
-            </v-tooltip>
+            </cheat-tooltip>
             <div class="d-flex align-center" style="gap: 4px;">
-                <v-btn
-                    small
-                    text
+                <v-btn size="small" variant="text"
                     color="primary"
                     :loading="isTranslatingEmptyStrings"
                     :disabled="isTranslatingEmptyStrings"
                     @click="translateEmptyStrings">
                     Translate empty
                 </v-btn>
-                <v-btn
-                    small
-                    text
+                <v-btn size="small" variant="text"
                     color="secondary"
                     @click="openBoxingModal">
                     Boxing...
@@ -64,113 +60,102 @@ export default {
         </div>
     </v-card-text>
 
-    <v-data-table
+    <v-data-table return-object
       class="mt-1 table-with-sticky-footer"
-        :headers="tableHeaders"
+        :headers="uiTableHeaders(tableHeaders)"
         :items="filteredEntries"
-        :page.sync="page"
-        :sort-by.sync="sortBy"
-        :sort-desc.sync="sortDesc"
-        :items-per-page.sync="rowsPerPage">
+        v-model:page="page"
+        :sort-by="uiTableSort(sortBy, sortDesc)" @update:sort-by="updateUiTableSort($event, 'sortBy', 'sortDesc')"
+
+        v-model:items-per-page="rowsPerPage">
                 <template v-slot:top>
                     <div>
                         <div class="d-flex align-center" style="gap: 8px;">
                             <v-text-field
                                 v-model="searchInput"
-                                :label="searchFieldLabel"
-                                solo
-                                dense
+                                :label="searchFieldLabel" variant="solo" single-line density="compact"
                                 hide-details
-                                background-color="grey darken-3"
-                                @keydown.self.stop>
+                                bg-color="grey-darken-3"
+                                @keydown.stop>
                             </v-text-field>
                             <v-select
                                 v-model="selectedTypeFilter"
                                 :items="typeFilterOptions"
                                 label="Type"
-                                item-text="text"
-                                item-value="value"
-                                solo
-                                dense
+                                item-title="text"
+                                item-value="value" variant="solo" single-line density="compact"
                                 clearable
                                 hide-details
-                                background-color="grey darken-3"
+                                bg-color="grey-darken-3"
                                 style="max-width: 220px;"
-                                @keydown.self.stop>
+                                @keydown.stop>
                             </v-select>
-                            <v-tooltip bottom>
-                                <template v-slot:activator="{ on, attrs }">
-                                    <v-btn icon small v-bind="attrs" v-on="on" @click="searchExpanded = !searchExpanded">
-                                        <v-icon small>{{ searchExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                            <cheat-tooltip location="bottom">
+                                <template v-slot:activator="{ props: activatorProps }">
+                                    <v-btn variant="text" icon size="small" v-bind="activatorProps"  @click="searchExpanded = !searchExpanded">
+                                        <v-icon size="small">{{ searchExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
                                     </v-btn>
                                 </template>
                                 <span>{{ searchExpanded ? 'Hide options' : 'More options' }}</span>
-                            </v-tooltip>
+                            </cheat-tooltip>
                         </div>
                         <div v-if="searchExpanded" class="d-flex align-center mt-1" style="gap: 8px;">
                             <v-text-field
                                 v-model="replaceInput"
-                                label="Replace"
-                                solo
-                                dense
+                                label="Replace" variant="solo" single-line density="compact"
                                 hide-details
-                                background-color="grey darken-3"
-                                @keydown.self.stop>
+                                bg-color="grey-darken-3"
+                                @keydown.stop>
                             </v-text-field>
-                            <v-btn
-                                small
+                            <v-btn size="small"
                                 color="primary"
                                 :disabled="replaceButtonDisabled"
                                 @click="performReplace">
                                 Replace
                             </v-btn>
-                            <span class="caption grey--text text--lighten-1" style="white-space: nowrap;">Search in:</span>
+                            <span class="text-caption text-grey-lighten-1" style="white-space: nowrap;">Search in:</span>
                             <v-select
                                 v-model="searchIn"
                                 :items="searchInOptions"
-                                item-text="text"
-                                item-value="value"
-                                solo
-                                dense
+                                item-title="text"
+                                item-value="value" variant="solo" single-line density="compact"
                                 hide-details
-                                background-color="grey darken-3"
+                                bg-color="grey-darken-3"
                                 style="max-width: 180px;"
-                                @keydown.self.stop>
+                                @keydown.stop>
                             </v-select>
-                            <v-btn
-                                icon
-                                small
+                            <v-btn variant="text"
+                                icon size="small"
                                 color="error"
                                 :disabled="matchingFilterEntryCount <= 0"
                                 @click="confirmClearTranslationsMatchingFilter">
-                                <v-icon small>mdi-delete</v-icon>
+                                <v-icon size="small">mdi-delete</v-icon>
                             </v-btn>
                         </div>
                         <div v-if="searchExpanded" class="d-flex align-center mt-1" style="gap: 8px;">
                             <v-switch
                                 v-model="onlyEmpty"
                                 label="Only empty"
-                                inset
-                                dense
+                                inset density="compact"
                                 hide-details
                                 class="mt-0 pt-0"
-                                @keydown.self.stop>
+                                @keydown.stop>
                             </v-switch>
                         </div>
                     </div>
                 </template>
 
         <template v-slot:item.seenSort="{ item }">
-            <span class="caption">{{item.seenDisplay}}</span>
+            <span class="text-caption">{{item.seenDisplay}}</span>
         </template>
 
         <template v-slot:item.type="{ item }">
-            <span class="caption">{{item.type}}</span>
+            <span class="text-caption">{{item.type}}</span>
         </template>
 
         <template v-slot:item.original="{ item }">
             <div
-                class="caption white--text"
+                class="text-caption text-white"
                 style="white-space: pre-wrap; word-break: break-word;"
                 v-html="highlightText(item.original, searchHighlightTerm, 'original')">
             </div>
@@ -179,19 +164,18 @@ export default {
         <template v-slot:item.translation="{ item }">
             <v-textarea
                 v-if="editingKey === item.key"
-                :value="getDraftValue(item)"
+                :model-value="getDraftValue(item)"
                 :rows="getRowLineCount(item, getDraftValue(item))"
                 auto-grow
-                no-resize
-                dense
+                no-resize variant="outlined" density="compact"
                 hide-details
                 class="mt-0 pt-0"
-                @input="onTranslationInput(item, $event)"
+                @update:model-value="onTranslationInput(item, $event)"
                 @keydown.stop>
             </v-textarea>
             <div
                 v-else
-                class="caption white--text"
+                class="text-caption text-white"
                 style="white-space: pre-wrap; word-break: break-word;"
                 v-html="highlightText(getDraftValue(item), searchHighlightTerm, 'translation')">
             </div>
@@ -200,56 +184,53 @@ export default {
         <template v-slot:item.actionsSort="{ item }">
             <div class="d-flex align-center justify-center" style="gap: 2px;">
                 <template v-if="editingKey === item.key">
-                    <v-btn icon x-small color="success" @click="saveEdit">
-                        <v-icon small>mdi-check</v-icon>
+                    <v-btn variant="text" icon size="x-small" color="success" @click="saveEdit">
+                        <v-icon size="small">mdi-check</v-icon>
                     </v-btn>
-                    <v-btn icon x-small color="grey" @click="cancelEdit">
-                        <v-icon small>mdi-close</v-icon>
+                    <v-btn variant="text" icon size="x-small" color="grey" @click="cancelEdit">
+                        <v-icon size="small">mdi-close</v-icon>
                     </v-btn>
                 </template>
                 <template v-else>
-                    <v-tooltip bottom>
+                    <cheat-tooltip location="bottom">
                         <span>Edit translation</span>
-                        <template v-slot:activator="{ on, attrs }">
-                            <v-btn
-                                icon
-                                x-small
+                        <template v-slot:activator="{ props: activatorProps }">
+                            <v-btn variant="text"
+                                icon size="x-small"
                                 color="primary"
-                                v-bind="attrs"
-                                v-on="on"
+                                v-bind="activatorProps"
+
                                 @click="startEdit(item)">
-                                <v-icon small>mdi-pencil</v-icon>
+                                <v-icon size="small">mdi-pencil</v-icon>
                             </v-btn>
                         </template>
-                    </v-tooltip>
-                    <v-tooltip bottom>
+                    </cheat-tooltip>
+                    <cheat-tooltip location="bottom">
                         <span>Copy original text</span>
-                        <template v-slot:activator="{ on, attrs }">
-                            <v-btn
-                                icon
-                                x-small
+                        <template v-slot:activator="{ props: activatorProps }">
+                            <v-btn variant="text"
+                                icon size="x-small"
                                 color="primary"
-                                v-bind="attrs"
-                                v-on="on"
+                                v-bind="activatorProps"
+
                                 @click="copyOriginal(item)">
-                                <v-icon small>mdi-content-copy</v-icon>
+                                <v-icon size="small">mdi-content-copy</v-icon>
                             </v-btn>
                         </template>
-                    </v-tooltip>
-                    <v-tooltip bottom>
+                    </cheat-tooltip>
+                    <cheat-tooltip location="bottom">
                         <span>Remove translation</span>
-                        <template v-slot:activator="{ on, attrs }">
-                            <v-btn
-                                icon
-                                x-small
+                        <template v-slot:activator="{ props: activatorProps }">
+                            <v-btn variant="text"
+                                icon size="x-small"
                                 color="error"
-                                v-bind="attrs"
-                                v-on="on"
+                                v-bind="activatorProps"
+
                                 @click="clearTranslation(item)">
-                                <v-icon small>mdi-close</v-icon>
+                                <v-icon size="small">mdi-close</v-icon>
                             </v-btn>
                         </template>
-                    </v-tooltip>
+                    </cheat-tooltip>
                 </template>
             </div>
         </template>
@@ -334,7 +315,7 @@ export default {
         this.flushPendingCacheEdits('panel-deactivated');
     },
 
-    beforeDestroy() {
+    beforeUnmount() {
         this.flushPendingCacheEdits('panel-before-destroy');
 
         if (this.unsubscribeRuntime) {
@@ -753,7 +734,7 @@ export default {
 
         onTranslationInput(item, value) {
             const normalized = this.normalizeCacheValue(value);
-            this.$set(this.draftByKey, item.key, normalized);
+            this.draftByKey[item.key] = normalized;
         },
 
         clearTranslation(item) {
@@ -975,11 +956,7 @@ export default {
                 this.flushPendingCacheEdits('start-edit-switch');
             }
             this.editingKey = item.key;
-            this.$set(
-                this.draftByKey,
-                item.key,
-                this.normalizeCacheValue(this.getDraftValue(item))
-            );
+            this.draftByKey[item.key] = this.normalizeCacheValue(this.getDraftValue(item));
         },
 
         saveEdit() {
@@ -988,7 +965,7 @@ export default {
 
         cancelEdit() {
             if (this.editingKey) {
-                this.$delete(this.draftByKey, this.editingKey);
+                delete this.draftByKey[this.editingKey];
             }
             this.editingKey = null;
         },

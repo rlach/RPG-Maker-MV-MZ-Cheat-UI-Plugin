@@ -4,18 +4,8 @@
         <meta charset="UTF-8" />
         <base href="./" />
         <title>Cheat UI</title>
-        <link
-            href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900"
-            rel="stylesheet"
-        />
-        <link
-            href="https://cdn.jsdelivr.net/npm/@mdi/font@6.x/css/materialdesignicons.min.css"
-            rel="stylesheet"
-        />
-        <link
-            href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css"
-            rel="stylesheet"
-        />
+        <link href="libs/mdi/css/materialdesignicons.min.css" rel="stylesheet" />
+        <link href="libs/vuetify.css" rel="stylesheet" />
         <link href="css/main.css" rel="stylesheet" />
         <style>
             html,
@@ -164,23 +154,12 @@
             console.log('[CheatWindow] Module script loading');
             (async function () {
                 // parentWin is already declared in the parent <script> tag and available globally
-                const { loadWindowUiLibraries, isolateWindowComponent } =
+                const { loadWindowUiLibraries, isolateWindowComponent, createWindowUiApp } =
                     await import('./js/WindowUiLibraries.js');
                 await loadWindowUiLibraries(window);
                 if (!window.Vue || !window.Vuetify) {
                     console.error('[CheatWindow] Vue/Vuetify not loaded locally');
                     throw new Error('Vue/Vuetify must be loaded in external window');
-                }
-
-                // Ensure Vuetify is installed on the local Vue (CDN builds may not auto-install)
-                if (!window.Vue.__vuetify_installed__) {
-                    try {
-                        window.Vue.use(window.Vuetify);
-                        window.Vue.__vuetify_installed__ = true;
-                    } catch (e) {
-                        console.error('[CheatWindow] Failed to install Vuetify on local Vue', e);
-                        throw e;
-                    }
                 }
 
                 const parentWin = window.opener;
@@ -207,14 +186,6 @@
                         Object.keys(CheatModal.components || {})
                     );
 
-                    // Register all CheatModal components globally in external window Vue context
-                    if (CheatModal.components) {
-                        for (const [name, component] of Object.entries(CheatModal.components)) {
-                            console.log('[CheatWindow] Registering global component:', name);
-                            Vue.component(name, component);
-                        }
-                    }
-
                     console.log('[CheatWindow] Importing AlertSnackbar...');
                     const AlertSnackbar = isolateWindowComponent(
                         (await import('./components/AlertSnackbar.js')).default
@@ -238,80 +209,37 @@
                         await import('./js/translation-runtime/TranslationRuntime.js');
                     console.log('[CheatWindow] TranslationRuntime imported');
 
-                    // Create a Vuetify instance bound to THIS window so overlays/menus/sliders attach here
-                    const Vuetify = window.Vuetify;
-                    window.__VUETIFY_INSTANCE__ = new Vuetify({ theme: { dark: true } });
-
-                    // Mount Vue app in external window - render CheatModal directly (no overlay needed)
-                    const defaultComponent =
-                        parentWin.__CHEAT_DEFAULT_COMPONENT__ || 'general-panel';
-
-                    // Kebab-case to PascalCase mapping
-                    const kebabToPascal = (str) => {
-                        return str
+                    const defaultComponent = window.__CHEAT_DEFAULT_COMPONENT__ || 'GeneralPanel';
+                    const kebabToPascal = (str) =>
+                        str
                             .split('-')
                             .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
                             .join('');
-                    };
-
-                    const app = new Vue({
-                        vuetify: window.__VUETIFY_INSTANCE__,
-                        components: { CheatModal, AlertSnackbar, ConfirmDialog },
-                        data: () => ({
-                            currentComponentName: kebabToPascal(defaultComponent), // Convert to PascalCase immediately
-                        }),
-                        methods: {
-                            onComponentChange(val) {
-                                console.log(
-                                    '[CheatWindow] Component changed from external to:',
-                                    val
-                                );
-                                // Convert kebab-case to PascalCase for cross-window compatibility
-                                this.currentComponentName = kebabToPascal(val);
-                            },
+                    const ObjectTranslationModalHost = (
+                        await import('./components/ObjectTranslationModalHost.js')
+                    ).default;
+                    const BoxingModal = (await import('./components/BoxingModal.js')).default;
+                    const app = createWindowUiApp(window, {
+                        components: {
+                            CheatModal,
+                            AlertSnackbar,
+                            ConfirmDialog,
+                            ObjectTranslationModalHost,
+                            BoxingModal,
                         },
-                        render(h) {
-                            return h(
-                                'v-app',
-                                {
-                                    props: { dark: true },
-                                    style: { height: '100%' },
-                                },
-                                [
-                                    h(
-                                        'v-main',
-                                        {
-                                            style: { height: '100%', padding: '0' },
-                                        },
-                                        [
-                                            h('cheat-modal', {
-                                                props: {
-                                                    currentComponentName: this.currentComponentName,
-                                                },
-                                                on: {
-                                                    change: this.onComponentChange,
-                                                },
-                                            }),
-                                        ]
-                                    ),
-                                    h('alert-snackbar'),
-                                    h('confirm-dialog'),
-                                ]
-                            );
-                        },
+                        data: () => ({ currentComponentName: kebabToPascal(defaultComponent) }),
+                        template:
+                            '<v-app><v-main style="height:100%;padding:0"><cheat-modal v-model:current-component-name="currentComponentName" /></v-main><alert-snackbar /><confirm-dialog /><object-translation-modal-host /><boxing-modal /></v-app>',
                     });
-
-                    // Slider mounted hooks query the live document for [data-app].
-                    // A detached mount leaves their drag event target null forever.
-                    app.$mount('#app');
+                    const vm = app.mount('#app');
+                    window.addEventListener('beforeunload', () => app.unmount(), { once: true });
 
                     // Expose for debugging
-                    window.__CHEAT_APP__ = app;
-                    window.addEventListener('beforeunload', () => app.$destroy(), { once: true });
+                    window.__CHEAT_APP__ = vm;
 
                     console.log('[CheatWindow] Vue app mounted in external window, app:', app);
-                    console.log('[CheatWindow] App element:', app.$el);
-                    console.log('[CheatWindow] Initial component:', app.currentComponentName);
+                    console.log('[CheatWindow] App element:', vm.$el);
+                    console.log('[CheatWindow] Initial component:', vm.currentComponentName);
 
                     console.log('[CheatWindow] Vue app mounted in external window');
 

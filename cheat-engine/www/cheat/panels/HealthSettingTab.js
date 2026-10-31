@@ -1,51 +1,45 @@
+import { gameObjectReference } from '../js/Tools.js';
 export default {
     name: 'HealthSettingTab',
 
     template: `
 <div>
-    <v-data-table
-        v-if="tableHeaders"
-        dense
+    <v-data-table return-object
+        v-if="tableHeaders" density="compact"
         hide-default-footer
-        :headers="tableHeaders"
+        :headers="uiTableHeaders(tableHeaders)"
         :items="editingItems">
         <template
             v-slot:item.name="{ item }">
-            <span class="caption">{{item.name}}</span>
+            <span class="text-caption">{{item.name}}</span>
         </template>
         <template
-            v-slot:item.hp="{ item }">
-            <v-text-field
-                background-color="grey darken-3"
+            v-slot:item.hp="{ item }"><div class="cheat-health-cell">
+            <v-text-field type="number" step="1"
+
                 class="d-inline-flex x-small-field caption"
                 style="width: 50px;"
-                hide-details
-                solo
-                v-model="item.hp.hp"
-                label="Curr Hp"
-                dense
-                @keydown.self.stop
-                @change="onDataChange"
+                hide-details variant="outlined"
+                v-model="item.hp.hp" density="compact"
+                @keydown.stop
+                @update:model-value="onDataChange"
                 @focus="$event.target.select()">
             </v-text-field>
-            <span class="caption">/ {{item.hp.mhp}}</span>
+            <span class="text-caption">/ {{item.hp.mhp}}</span></div>
         </template>
         <template
-            v-slot:item.mp="{ item }">
-            <v-text-field
-                background-color="grey darken-3"
+            v-slot:item.mp="{ item }"><div class="cheat-health-cell">
+            <v-text-field type="number" step="1"
+
                 class="d-inline-flex x-small-field caption"
                 style="width: 50px;"
-                hide-details
-                solo
-                v-model="item.mp.mp"
-                label="Curr Mp"
-                dense
-                @keydown.self.stop
-                @change="onDataChange"
+                hide-details variant="outlined"
+                v-model="item.mp.mp" density="compact"
+                @keydown.stop
+                @update:model-value="onDataChange"
                 @focus="$event.target.select()">
             </v-text-field>
-            <span class="caption">/ {{item.mp.mmp}}</span>
+            <span class="text-caption">/ {{item.mp.mmp}}</span></div>
         </template>
     </v-data-table>
 </div>
@@ -85,7 +79,7 @@ export default {
             handler() {
                 this.editingItems = this.items.map((member) => {
                     return {
-                        _member: member,
+                        _member: gameObjectReference(member),
                         name: member.name(),
                         hp: {
                             hp: member.hp,

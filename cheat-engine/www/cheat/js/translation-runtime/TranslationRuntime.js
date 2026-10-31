@@ -32,10 +32,6 @@ class TranslationRuntime {
     constructor() {
         const engineOptions = getAvailableEngines();
 
-        this.$set = (target, key, value) => {
-            target[key] = value;
-        };
-
         this._initialized = false;
         this._hookInitialized = false;
 
@@ -221,12 +217,9 @@ class TranslationRuntime {
             return;
         }
 
-        const setter =
-            typeof target.$set === 'function'
-                ? (key, value) => target.$set(target, key, value)
-                : (key, value) => {
-                      target[key] = value;
-                  };
+        const setter = (key, value) => {
+            target[key] = value;
+        };
 
         const engineConfigData = this.engine.getConfigData();
         Object.keys(engineConfigData).forEach((key) => {
@@ -244,12 +237,9 @@ class TranslationRuntime {
             return;
         }
 
-        const setter =
-            typeof target.$set === 'function'
-                ? (key, value) => target.$set(target, key, value)
-                : (key, value) => {
-                      target[key] = value;
-                  };
+        const setter = (key, value) => {
+            target[key] = value;
+        };
 
         const snapshotKeys = [...UI_SYNC_STATE_KEYS, ...UI_SYNC_TO_ONLY_STATE_KEYS];
 

@@ -18,33 +18,29 @@ export default {
 
     template: `
 <v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
-    <v-card-title class="subtitle-1 font-weight-bold pb-1">
+    <v-card-title class="text-subtitle-1 font-weight-bold pb-1">
         Detected Plugins
     </v-card-title>
 
-    <v-data-table
+    <v-data-table return-object
         class="mt-1 table-with-sticky-footer"
-        :headers="tableHeaders"
+        :headers="uiTableHeaders(tableHeaders)"
         :items="filteredEntries"
-        :page.sync="page"
-        :sort-by.sync="sortBy"
-        :sort-desc.sync="sortDesc"
-        :items-per-page.sync="rowsPerPage">
+        v-model:page="page"
+        :sort-by="uiTableSort(sortBy, sortDesc)" @update:sort-by="updateUiTableSort($event, 'sortBy', 'sortDesc')"
+
+        v-model:items-per-page="rowsPerPage">
         <template v-slot:top>
             <div class="d-flex align-center" style="gap: 8px;">
                 <v-text-field
                     v-model="searchInput"
-                    label="Search plugins"
-                    solo
-                    dense
+                    label="Search plugins" variant="solo" single-line density="compact"
                     hide-details
-                    background-color="grey darken-3"
-                    @keydown.self.stop>
+                    bg-color="grey-darken-3"
+                    @keydown.stop>
                 </v-text-field>
                 <v-btn
-                    v-if="hasCustomTranslatorScripts"
-                    small
-                    text
+                    v-if="hasCustomTranslatorScripts" size="small" variant="text"
                     color="warning"
                     @click="resetCustomTranslatorConsent">
                     Reset script consent
@@ -53,19 +49,19 @@ export default {
         </template>
 
         <template v-slot:item.label="{ item }">
-            <span class="caption white--text">{{ item.label }}</span>
+            <span class="text-caption text-white">{{ item.label }}</span>
         </template>
 
         <template v-slot:item.activationSucceeded="{ item }">
             <div class="d-flex align-center justify-center">
-                <v-icon small :color="item.activationSucceeded ? 'green' : 'red'">
+                <v-icon size="small" :color="item.activationSucceeded ? 'green' : 'red'">
                     {{ item.activationSucceeded ? 'mdi-check' : 'mdi-close' }}
                 </v-icon>
             </div>
         </template>
 
         <template v-slot:item.activationRetryCount="{ item }">
-            <span class="caption">{{ item.activationRetryCount }}</span>
+            <span class="text-caption">{{ item.activationRetryCount }}</span>
         </template>
     </v-data-table>
 </v-card>
@@ -111,7 +107,7 @@ export default {
         }, 1000);
     },
 
-    beforeDestroy() {
+    beforeUnmount() {
         if (this._refreshTimerId) {
             clearInterval(this._refreshTimerId);
             this._refreshTimerId = 0;

@@ -11,6 +11,12 @@ export function cloneObject(obj) {
     return clone;
 }
 
+/** Preserve engine object identity when storing references in reactive UI rows. */
+export function gameObjectReference(value) {
+    const vue = globalThis.Vue;
+    return vue?.markRaw ? vue.markRaw(vue.toRaw(value)) : value;
+}
+
 export function isNwjsEnvironment() {
     const utils = typeof Utils !== 'undefined' ? Utils : null;
     if (utils && typeof utils.isNwjs === 'function') {

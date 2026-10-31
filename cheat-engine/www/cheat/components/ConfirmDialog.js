@@ -11,24 +11,22 @@ export default {
         content-class="cheat-confirm-dialog"
     >
     <v-card
-        dark
         class="pt-4">
       <v-card-text
-        class="subtitle-1">
+        class="text-subtitle-1">
         <template v-if="options.messageHtml">
           <div v-html="options.messageHtml"></div>
         </template>
-        <template v-else v-for="(msg, idx) in messageArray">
-          <span :key="idx">{{msg}}</span>
-          <br :key="-idx - 1"/>
+        <template v-else v-for="(msg, idx) in messageArray" :key="idx">
+          <span>{{msg}}</span>
+          <br/>
         </template>
         <v-checkbox
           v-if="options.checkboxLabel"
           v-model="checkboxChecked"
           :label="options.checkboxLabel"
           class="mt-3"
-          hide-details
-          dense
+          hide-details density="compact"
         ></v-checkbox>
       </v-card-text>
 
@@ -36,8 +34,7 @@ export default {
         <v-spacer></v-spacer>
         <v-btn
           v-for="(action, idx) in options.actions"
-          :key="idx"
-          text
+          :key="idx" variant="text"
           class="font-weight-bold"
           :color="action.color"
           :disabled="action.requiresCheckbox && !checkboxChecked"

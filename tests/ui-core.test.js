@@ -11,22 +11,22 @@ import {
 } from '../cheat-engine/www/cheat/translate-engines/ai-engine/constants.js';
 import { isolateWindowComponent } from '../cheat-engine/www/cheat/js/WindowUiLibraries.js';
 afterEach(() => vi.useRealTimers());
-it('isolates cached Vue constructors throughout shared components and mixins', () => {
-    const child = { _Ctor: { 0: 'parent constructor' }, methods: { test() {} } };
+it('isolates compiled Vue render functions throughout shared components and mixins', () => {
+    const render = () => null;
+    const child = { template: '<span/>', render, methods: { test() {} } };
     const options = {
-        _Ctor: { 0: 'parent root' },
-        _base: 'parent Vue',
+        template: '<div/>',
+        render,
         components: { child },
         mixins: [child],
         extends: child,
     };
     const clone = isolateWindowComponent(options);
-    expect(clone._Ctor).toBeUndefined();
-    expect(clone._base).toBeUndefined();
-    expect(clone.components.child._Ctor).toBeUndefined();
+    expect(clone.render).toBeUndefined();
+    expect(clone.components.child.render).toBeUndefined();
     expect(clone.mixins[0]).toBe(clone.components.child);
     expect(clone.extends).toBe(clone.components.child);
-    expect(child._Ctor[0]).toBe('parent constructor');
+    expect(child.render).toBe(render);
 });
 function snackbar() {
     const context = {
@@ -64,7 +64,7 @@ it('keeps persistent notifications until dismissal and clears pending timers on 
     component.dismiss();
     await Promise.resolve();
     expect(component.text[0].value).toBe('Next');
-    Snackbar.beforeDestroy.call(component);
+    Snackbar.beforeUnmount.call(component);
     await vi.advanceTimersByTimeAsync(1000);
     expect(component.activeNotification).toBeNull();
 });

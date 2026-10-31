@@ -16,7 +16,7 @@ export default {
         :headers="headers"
         :as-table-data="convertToTableData"
         :searchable-attrs="['name', 'desc']">
-        
+
     </item-table-tab>
 </v-card>
     `,

@@ -13,10 +13,10 @@ export default {
 
     template: `
 <v-card flat class="ma-0 pa-0 fill-height d-flex flex-column">
-    <v-card-title class="subtitle-1 font-weight-bold pb-1">Koharu Integration</v-card-title>
+    <v-card-title class="text-subtitle-1 font-weight-bold pb-1">Koharu Integration</v-card-title>
 
     <v-card-text class="pt-0 pb-2">
-        <div class="caption mb-2">
+        <div class="text-caption mb-2">
             Translate game images using Koharu automated image translation pipeline.
         </div>
 
@@ -24,41 +24,37 @@ export default {
         <div class="d-flex align-center mb-2" style="gap: 8px;">
             <v-text-field
                 v-model="apiUrl"
-                label="Koharu API URL"
-                dense
-                outlined
+                label="Koharu API URL" density="compact" variant="outlined"
                 hide-details
                 style="max-width: 340px;"
                 @keydown.stop
-                @change="onApiUrlChange">
+                @update:model-value="onApiUrlChange">
             </v-text-field>
 
-            <v-btn small outlined @click="onRefresh" :loading="isRefreshing">
-                <v-icon small left>mdi-refresh</v-icon>Refresh
+            <v-btn size="small" variant="outlined" @click="onRefresh" :loading="isRefreshing">
+                <v-icon size="small" left>mdi-refresh</v-icon>Refresh
             </v-btn>
 
-            <v-icon small :color="connected ? 'green' : 'red'">
+            <v-icon size="small" :color="connected ? 'green' : 'red'">
                 {{ connected ? 'mdi-circle' : 'mdi-circle-outline' }}
             </v-icon>
         </div>
 
-        <div v-if="lastError" class="caption red--text mb-2">{{ lastError }}</div>
+        <div v-if="lastError" class="text-caption text-red mb-2">{{ lastError }}</div>
 
         <!-- Target language -->
         <v-select
             v-model="targetLanguage"
             :items="languageOptions"
             label="Target language"
-            item-text="text"
-            item-value="value"
-            dense
-            outlined
+            item-title="text"
+            item-value="value" density="compact" variant="outlined"
             hide-details
             style="max-width: 240px;"
             class="mb-2"
             :disabled="!connected"
             @keydown.stop
-            @change="onSettingChange('targetLanguage', $event)">
+            @update:model-value="onSettingChange('targetLanguage', $event)">
         </v-select>
     </v-card-text>
 
@@ -66,7 +62,7 @@ export default {
 
     <!-- Engine selection -->
     <v-card-text v-if="connected" class="pt-2 pb-1">
-        <div class="caption font-weight-bold mb-1">Pipeline Engines</div>
+        <div class="text-caption font-weight-bold mb-1">Pipeline Engines</div>
         <div class="d-flex flex-wrap" style="gap: 8px;">
             <v-select
                 v-for="dropdown in engineDropdowns"
@@ -74,14 +70,12 @@ export default {
                 v-model="engineSelections[dropdown.settingKey]"
                 :items="dropdown.items"
                 :label="dropdown.label"
-                item-text="name"
-                item-value="id"
-                dense
-                outlined
+                item-title="name"
+                item-value="id" density="compact" variant="outlined"
                 hide-details
                 style="max-width: 220px;"
                 @keydown.stop
-                @change="onEngineChange(dropdown.settingKey, $event)">
+                @update:model-value="onEngineChange(dropdown.settingKey, $event)">
             </v-select>
         </div>
     </v-card-text>
@@ -90,16 +84,15 @@ export default {
 
     <!-- Project section -->
     <v-card-text v-if="connected" class="pt-2 pb-1">
-        <div class="caption font-weight-bold mb-1">Project</div>
+        <div class="text-caption font-weight-bold mb-1">Project</div>
 
-        <div v-if="!hasSourceImages" class="caption orange--text">
+        <div v-if="!hasSourceImages" class="text-caption text-orange">
             No exported images found for language "{{ targetLanguage }}".
             Use the Images Exporter panel to export decoded images first.
         </div>
 
         <div v-else-if="!hasProject">
-            <v-btn
-                small
+            <v-btn size="small"
                 color="primary"
                 :loading="isCreatingProject"
                 :disabled="isStepRunning"
@@ -108,7 +101,7 @@ export default {
             </v-btn>
         </div>
 
-        <div v-else class="caption">
+        <div v-else class="text-caption">
             Project: <strong>{{ projectName }}</strong>
             &nbsp;({{ Object.keys(pageIdMappings).length }} pages)
         </div>
@@ -121,15 +114,14 @@ export default {
         v-if="connected && hasProject"
         class="pt-2 pb-2 flex-grow-1"
         style="min-height: 0; overflow-y: auto;">
-        <div class="caption font-weight-bold mb-1">Pipeline Steps</div>
+        <div class="text-caption font-weight-bold mb-1">Pipeline Steps</div>
 
         <div v-for="step in pipelineSteps" :key="step.id" class="d-flex align-center mb-1">
             <div class="mr-2" :style="{ width: getStepLabelColumnWidth() }">
                 <v-checkbox
                     v-model="checkedStepIds"
-                    :value="step.id"
-                    :label="step.label"
-                    dense
+                    :model-value="step.id"
+                    :label="step.label" density="compact"
                     hide-details
                     class="mt-0 pt-0"
                     :disabled="isStepRunning">
@@ -138,22 +130,18 @@ export default {
 
             <span
                 v-if="runningStepId === step.id && formatRunningStepProgress()"
-                class="caption grey--text mr-2">
+                class="text-caption text-grey mr-2">
                 {{ formatRunningStepProgress() }}
             </span>
 
             <v-btn
-                v-if="runningStepId === step.id"
-                x-small
-                color="red"
-                outlined
+                v-if="runningStepId === step.id" size="x-small"
+                color="red" variant="outlined"
                 @click="onCancelStep">
                 Cancel
             </v-btn>
             <v-btn
-                v-else
-                x-small
-                outlined
+                v-else size="x-small" variant="outlined"
                 :disabled="isStepRunning"
                 @click="onRunSingleStep(step.id)">
                 GO
@@ -161,8 +149,7 @@ export default {
         </div>
 
         <div class="mt-2">
-            <v-btn
-                small
+            <v-btn size="small"
                 color="primary"
                 :disabled="isStepRunning || checkedStepIds.length === 0"
                 :loading="isStepRunning"
@@ -245,7 +232,7 @@ export default {
         this.onRefresh();
     },
 
-    beforeDestroy() {
+    beforeUnmount() {
         if (typeof this._unsubscribe === 'function') {
             this._unsubscribe();
             this._unsubscribe = null;

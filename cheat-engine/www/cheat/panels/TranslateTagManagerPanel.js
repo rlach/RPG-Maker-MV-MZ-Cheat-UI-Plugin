@@ -22,100 +22,91 @@ export default {
 
     template: `
 <v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
-    <v-card-title class="subtitle-1 font-weight-bold pb-1 d-flex align-center">
+    <v-card-title class="text-subtitle-1 font-weight-bold pb-1 d-flex align-center">
         <span>Tag Manager</span>
         <v-spacer></v-spacer>
-        <v-btn
-            small
-            outlined
+        <v-btn size="small" variant="outlined"
             color="primary"
             class="mr-2"
             :disabled="!isAiEngine"
             :title="!isAiEngine ? 'Only available with AI translation engine' : ''"
             @click="openFindUnknownTags">
-            <v-icon small left>mdi-magnify-scan</v-icon>
+            <v-icon size="small" left>mdi-magnify-scan</v-icon>
             Find unknown tags
         </v-btn>
         <v-btn
-            v-if="isAiEngine"
-            small
-            outlined
+            v-if="isAiEngine" size="small" variant="outlined"
             color="primary"
             @click="openAddCustomTagDialog">
-            <v-icon small left>mdi-plus</v-icon>
+            <v-icon size="small" left>mdi-plus</v-icon>
             Add tag
         </v-btn>
     </v-card-title>
 
     <v-select
         v-if="isAiEngine"
-        :value="_runtime.aiTagFormat"
+        :model-value="runtimeForUi.aiTagFormat"
         :items="tagFormatOptions"
         label="LLM tag format"
-        item-text="text"
+        item-title="text"
         item-value="value"
-        class="mx-4 mt-2"
-        dense outlined hide-details
-        @change="changeTagFormat"
-        @keydown.self.stop>
+        class="cheat-tag-format mx-4 mt-2" density="compact" variant="outlined" hide-details
+        @update:model-value="changeTagFormat"
+        @keydown.stop>
     </v-select>
 
-    <v-data-table
+    <v-data-table return-object
         class="mt-1 table-with-sticky-footer"
-        :headers="tableHeaders"
+        :headers="uiTableHeaders(tableHeaders)"
         :items="filteredEntries"
-        :page.sync="page"
-        :sort-by.sync="sortBy"
-        :sort-desc.sync="sortDesc"
-        :items-per-page.sync="rowsPerPage">
+        v-model:page="page"
+        :sort-by="uiTableSort(sortBy, sortDesc)" @update:sort-by="updateUiTableSort($event, 'sortBy', 'sortDesc')"
+
+        v-model:items-per-page="rowsPerPage">
         <template v-slot:top>
             <div class="d-flex align-center" style="gap: 8px;">
                 <v-select
                     v-model="selectedTypeFilter"
                     :items="typeFilterOptions"
                     label="Type"
-                    item-text="text"
-                    item-value="value"
-                    solo
-                    dense
+                    item-title="text"
+                    item-value="value" variant="solo" single-line density="compact"
                     clearable
                     hide-details
-                    background-color="grey darken-3"
+                    bg-color="grey-darken-3"
                     style="max-width: 180px;"
-                    @keydown.self.stop>
+                    @keydown.stop>
                 </v-select>
                 <v-text-field
                     v-model="searchInput"
-                    label="Search tags"
-                    solo
-                    dense
+                    label="Search tags" variant="solo" single-line density="compact"
                     hide-details
-                    background-color="grey darken-3"
-                    @keydown.self.stop>
+                    bg-color="grey-darken-3"
+                    @keydown.stop>
                 </v-text-field>
             </div>
         </template>
 
         <template v-slot:item.tagDisplay="{ item }">
-            <span class="caption font-weight-bold" style="font-family: monospace;">{{ item.tagDisplay }}</span>
+            <span class="text-caption font-weight-bold" style="font-family: monospace;">{{ item.tagDisplay }}</span>
         </template>
 
         <template v-slot:item.tagSource="{ item }">
-            <span class="caption">{{ item.tagSource }}</span>
+            <span class="text-caption">{{ item.tagSource }}</span>
         </template>
 
         <template v-slot:item.description="{ item }">
-            <span class="caption">{{ item.description }}</span>
+            <span class="text-caption">{{ item.description }}</span>
         </template>
 
         <template v-slot:item.actions="{ item }">
             <div class="d-flex align-center justify-center">
-                <v-btn icon x-small color="primary" @click="openEditTagDialog(item)">
-                    <v-icon small>mdi-pencil</v-icon>
+                <v-btn variant="text" icon size="x-small" color="primary" @click="openEditTagDialog(item)">
+                    <v-icon size="small">mdi-pencil</v-icon>
                 </v-btn>
                 <template v-if="item.tagSource === 'custom'">
-                    <v-btn icon x-small color="error" @click="removeCustomTag(item.customIndex)">
-                        <v-icon small>mdi-delete</v-icon>
+                    <v-btn variant="text" icon size="x-small" color="error" @click="removeCustomTag(item.customIndex)">
+                        <v-icon size="small">mdi-delete</v-icon>
                     </v-btn>
                 </template>
             </div>
@@ -137,7 +128,7 @@ export default {
 
     <unknown-tags-modal
         :visible="findUnknownTagsVisible"
-        :runtime="_runtime"
+        :runtime="runtimeForUi"
         :resolved-pattern="resolvedUnknownPattern"
         @update:visible="findUnknownTagsVisible = $event"
         @create-custom-tag="openAddCustomTagFromUnknown"
@@ -236,7 +227,7 @@ export default {
         }
     },
 
-    beforeDestroy() {
+    beforeUnmount() {
         if (this.searchDebounceTimer) {
             clearTimeout(this.searchDebounceTimer);
             this.searchDebounceTimer = null;
@@ -272,6 +263,9 @@ export default {
     },
 
     computed: {
+        runtimeForUi() {
+            return this._runtime || {};
+        },
         isAiEngine() {
             if (!this._runtime) return false;
             const e = this._runtime.translationEngine;

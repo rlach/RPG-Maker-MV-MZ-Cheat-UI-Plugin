@@ -1,0 +1,14 @@
+{
+    "vue": {
+        "version": "3.5.22",
+        "url": "https://unpkg.com/vue@3.5.22/dist/vue.global.prod.js",
+        "sha256": "dae9c178e86e09240e58721cdb46a81ac96ae1dc6a870d1b1bb9ffaee3c6d3fe"
+    },
+    "vuetify": {
+        "version": "3.9.0",
+        "url": "https://unpkg.com/vuetify@3.9.0/dist/vuetify.min.js",
+        "sha256": "c98f48a36c211836daf54bb9ddd6ecc3f897e11f66d44f0ad7348e15a6759bb2",
+        "cssUrl": "https://unpkg.com/vuetify@3.9.0/dist/vuetify.min.css",
+        "cssSha256": "ce1e99a8b5711bd0cab17dd6d5c957b84a6537f53cd3f17f11277031a8383435"
+    }
+}

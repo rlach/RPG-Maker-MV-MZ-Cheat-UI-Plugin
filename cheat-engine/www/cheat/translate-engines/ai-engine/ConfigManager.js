@@ -73,46 +73,38 @@ export class ConfigManager {
              <v-select
                v-model="aiProvider"
                :items="aiProviderOptions"
-               label="Provider"
-               outlined
-               dense
+               label="Provider" variant="outlined" density="compact"
                hide-details
-               @input="onChangeAiProvider"
-               @change="onChangeAiProvider"
+               @update:model-value="onChangeAiProvider"
+               @update:model-value="onChangeAiProvider"
                class="mb-2"
-             ></v-select>
+              item-title="text"></v-select>
              <v-text-field
                v-model="aiHost"
-               :label="aiProvider === 'openwebui' ? 'Open WebUI Host' : 'OpenAPI compatible Host'"
-               outlined
-               dense
+               :label="aiProvider === 'openwebui' ? 'Open WebUI Host' : 'OpenAPI compatible Host'" variant="outlined" density="compact"
                hide-details
                @keydown.stop
-               @change="onChangeAiHost"
+               @update:model-value="onChangeAiHost"
                class="mb-2"
              ></v-text-field>
              <v-text-field
                              v-if="aiProvider === 'openwebui' || aiProvider === 'openApi'"
                v-model="aiApiKey"
-                             :label="aiProvider === 'openwebui' ? 'Open WebUI API Key' : 'OpenAPI compatible API Key'"
-               outlined
-               dense
+                             :label="aiProvider === 'openwebui' ? 'Open WebUI API Key' : 'OpenAPI compatible API Key'" variant="outlined" density="compact"
                hide-details
                type="password"
                @keydown.stop
-               @change="onChangeAiApiKey"
+               @update:model-value="onChangeAiApiKey"
                class="mb-2"
              ></v-text-field>
              <div class="d-flex gap-2 mb-2 align-center">
-               <v-btn
-                 small
-                 outlined
+               <v-btn size="small" variant="outlined"
                  color="primary"
                  :disabled="aiLoadingModels"
                  @click="fetchAiModels"
                  :loading="aiLoadingModels"
                >
-                 <v-icon small left>mdi-refresh</v-icon>
+                 <v-icon size="small" left>mdi-refresh</v-icon>
                  Fetch Models
                </v-btn>
                <div v-if="aiModelsError" class="text-caption error--text">{{ aiModelsError }}</div>
@@ -120,19 +112,17 @@ export class ConfigManager {
              <v-select
                v-model="aiSelectedModel"
                :items="aiModels"
-               label="Select Model"
-               outlined
-               dense
+               label="Select Model" variant="outlined" density="compact"
                hide-details
                :disabled="aiModels.length === 0"
-               @change="onChangeAiModel"
+               @update:model-value="onChangeAiModel"
                class="mb-2"
-             ></v-select>
-             
+              item-title="text"></v-select>
+
              <v-checkbox
                v-model="aiAskIfTextTranslated"
                label="ask AI if text is translated"
-               @change="onChangeAiAskIfTextTranslated"
+               @update:model-value="onChangeAiAskIfTextTranslated"
                class="mt-2"
                hide-details
              ></v-checkbox>
@@ -140,67 +130,57 @@ export class ConfigManager {
              <v-select
                v-model="aiInvalidJsonHandlingStrategy"
                :items="aiInvalidJsonHandlingStrategyOptions"
-               label="Invalid JSON Handling Strategy"
-               outlined
-               dense
+               label="Invalid JSON Handling Strategy" variant="outlined" density="compact"
                hide-details
-               @change="onChangeAiInvalidJsonHandlingStrategy"
+               @update:model-value="onChangeAiInvalidJsonHandlingStrategy"
                class="mt-2"
-             ></v-select>
+              item-title="text"></v-select>
 
                          <v-text-field
                              v-model.number="aiLengthMultiplierForMaxLength"
-                             label="Length multiplier for max length"
-                             outlined
-                             dense
+                             label="Length multiplier for max length" variant="outlined" density="compact"
                              type="number"
                              min="0.1"
                              step="0.1"
                              hide-details
                              @keydown.stop
-                             @change="onChangeAiLengthMultiplierForMaxLength"
+                             @update:model-value="onChangeAiLengthMultiplierForMaxLength"
                              class="mt-2"
                          ></v-text-field>
 
                          <v-text-field
                              v-model.number="aiMinimumMaxLength"
-                             label="Minimum max length"
-                             outlined
-                             dense
+                             label="Minimum max length" variant="outlined" density="compact"
                              type="number"
                              min="1"
                              hide-details
                              @keydown.stop
-                             @change="onChangeAiMinimumMaxLength"
+                             @update:model-value="onChangeAiMinimumMaxLength"
                              class="mt-2"
                          ></v-text-field>
 
                          <v-text-field
                              v-if="aiInvalidJsonHandlingStrategy === 'resendXTimes'"
                              v-model.number="aiInvalidJsonResendCount"
-                             label="Resend retries per batch"
-                             outlined
-                             dense
+                             label="Resend retries per batch" variant="outlined" density="compact"
                              type="number"
                              min="1"
                              hide-details
                              @keydown.stop
-                             @change="onChangeAiInvalidJsonResendCount"
+                             @update:model-value="onChangeAiInvalidJsonResendCount"
                              class="mt-2"
                          ></v-text-field>
 
              <v-text-field
                v-if="aiInvalidJsonHandlingStrategy === 'askAIToFix'"
                v-model.number="aiFixRecursionMaxDepth"
-               label="AI fix recursion max depth (0 = infinite)"
-               outlined
-               dense
+               label="AI fix recursion max depth (0 = infinite)" variant="outlined" density="compact"
                type="number"
                min="0"
                max="100"
                hide-details
                @keydown.stop
-               @change="onChangeAiFixRecursionMaxDepth"
+               @update:model-value="onChangeAiFixRecursionMaxDepth"
                class="mt-2"
              ></v-text-field>
 
@@ -208,19 +188,17 @@ export class ConfigManager {
                v-model="aiBannedPhrases"
                label="Banned phrases (one per line)"
                auto-grow
-               rows="2"
-               outlined
-               dense
+               rows="2" variant="outlined" density="compact"
                hide-details
                @keydown.stop
-               @change="onChangeAiBannedPhrases"
+               @update:model-value="onChangeAiBannedPhrases"
                class="mt-2"
              ></v-textarea>
 
              <v-checkbox
                v-model="useJsonFixer"
                label="Allow calls to json fixer (external API, don't send sensitive data)"
-               @change="onChangeUseJsonFixer"
+               @update:model-value="onChangeUseJsonFixer"
                class="mb-2"
                hide-details
              ></v-checkbox>
@@ -229,34 +207,28 @@ export class ConfigManager {
                v-model="aiSystemPrompt"
                label="System prompt"
                auto-grow
-               rows="3"
-               outlined
-               dense
+               rows="3" variant="outlined" density="compact"
                hide-details
                @keydown.stop
-               @change="onChangeAiSystemPrompt"
+               @update:model-value="onChangeAiSystemPrompt"
                class="mb-2"
              ></v-textarea>
 
              <v-text-field
                v-model="aiReasoningOpenToken"
-               label="Reasoning open token (e.g. <think>)"
-               outlined
-               dense
+               label="Reasoning open token (e.g. <think>)" variant="outlined" density="compact"
                hide-details
                @keydown.stop
-               @change="onChangeAiReasoningOpenToken"
+               @update:model-value="onChangeAiReasoningOpenToken"
                class="mb-2"
              ></v-text-field>
 
              <v-text-field
                v-model="aiReasoningCloseToken"
-               label="Reasoning close token (e.g. </think>)"
-               outlined
-               dense
+               label="Reasoning close token (e.g. </think>)" variant="outlined" density="compact"
                hide-details
                @keydown.stop
-               @change="onChangeAiReasoningCloseToken"
+               @update:model-value="onChangeAiReasoningCloseToken"
                class="mb-2"
              ></v-text-field>
 
@@ -266,19 +238,17 @@ export class ConfigManager {
                label="Experimental: Use strata constrained"
                hint="Sends the expected JSON Schema and forces reasoning effort to none for JSON requests. Requires a compatible PolyStrata build."
                persistent-hint
-               @change="onChangeAiUseStrataConstrained"
+               @update:model-value="onChangeAiUseStrataConstrained"
                class="mb-2"
              ></v-checkbox>
              <v-select
                v-model="aiReasoningEffort"
                :items="aiReasoningEffortOptions"
-               label="Reasoning effort"
-               outlined
-               dense
+               label="Reasoning effort" variant="outlined" density="compact"
                hide-details
-               @change="onChangeAiReasoningEffort"
+               @update:model-value="onChangeAiReasoningEffort"
                class="mb-2"
-             ></v-select>
+              item-title="text"></v-select>
              </div>
     `;
     }

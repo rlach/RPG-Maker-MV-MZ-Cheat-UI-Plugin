@@ -9,86 +9,71 @@ export default {
     mixins: [tableSessionMixin('switches')],
 
     template: `
-<v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
-    <v-card-text class="pt-1 pb-1">
+<v-card flat class="cheat-refresh-panel ma-0 pa-0 fill-height panel-with-sticky-table">
+    <v-card-text  class="cheat-panel-header pt-1 pb-1">
         <v-text-field
-            label="Search..."
-            solo
-            background-color="grey darken-3"
-            v-model="search"
-            dense
+            label="Search..." variant="solo" single-line
+            bg-color="grey-darken-3"
+            v-model="search" density="compact"
             hide-details
-            @keydown.self.stop
+            @keydown.stop
             @focus="$event.target.select()">
         </v-text-field>
         <div class="d-flex align-center mt-2">
             <v-checkbox
-                v-model="excludeNameless"
-                dense
+                v-model="excludeNameless" density="compact"
                 hide-details
                 label="Hide Nameless Items">
             </v-checkbox>
             <v-spacer></v-spacer>
-            <v-tooltip
-                bottom>
+            <cheat-tooltip location="bottom">
                 <span>{{ allSwitchOn ? 'Turn off all filtered switches' : 'Turn on all filtered switches' }}</span>
-                <template v-slot:activator="{ on, attrs }">
-                    <v-btn
+                <template v-slot:activator="{ props: activatorProps }">
+                    <v-btn variant="text"
                         color="teal"
-                        v-bind="attrs"
-                        v-on="on"
-                        fab
-                        x-small
+                        v-bind="activatorProps" icon size="small" class="cheat-toggle-all" aria-label="Toggle all filtered switches"
                         @click="toggleAllSwitches">
-                        <v-icon v-text="allSwitchIcon"></v-icon>
+                        <v-icon :icon="allSwitchIcon"></v-icon>
                     </v-btn>
                 </template>
-            </v-tooltip>
+            </cheat-tooltip>
         </div>
     </v-card-text>
-    <v-data-table
+    <v-data-table return-object
         v-if="tableReady && tableHeaders"
         class="table-with-sticky-footer"
-        :headers="tableHeaders"
+        :headers="uiTableHeaders(tableHeaders)"
         :items="filteredTableItems"
         :search="search"
-        :custom-filter="tableItemFilter"
-        :items-per-page.sync="rowsPerPage"
-        :page.sync="page"
-        :sort-by.sync="tableSession.sortBy"
-        :sort-desc.sync="tableSession.sortDesc">
+        :custom-filter="(value, query, item) => tableItemFilter(value, query, item.raw)"
+        v-model:items-per-page="rowsPerPage"
+        v-model:page="page"
+        :sort-by="uiTableSort(tableSession.sortBy, tableSession.sortDesc)" @update:sort-by="updateUiTableSort($event, 'tableSession.sortBy', 'tableSession.sortDesc')"
+        >
         <template
             v-slot:item.value="{ item }">
             <v-switch
-                v-model="item.value"
-                dense
+                v-model="item.value" density="compact"
                 hide-details
                 @click.self.stop
-                @change="onItemChange(item)">
+                @update:model-value="onItemChange(item)">
             </v-switch>
         </template>
     </v-data-table>
 
-    <v-tooltip
-        bottom>
+    <cheat-tooltip location="bottom">
         <span>Reload from game data</span>
-        <template v-slot:activator="{ on, attrs }">
-            <v-btn
-                style="top: 0px; right: 0px;"
-                color="pink"
-                dark
-                small
-                absolute
-                top
-                right
-                fab
-                v-bind="attrs"
-                v-on="on"
+        <template v-slot:activator="{ props: activatorProps }">
+            <v-btn class="cheat-refresh" variant="elevated"
+
+                color="pink" aria-label="Reload from game data" size="small" icon
+                v-bind="activatorProps"
+
                 @click="initializeVariables">
                 <v-icon>mdi-refresh</v-icon>
             </v-btn>
         </template>
-    </v-tooltip>
+    </cheat-tooltip>
 </v-card>
     `,
 
@@ -198,7 +183,7 @@ export default {
                 return true;
             }
 
-            return item.name.toLowerCase().contains(search.toLowerCase());
+            return item.name.toLowerCase().includes(search.toLowerCase());
         },
 
         toggleAllSwitches() {

@@ -11,18 +11,14 @@ export default {
     </div>
     <div class="py-1 px-2 d-flex align-center" style="margin: 0;">
       <v-spacer></v-spacer>
-      <v-btn
-        small
-        text
+      <v-btn size="small" variant="text"
         color="primary"
         :disabled="!hasSelection"
         @click="onCopy"
         style="opacity: 1 !important;">
         <span :style="!hasSelection ? 'color: rgba(255,255,255,0.4)' : ''">Copy</span>
       </v-btn>
-      <v-btn
-        small
-        text
+      <v-btn size="small" variant="text"
         color="red"
         @click="onClearMessages">
         Clear Log
@@ -62,7 +58,7 @@ export default {
         document.addEventListener('selectionchange', this.onSelectionChange);
     },
 
-    beforeDestroy() {
+    beforeUnmount() {
         if (this.messageUnsubscribe) {
             this.messageUnsubscribe();
             this.messageUnsubscribe = null;

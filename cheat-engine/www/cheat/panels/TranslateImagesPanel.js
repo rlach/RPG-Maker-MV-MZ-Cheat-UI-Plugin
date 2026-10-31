@@ -17,35 +17,32 @@ export default {
     name: 'TranslateImagesPanel',
 
     template: `
-<v-card flat class="ma-0 pa-0 fill-height d-flex flex-column">
-    <v-card-title class="subtitle-1 font-weight-bold pb-1">Images Exporter</v-card-title>
+<v-card flat class="cheat-export-panel ma-0 pa-0 fill-height d-flex flex-column">
+    <v-card-title class="text-subtitle-1 font-weight-bold pb-1">Images Exporter</v-card-title>
 
     <v-card-text class="pt-0 pb-2">
-        <div class="caption mb-2">
+        <div class="text-caption mb-2">
             Select folders from game image directory and export decoded PNG files to translation cache.
         </div>
 
         <v-switch
             v-model="highlightImages"
-            label="Highlight images (requires game restart)"
-            dense
+            label="Highlight images (requires game restart)" density="compact"
             hide-details
             class="mb-2"
             @click.self.stop
-            @change="onChangeHighlightImages">
+            @update:model-value="onChangeHighlightImages">
         </v-switch>
 
-        <div class="d-flex align-center" style="gap: 8px;">
+        <div class="d-flex align-center cheat-export-toolbar">
             <v-select
                 v-model="selectedTargetLang"
                 :items="languageOptions"
                 label="Target language"
-                item-text="text"
-                item-value="value"
-                dense
-                outlined
+                item-title="text"
+                item-value="value" density="compact" variant="outlined"
                 hide-details
-                style="max-width: 240px;"
+                style="width: 200px; min-width: 180px; flex: 0 0 200px;"
                 @keydown.stop>
             </v-select>
 
@@ -57,32 +54,31 @@ export default {
             </v-btn>
         </div>
 
-        <div class="caption mt-2 grey--text text--lighten-1">
+        <div class="text-caption mt-2 text-grey-lighten-1">
             Source: {{ sourceImageRootDisplay }}
         </div>
     </v-card-text>
 
     <v-divider></v-divider>
 
-    <v-card-text class="pt-2 pb-2 flex-grow-1" style="min-height: 0; overflow-y: auto;">
+    <v-card-text class="cheat-export-tree pt-2 pb-2" style="min-height: 0; overflow-y: auto;">
         <v-treeview
             v-if="folderTreeItems.length > 0"
             :items="folderTreeItems"
-            item-key="id"
-            open-all
-            dense>
+            item-value="id" item-title="name"
+            open-all density="compact">
             <template v-slot:prepend="{ item }">
-                <v-icon small @click.stop="toggleFolderSelection(item.id)">
+                <v-icon size="small" @click.stop="toggleFolderSelection(item.id)">
                     {{ checkboxIconForFolder(item.id) }}
                 </v-icon>
             </template>
 
-            <template v-slot:label="{ item }">
-                <span class="caption">{{ item.name }} ({{ item.directImageCount }})</span>
+            <template v-slot:title="{ item }">
+                <span class="text-caption">{{ item.name }} ({{ item.directImageCount }})</span>
             </template>
         </v-treeview>
 
-        <div v-else class="caption grey--text text--lighten-1">
+        <div v-else class="text-caption text-grey-lighten-1">
             No folders found in image directory.
         </div>
     </v-card-text>
@@ -139,7 +135,7 @@ export default {
         }, 1000);
     },
 
-    beforeDestroy() {
+    beforeUnmount() {
         if (this._progressPollIntervalId) {
             clearInterval(this._progressPollIntervalId);
             this._progressPollIntervalId = 0;

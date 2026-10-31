@@ -11,225 +11,210 @@ export default {
     name: 'TranslateNamesPanel',
 
     template: `
-<v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
-    <v-card-title class="subtitle-1 font-weight-bold">Names Manager</v-card-title>
+<v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table cheat-names-panel">
+    <v-card-title class="text-subtitle-1 font-weight-bold">Names Manager</v-card-title>
     <v-card-text class="py-0">
-        <div class="mt-2 d-flex align-center">
+        <div class="mt-2 d-flex align-center cheat-toolbar">
             <v-text-field
                 v-model="namePattern"
-                label="Name regex pattern (capture group 1 = name)"
-                dense
+                label="Name pattern (capture group 1)" density="compact"
                 hide-details
                 @keydown.stop
                 style="max-width: 320px;">
             </v-text-field>
-            <v-btn small color="primary" class="ml-2" @click="openPatternPicker">
-                <v-icon small left>mdi-format-list-bulleted</v-icon>
+            <v-btn size="small" color="primary" class="ml-2" @click="openPatternPicker">
+                <v-icon size="small" left>mdi-format-list-bulleted</v-icon>
                 Select pattern
             </v-btn>
         </div>
-        <div class="mt-2 d-flex align-center">
+        <div class="mt-2 d-flex align-center cheat-toolbar">
             <v-select
                 v-model="officialNameEnforcementMode"
                 :items="officialNameEnforcementOptions"
                 label="Official name enforcement"
-                item-text="text"
-                item-value="value"
-                dense
+                item-title="text"
+                item-value="value" density="compact"
                 hide-details
                 style="max-width: 360px;">
             </v-select>
         </div>
         <div v-if="officialNameEnforcementMode === 'fill_before_llm'" class="mt-2">
             <v-checkbox
-                v-model="officialNameEnforcementIncludeAllText"
-                dense
+                v-model="officialNameEnforcementIncludeAllText" density="compact"
                 hide-details
                 label="Include all text, not just regex">
             </v-checkbox>
         </div>
-        <div class="mt-2 d-flex align-center">
-            <span class="caption mr-2">Names:</span>
-            <v-tooltip bottom>
-                <template v-slot:activator="{ on, attrs }">
-                    <v-btn
-                        small
-                        outlined
+        <div class="mt-2 d-flex align-center cheat-toolbar">
+            <span class="text-caption mr-2">Names:</span>
+            <cheat-tooltip location="bottom">
+                <template v-slot:activator="{ props: activatorProps }">
+                    <v-btn size="small" variant="outlined"
                         color="primary"
-                        v-bind="attrs"
-                        v-on="on"
+                        v-bind="activatorProps"
+
                         @click="lookForNamesInCache">
-                        <v-icon small left>mdi-magnify</v-icon>
+                        <v-icon size="small" left>mdi-magnify</v-icon>
                         Search
                     </v-btn>
                 </template>
                 <span>Look for names in cache</span>
-            </v-tooltip>
-            <v-tooltip bottom>
-                <template v-slot:activator="{ on, attrs }">
-                    <v-btn
-                        small outlined color="green" class="ml-2"
+            </cheat-tooltip>
+            <cheat-tooltip location="bottom">
+                <template v-slot:activator="{ props: activatorProps }">
+                    <v-btn size="small" variant="outlined" color="green" class="ml-2"
                         :loading="translating"
                         :disabled="translating || untranslatedCount === 0"
-                        v-bind="attrs"
-                        v-on="on"
+                        v-bind="activatorProps"
+
                         @click="translateNames">
-                        <v-icon small left>mdi-translate</v-icon>
+                        <v-icon size="small" left>mdi-translate</v-icon>
                         Translate ({{ untranslatedCount }})
                     </v-btn>
                 </template>
                 <span>Translate names</span>
-            </v-tooltip>
-            <v-tooltip bottom>
-                <template v-slot:activator="{ on, attrs }">
-                    <v-btn
-                        small
-                        outlined
+            </cheat-tooltip>
+            <cheat-tooltip location="bottom">
+                <template v-slot:activator="{ props: activatorProps }">
+                    <v-btn size="small" variant="outlined"
                         color="error"
                         class="ml-2"
                         :disabled="cacheOnlyCount === 0"
-                        v-bind="attrs"
-                        v-on="on"
+                        v-bind="activatorProps"
+
                         @click="confirmRemoveAllCacheOnlyEntries">
-                        <v-icon small left>mdi-trash-can-outline</v-icon>
+                        <v-icon size="small" left>mdi-trash-can-outline</v-icon>
                         Remove ({{ cacheOnlyCount }})
                     </v-btn>
                 </template>
                 <span>Remove all cache names</span>
-            </v-tooltip>
+            </cheat-tooltip>
         </div>
-        <div class="mt-2 d-flex align-center">
-            <v-tooltip bottom>
-                <template v-slot:activator="{ on, attrs }">
-                    <v-btn
-                        small
-                        outlined
+        <div class="mt-2 d-flex align-center cheat-toolbar">
+            <cheat-tooltip location="bottom">
+                <template v-slot:activator="{ props: activatorProps }">
+                    <v-btn size="small" variant="outlined"
                         color="teal"
-                        v-bind="attrs"
-                        v-on="on"
+                        v-bind="activatorProps"
+
                         @click="applyTranslatedNamesToDbActors">
-                        <v-icon small left>mdi-account-check</v-icon>
+                        <v-icon size="small" left>mdi-account-check</v-icon>
                         Apply translations
                     </v-btn>
                 </template>
                 <span>Apply translated names to actors from the database.</span>
-            </v-tooltip>
+            </cheat-tooltip>
             <v-checkbox
                 v-model="applyOnlyActorsWithOriginalNames"
-                class="ml-3 mt-0 pt-0"
-                dense
+                class="ml-3 mt-0 pt-0" density="compact"
                 hide-details
                 label="Only actors with original names">
             </v-checkbox>
-            <v-btn small outlined color="teal" class="ml-3"
+            <v-btn size="small" variant="outlined" color="teal" class="cheat-repair-names"
                 :disabled="translating || !namePattern" @click="previewPatternNameRepair">
                 Repair names in cache
             </v-btn>
         </div>
-        <div class="mt-2 d-flex align-center">
+        <div class="mt-2 d-flex align-center cheat-toolbar">
             <v-text-field
                 v-model="filter"
                 class="flex-grow-1"
-                label="Search"
-                solo
-                dense
+                label="Search" variant="solo" single-line density="compact"
                 hide-details
                 clearable
-                background-color="grey darken-3"
-                @keydown.self.stop
+                bg-color="grey-darken-3"
+                @keydown.stop
                 @focus="$event.target.select()">
             </v-text-field>
         </div>
     </v-card-text>
 
     <v-dialog v-model="nameRepairOpen" max-width="860">
-        <v-card dark>
+        <v-card>
             <v-card-title>Repair names in translated cache</v-card-title>
             <v-card-text v-if="nameRepairError"><v-alert type="error" text>{{ nameRepairError }}</v-alert></v-card-text>
             <v-card-text v-if="nameRepairPreview">
                 <p>{{ nameRepairPreview.count }} cache entries will be changed. Only capture group 1 of the selected pattern is replaced.</p>
                 <p v-if="!nameRepairPreview.count">No matching names need replacement. Unknown names and already translated names are left unchanged.</p>
                 <template v-if="nameRepairPreview.count">
-                <div class="caption">Example before</div>
+                <div class="text-caption">Example before</div>
                 <pre style="white-space:pre-wrap;word-break:break-word;max-height:200px;overflow:auto">{{ nameRepairPreview.before }}</pre>
-                <div class="caption">Example after</div>
+                <div class="text-caption">Example after</div>
                 <pre style="white-space:pre-wrap;word-break:break-word;max-height:200px;overflow:auto">{{ nameRepairPreview.after }}</pre>
                 Apply these changes?
                 </template>
             </v-card-text>
             <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn text @click="nameRepairOpen = false">Cancel</v-btn>
+                <v-btn variant="text" @click="nameRepairOpen = false">Cancel</v-btn>
                 <v-btn color="primary" :disabled="!nameRepairPreview || !nameRepairPreview.count || !!nameRepairError" @click="applyPatternNameRepair">Apply</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
     <v-dialog v-model="patternPickerOpen" max-width="860">
-        <v-card dark>
-            <v-card-title class="subtitle-1 font-weight-bold">
+        <v-card>
+            <v-card-title class="text-subtitle-1 font-weight-bold">
                 Select name pattern
             </v-card-title>
             <v-card-text>
-                <div class="caption mb-3">
+                <div class="text-caption mb-3">
                     Patterns are used case-insensitively. Capture group 1 must be the character name.
                 </div>
-                <v-simple-table dense>
+                <v-table density="compact">
                     <thead>
                         <tr>
-                            <th class="text-left caption white--text" style="width: 40%;">Pattern</th>
-                            <th class="text-left caption white--text">Example</th>
-                            <th class="text-right caption white--text" style="width: 92px;"></th>
+                            <th class="text-left caption text-white" style="width: 40%;">Pattern</th>
+                            <th class="text-left caption text-white">Example</th>
+                            <th class="text-right caption text-white" style="width: 92px;"></th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-for="item in predefinedNamePatterns" :key="item.pattern">
                             <td>
-                                <pre class="caption mb-0" style="white-space: pre-wrap;">{{ item.pattern }}</pre>
+                                <pre class="text-caption mb-0" style="white-space: pre-wrap;">{{ item.pattern }}</pre>
                             </td>
                             <td>
-                                <pre class="caption mb-0" style="white-space: pre-wrap;">{{ item.example }}</pre>
+                                <pre class="text-caption mb-0" style="white-space: pre-wrap;">{{ item.example }}</pre>
                             </td>
                             <td class="text-right">
-                                <v-btn x-small color="primary" @click="selectNamePattern(item.pattern)">
+                                <v-btn size="x-small" color="primary" @click="selectNamePattern(item.pattern)">
                                     Use
                                 </v-btn>
                             </td>
                         </tr>
                     </tbody>
-                </v-simple-table>
+                </v-table>
             </v-card-text>
             <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn text @click="patternPickerOpen = false">Close</v-btn>
+                <v-btn variant="text" @click="patternPickerOpen = false">Close</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
 
-    <v-data-table
+    <v-data-table return-object
         class="mt-2 table-with-sticky-footer"
-        :headers="tableHeaders"
+        :headers="uiTableHeaders(tableHeaders)"
         :items="filteredEntries"
-        item-key="rowKey"
-        :page.sync="page"
-        :sort-by.sync="sortBy"
-        :sort-desc.sync="sortDesc"
-        :items-per-page.sync="rowsPerPage">
+        item-value="rowKey"
+        v-model:page="page"
+        :sort-by="uiTableSort(sortBy, sortDesc)" @update:sort-by="updateUiTableSort($event, 'sortBy', 'sortDesc')"
+
+        v-model:items-per-page="rowsPerPage">
         <template v-slot:item.lp="{ item }">
-            <span class="caption white--text">{{ item.lp }}</span>
+            <span class="text-caption text-white">{{ item.lp }}</span>
         </template>
 
         <template v-slot:item.source="{ item }">
-            <v-chip
-                x-small
-                :color="item.source === 'both' ? 'green darken-3' : item.source === 'db' ? 'blue darken-3' : 'grey darken-2'">
+            <v-chip size="x-small"
+                :color="item.source === 'both' ? 'green darken-3' : item.source === 'db' ? 'blue darken-3' : 'grey-darken-2'">
                 {{ item.source }}
             </v-chip>
         </template>
 
         <template v-slot:item.gender="{ item }">
-            <v-chip
-                x-small
-                :color="item.gender === '?' ? 'grey darken-2' : item.gender === 'male' ? 'blue darken-3' : 'pink darken-3'"
+            <v-chip size="x-small"
+                :color="item.gender === '?' ? 'grey-darken-2' : item.gender === 'male' ? 'blue darken-3' : 'pink darken-3'"
                 style="cursor: pointer;"
                 @click="cycleGender(item)">
                 {{ item.gender }}
@@ -237,15 +222,14 @@ export default {
         </template>
 
         <template v-slot:item.originalName="{ item }">
-            <span class="caption white--text">{{ item.originalName }}</span>
+            <span class="text-caption text-white">{{ item.originalName }}</span>
         </template>
 
         <template v-slot:item.translation="{ item }">
             <v-text-field
-                :value="item.translation"
-                dense
+                :model-value="item.translation" density="compact"
                 hide-details
-                @change="onTranslationChange(item, $event)"
+                @update:model-value="onTranslationChange(item, $event)"
                 @keydown.stop
                 class="mt-0 pt-0">
             </v-text-field>
@@ -253,40 +237,38 @@ export default {
 
         <template v-slot:item.actions="{ item }">
             <div class="d-flex align-center justify-center">
-                <v-tooltip bottom>
-                    <template v-slot:activator="{ on, attrs }">
-                        <v-btn
-                            icon
-                            x-small
+                <cheat-tooltip location="bottom">
+                    <template v-slot:activator="{ props: activatorProps }">
+                        <v-btn variant="text"
+                            icon size="x-small"
                             color="primary"
-                            v-bind="attrs"
-                            v-on="on"
+                            v-bind="activatorProps"
+
                             @click="copyOriginal(item)">
-                            <v-icon small>mdi-content-copy</v-icon>
+                            <v-icon size="small">mdi-content-copy</v-icon>
                         </v-btn>
                     </template>
                     <span>Copy original name</span>
-                </v-tooltip>
+                </cheat-tooltip>
 
-                <v-tooltip bottom v-if="item.source === 'cache'">
-                    <template v-slot:activator="{ on, attrs }">
-                        <v-btn
-                            icon
-                            x-small
+                <cheat-tooltip location="bottom" v-if="item.source === 'cache'">
+                    <template v-slot:activator="{ props: activatorProps }">
+                        <v-btn variant="text"
+                            icon size="x-small"
                             color="error"
-                            v-bind="attrs"
-                            v-on="on"
+                            v-bind="activatorProps"
+
                             @click="removeCacheOnlyEntry(item)">
-                            <v-icon small>mdi-trash-can-outline</v-icon>
+                            <v-icon size="small">mdi-trash-can-outline</v-icon>
                         </v-btn>
                     </template>
                     <span>Remove cache-only name</span>
-                </v-tooltip>
+                </cheat-tooltip>
             </div>
         </template>
 
         <template v-slot:no-data>
-            <div v-if="!loading" class="caption text--secondary mt-2">
+            <div v-if="!loading" class="text-caption text-medium-emphasis mt-2">
                 No actor names found.
             </div>
         </template>

@@ -28,7 +28,7 @@ export default {
         <cheat-modal
             id="cheat-modal"
             class="opaque-on-mouseover"
-            v-model="currentComponentName"
+            v-model:current-component-name="currentComponentName"
             v-if="show"
             >
         </cheat-modal>
@@ -85,7 +85,7 @@ export default {
         this.notifyCheatInitialized();
     },
 
-    beforeDestroy() {
+    beforeUnmount() {
         window.removeEventListener('keydown', this.onGlobalKeyDown);
         window.removeEventListener('keyup', this.onGlobalKeyUp);
     },

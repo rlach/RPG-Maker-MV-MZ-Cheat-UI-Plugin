@@ -124,7 +124,7 @@ if __name__ == '__main__':
         # clean up temp directory if it exists
         if os.path.exists(paths.temp.root_dir):
             shutil.rmtree(paths.temp.root_dir)
-        
+
         # copy js sources to temp directory
         shutil.copytree(paths.origin.root_dir, paths.temp.root_dir)
 
@@ -155,18 +155,19 @@ if __name__ == '__main__':
             # Create temporary build directory for MV structure
             mv_build_dir = os.path.join(paths.temp_root_path, 'mv_build')
             os.makedirs(mv_build_dir, exist_ok=True)
-            
+
             # Move everything to www subdirectory
             www_dir = os.path.join(mv_build_dir, 'www')
             shutil.move(paths.temp.root_dir, www_dir)
-            
+
             # Use mv_build_dir as the archive root for MV
             archive_root = mv_build_dir
         else:
             # For MZ, use temp root directly
             archive_root = paths.temp.root_dir
-        
+
         shutil.make_archive(paths.get_output_file_path(game_type, version), 'gztar', archive_root)
+        shutil.make_archive(paths.get_output_file_path(game_type, version), 'zip', archive_root)
 
         # remove temp directory
         shutil.rmtree(paths.temp_root_path)

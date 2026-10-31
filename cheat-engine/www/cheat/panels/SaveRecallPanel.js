@@ -6,38 +6,33 @@ export default {
     name: 'SaveRecallPanel',
 
     template: `
-<v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
-    <v-card-text class="pt-1 pb-1">
+<v-card flat class="cheat-refresh-panel ma-0 pa-0 fill-height panel-with-sticky-table">
+    <v-card-text  class="cheat-panel-header pt-1 pb-1">
         <v-card-subtitle class="ma-0 pa-n2 pb-2">Save Location</v-card-subtitle>
-        <span class="body-2 green--text text--darken-1">Map : {{currentMapName}}</span>
+        <span class="body-2 text-green">Map : {{currentMapName}}</span>
         <v-text-field
             ref="locationAliasField"
-            label="Location Alias"
-            solo
-            background-color="grey darken-3"
-            v-model="locationAliasInput"
-            dense
+            label="Location Alias" variant="solo" single-line
+            bg-color="grey-darken-3"
+            v-model="locationAliasInput" density="compact"
             hide-details
             class="mt-2"
-            @keydown.self.stop="onLocationAliasKeyDown"
+            @keydown.stop="onLocationAliasKeyDown"
             @focus="$event.target.select()">
-            <template v-slot:append-outer>
-                <v-tooltip
-                    bottom>
+            <template v-slot:append>
+                <cheat-tooltip location="bottom">
                     <span>Save current location</span>
-                    <template v-slot:activator="{ on, attrs }">
-                        <v-btn
+                    <template v-slot:activator="{ props: activatorProps }">
+                        <v-btn variant="elevated" aria-label="Save current location"
                             class="mt-n1"
-                            color="teal"
-                            x-small
-                            fab
-                            v-on="on"
-                            v-bind="attrs"
+                            color="teal" size="small" icon
+
+                            v-bind="activatorProps"
                             @click="onAddLocation">
                             <v-icon>mdi-plus</v-icon>
                         </v-btn>
                     </template>
-                </v-tooltip>
+                </cheat-tooltip>
             </template>
         </v-text-field>
     </v-card-text>
@@ -45,87 +40,72 @@ export default {
     <v-card-subtitle class="ma-0 pa-0 mt-2">Recall Location</v-card-subtitle>
     <v-card-text class="pt-1 pb-1">
         <v-text-field
-            label="Search..."
-            solo
-            background-color="grey darken-3"
-            v-model="search"
-            dense
+            label="Search..." variant="solo" single-line
+            bg-color="grey-darken-3"
+            v-model="search" density="compact"
             hide-details
-            @keydown.self.stop
+            @keydown.stop
             @focus="$event.target.select()">
         </v-text-field>
     </v-card-text>
-    <v-data-table
+    <v-data-table return-object
         v-if="tableHeaders"
         class="table-with-sticky-footer"
-        :headers="tableHeaders"
+        :headers="uiTableHeaders(tableHeaders)"
         :items="tableItems"
         :search="search"
-        :custom-filter="tableItemFilter"
-        :items-per-page.sync="rowsPerPage">
+        :custom-filter="(value, query, item) => tableItemFilter(value, query, item.raw)"
+        v-model:items-per-page="rowsPerPage">
         <template
             v-slot:item.coord="{ item }">
             {{ item.coord.x }}, {{ item.coord.y }}
         </template>
         <template
             v-slot:item.actions="{ item, index }">
-            
-            <v-tooltip
-                bottom>
+
+            <cheat-tooltip location="bottom">
                 <span>Teleport</span>
-                <template v-slot:activator="{ on, attrs }">
-                    <v-btn
-                        color="green"
-                        x-small
-                        fab
-                        v-bind="attrs"
-                        v-on="on"
+                <template v-slot:activator="{ props: activatorProps }">
+                    <v-btn variant="text"
+                        color="green" size="x-small" icon
+                        v-bind="activatorProps"
+
                         @click="teleportLocation(item.mapId, item.coord.x, item.coord.y)">
-                        <v-icon small>mdi-map-marker</v-icon>
+                        <v-icon size="small">mdi-map-marker</v-icon>
                     </v-btn>
                 </template>
-            </v-tooltip>
-            
-            
-            <v-tooltip
-                bottom>
+            </cheat-tooltip>
+
+
+            <cheat-tooltip location="bottom">
                 <span>Delete location</span>
-                <template v-slot:activator="{ on, attrs }">
-                    <v-btn
+                <template v-slot:activator="{ props: activatorProps }">
+                    <v-btn variant="text"
                         color="red"
-                        class="ml-2"
-                        x-small
-                        fab
-                        v-bind="attrs"
-                        v-on="on"
+                        class="ml-2" size="x-small" icon
+                        v-bind="activatorProps"
+
                         @click="removeLocation(index)">
-                        <v-icon small>mdi-delete</v-icon>
+                        <v-icon size="small">mdi-delete</v-icon>
                     </v-btn>
                 </template>
-            </v-tooltip>
+            </cheat-tooltip>
         </template>
     </v-data-table>
-    
-    <v-tooltip
-        bottom>
+
+    <cheat-tooltip location="bottom">
         <span>Reload from game data</span>
-        <template v-slot:activator="{ on, attrs }">
-            <v-btn
-                style="top: 0px; right: 0px;"
-                color="pink"
-                dark
-                small
-                absolute
-                top
-                right
-                fab
-                v-bind="attrs"
-                v-on="on"
+        <template v-slot:activator="{ props: activatorProps }">
+            <v-btn class="cheat-refresh" variant="elevated"
+
+                color="pink" aria-label="Reload from game data" size="small" icon
+                v-bind="activatorProps"
+
                 @click="initializeVariables">
                 <v-icon>mdi-refresh</v-icon>
             </v-btn>
         </template>
-    </v-tooltip>
+    </cheat-tooltip>
 </v-card>
     `,
 
@@ -299,9 +279,9 @@ export default {
             search = search.toLowerCase();
 
             return (
-                item.name.toLowerCase().contains(search) ||
-                item.mapName.toLowerCase().contains(search) ||
-                String(item.value).toLowerCase().contains(search)
+                item.name.toLowerCase().includes(search) ||
+                item.mapName.toLowerCase().includes(search) ||
+                String(item.value).toLowerCase().includes(search)
             );
         },
     },

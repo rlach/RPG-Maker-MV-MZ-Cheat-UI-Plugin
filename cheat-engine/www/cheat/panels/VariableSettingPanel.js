@@ -9,124 +9,107 @@ export default {
     mixins: [tableSessionMixin('variables')],
 
     template: `
-<v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
-    <v-card-text class="pt-1 pb-1">
-        <div class="d-flex align-center" style="gap: 12px;">
+<v-card flat class="cheat-refresh-panel ma-0 pa-0 fill-height panel-with-sticky-table">
+    <v-card-text  class="cheat-panel-header pt-1 pb-1">
+        <div class="d-flex align-center cheat-variable-filters">
             <v-text-field
-                label="Search..."
-                solo
-                background-color="grey darken-3"
-                v-model="search"
-                dense
+                label="Search..." variant="solo" single-line
+                bg-color="grey-darken-3"
+                v-model="search" density="compact"
                 hide-details
                 style="flex: 1 1 auto;"
-                @keydown.self.stop
+                @keydown.stop
                 @focus="$event.target.select()">
             </v-text-field>
             <v-switch
-                v-model="onlySafeForTranslate"
-                dense
+                v-model="onlySafeForTranslate" density="compact"
                 hide-details
-                inset
                 class="mt-0 pt-0 shrink"
                 label="Only translated">
             </v-switch>
         </div>
         <div class="d-flex align-center mt-2">
             <v-checkbox
-                v-model="excludeNameless"
-                dense
+                v-model="excludeNameless" density="compact"
                 hide-details
                 label="Hide Nameless Items">
             </v-checkbox>
             <v-spacer></v-spacer>
             <v-checkbox
-                v-model="onlyPinned"
-                dense
+                v-model="onlyPinned" density="compact"
                 hide-details
                 label="Only Pinned">
             </v-checkbox>
         </div>
     </v-card-text>
-    <v-data-table
+    <v-data-table return-object
         v-if="tableReady && tableHeaders"
         class="table-with-sticky-footer"
-        :headers="tableHeaders"
+        :headers="uiTableHeaders(tableHeaders)"
         :items="filteredTableItems"
-        :items-per-page.sync="rowsPerPage"
-        :page.sync="page"
-        :sort-by.sync="tableSession.sortBy"
-        :sort-desc.sync="tableSession.sortDesc">
+        v-model:items-per-page="rowsPerPage"
+        v-model:page="page"
+        :sort-by="uiTableSort(tableSession.sortBy, tableSession.sortDesc)" @update:sort-by="updateUiTableSort($event, 'tableSession.sortBy', 'tableSession.sortDesc')"
+        >
         <template v-slot:item.name="{ item }">
-            <div style="width: 100%;">{{ item.name }}</div>
+            <div style="width: 100%; min-width: 160px;">{{ item.name }}</div>
         </template>
         <template
             v-slot:item.value="{ item }">
             <v-text-field
-                background-color="grey darken-3"
+
                 class="d-flex"
-                height="10"
-                style="width: 100%;"
-                hide-details
-                solo
-                v-model="item.value"
-                label="Value"
-                dense
-                @keydown.self.stop
-                @change="onItemChange(item)"
+
+                style="width: 100%; min-width: 160px;"
+                hide-details variant="outlined"
+                v-model="item.value" density="compact"
+                @keydown.stop="onValueKeyDown(item, $event)"
+                @update:model-value="onItemChange(item)"
                 @focus="$event.target.select()">
             </v-text-field>
         </template>
         <template v-slot:item.actions="{ item }">
             <div class="d-flex align-center justify-center">
-                <v-tooltip bottom>
+                <cheat-tooltip location="bottom">
                     <span>{{ item.pinned ? 'Unpin variable' : 'Pin variable' }}</span>
-                    <template v-slot:activator="{ on, attrs }">
-                        <v-btn icon x-small
+                    <template v-slot:activator="{ props: activatorProps }">
+                        <v-btn variant="text" icon size="x-small"
                             :color="item.pinned ? 'cyan' : 'grey'"
-                            v-bind="attrs" v-on="on" @click="togglePin(item)">
-                            <v-icon small>{{ item.pinned ? 'mdi-pin' : 'mdi-pin-outline' }}</v-icon>
+                            v-bind="activatorProps"  @click="togglePin(item)">
+                            <v-icon size="small">{{ item.pinned ? 'mdi-pin' : 'mdi-pin-outline' }}</v-icon>
                         </v-btn>
                     </template>
-                </v-tooltip>
-                <v-tooltip bottom>
+                </cheat-tooltip>
+                <cheat-tooltip location="bottom">
                     <span>Mark as safe for translate</span>
-                    <template v-slot:activator="{ on, attrs }">
-                        <v-btn
-                            icon
-                            x-small
+                    <template v-slot:activator="{ props: activatorProps }">
+                        <v-btn variant="text"
+                            icon size="x-small"
                             :color="item.safeForTranslate ? 'amber darken-2' : 'grey'"
-                            v-bind="attrs"
-                            v-on="on"
+                            v-bind="activatorProps"
+
                             @click="toggleSafeForTranslate(item)">
-                            <v-icon small>{{ item.safeForTranslate ? 'mdi-star' : 'mdi-star-outline' }}</v-icon>
+                            <v-icon size="small">{{ item.safeForTranslate ? 'mdi-star' : 'mdi-star-outline' }}</v-icon>
                         </v-btn>
                     </template>
-                </v-tooltip>
+                </cheat-tooltip>
             </div>
         </template>
     </v-data-table>
 
-    <v-tooltip
-        bottom>
+    <cheat-tooltip location="bottom">
         <span>Reload from game data</span>
-        <template v-slot:activator="{ on, attrs }">
-            <v-btn
-                style="top: 0px; right: 0px;"
-                color="pink"
-                dark
-                small
-                absolute
-                top
-                right
-                fab
-                v-bind="attrs"
-                v-on="on"
+        <template v-slot:activator="{ props: activatorProps }">
+            <v-btn class="cheat-refresh" variant="elevated"
+
+                color="pink" aria-label="Reload from game data" size="small" icon
+                v-bind="activatorProps"
+
                 @click="initializeVariables">
                 <v-icon>mdi-refresh</v-icon>
             </v-btn>
         </template>
-    </v-tooltip>
+    </cheat-tooltip>
 </v-card>
     `,
 
@@ -235,6 +218,14 @@ export default {
 
         getDisplayVariableName(variableName) {
             return typeof variableName === 'string' ? variableName.trim() : variableName;
+        },
+
+        onValueKeyDown(item, event) {
+            if (typeof item.value !== 'number' || !Number.isFinite(item.value)) return;
+            if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+            event.preventDefault();
+            item.value += event.key === 'ArrowUp' ? 1 : -1;
+            this.onItemChange(item);
         },
 
         onItemChange(item) {

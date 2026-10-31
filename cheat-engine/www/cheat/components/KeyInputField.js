@@ -5,24 +5,22 @@ export default {
 
     template: `
 <v-text-field
-    v-model="showingText"
+    :model-value="showingText"
     :label="label"
-    :solo="solo"
-    :outlined="outlined"
-    :background-color="backgroundColor"
-    dense
+    :single-line="solo"
+    :variant="solo ? 'solo' : outlined ? 'outlined' : 'filled'"
+    :bg-color="backgroundColor" density="compact"
     hide-details
-    @keydown.self.stop.prevent="onShortcutInput"
+    @keydown.stop.prevent="onShortcutInput"
     @focus="$event.target.select()">
-    <template v-slot:append>
-        <v-btn 
+    <template v-slot:append-inner>
+        <v-btn class="cheat-shortcut-clear" variant="text"
             v-if="deletable"
-            :disabled="shortcut.isEmpty()"
-            small
+            :disabled="shortcut.isEmpty()" size="small"
             :style="deleteBtnStyle"
             icon
             @click="onDeleteClick">
-            <v-icon small>mdi-close-circle</v-icon>
+            <v-icon size="small">mdi-close-circle</v-icon>
         </v-btn>
     </template>
 </v-text-field>
@@ -32,10 +30,7 @@ export default {
         return {};
     },
 
-    model: {
-        prop: 'shortcut',
-        event: 'change',
-    },
+    emits: ['update:shortcut', 'change'],
 
     props: {
         shortcut: {
@@ -88,7 +83,7 @@ export default {
         onDeleteClick() {
             const eventKey = Key.createEmpty();
             this.$emit('change', eventKey);
-            this.$emit('input', eventKey);
+            this.$emit('update:shortcut', eventKey);
         },
 
         onShortcutInput(e) {
@@ -102,7 +97,7 @@ export default {
                 this.$emit('change', eventKey);
             }
 
-            this.$emit('input', eventKey);
+            this.$emit('update:shortcut', eventKey);
         },
     },
 };

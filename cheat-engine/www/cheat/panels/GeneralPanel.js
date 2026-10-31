@@ -13,43 +13,41 @@ export default {
     name: 'GeneralPanel',
 
     template: `
-<v-card 
-    class="ma-0 pa-0"
+<v-card
+    class="cheat-refresh-panel ma-0 pa-0"
     flat>
     <v-card-subtitle class="pb-0 font-weight-bold">Edit</v-card-subtitle>
 
-    <v-card-text class="py-0 caption grey--text text--lighten-1">
+    <v-card-text  class="cheat-panel-header py-0 caption text-grey-lighten-1">
         Cheat version: {{cheatVersion}}, RPG maker: {{rpgMakerName}}, nwjs: {{nwjsNodeWebkitVersion}} {{nwjsFlavor}}
     </v-card-text>
-    
-    <v-card-text 
+
+    <v-card-text
         class="py-0">
         <v-checkbox
             v-model="noClip"
             label="No Clip"
-            @change="onNoClipChange">
+            @update:model-value="onNoClipChange">
         </v-checkbox>
 
         <v-checkbox
             v-model="openInSeparateWindow"
             label="Open in separate window"
-            @change="onOpenInSeparateWindowChange">
+            @update:model-value="onOpenInSeparateWindowChange">
         </v-checkbox>
     </v-card-text>
-    
+
     <v-card-text class="py-0">
-        <v-text-field
+        <v-text-field type="number" step="1"
             v-model="gold"
-            label="Gold"
-            outlined
-            dense
+            label="Gold" variant="outlined" density="compact"
             hide-details
-            @keydown.self.stop
-            @change="onGoldChange"
+            @keydown.stop
+            @update:model-value="onGoldChange"
             @focus="$event.target.select()">
         </v-text-field>
     </v-card-text>
-    
+
     <v-card-text class="pt-4 pb-0">
         <v-slider
             v-model="speed"
@@ -59,34 +57,32 @@ export default {
             thumb-label
             thumb-color="red"
             hide-details
-            @change="onSpeedChange">
+            @update:model-value="onSpeedChange">
             <template v-slot:prepend>
-                <span class="grey--text text--lighten-1 align-self-center mr-2 body-2" style="white-space: nowrap;">Move Speed</span>
-                <v-icon color="grey lighten-3" @click="addSpeed(-stepSpeed)">mdi-chevron-left</v-icon>
+                <span class="text-grey-lighten-1 align-self-center mr-2 body-2" style="white-space: nowrap;">Move Speed</span>
+                <v-icon color="grey-lighten-3" @click="addSpeed(-stepSpeed)">mdi-chevron-left</v-icon>
             </template>
             <template v-slot:append>
-                <v-icon color="grey lighten-3" @click="addSpeed(stepSpeed)">mdi-chevron-right</v-icon>
-                <span class="grey--text text--lighten-1 align-self-center ml-2">{{speed.toFixed(1)}}</span>
+                <v-icon color="grey-lighten-3" @click="addSpeed(stepSpeed)">mdi-chevron-right</v-icon>
+                <span class="text-grey-lighten-1 align-self-center ml-2">{{speed.toFixed(1)}}</span>
             </template>
         </v-slider>
         <v-checkbox
             v-model="fixSpeed"
             class="pt-0"
-            hide-details
-            dense
+            hide-details density="compact"
             label="Fixed"
-            @change="onSpeedChange">
+            @update:model-value="onSpeedChange">
         </v-checkbox>
 
         <v-checkbox
             v-model="alwaysDash"
             class="pt-2"
-            hide-details
-            dense
+            hide-details density="compact"
             label="Always Dash"
-            @change="onAlwaysDashChange">
+            @update:model-value="onAlwaysDashChange">
         </v-checkbox>
-        
+
         <v-slider
             v-model="textSpeed"
             :min="minTextSpeed"
@@ -96,20 +92,20 @@ export default {
             thumb-label
             thumb-color="red"
             hide-details
-            @change="onTextSpeedChange">
+            @update:model-value="onTextSpeedChange">
             <template v-slot:prepend>
-                <span class="grey--text text--lighten-1 align-self-center mr-2 body-2" style="white-space: nowrap;">Text Speed</span>
-                <v-icon color="grey lighten-3" @click="addTextSpeed(-stepTextSpeed)">mdi-chevron-left</v-icon>
+                <span class="text-grey-lighten-1 align-self-center mr-2 body-2" style="white-space: nowrap;">Text Speed</span>
+                <v-icon color="grey-lighten-3" @click="addTextSpeed(-stepTextSpeed)">mdi-chevron-left</v-icon>
             </template>
             <template v-slot:append>
-                <v-icon color="grey lighten-3" @click="addTextSpeed(stepTextSpeed)">mdi-chevron-right</v-icon>
-              <span class="grey--text text--lighten-1 align-self-center ml-2">{{formatTextSpeedLabel(textSpeed)}}</span>
+                <v-icon color="grey-lighten-3" @click="addTextSpeed(stepTextSpeed)">mdi-chevron-right</v-icon>
+              <span class="text-grey-lighten-1 align-self-center ml-2">{{formatTextSpeedLabel(textSpeed)}}</span>
             </template>
         </v-slider>
-          <div class="caption grey--text text--lighten-1 mt-1 ml-1">
+          <div class="text-caption text-grey-lighten-1 mt-1 ml-1">
             0 = instant, 1 = default, 20 = very slow
           </div>
-        
+
         <v-slider
             v-model="gameSpeed"
             :min="minGameSpeed"
@@ -119,80 +115,68 @@ export default {
             thumb-label
             thumb-color="red"
             hide-details
-            @change="onGameSpeedChange">
+            @update:model-value="onGameSpeedChange">
             <template v-slot:prepend>
-                <span class="grey--text text--lighten-1 align-self-center mr-2 d-inline-block body-2" style="white-space: nowrap;">Game Speed</span>
-                <v-icon color="grey lighten-3" @click="addGameSpeed(-stepGameSpeed)">mdi-chevron-left</v-icon>
+                <span class="text-grey-lighten-1 align-self-center mr-2 d-inline-block body-2" style="white-space: nowrap;">Game Speed</span>
+                <v-icon color="grey-lighten-3" @click="addGameSpeed(-stepGameSpeed)">mdi-chevron-left</v-icon>
             </template>
             <template v-slot:append>
-                <v-icon color="grey lighten-3" @click="addGameSpeed(stepGameSpeed)">mdi-chevron-right</v-icon>
-                <span class="grey--text text--lighten-1 align-self-center ml-2 mr-2">x{{gameSpeed.toFixed(1)}}</span>
-                <v-icon size="16" color="grey lighten-3 ml-2" @click="setGameSpeed()">mdi-restore</v-icon>
+                <v-icon color="grey-lighten-3" @click="addGameSpeed(stepGameSpeed)">mdi-chevron-right</v-icon>
+                <span class="text-grey-lighten-1 align-self-center ml-2 mr-2">x{{gameSpeed.toFixed(1)}}</span>
+                <v-icon size="16" color="grey-lighten-3 ml-2" @click="setGameSpeed()">mdi-restore</v-icon>
             </template>
         </v-slider>
-        
+
         <v-checkbox
             v-model="applyAllForGameSpeed"
             class="d-inline-flex pt-0"
-            hide-details
-            dense
+            hide-details density="compact"
             label="All"
-            @change="onApplyAllForGameSpeedChange">
+            @update:model-value="onApplyAllForGameSpeedChange">
         </v-checkbox>
         <v-checkbox
             v-model="applyBattleForGameSpeed"
             class="d-inline-flex ml-2 pt-0 mb-0"
-            hide-details
-            dense
+            hide-details density="compact"
             label="Battle"
-            @change="onApplyBattleForGameSpeedChange">
+            @update:model-value="onApplyBattleForGameSpeedChange">
         </v-checkbox>
     </v-card-text>
-    
+
     <v-card-subtitle class="mt-3 font-weight-bold">Quick Actions</v-card-subtitle>
-    
+
     <v-card-text class="py-0">
-        <v-btn
-            small
+        <v-btn size="small"
             @click="gotoTitle">
             To Title
         </v-btn>
     </v-card-text>
-    
+
     <v-card-text>
-        <v-btn 
-            small
+        <v-btn size="small"
             class="mr-1"
             @click="toggleSaveScene">
             Open Save
         </v-btn>
-        <v-btn
-            small
+        <v-btn size="small"
             @click="toggleLoadScene">
             Open Load
         </v-btn>
     </v-card-text>
-    
-    <v-tooltip
-        bottom>
+
+    <cheat-tooltip location="bottom">
         <span>Reload from game data</span>
-        <template v-slot:activator="{ on, attrs }">
-            <v-btn
-                style="top: 0px; right: 0px;"
-                color="pink"
-                dark
-                small
-                absolute
-                top
-                right
-                fab
-                v-bind="attrs"
-                v-on="on"
+        <template v-slot:activator="{ props: activatorProps }">
+            <v-btn class="cheat-refresh" variant="elevated"
+
+                color="pink" aria-label="Reload from game data" size="small" icon
+                v-bind="activatorProps"
+
                 @click="initializeVariables">
                 <v-icon>mdi-refresh</v-icon>
             </v-btn>
         </template>
-    </v-tooltip>
+    </cheat-tooltip>
 </v-card>
     `,
 

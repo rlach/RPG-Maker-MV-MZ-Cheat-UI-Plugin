@@ -66,17 +66,15 @@ export default {
     },
 
     template: `
-<v-dialog :value="visible" max-width="560" scrollable @keydown.stop @input="$emit('update:visible', $event)">
-    <v-card dark class="pt-2">
-        <v-card-title class="subtitle-1 font-weight-bold">
+<v-dialog :model-value="visible" max-width="560" scrollable @keydown.stop @update:model-value="$emit('update:visible', $event)">
+    <v-card class="pt-2">
+        <v-card-title class="text-subtitle-1 font-weight-bold">
             {{ title }}
         </v-card-title>
         <v-card-text style="max-height: 62vh; overflow-y: auto;">
             <v-text-field
                 v-model="form.description"
-                label="Description"
-                outlined
-                dense
+                label="Description" variant="outlined" density="compact"
                 hide-details
                 :disabled="isFieldDisabled('description')"
                 @keydown.stop
@@ -85,9 +83,7 @@ export default {
 
             <v-text-field
                 v-model="form.tagSymbol"
-                label="Tag Symbol"
-                outlined
-                dense
+                label="Tag Symbol" variant="outlined" density="compact"
                 hide-details
                 :disabled="isFieldDisabled('tagSymbol')"
                 @keydown.stop
@@ -97,26 +93,22 @@ export default {
             <v-select
                 v-model="form.style"
                 :items="tagStyleOptions"
-                label="Style"
-                outlined
-                dense
+                label="Style" variant="outlined" density="compact"
                 hide-details
                 :disabled="isFieldDisabled('style')"
                 @keydown.stop
                 class="mb-2"
-            ></v-select>
+             item-title="text"></v-select>
 
             <v-select
                 v-model="form.type"
                 :items="tagTypeOptions"
-                label="Type"
-                outlined
-                dense
+                label="Type" variant="outlined" density="compact"
                 hide-details
                 :disabled="isFieldDisabled('type')"
                 @keydown.stop
                 class="mb-2"
-            ></v-select>
+             item-title="text"></v-select>
 
             <v-checkbox
                 v-model="form.requiredConsistency"
@@ -131,9 +123,7 @@ export default {
                 type="number"
                 min="0"
                 step="1"
-                label="Reserved width"
-                outlined
-                dense
+                label="Reserved width" variant="outlined" density="compact"
                 hide-details
                 @keydown.stop
                 class="mb-2"
@@ -141,16 +131,14 @@ export default {
 
             <v-textarea
                 v-model="form.extraPromptForLlm"
-                label="Extra prompt for LLM"
-                outlined
-                dense
+                label="Extra prompt for LLM" variant="outlined" density="compact"
                 hide-details
                 rows="3"
                 auto-grow
                 @keydown.stop
                 class="mb-2"
             ></v-textarea>
-            <div class="caption grey--text text--lighten-1 mb-2">
+            <div class="text-caption text-grey-lighten-1 mb-2">
                 Tag name will be listed before the description.
             </div>
 
@@ -158,14 +146,12 @@ export default {
                 <v-select
                     v-model="form.bracket"
                     :items="bracketOptionsForStyle"
-                    label="Bracket"
-                    outlined
-                    dense
+                    label="Bracket" variant="outlined" density="compact"
                     hide-details
                     :disabled="isFieldDisabled('bracket')"
                     @keydown.stop
                     class="mb-2"
-                ></v-select>
+                 item-title="text"></v-select>
 
                 <v-checkbox
                     v-model="form.maskValue"
@@ -194,8 +180,8 @@ export default {
         </v-card-text>
         <v-card-actions>
             <v-spacer></v-spacer>
-            <v-btn text color="grey" @click="cancel">Cancel</v-btn>
-            <v-btn text color="primary" @click="save">Save</v-btn>
+            <v-btn variant="text" color="grey" @click="cancel">Cancel</v-btn>
+            <v-btn variant="text" color="primary" @click="save">Save</v-btn>
         </v-card-actions>
     </v-card>
 </v-dialog>

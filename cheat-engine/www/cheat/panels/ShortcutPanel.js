@@ -15,8 +15,7 @@ export default {
 <v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
     <v-alert
         v-if="showUnavailable"
-        type="warning"
-        dense
+        type="warning" density="compact"
         border="left"
         colored-border
         class="ma-0 mb-2"
@@ -29,14 +28,12 @@ export default {
             cols="12"
             md="8">
             <v-text-field
-                label="Search..."
-                solo
-                background-color="grey darken-3"
-                v-model="search"
-                dense
+                label="Search..." variant="solo" single-line
+                bg-color="grey-darken-3"
+                v-model="search" density="compact"
                 hide-details
-                @keydown.self.stop
-                @input="onSearchChange"
+                @keydown.stop
+                @update:model-value="onSearchChange"
                 @focus="$event.target.select()">
             </v-text-field>
         </v-col>
@@ -44,11 +41,11 @@ export default {
             cols="12"
             md="4">
             <key-input-field
-                v-model="shortcutSearch"
+                v-model:shortcut="shortcutSearch"
                 label="Shortcut"
                 solo
                 dense
-                background-color="grey darken-3"
+                background-color="grey-darken-3"
                 hide-details
                 combining-key-alone
                 @change="onShortcutSearchChange">
@@ -62,42 +59,38 @@ export default {
             v-model="hideDesc"
             label="Hide Description Field">
         </v-checkbox>
-        <v-tooltip
-            bottom>
+        <cheat-tooltip location="bottom">
             <span>Restore to default settings</span>
-            <template v-slot:activator="{ on, attrs }">
-                <v-btn
+            <template v-slot:activator="{ props: activatorProps }">
+                <v-btn variant="elevated" aria-label="Restore default shortcuts"
                     color="green"
-                    v-bind="attrs"
-                    v-on="on"
-                    x-small
-                    fab
+                    v-bind="activatorProps"
+                     size="small" icon
                     @click="restoreToDefault">
-                    <v-icon small>mdi-restore</v-icon>
+                    <v-icon size="small">mdi-restore</v-icon>
                 </v-btn>
             </template>
-        </v-tooltip>
+        </cheat-tooltip>
     </v-card-text>
-    <v-data-table
+    <v-data-table return-object
         class="mt-2 table-with-sticky-footer"
-        denses
-        single-expand
-        :headers="filteredHeaders"
-        :expanded.sync="tableExpanded"
+        density="compact"
+        @update:expanded="tableExpanded = $event.slice(-1)"
+        :headers="uiTableHeaders(filteredHeaders)"
+        v-model:expanded="tableExpanded"
         :items="filteredShortcuts"
         :search="search"
-        :custom-filter="tableItemFilter"
-        :items-per-page.sync="rowsPerPage">
+        :custom-filter="(value, query, item) => tableItemFilter(value, query, item.raw)"
+        v-model:items-per-page="rowsPerPage">
         <template
             v-slot:item.shortcut="{ item }">
             <key-input-field
                 style="width: 170px;"
-                v-model="item.shortcut"
+                v-model:shortcut="item.shortcut"
                 :deletable="!item.necessary"
-                label="No Shortcut"
-                solo
+                label="" aria-label="Shortcut"
+                outlined
                 dense
-                background-color="grey darken-3"
                 :combining-key-alone="item.combiningKeyAlone"
                 hide-details
                 @change="onShortcutChange($event, item)">
@@ -107,17 +100,15 @@ export default {
             v-slot:item.param="{ item, index }">
             <v-btn
                 v-if="Object.keys(item.paramDesc).length > 0"
-                color="blue-grey"
-                dark
-                x-small
-                fab
+                color="blue-grey" size="x-small"
+                icon variant="text"
                 @click="changeExpanded(item)">
-                <v-icon small>mdi-cog</v-icon>
+                <v-icon size="small">mdi-cog</v-icon>
             </v-btn>
         </template>
-        <template v-slot:expanded-item="{ headers, item }">
-            <td :colspan="headers.length" class="ma-0 pa-0">
-                <v-card 
+        <template v-slot:expanded-row="{ columns, item }">
+            <tr><td :colspan="columns.length" class="ma-0 pa-0">
+                <v-card
                     flat
                     class="ma-0 py-2 px-0"
                     v-if="Object.keys(item.paramDesc).length > 0">
@@ -136,12 +127,10 @@ export default {
                                 cols="12"
                                 md="3">
                                 <v-text-field
-                                    v-model="item.param[paramKey].value"
-                                    outlined
-                                    dense
+                                    v-model="item.param[paramKey].value" variant="outlined" density="compact"
                                     hide-details
-                                    @keydown.self.stop
-                                    @change="onParameterChange($event, item, paramKey)"
+                                    @keydown.stop
+                                    @update:model-value="onParameterChange($event, item, paramKey)"
                                     :label="item.paramDesc[paramKey].name"
                                     @focus="$event.target.select()">
                                 </v-text-field>
@@ -155,7 +144,7 @@ export default {
                         </v-row>
                     </v-card-text>
                 </v-card>
-            </td>
+            </td></tr>
         </template>
     </v-data-table>
     </template>
@@ -335,9 +324,9 @@ export default {
 
             search = search.toLowerCase();
             return (
-                item.name.toLowerCase().contains(search) ||
-                item.desc.toLowerCase().contains(search) ||
-                item.shortcut.asDisplayString().toLowerCase().contains(search)
+                item.name.toLowerCase().includes(search) ||
+                item.desc.toLowerCase().includes(search) ||
+                item.shortcut.asDisplayString().toLowerCase().includes(search)
             );
         },
     },

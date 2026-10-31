@@ -1,102 +1,92 @@
 import { GeneralCheat } from '../js/CheatHelper.js';
+import { gameObjectReference } from '../js/Tools.js';
 
 export default {
     name: 'StatsSettingPanel',
 
     template: `
-<v-card flat class="ma-0 pa-0">
+<v-card flat class="cheat-refresh-panel ma-0 pa-0">
     <v-tabs
         v-model="selectedTab"
-        dark
-        background-color="grey darken-3"
+        bg-color="grey-darken-3"
         show-arrows>
         <v-tab
             v-for="actor in actors"
+            :value="actor.id"
             :key="actor.id">
             {{actor.name}}
         </v-tab>
     </v-tabs>
-    <v-tabs-items
-        dark
+    <v-window
         v-model="selectedTab">
-        <v-tab-item
+        <v-window-item
             v-for="actor in actors"
+            :value="actor.id"
             :key="actor.id">
             <v-card
                 flat
-                class="ma-0">
+                class="ma-0 cheat-stats-card">
                 <v-card-actions
                     class="pa-0">
                     <v-checkbox
                         v-model="actor.godMode"
                         label="God Mode"
-                        @change="onGodModeChange(actor)">
+                        @update:model-value="onGodModeChange(actor)">
                     </v-checkbox>
                     <v-spacer></v-spacer>
-                    <v-tooltip
-                        bottom>
+                    <cheat-tooltip location="bottom">
                         <span>Reload from game data</span>
-                        <template v-slot:activator="{ on, attrs }">
-                            <v-btn
-                                color="pink"
-                                dark
-                                small
-                                fab
-                                v-bind="attrs"
-                                v-on="on"
+                        <template v-slot:activator="{ props: activatorProps }">
+                            <v-btn class="cheat-refresh" variant="elevated" aria-label="Reload from game data"
+                                color="pink" size="small" icon
+                                v-bind="activatorProps"
+
                                 @click="initializeVariables">
                                 <v-icon>mdi-refresh</v-icon>
                             </v-btn>
                         </template>
-                    </v-tooltip>
+                    </cheat-tooltip>
                 </v-card-actions>
                 <v-card-subtitle class="pa-0">Level / EXP</v-card-subtitle>
                 <v-row class="mt-0">
                     <v-col>
-                        <v-text-field
+                        <v-text-field type="number" step="1"
                             label="Lv"
-                            v-model="actor.level"
-                            outlined
-                            dense
+                            v-model="actor.level" variant="outlined" density="compact"
                             hide-details
-                            @keydown.self.stop
-                            @change="onLevelChange(actor)"
+                            @keydown.stop
+                            @update:model-value="onLevelChange(actor)"
                             @focus="$event.target.select()"></v-text-field>
                     </v-col>
                     <v-col>
-                        <v-text-field
+                        <v-text-field type="number" step="1"
                             label="EXP"
-                            v-model="actor.exp"
-                            outlined
-                            dense
+                            v-model="actor.exp" variant="outlined" density="compact"
                             hide-details
-                            @keydown.self.stop
-                            @change="onExpChange(actor)"
+                            @keydown.stop
+                            @update:model-value="onExpChange(actor)"
                             @focus="$event.target.select()"></v-text-field>
                     </v-col>
                 </v-row>
-                
+
                 <v-card-subtitle class="pa-0 mt-4">Stats</v-card-subtitle>
                 <v-row class="mt-0">
                     <v-col
                         v-for="(_, paramIdx) in actor.param.length"
                         :key="paramIdx"
-                        cols="12"
-                        md="6">
-                        <v-text-field
+                        cols="6">
+                        <v-text-field type="number" step="1"
                             :label="paramNames[paramIdx]"
-                            v-model="actor.param[paramIdx]"
-                            outlined
-                            dense
+                            v-model="actor.param[paramIdx]" variant="outlined" density="compact"
                             hide-details
-                            @keydown.self.stop
-                            @change="onParamChange(actor, paramIdx)"
+                            @keydown.stop
+                            @update:model-value="onParamChange(actor, paramIdx)"
                             @focus="$event.target.select()"></v-text-field>
                     </v-col>
                 </v-row>
             </v-card>
-        </v-tab-item>
-    </v-tabs-items>
+        </v-window-item>
+    </v-window>
 </v-card>
     `,
 
@@ -123,7 +113,7 @@ export default {
             }
 
             return {
-                _actor: actor,
+                _actor: gameObjectReference(actor),
                 id: actor._actorId,
                 name: actor._name,
                 godMode: GeneralCheat.isGodMode(actor),

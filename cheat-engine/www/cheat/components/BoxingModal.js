@@ -1,3 +1,4 @@
+import { createSharedUiState, bindSharedUiState } from '../js/SharedUiState.js';
 import { TagSyntax } from '../translate-engines/ai-engine/TagSyntax.js';
 import { parseCacheKeyForLangPair } from '../js/TranslateCacheRuntime.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
@@ -64,12 +65,7 @@ function tallyCacheEntry(statsMap, parsed, value) {
     typeStat.translatedCount++;
 }
 
-function makeObservable(value) {
-    if (globalThis.Vue && typeof globalThis.Vue.observable === 'function') {
-        return globalThis.Vue.observable(value);
-    }
-    return value;
-}
+const makeObservable = createSharedUiState;
 
 function buildTagInfo() {
     // Find tags with reservedWidth > 0 (excluding simpleN/sn which is handled separately)
@@ -449,7 +445,7 @@ class BoxingService {
 
 export const BOXING_SERVICE = new BoxingService();
 
-export default {
+const component = {
     name: 'BoxingModal',
 
     template: `
@@ -463,25 +459,24 @@ export default {
     @click.stop
     @wheel.stop
   >
-    <v-card dark>
-      <v-card-title class="subtitle-1 font-weight-bold">Boxing</v-card-title>
-      <v-card-text class="caption pb-1">
+    <v-card>
+      <v-card-title class="text-subtitle-1 font-weight-bold">Boxing</v-card-title>
+      <v-card-text class="text-caption pb-1">
         Ask the LLM to reformat existing description translations to fit within a given box size.
         Only works for already-translated cache entries. Untranslated entries won't be processed.
       </v-card-text>
 
       <v-card-text class="pt-1 pb-0">
-        <div class="subtitle-2 mb-2">Entries to adjust:</div>
+        <div class="text-subtitle-2 mb-2">Entries to adjust:</div>
         <template v-if="typeStats.length === 0">
-          <div class="caption grey--text">No translated description entries found for current language pair.</div>
+          <div class="text-caption text-grey">No translated description entries found for current language pair.</div>
         </template>
         <template v-else>
                     <div class="d-flex align-center mb-2">
                         <v-checkbox
                             v-model="showAllTypes"
                             label="Show all types"
-                            hide-details
-                            dense
+                            hide-details density="compact"
                             class="ma-0 pa-0"
                         ></v-checkbox>
                     </div>
@@ -494,11 +489,10 @@ export default {
               v-model="selection[stat.type]"
               :label="stat.type"
               :disabled="stat.translatedCount === 0"
-              hide-details
-              dense
+              hide-details density="compact"
               class="ma-0 pa-0"
             ></v-checkbox>
-            <span class="caption grey--text text--lighten-1 ml-2">
+            <span class="text-caption text-grey-lighten-1 ml-2">
               <template v-if="stat.untranslatedCount > 0">
                 ({{ stat.translatedCount }}) ({{ stat.untranslatedCount }} still untranslated, won't be processed)
               </template>
@@ -511,54 +505,47 @@ export default {
       </v-card-text>
 
       <v-card-text class="pt-2">
-        <div class="subtitle-2 mb-2">LLM Prompt:</div>
+        <div class="text-subtitle-2 mb-2">LLM Prompt:</div>
                 <v-checkbox
                     v-model="onlyReformatWithoutLlm"
                     label="Only reformat, without LLM"
-                    hide-details
-                    dense
+                    hide-details density="compact"
                     class="ma-0 mb-2 pa-0"
                 ></v-checkbox>
         <v-textarea
           v-model="llmPrompt"
-                    :disabled="onlyReformatWithoutLlm"
-          outlined
-          dense
+                    :disabled="onlyReformatWithoutLlm" variant="outlined" density="compact"
           rows="8"
           hide-details
-          background-color="grey darken-3"
+          bg-color="grey-darken-3"
           @keydown.stop
         ></v-textarea>
       </v-card-text>
 
       <v-card-text class="pt-0">
-        <div class="subtitle-2 mb-2">Box size:</div>
+        <div class="text-subtitle-2 mb-2">Box size:</div>
         <div class="d-flex align-center" style="gap: 8px;">
           <v-text-field
             v-model.number="descriptionMaxLineWidth"
-            label="Width (chars)"
-            outlined
-            dense
+            label="Width (chars)" variant="outlined" density="compact"
             type="number"
             min="20"
             max="200"
             hide-details
-            background-color="grey darken-3"
-            @keydown.self.stop
+            bg-color="grey-darken-3"
+            @keydown.stop
             @focus="$event.target.select()"
             style="flex: 1 1 auto;">
           </v-text-field>
           <v-text-field
             v-model.number="descriptionMaxRows"
-            label="Max rows"
-            outlined
-            dense
+            label="Max rows" variant="outlined" density="compact"
             type="number"
             min="1"
             max="20"
             hide-details
-            background-color="grey darken-3"
-            @keydown.self.stop
+            bg-color="grey-darken-3"
+            @keydown.stop
             @focus="$event.target.select()"
             style="flex: 0 0 120px; max-width: 120px;">
           </v-text-field>
@@ -566,27 +553,24 @@ export default {
                 <div class="d-flex align-center mt-2" style="gap: 8px;">
                     <v-text-field
                         v-model.number="removeNewlinesBeforeWrappingMaxCount"
-                        label="Remove existing newlines before wrapping if there are"
-                        outlined
-                        dense
+                        label="Remove existing newlines before wrapping if there are" variant="outlined" density="compact"
                         type="number"
                         min="0"
                         max="20"
                         hide-details
-                        background-color="grey darken-3"
-                        @keydown.self.stop
+                        bg-color="grey-darken-3"
+                        @keydown.stop
                         @focus="$event.target.select()"
                         style="flex: 0 0 auto; width: 80px;">
                     </v-text-field>
-                    <span class="caption grey--text text--lighten-1" style="white-space: nowrap;">or less in a row</span>
+                    <span class="text-caption text-grey-lighten-1" style="white-space: nowrap;">or less in a row</span>
                 </div>
       </v-card-text>
 
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn text color="grey" @click="closeModal">Cancel</v-btn>
-        <v-btn
-          text
+        <v-btn variant="text" color="grey" @click="closeModal">Cancel</v-btn>
+        <v-btn variant="text"
           color="primary"
           :disabled="!hasSelection"
           @click="startBoxing">
@@ -678,3 +662,5 @@ export default {
         },
     },
 };
+
+export default bindSharedUiState(component, BOXING_SERVICE);

@@ -21,51 +21,47 @@ export default {
 
     template: `
 <v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
-    <v-card-title class="subtitle-1 font-weight-bold pb-1">
+    <v-card-title class="text-subtitle-1 font-weight-bold pb-1">
         Knowledge Base
     </v-card-title>
 
     <v-card-text class="pt-0 pb-1">
         <div class="d-flex align-center justify-space-between">
-            <div class="caption grey--text text--lighten-1">
+            <div class="text-caption text-grey-lighten-1">
                 {{ activeLanguagePairLabel }}
             </div>
         </div>
         <v-switch
             v-model="askLlmToAddToKnowledge"
-            label="Ask LLM to add to Knowledge Base"
-            dense
+            label="Ask LLM to add to Knowledge Base" density="compact"
             hide-details
             class="mt-1"
             @click.self.stop
-            @change="onToggleAskLlm">
+            @update:model-value="onToggleAskLlm">
         </v-switch>
     </v-card-text>
 
-    <v-data-table
+    <v-data-table return-object
         class="mt-1 table-with-sticky-footer"
-        :headers="tableHeaders"
+        :headers="uiTableHeaders(tableHeaders)"
         :items="filteredEntries"
-        :page.sync="page"
-        :sort-by.sync="sortBy"
-        :sort-desc.sync="sortDesc"
-        :items-per-page.sync="rowsPerPage">
+        v-model:page="page"
+        :sort-by="uiTableSort(sortBy, sortDesc)" @update:sort-by="updateUiTableSort($event, 'sortBy', 'sortDesc')"
+
+        v-model:items-per-page="rowsPerPage">
         <template v-slot:top>
             <div class="d-flex align-center" style="gap: 8px;">
                 <v-text-field
                     v-model="searchInput"
-                    label="Search key / translation / info"
-                    solo
-                    dense
+                    label="Search key / translation / info" variant="solo" single-line density="compact"
                     hide-details
-                    background-color="grey darken-3"
-                    @keydown.self.stop>
+                    bg-color="grey-darken-3"
+                    @keydown.stop>
                 </v-text-field>
-                <v-btn
-                    small
+                <v-btn size="small"
                     color="primary"
                     @click="startAddEntry">
-                    <v-icon small left>mdi-plus</v-icon>
+                    <v-icon size="small" left>mdi-plus</v-icon>
                     Add
                 </v-btn>
             </div>
@@ -74,15 +70,14 @@ export default {
         <template v-slot:item.key="{ item }">
             <v-text-field
                 v-if="editingKey === item.key"
-                :value="editDraft.key"
-                dense
+                :model-value="editDraft.key" density="compact"
                 hide-details
                 class="mt-0 pt-0 caption"
-                @input="editDraft.key = $event"
+                @update:model-value="editDraft.key = $event"
                 @keydown.stop>
             </v-text-field>
             <div v-else
-                class="caption white--text"
+                class="text-caption text-white"
                 style="white-space: pre-wrap; word-break: break-word;"
                 v-text="item.key">
             </div>
@@ -91,15 +86,14 @@ export default {
         <template v-slot:item.translation="{ item }">
             <v-text-field
                 v-if="editingKey === item.key"
-                :value="editDraft.translation"
-                dense
+                :model-value="editDraft.translation" density="compact"
                 hide-details
                 class="mt-0 pt-0 caption"
-                @input="editDraft.translation = $event"
+                @update:model-value="editDraft.translation = $event"
                 @keydown.stop>
             </v-text-field>
             <div v-else
-                class="caption white--text"
+                class="text-caption text-white"
                 style="white-space: pre-wrap; word-break: break-word;"
                 v-text="item.translation">
             </div>
@@ -108,63 +102,60 @@ export default {
         <template v-slot:item.info="{ item }">
             <v-text-field
                 v-if="editingKey === item.key"
-                :value="editDraft.info"
-                dense
+                :model-value="editDraft.info" density="compact"
                 hide-details
                 class="mt-0 pt-0 caption"
-                @input="editDraft.info = $event"
+                @update:model-value="editDraft.info = $event"
                 @keydown.stop>
             </v-text-field>
             <div v-else
-                class="caption white--text"
+                class="text-caption text-white"
                 style="white-space: pre-wrap; word-break: break-word;"
                 v-text="item.info">
             </div>
         </template>
 
         <template v-slot:item.plugin="{ item }">
-            <span class="caption grey--text" v-text="item.plugin"></span>
+            <span class="text-caption text-grey" v-text="item.plugin"></span>
         </template>
 
         <template v-slot:item.actions="{ item }">
             <div class="d-flex align-center justify-center" style="gap: 2px;">
                 <template v-if="editingKey === item.key">
-                    <v-btn icon x-small color="success" @click="saveEdit">
-                        <v-icon small>mdi-check</v-icon>
+                    <v-btn variant="text" icon size="x-small" color="success" @click="saveEdit">
+                        <v-icon size="small">mdi-check</v-icon>
                     </v-btn>
-                    <v-btn icon x-small color="grey" @click="cancelEdit">
-                        <v-icon small>mdi-close</v-icon>
+                    <v-btn variant="text" icon size="x-small" color="grey" @click="cancelEdit">
+                        <v-icon size="small">mdi-close</v-icon>
                     </v-btn>
                 </template>
                 <template v-else>
-                    <v-tooltip bottom>
+                    <cheat-tooltip location="bottom">
                         <span>Edit entry</span>
-                        <template v-slot:activator="{ on, attrs }">
-                            <v-btn
-                                icon
-                                x-small
+                        <template v-slot:activator="{ props: activatorProps }">
+                            <v-btn variant="text"
+                                icon size="x-small"
                                 color="primary"
-                                v-bind="attrs"
-                                v-on="on"
+                                v-bind="activatorProps"
+
                                 @click="startEdit(item)">
-                                <v-icon small>mdi-pencil</v-icon>
+                                <v-icon size="small">mdi-pencil</v-icon>
                             </v-btn>
                         </template>
-                    </v-tooltip>
-                    <v-tooltip bottom>
+                    </cheat-tooltip>
+                    <cheat-tooltip location="bottom">
                         <span>Delete entry</span>
-                        <template v-slot:activator="{ on, attrs }">
-                            <v-btn
-                                icon
-                                x-small
+                        <template v-slot:activator="{ props: activatorProps }">
+                            <v-btn variant="text"
+                                icon size="x-small"
                                 color="error"
-                                v-bind="attrs"
-                                v-on="on"
+                                v-bind="activatorProps"
+
                                 @click="removeEntry(item)">
-                                <v-icon small>mdi-delete</v-icon>
+                                <v-icon size="small">mdi-delete</v-icon>
                             </v-btn>
                         </template>
-                    </v-tooltip>
+                    </cheat-tooltip>
                 </template>
             </div>
         </template>
@@ -174,8 +165,7 @@ export default {
                 <td>
                     <v-text-field
                         v-model="addDraft.key"
-                        placeholder="Key (required)"
-                        dense
+                        placeholder="Key (required)" density="compact"
                         hide-details
                         class="mt-0 pt-0 caption"
                         @keydown.stop>
@@ -184,8 +174,7 @@ export default {
                 <td>
                     <v-text-field
                         v-model="addDraft.translation"
-                        placeholder="Translation"
-                        dense
+                        placeholder="Translation" density="compact"
                         hide-details
                         class="mt-0 pt-0 caption"
                         @keydown.stop>
@@ -194,23 +183,22 @@ export default {
                 <td>
                     <v-text-field
                         v-model="addDraft.info"
-                        placeholder="Info"
-                        dense
+                        placeholder="Info" density="compact"
                         hide-details
                         class="mt-0 pt-0 caption"
                         @keydown.stop>
                     </v-text-field>
                 </td>
                 <td>
-                    <span class="caption grey--text">—</span>
+                    <span class="text-caption text-grey">—</span>
                 </td>
                 <td>
                     <div class="d-flex align-center justify-center" style="gap: 2px;">
-                        <v-btn icon x-small color="success" @click="confirmAdd" :disabled="!addDraft.key.trim()">
-                            <v-icon small>mdi-check</v-icon>
+                        <v-btn variant="text" icon size="x-small" color="success" @click="confirmAdd" :disabled="!addDraft.key.trim()">
+                            <v-icon size="small">mdi-check</v-icon>
                         </v-btn>
-                        <v-btn icon x-small color="grey" @click="cancelAdd">
-                            <v-icon small>mdi-close</v-icon>
+                        <v-btn variant="text" icon size="x-small" color="grey" @click="cancelAdd">
+                            <v-icon size="small">mdi-close</v-icon>
                         </v-btn>
                     </div>
                 </td>
@@ -262,7 +250,7 @@ export default {
         this.refreshEntries();
     },
 
-    beforeDestroy() {
+    beforeUnmount() {
         if (this.unsubscribeRuntime) {
             this.unsubscribeRuntime();
             this.unsubscribeRuntime = null;

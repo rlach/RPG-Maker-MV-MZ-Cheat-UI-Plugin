@@ -1,12 +1,7 @@
+import { createSharedUiState } from '../SharedUiState.js';
 import { ensureTranslationRuntime } from './TranslationRuntime.js';
 
-const makeObservable = (value) => {
-    if (window.Vue && typeof window.Vue.observable === 'function') {
-        return window.Vue.observable(value);
-    }
-
-    return value;
-};
+const makeObservable = createSharedUiState;
 
 class ObjectTranslationService {
     constructor() {

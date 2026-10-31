@@ -264,7 +264,7 @@ export const translateOnTheFlySettingsMethods = {
         // Bind new engine config data to runtime
         const engineConfigData = this.engine.getConfigData();
         Object.keys(engineConfigData).forEach((key) => {
-            this.$set(this, key, engineConfigData[key]);
+            this[key] = engineConfigData[key];
         });
 
         // Bind new engine config methods to runtime

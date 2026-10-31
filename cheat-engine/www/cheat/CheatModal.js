@@ -48,7 +48,6 @@ export default {
 
     template: `
 <v-card
-    dark
     class="z-index-cheat-0 resizable-overlay"
     :width="overlayWidth"
     :height="overlayHeight">
@@ -56,28 +55,28 @@ export default {
         class="fill-height ma-0 pa-0">
         <div
             :style="'width: ' + navWidth + 'px;'"
-            class="fill-height d-inline pa-2 overflow-y-auto hide-scrollbar">
+            class="cheat-navigation fill-height pa-2 overflow-y-auto hide-scrollbar">
             <v-treeview
-                :active.sync="navTreeModel"
+                v-model:activated="navTreeModel"
                 transition
                 return-object
-                open-all
-                dense
+                open-all density="compact" color="primary" selected-color="primary"
                 :items="navTreeItems"
                 activatable
-                item-key="name"
+                item-value="name"
+                item-title="name"
                 open-on-click
-                @update:active="onNavTreeUpdate">
-                <template v-slot:label="{item}">
-                    <v-icon v-text="item.icon" small class="mx-0 px-0 align-self-center"></v-icon>
-                    <span class="subtitle-2">{{item.name}}</span>
+                @update:activated="onNavTreeUpdate">
+                <template v-slot:title="{item}">
+                    <v-icon :icon="item.icon" size="small" class="mx-0 px-0 align-self-center"></v-icon>
+                    <span class="text-subtitle-2">{{item.name}}</span>
                 </template>
             </v-treeview>
         </div>
         <v-divider vertical></v-divider>
         <div
             :style="'width: calc(100% - ' + navWidth + 'px - 1px);'"
-            class="fill-height d-inline pa-2 overflow-y-auto hide-scrollbar">
+            class="cheat-panel-content fill-height pa-2 overflow-y-auto hide-scrollbar">
             <keep-alive>
                 <component :is="currentComponentName"></component>
             </keep-alive>
@@ -86,10 +85,7 @@ export default {
 </v-card>
     `,
 
-    model: {
-        prop: 'currentComponentName',
-        event: 'change',
-    },
+    emits: ['update:currentComponentName'],
 
     props: {
         currentComponentName: {
@@ -252,7 +248,7 @@ export default {
 
         if (!navItem) {
             navItem = Object.values(this.componentNameToNavItem)[0];
-            this.$emit('change', navItem.component);
+            this.$emit('update:currentComponentName', navItem.component);
         }
         this.navTreeModel = [navItem];
     },
@@ -288,7 +284,7 @@ export default {
 
         onNavTreeUpdate(data) {
             if (data && data.length === 1) {
-                this.$emit('change', data[0].component);
+                this.$emit('update:currentComponentName', data[0].component);
             }
         },
 
@@ -305,7 +301,7 @@ export default {
         },
     },
 
-    beforeDestroy() {
+    beforeUnmount() {
         if (this.resizeObserver && this.$el) {
             try {
                 this.resizeObserver.unobserve(this.$el);

@@ -1,7 +1,6 @@
 // RPG MV API : https://kinoar.github.io/rmmv-doc-web/index.html
 
-import '../libs/vue.js';
-import '../libs/vuetify.js';
+import { loadWindowUiLibraries, createWindowUiApp } from '../js/WindowUiLibraries.js';
 
 import MainComponent from '../MainComponent.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
@@ -131,14 +130,13 @@ async function bootstrapCheatUi() {
     await ensureEveryDependencyReadyWithRetry({ delayMs: 250, logEvery: 8 });
 
     // initialize vue
-    const vuetify = new Vuetify();
-
-    window.__VUETIFY_INSTANCE__ = vuetify;
-
-    new Vue({
-        vuetify,
+    await loadWindowUiLibraries(window);
+    const app = createWindowUiApp(window, {
         components: { MainComponent },
-    }).$mount('#app');
+        template: '<v-app><v-main><main-component /></v-main></v-app>',
+    });
+    window.__CHEAT_APP__ = app.mount('#app');
+    window.addEventListener('beforeunload', () => app.unmount(), { once: true });
 
     // Boot translation runtime even if settings panel UI is never opened.
     ensureTranslateOnTheFlyRuntimeWithRetry({ maxAttempts: 30, delayMs: 500 });

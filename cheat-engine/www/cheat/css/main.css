@@ -32,7 +32,9 @@ body::-webkit-scrollbar {
 .v-select-list,
 .v-select-list *,
 .v-overlay__content,
-.v-overlay__content * {
+.v-overlay__content *,
+which can inherit hidden cursors. */ .v-overlay-container,
+.v-overlay-container * {
     cursor: default !important;
 }
 
@@ -78,7 +80,18 @@ body::-webkit-scrollbar {
 .v-overlay__content a,
 .v-overlay__content label,
 .v-overlay__content .v-btn,
-.v-overlay__content .v-list-item {
+.v-overlay__content .v-list-item ,
+
+/* Pointer for clickable controls. */
+.v-overlay-container button,
+.v-overlay-container [role='button'],
+.v-overlay-container a,
+.v-overlay-container label,
+.v-overlay-container .v-btn,
+.v-overlay-container .v-tab,
+.v-overlay-container .v-list-item,
+.v-overlay-container .v-input--selection-controls__input,
+.v-overlay-container .v-input--selection-controls__ripple {
     cursor: pointer !important;
 }
 
@@ -106,7 +119,15 @@ body::-webkit-scrollbar {
 .v-select-list [contenteditable='true'],
 .v-overlay__content input,
 .v-overlay__content textarea,
-.v-overlay__content [contenteditable='true'] {
+.v-overlay__content [contenteditable='true'] ,
+
+/* Text cursor for editable fields. */
+.v-overlay-container input,
+.v-overlay-container textarea,
+.v-overlay-container [contenteditable='true'],
+.v-overlay-container .v-input input,
+.v-overlay-container .v-text-field input,
+.v-overlay-container .v-textarea textarea {
     cursor: text !important;
 }
 
@@ -221,4 +242,652 @@ body::-webkit-scrollbar {
 /* White text for text fields in dark theme */
 .v-text-field input {
     color: white !important;
+}
+/* Vue 3 / Vuetify 3 UI defaults; game canvas remains interactive when closed. */
+#app > .v-application ,
+/* Vue 3 / Vuetify 3 UI defaults; game canvas remains interactive when closed. */
+.v-overlay-container > .v-application {
+    background: transparent;
+    min-height: 0;
+}
+#app .v-application__wrap,
+.v-overlay-container .v-application__wrap {
+    min-height: 0;
+}
+#app .v-table__wrapper,
+.v-overlay-container .v-table__wrapper {
+    min-height: 0;
+}
+.panel-with-sticky-table .table-with-sticky-footer .v-table__wrapper {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+.panel-with-sticky-table .v-data-table-footer {
+    flex: 0 0 auto;
+}
+#app .v-field__input,
+.v-overlay-container .v-field__input {
+    padding: 8px 12px;
+}
+#app .v-field--active .v-field__input,
+.v-overlay-container .v-field--active .v-field__input {
+    padding-top: 8px;
+}
+@supports not (inset-inline-start: 0px) {
+    #app .v-slider.v-input--horizontal .v-slider-thumb,
+    .v-overlay-container .v-slider.v-input--horizontal .v-slider-thumb {
+        left: calc(var(--v-slider-thumb-position) - var(--v-slider-thumb-size) / 2);
+        right: auto;
+    }
+    #app .v-locale--is-rtl .v-slider.v-input--horizontal .v-slider-thumb,
+    .v-overlay-container .v-locale--is-rtl .v-slider.v-input--horizontal .v-slider-thumb {
+        right: calc(var(--v-slider-thumb-position) - var(--v-slider-thumb-size) / 2);
+        left: auto;
+    }
+}
+
+/* Keep the pre-migration typeface available offline, in every UI window. */
+@font-face {
+    font-family: Roboto;
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../libs/fonts/roboto-400.ttf') format('truetype');
+}
+@font-face {
+    font-family: Roboto;
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../libs/fonts/roboto-500.ttf') format('truetype');
+}
+@font-face {
+    font-family: Roboto;
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../libs/fonts/roboto-700.ttf') format('truetype');
+}
+#app,
+.v-overlay-container {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 14px;
+}
+#app .v-application,
+.v-overlay-container .v-application {
+    font-family: Roboto, Arial, sans-serif;
+}
+#app .v-label,
+.v-overlay-container .v-label {
+    font-size: 14px;
+    opacity: 0.8;
+    line-height: 1.4;
+}
+#app .v-card-subtitle,
+.v-overlay-container .v-card-subtitle {
+    opacity: 0.8;
+}
+#app .v-card-text,
+.v-overlay-container .v-card-text {
+    line-height: 1.5;
+}
+#app .v-btn,
+.v-overlay-container .v-btn {
+    font-weight: 500;
+    letter-spacing: 0.04em;
+}
+#app .v-btn--icon,
+.v-overlay-container .v-btn--icon {
+    flex: 0 0 auto;
+}
+#app .v-btn--icon.v-btn--variant-text,
+.v-overlay-container .v-btn--icon.v-btn--variant-text {
+    box-shadow: none;
+}
+#app .v-btn .v-icon,
+.v-overlay-container .v-btn .v-icon {
+    flex-shrink: 0;
+}
+#app .v-btn .v-icon.mr-1,
+.v-overlay-container .v-btn .v-icon.mr-1 {
+    margin-right: 4px;
+}
+
+/* A panel owns its scrollbar; headers never stretch to fill spare height. */
+.cheat-panel-content {
+    min-width: 0;
+    position: relative;
+}
+#app .panel-with-sticky-table > .v-card-text,
+#app .panel-with-sticky-table > .v-card-title,
+#app .panel-with-sticky-table > .v-row,
+.v-overlay-container .panel-with-sticky-table > .v-card-text,
+.v-overlay-container .panel-with-sticky-table > .v-card-title,
+.v-overlay-container .panel-with-sticky-table > .v-row {
+    flex: 0 0 auto;
+}
+#app .panel-with-sticky-table > .v-row,
+.v-overlay-container .panel-with-sticky-table > .v-row {
+    margin-bottom: 0;
+}
+#app .cheat-panel-content > .v-card,
+.v-overlay-container .cheat-panel-content > .v-card {
+    position: relative;
+}
+#app .cheat-refresh,
+.v-overlay-container .cheat-refresh {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 2;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    flex: 0 0 36px;
+    padding: 0;
+    border-radius: 50%;
+    box-shadow: 0 2px 5px #0005;
+}
+#app .cheat-refresh .v-icon,
+.v-overlay-container .cheat-refresh .v-icon {
+    font-size: 22px;
+}
+#app .cheat-panel-content > .v-card:has(> .cheat-refresh) > .v-card-text:first-child,
+.v-overlay-container
+    .cheat-panel-content
+    > .v-card:has(> .cheat-refresh)
+    > .v-card-text:first-child {
+    padding-right: 52px;
+}
+#app .cheat-stats-card,
+.v-overlay-container .cheat-stats-card {
+    position: relative;
+}
+#app .cheat-stats-card .v-card-actions,
+.v-overlay-container .cheat-stats-card .v-card-actions {
+    min-height: 44px;
+}
+
+/* Compact native fields, including Chromium versions without :has() support. */
+#app .v-input,
+including Chromium versions without :has() support. */ .v-overlay-container .v-input {
+    font-size: 14px;
+}
+#app .v-field,
+.v-overlay-container .v-field {
+    font-size: 14px;
+    border-radius: 4px;
+}
+#app .v-field__input,
+.v-overlay-container .v-field__input {
+    min-height: 36px;
+    padding: 8px 12px;
+    line-height: 20px;
+    --v-field-input-padding-top: 8px;
+    --v-field-input-padding-bottom: 8px;
+}
+#app .v-field--variant-outlined .v-field__input,
+.v-overlay-container .v-field--variant-outlined .v-field__input {
+    padding: 8px 12px;
+}
+#app .v-field--variant-filled .v-field__input,
+.v-overlay-container .v-field--variant-filled .v-field__input {
+    padding-top: 18px;
+    padding-bottom: 4px;
+}
+#app .v-field__append-inner,
+#app .v-field__prepend-inner,
+.v-overlay-container .v-field__append-inner,
+.v-overlay-container .v-field__prepend-inner {
+    padding-top: 6px;
+}
+#app .v-field-label,
+.v-overlay-container .v-field-label {
+    margin-left: 12px;
+}
+#app .v-field--variant-solo .v-field-label,
+.v-overlay-container .v-field--variant-solo .v-field-label {
+    margin-left: 12px;
+}
+#app .v-field__outline,
+.v-overlay-container .v-field__outline {
+    border-radius: 4px;
+}
+#app .v-field__outline__start,
+.v-overlay-container .v-field__outline__start {
+    border-radius: 4px 0 0 4px;
+    flex-basis: 12px;
+}
+#app .v-field__outline__end,
+.v-overlay-container .v-field__outline__end {
+    border-radius: 0 4px 4px 0;
+}
+#app .v-selection-control,
+.v-overlay-container .v-selection-control {
+    min-height: 36px;
+}
+#app .v-selection-control .v-label,
+.v-overlay-container .v-selection-control .v-label {
+    white-space: normal;
+    overflow-wrap: normal;
+}
+#app .v-input__details,
+.v-overlay-container .v-input__details {
+    min-height: 16px;
+    padding-top: 2px;
+}
+#app .v-table .v-input,
+.v-overlay-container .v-table .v-input {
+    margin: 3px 0;
+}
+#app .v-table .v-field--variant-solo,
+.v-overlay-container .v-table .v-field--variant-solo {
+    box-shadow: none;
+}
+#app .v-table .v-field__input,
+.v-overlay-container .v-table .v-field__input {
+    min-height: 32px;
+    padding: 6px 10px;
+}
+#app .x-small-field .v-input__control,
+.v-overlay-container .x-small-field .v-input__control {
+    height: auto !important;
+    min-height: 32px !important;
+}
+#app .v-table .v-field__append-inner,
+.v-overlay-container .v-table .v-field__append-inner {
+    padding-top: 4px;
+}
+#app .v-table td,
+.v-overlay-container .v-table td {
+    font-size: 14px;
+    padding: 4px 12px;
+}
+#app .v-table th,
+.v-overlay-container .v-table th {
+    font-size: 13px;
+    font-weight: 700;
+    color: #bdbdbd;
+    padding: 4px 12px;
+}
+#app .v-table,
+.v-overlay-container .v-table {
+    --v-table-header-height: 40px;
+    --v-table-row-height: 40px;
+}
+
+/* One compact pagination row; never consume the table's vertical space. */
+#app .v-data-table-footer ,
+
+/* One compact pagination row; never consume the table's vertical space. */
+.v-overlay-container .v-data-table-footer {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: 52px;
+    padding: 4px 8px;
+    font-size: 12px;
+    border-top: 1px solid #ffffff1f;
+}
+#app .v-data-table-footer__items-per-page,
+.v-overlay-container .v-data-table-footer__items-per-page {
+    flex: 0 0 auto;
+    margin: 0 16px 0 0;
+}
+#app .v-data-table-footer__items-per-page > span,
+.v-overlay-container .v-data-table-footer__items-per-page > span {
+    margin-right: 8px;
+    white-space: nowrap;
+}
+#app .v-data-table-footer__items-per-page .v-input,
+.v-overlay-container .v-data-table-footer__items-per-page .v-input {
+    width: 64px;
+    min-width: 64px;
+    margin: 0;
+}
+#app .v-data-table-footer .v-field,
+.v-overlay-container .v-data-table-footer .v-field {
+    font-size: 12px;
+    background: transparent;
+    box-shadow: none;
+}
+#app .v-data-table-footer .v-field__outline,
+.v-overlay-container .v-data-table-footer .v-field__outline {
+    display: none;
+}
+#app .v-data-table-footer .v-field__input,
+.v-overlay-container .v-data-table-footer .v-field__input {
+    padding: 4px 8px;
+    min-height: 32px;
+}
+#app .v-data-table-footer .v-field__append-inner,
+.v-overlay-container .v-data-table-footer .v-field__append-inner {
+    padding-top: 4px;
+}
+#app .v-data-table-footer__info,
+.v-overlay-container .v-data-table-footer__info {
+    flex: 0 0 auto;
+    min-width: 74px;
+    margin: 0 8px;
+}
+#app .v-data-table-footer__pagination,
+.v-overlay-container .v-data-table-footer__pagination {
+    flex: 0 0 auto;
+    margin: 0;
+}
+#app .v-data-table-footer__pagination .v-btn,
+.v-overlay-container .v-data-table-footer__pagination .v-btn {
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    margin: 0;
+}
+
+/* Branch expansion is not selection. Keep the active leaf blue and readable. */
+#app .cheat-navigation .v-treeview ,
+
+/* Branch expansion is not selection. Keep the active leaf blue and readable. */
+.v-overlay-container .cheat-navigation .v-treeview {
+    padding: 0;
+}
+#app .cheat-navigation .v-treeview-item,
+.v-overlay-container .cheat-navigation .v-treeview-item {
+    min-height: 36px;
+    padding: 0 6px;
+}
+#app .cheat-navigation .v-list-item__prepend > .v-icon,
+.v-overlay-container .cheat-navigation .v-list-item__prepend > .v-icon {
+    margin-right: 4px;
+}
+#app .cheat-navigation .v-list-item__spacer,
+.v-overlay-container .cheat-navigation .v-list-item__spacer {
+    width: 0;
+}
+#app .cheat-navigation .v-treeview-item__level,
+.v-overlay-container .cheat-navigation .v-treeview-item__level {
+    width: 12px;
+}
+#app .cheat-navigation .v-list-item-title,
+.v-overlay-container .cheat-navigation .v-list-item-title {
+    overflow: visible;
+    white-space: normal;
+}
+#app .cheat-navigation .v-list-item-title .v-icon,
+.v-overlay-container .cheat-navigation .v-list-item-title .v-icon {
+    font-size: 18px;
+    margin-right: 5px !important;
+}
+#app .cheat-navigation .text-subtitle-2,
+.v-overlay-container .cheat-navigation .text-subtitle-2 {
+    font-size: 14px !important;
+    font-weight: 500;
+}
+#app .cheat-navigation .v-list-group__header .v-list-item__overlay,
+.v-overlay-container .cheat-navigation .v-list-group__header .v-list-item__overlay {
+    opacity: 0 !important;
+}
+#app .cheat-navigation .v-list-group__header,
+.v-overlay-container .cheat-navigation .v-list-group__header {
+    color: #fff !important;
+}
+#app .cheat-navigation .v-list-item--active:not(.v-list-group__header),
+.v-overlay-container .cheat-navigation .v-list-item--active:not(.v-list-group__header) {
+    color: #2196f3;
+}
+
+/* Flexible toolbars wrap controls as units instead of squeezing their labels. */
+#app .cheat-toolbar,
+#app .cheat-export-toolbar ,
+
+/* Flexible toolbars wrap controls as units instead of squeezing their labels. */
+.v-overlay-container .cheat-toolbar,
+.v-overlay-container .cheat-export-toolbar {
+    flex-wrap: wrap;
+}
+#app .cheat-toolbar > *,
+.v-overlay-container .cheat-toolbar > * {
+    margin-bottom: 8px;
+}
+#app .cheat-toolbar > .v-input,
+.v-overlay-container .cheat-toolbar > .v-input {
+    flex: 1 1 230px;
+    min-width: 220px;
+}
+#app .cheat-toolbar > .v-btn,
+.v-overlay-container .cheat-toolbar > .v-btn {
+    flex: 0 0 auto;
+}
+#app .cheat-export-toolbar > *,
+.v-overlay-container .cheat-export-toolbar > * {
+    margin-right: 8px;
+    margin-bottom: 8px;
+}
+#app .cheat-export-toolbar > .v-btn,
+.v-overlay-container .cheat-export-toolbar > .v-btn {
+    white-space: normal;
+    height: auto;
+    min-height: 36px;
+}
+#app .text-amber,
+#app .text-yellow,
+.v-overlay-container .text-amber,
+.v-overlay-container .text-yellow {
+    color: #ffc107 !important;
+}
+#app .text-orange,
+.v-overlay-container .text-orange {
+    color: #ffb74d !important;
+}
+
+#app .cheat-navigation .v-list-item,
+.v-overlay-container .cheat-navigation .v-list-item {
+    padding-left: 6px !important;
+}
+#app .cheat-navigation .v-list-group .v-list-item,
+.v-overlay-container .cheat-navigation .v-list-group .v-list-item {
+    padding-left: 18px !important;
+}
+#app .cheat-navigation .v-list-item-action,
+.v-overlay-container .cheat-navigation .v-list-item-action {
+    margin: 0 4px 0 0;
+}
+#app .cheat-navigation .v-list-item-title,
+.v-overlay-container .cheat-navigation .v-list-item-title {
+    display: flex;
+    align-items: center;
+}
+#app .cheat-navigation .v-list-item-title span,
+.v-overlay-container .cheat-navigation .v-list-item-title span {
+    white-space: nowrap;
+}
+#app .v-data-table-footer .v-pagination__first,
+#app .v-data-table-footer .v-pagination__last,
+.v-overlay-container .v-data-table-footer .v-pagination__first,
+.v-overlay-container .v-data-table-footer .v-pagination__last {
+    display: none;
+}
+#app .v-table .cheat-health-cell,
+.v-overlay-container .v-table .cheat-health-cell {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+}
+#app .cheat-health-cell > .v-input,
+.v-overlay-container .cheat-health-cell > .v-input {
+    flex: 0 0 74px;
+    width: 74px;
+    margin-right: 4px;
+}
+
+#app .cheat-panel-content .v-card > .v-card-text,
+.v-overlay-container .cheat-panel-content .v-card > .v-card-text {
+    flex: 0 0 auto;
+}
+#app .cheat-panel-content .v-card-title,
+.v-overlay-container .cheat-panel-content .v-card-title {
+    white-space: normal;
+    flex-wrap: wrap;
+}
+#app .cheat-panel-content .v-card-title > .v-btn,
+.v-overlay-container .cheat-panel-content .v-card-title > .v-btn {
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+#app .cheat-panel-content .v-card-title > span,
+.v-overlay-container .cheat-panel-content .v-card-title > span {
+    margin-right: 12px;
+}
+#app .cheat-refresh-panel > .v-card-text:first-child,
+.v-overlay-container .cheat-refresh-panel > .v-card-text:first-child {
+    padding-right: 52px;
+}
+#app .cheat-panel-content .v-input--horizontal .v-input__append,
+.v-overlay-container .cheat-panel-content .v-input--horizontal .v-input__append {
+    margin-left: 8px;
+}
+
+#app .v-switch .v-switch__thumb,
+.v-overlay-container .v-switch .v-switch__thumb {
+    background: #bdbdbd;
+}
+#app .v-switch .v-selection-control--dirty .v-switch__thumb,
+.v-overlay-container .v-switch .v-selection-control--dirty .v-switch__thumb {
+    background: #2196f3;
+}
+
+#app .cheat-refresh-panel > .cheat-panel-header,
+.v-overlay-container .cheat-refresh-panel > .cheat-panel-header {
+    padding-right: 52px !important;
+}
+#app .cheat-variable-filters,
+.v-overlay-container .cheat-variable-filters {
+    flex-wrap: wrap;
+}
+#app .cheat-variable-filters > .v-text-field,
+.v-overlay-container .cheat-variable-filters > .v-text-field {
+    flex: 1 1 160px;
+    min-width: 160px;
+    margin-right: 12px;
+}
+#app .cheat-variable-filters > .v-switch,
+.v-overlay-container .cheat-variable-filters > .v-switch {
+    flex: 0 0 auto;
+    min-width: 156px;
+}
+#app .v-card-subtitle + .v-card-text,
+.v-overlay-container .v-card-subtitle + .v-card-text {
+    padding-top: 8px !important;
+}
+
+/* Field chrome has the same metrics in panels and teleported dialogs. */
+#app .v-field__append-inner, #app .v-field__prepend-inner ,
+
+/* Field chrome has the same metrics in panels and teleported dialogs. */
+.v-overlay-container .v-field__append-inner, .v-overlay-container .v-field__prepend-inner {
+    padding-top: 0;
+    align-items: center;
+}
+#app .v-field--variant-solo .v-field-label,
+.v-overlay-container .v-field--variant-solo .v-field-label {
+    margin-left: 12px;
+}
+#app .v-table .v-text-field,
+#app .v-table .v-textarea,
+.v-overlay-container .v-table .v-text-field,
+.v-overlay-container .v-table .v-textarea {
+    width: 100%;
+}
+#app .v-table .v-field--variant-outlined,
+.v-overlay-container .v-table .v-field--variant-outlined {
+    background: transparent;
+    box-shadow: none;
+}
+#app .cheat-tag-format,
+.v-overlay-container .cheat-tag-format {
+    flex: 0 0 auto;
+}
+#app .cheat-repair-names,
+.v-overlay-container .cheat-repair-names {
+    margin-left: 0 !important;
+    margin-right: 12px;
+}
+#app .cheat-export-panel,
+.v-overlay-container .cheat-export-panel {
+    min-height: 0;
+    overflow: hidden;
+}
+#app .cheat-export-tree,
+.v-overlay-container .cheat-export-tree {
+    flex: 1 1 0 !important;
+    min-height: 0;
+    overflow-y: auto;
+}
+#app .cheat-toggle-all .v-icon,
+.v-overlay-container .cheat-toggle-all .v-icon {
+    font-size: 28px;
+}
+#app .cheat-mass-translation-row,
+.v-overlay-container .cheat-mass-translation-row {
+    min-height: 32px;
+    padding: 0;
+}
+#app .cheat-mass-translation-row .v-selection-control,
+.v-overlay-container .cheat-mass-translation-row .v-selection-control {
+    min-height: 32px;
+}
+#app .cheat-unknown-tags-table,
+.v-overlay-container .cheat-unknown-tags-table {
+    margin: 0 16px;
+}
+
+#app .cheat-unknown-tags-table,
+.v-overlay-container .cheat-unknown-tags-table {
+    width: calc(100% - 32px);
+}
+#app .v-field--variant-outlined .v-field__append-inner,
+.v-overlay-container .v-field--variant-outlined .v-field__append-inner {
+    padding-top: 0;
+}
+
+#app .v-text-field .v-input__control,
+.v-overlay-container .v-text-field .v-input__control,
+#app .v-textarea .v-input__control,
+.v-overlay-container .v-textarea .v-input__control {
+    width: 100%;
+    flex: 1 1 auto;
+}
+#app .v-text-field .v-field,
+.v-overlay-container .v-text-field .v-field {
+    width: 100%;
+}
+#app .v-field__append-inner .v-btn,
+.v-overlay-container .v-field__append-inner .v-btn {
+    align-self: center;
+    margin: 0;
+}
+#app .cheat-inventory-table table {
+    table-layout: fixed;
+}
+
+#app .v-table .v-field__append-inner,
+.v-overlay-container .v-table .v-field__append-inner {
+    padding-top: 0;
+}
+#app .cheat-shortcut-clear,
+.v-overlay-container .cheat-shortcut-clear {
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+}
+
+#app .cheat-newline-threshold,
+.v-overlay-container .cheat-newline-threshold {
+    flex-wrap: wrap;
+}
+#app .cheat-newline-threshold > *,
+.v-overlay-container .cheat-newline-threshold > * {
+    margin-right: 8px;
+    margin-bottom: 4px;
 }

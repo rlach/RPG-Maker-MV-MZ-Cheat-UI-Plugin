@@ -1,11 +1,15 @@
-/** Evaluate UMD libraries in the target DOM realm, independent of NW module caches. */
+import CheatTooltip from '../components/CheatTooltip.js';
+import { installUiKeyboardGuard } from './UiKeyboardGuard.js';
+
+/** Evaluate bundled libraries in the document that owns their DOM and events. */
 export async function loadWindowUiLibraries(hostWindow, readSource = null) {
+    const base = new URL('../', import.meta.url);
     const read =
         readSource ||
         ((path) =>
             new Promise((resolve, reject) => {
                 const request = new hostWindow.XMLHttpRequest();
-                request.open('GET', new URL(path, hostWindow.document.baseURI).href, true);
+                request.open('GET', new URL(path, base).href, true);
                 request.onload = () =>
                     request.status < 400 && request.responseText
                         ? resolve(request.responseText)
@@ -13,35 +17,109 @@ export async function loadWindowUiLibraries(hostWindow, readSource = null) {
                 request.onerror = () => reject(new Error(`Cannot load ${path}`));
                 request.send();
             }));
-    for (const path of ['libs/vue.js', 'libs/vuetify.js']) {
-        const source = await read(path);
-        // Shadow CommonJS/AMD globals: neither require() nor a shared constructor
-        // may bind DOM events and detached menus to the parent game's document.
-        hostWindow
-            .Function('module', 'exports', 'define', source)
-            .call(hostWindow, undefined, undefined, undefined);
-    }
-    hostWindow.Vue.use(hostWindow.Vuetify);
+    hostWindow.Function(await read('js/UiCompatibility.js')).call(hostWindow);
+    hostWindow.Vue = hostWindow
+        .Function('module', 'exports', 'define', `${await read('libs/vue.js')}\nreturn Vue;`)
+        .call(hostWindow, undefined, undefined, undefined);
+    hostWindow
+        .Function('module', 'exports', 'define', await read('libs/vuetify.js'))
+        .call(hostWindow, undefined, undefined, undefined);
 }
 
-/** Vue 2 caches constructors on imported options by cid (both windows start at 0). */
+/** NW shares imported options; avoid sharing Vue's compiled render functions. */
 export function isolateWindowComponent(component, seen = new WeakMap()) {
-    const options = typeof component === 'function' ? component.options : component;
-    if (!options || typeof options !== 'object') return component;
-    if (seen.has(options)) return seen.get(options);
-    const clone = { ...options };
-    seen.set(options, clone);
-    delete clone._Ctor;
-    delete clone._base;
-    if (options.components)
+    if (!component || typeof component !== 'object') return component;
+    if (seen.has(component)) return seen.get(component);
+    const clone = { ...component };
+    seen.set(component, clone);
+    if (clone.template) delete clone.render;
+    if (component.components)
         clone.components = Object.fromEntries(
-            Object.entries(options.components).map(([name, child]) => [
+            Object.entries(component.components).map(([name, child]) => [
                 name,
                 isolateWindowComponent(child, seen),
             ])
         );
-    if (options.mixins)
-        clone.mixins = options.mixins.map((mixin) => isolateWindowComponent(mixin, seen));
-    if (options.extends) clone.extends = isolateWindowComponent(options.extends, seen);
+    if (component.mixins)
+        clone.mixins = component.mixins.map((mixin) => isolateWindowComponent(mixin, seen));
+    if (component.extends) clone.extends = isolateWindowComponent(component.extends, seen);
     return clone;
+}
+
+export const uiTableMethods = {
+    uiTableHeaders(headers = []) {
+        return headers.map((header) => ({
+            ...header,
+            title: header.title ?? header.text,
+            key: header.key ?? header.value,
+        }));
+    },
+    uiTableSort(keys, descending) {
+        return (Array.isArray(keys) ? keys : keys ? [keys] : []).map((key, index) =>
+            typeof key === 'object'
+                ? key
+                : {
+                      key,
+                      order: (Array.isArray(descending) ? descending[index] : descending)
+                          ? 'desc'
+                          : 'asc',
+                  }
+        );
+    },
+    updateUiTableSort(sort, keysPath, descendingPath) {
+        const read = (path) => path.split('.').reduce((value, key) => value[key], this);
+        const set = (path, value) => {
+            const parts = path.split('.');
+            const key = parts.pop();
+            let target = this;
+            for (const part of parts) target = target[part];
+            target[key] = value;
+        };
+        const keys = sort.map((item) => item.key);
+        const directions = sort.map((item) => item.order === 'desc');
+        set(keysPath, Array.isArray(read(keysPath)) ? keys : keys[0] || '');
+        if (!['false', 'true'].includes(descendingPath))
+            set(
+                descendingPath,
+                Array.isArray(read(descendingPath)) ? directions : directions[0] || false
+            );
+    },
+};
+
+export function createWindowUiApp(hostWindow, options) {
+    installUiKeyboardGuard(hostWindow);
+    const app = hostWindow.Vue.createApp(isolateWindowComponent(options));
+    app.component('CheatTooltip', isolateWindowComponent(CheatTooltip));
+    app.mixin({ methods: uiTableMethods });
+    app.use(
+        hostWindow.Vuetify.createVuetify({
+            theme: {
+                defaultTheme: 'dark',
+                themes: {
+                    dark: {
+                        colors: {
+                            primary: '#2196f3',
+                            warning: '#ffc107',
+                            surface: '#1e1e1e',
+                            background: '#1e1e1e',
+                        },
+                    },
+                },
+            },
+            defaults: {
+                VSelect: { density: 'compact', variant: 'outlined' },
+                VAutocomplete: { density: 'compact', variant: 'outlined' },
+                VTextField: { density: 'compact', variant: 'outlined' },
+                VCheckbox: { density: 'compact' },
+                VDataTable: {
+                    density: 'compact',
+                    showFirstLastPage: false,
+                    itemsPerPageOptions: [5, 10, 20, 50, 100, -1],
+                    itemsPerPageText: 'Rows per page:',
+                },
+                VTooltip: { openDelay: 400, closeDelay: 0 },
+            },
+        })
+    );
+    return app;
 }

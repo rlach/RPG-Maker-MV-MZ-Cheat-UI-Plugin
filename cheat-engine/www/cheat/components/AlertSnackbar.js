@@ -7,29 +7,26 @@ export default {
 <v-snackbar
     :key="activeNotification ? activeNotification.id : 0"
     app
-    top
-    left
+    location="top left"
     :color="color"
     v-model="showSnackbar"
     :timeout="-1"
-    @input="onVisibilityChange"
+    @update:model-value="onVisibilityChange"
     class="z-index-cheat-1">
-    <span 
+    <span
         v-for="(line, idx) in text"
         :key="idx"
         class="font-weight-bold caption d-block">
         <span v-if="line.html" v-html="line.value"></span>
         <span v-else>{{ line.value }}</span>
     </span>
-    <template v-slot:action="{ attrs }">
-    <v-btn
-        x-small
+    <template v-slot:actions>
+    <v-btn variant="text" size="x-small"
         style="margin:0"
         color="white"
         icon
-        v-bind="attrs"
         @click="dismiss()">
-        <v-icon small>mdi-close</v-icon>
+        <v-icon size="small">mdi-close</v-icon>
     </v-btn>
     </template>
 </v-snackbar>
@@ -78,7 +75,7 @@ export default {
         Alert.alertInternal = this.alertHandler;
     },
 
-    beforeDestroy() {
+    beforeUnmount() {
         clearTimeout(this.dismissalTimer);
         this.notifications = [];
         this.activeNotification = null;

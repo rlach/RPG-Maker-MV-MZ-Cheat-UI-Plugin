@@ -1,0 +1,326 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <link rel="stylesheet" href="../cheat-engine/www/cheat/libs/vuetify.css" />
+        <link rel="stylesheet" href="../cheat-engine/www/cheat/css/main.css" />
+        <link
+            rel="stylesheet"
+            href="../cheat-engine/www/cheat/libs/mdi/css/materialdesignicons.min.css"
+        />
+    </head>
+    <body>
+        <div id="app"></div>
+        <pre id="errors"></pre>
+        <script>
+            window.__QA_ERRORS__ = [];
+            window.addEventListener('error', (e) => window.__QA_ERRORS__.push(e.message));
+            window.addEventListener('unhandledrejection', (e) =>
+                window.__QA_ERRORS__.push(String(e.reason?.stack || e.reason))
+            );
+            // Register before the UI, like the real engine's already-bound listeners.
+            window.__QA_GAME_KEYS__ = [];
+            document.addEventListener('keydown', (event) => {
+                window.__QA_GAME_KEYS__.push(event.key);
+                if (
+                    ['Backspace', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(
+                        event.key
+                    )
+                )
+                    event.preventDefault();
+            });
+            const disk = new Map();
+            const fs = {
+                existsSync: (p) => disk.has(p),
+                mkdirSync() {},
+                readFileSync(p) {
+                    if (!disk.has(p)) throw new Error('ENOENT');
+                    return disk.get(p);
+                },
+                writeFileSync(p, v) {
+                    disk.set(p, v);
+                },
+                renameSync(a, b) {
+                    disk.set(b, disk.get(a));
+                    disk.delete(a);
+                },
+                readdirSync() {
+                    return [];
+                },
+                unlinkSync(p) {
+                    disk.delete(p);
+                },
+            };
+            window.require = (name) =>
+                name === 'fs'
+                    ? fs
+                    : name === 'path'
+                      ? {
+                            join: (...p) => p.join('/'),
+                            resolve: (...p) => p.join('/'),
+                            dirname: (p) => p.split('/').slice(0, -1).join('/'),
+                            parse: (p) => ({ dir: p.split('/').slice(0, -1).join('/') }),
+                            isAbsolute: (p) => p.startsWith('/'),
+                        }
+                      : name === 'nw.gui'
+                        ? window.nw
+                        : {};
+            window.process = {
+                versions: {},
+                cwd: () => '/fixture',
+                mainModule: { filename: '/fixture/package.json' },
+            };
+            window.nw = {
+                Window: { get: () => ({ on() {}, close() {}, showDevTools() {} }), open() {} },
+                App: { startPath: '/fixture' },
+            };
+            window.Utils = {
+                RPGMAKER_NAME: new URLSearchParams(location.search).get('maker') || 'MV',
+                RPGMAKER_VERSION: '1.6.2',
+                isNwjs: () => true,
+            };
+            const actor = {
+                _name: 'Hero',
+                _actorId: 1,
+                _paramPlus: [0, 0, 0, 0, 0, 0, 0, 0],
+                hp: 100,
+                mhp: 100,
+                mp: 50,
+                mmp: 50,
+                tp: 0,
+                level: 1,
+                name() {
+                    return this._name;
+                },
+                actorId() {
+                    return 1;
+                },
+                param() {
+                    return 10;
+                },
+                currentExp() {
+                    return 0;
+                },
+                moveSpeed() {
+                    return 4;
+                },
+                setHp(v) {
+                    this.hp = v;
+                },
+                setMp(v) {
+                    this.mp = v;
+                },
+                maxTp() {
+                    return 100;
+                },
+            };
+            window.$gamePlayer = {
+                _through: false,
+                _moveSpeed: 4,
+                moveSpeed() {
+                    return this._moveSpeed;
+                },
+                setMoveSpeed(v) {
+                    this._moveSpeed = v;
+                },
+                isDashing() {
+                    return false;
+                },
+                canMove() {
+                    return true;
+                },
+                isTransferring() {
+                    return false;
+                },
+            };
+            const actors = ['Ichika', 'Norn', 'Tanis', 'Miln'].map((name, index) => ({
+                ...actor,
+                _name: name,
+                _actorId: index + 1,
+                actorId() {
+                    return this._actorId;
+                },
+            }));
+            window.$gameParty = {
+                _gold: 100,
+                gold() {
+                    return this._gold ?? 100;
+                },
+                members: () => actors,
+                battleMembers: () => actors,
+                inBattle: () => false,
+                numItems: () => 1,
+                steps: () => 0,
+                loseGold(value) {
+                    this._gold -= value;
+                },
+                gainGold(value) {
+                    this._gold = this.gold() + value;
+                },
+                gainItem() {},
+            };
+            window.$gameTroop = { members: () => [] };
+            window.$gameActors = { actor: () => actor };
+            window.$gameMap = { mapId: () => 1, events: () => [], isEventRunning: () => false };
+            window.$gameVariables = {
+                _data: [],
+                value(id) {
+                    return this._data[id] ?? 0;
+                },
+                setValue(id, value) {
+                    this._data[id] = value;
+                },
+            };
+            window.$gameSwitches = { _data: [], value: () => false, setValue() {} };
+            window.$gameSystem = {};
+            window.$gameMessage = { isBusy: () => false };
+            window.$gameTemp = {};
+            for (const name of ['$dataItems', '$dataWeapons', '$dataArmors'])
+                window[name] = [
+                    null,
+                    ...[
+                        'For Debugging',
+                        'Monster Luring Bell',
+                        'Legendary Weapon Gacha',
+                        'Red Potion',
+                        'Orange Potion',
+                    ].map((name, i) => ({
+                        id: i + 1,
+                        name,
+                        description: [
+                            '',
+                            'A bell that rings with a mysterious tone that attracts monsters. Has no effect in areas where enemies do not appear.',
+                            'A gacha containing one legendary weapon. Want to try opening it...?',
+                            'A potion that restores approximately 30 HP to one ally.',
+                            'A potion that restores approximately 80 HP to one ally.',
+                        ][i],
+                        note: '',
+                        iconIndex: 0,
+                    })),
+                ];
+            window.$dataActors = [
+                null,
+                ...actors.map((a) => ({
+                    id: a._actorId,
+                    name: a._name,
+                    nickname: '',
+                    profile: '',
+                })),
+            ];
+            window.$dataStates = [null];
+            window.$dataSkills = [null];
+            window.$dataCommonEvents = [null];
+            window.$dataTroops = [null];
+            window.$dataMapInfos = [null, { id: 1, name: 'Town', parentId: 0 }];
+            window.$dataMap = { events: [], displayName: 'Town' };
+            window.$dataSystem = {
+                variables: ['', 'Sample variable'],
+                switches: ['', 'Sample switch'],
+                terms: { params: ['HP', 'MP', 'ATK', 'DEF', 'MAT', 'MDF', 'AGI', 'LUK'] },
+                gameTitle: 'Fixture',
+            };
+            window.ConfigManager = { alwaysDash: false };
+            window.SceneManager = { _scene: {}, _deltaTime: 1 / 60 };
+            window.BattleManager = {};
+            window.Input = {};
+            window.TouchInput = {};
+            window.DataManager = {
+                isBattleTest: () => false,
+                isEventTest: () => false,
+                maxSavefiles: () => 20,
+                loadGlobalInfo: () => [],
+                isAnySavefileExists: () => false,
+            };
+            window.StorageManager = {};
+            window.Graphics = { width: 1100, height: 900, boxWidth: 1100, boxHeight: 900 };
+        </script>
+        <script type="module">
+            (async function () {
+                try {
+                    const { loadWindowUiLibraries, createWindowUiApp } =
+                        await import('../cheat-engine/www/cheat/js/WindowUiLibraries.js');
+                    await loadWindowUiLibraries(window);
+                    const { default: CheatModal } =
+                        await import('../cheat-engine/www/cheat/CheatModal.js');
+                    const { default: AlertSnackbar } =
+                        await import('../cheat-engine/www/cheat/components/AlertSnackbar.js');
+                    const { default: ConfirmDialog } =
+                        await import('../cheat-engine/www/cheat/components/ConfirmDialog.js');
+                    const { default: ObjectTranslationModalHost } =
+                        await import('../cheat-engine/www/cheat/components/ObjectTranslationModalHost.js');
+                    const { default: BoxingModal, BOXING_SERVICE } =
+                        await import('../cheat-engine/www/cheat/components/BoxingModal.js');
+                    const { OBJECT_TRANSLATION_SERVICE } =
+                        await import('../cheat-engine/www/cheat/js/translation-runtime/ObjectTranslationService.js');
+                    window.__QA_SERVICES__ = {
+                        boxing: BOXING_SERVICE,
+                        translation: OBJECT_TRANSLATION_SERVICE,
+                    };
+                    const visited = new Set();
+                    function check(component) {
+                        if (visited.has(component)) return;
+                        visited.add(component);
+                        if (component.template)
+                            Vue.compile(component.template, {
+                                onError: (e) => window.__QA_ERRORS__.push(e.message),
+                            });
+                        for (const child of Object.values(component.components || {})) check(child);
+                    }
+                    check(CheatModal);
+                    check(ObjectTranslationModalHost);
+                    check(BoxingModal);
+                    const app = createWindowUiApp(window, {
+                        components: {
+                            CheatModal,
+                            AlertSnackbar,
+                            ConfirmDialog,
+                            ObjectTranslationModalHost,
+                            BoxingModal,
+                        },
+                        data: () => ({ panel: 'GeneralPanel' }),
+                        template:
+                            '<v-app><v-main><cheat-modal v-model:current-component-name="panel"/></v-main><alert-snackbar/><confirm-dialog/><object-translation-modal-host/><boxing-modal/></v-app>',
+                    });
+                    app.config.errorHandler = (error) =>
+                        window.__QA_ERRORS__.push(error.stack || String(error));
+                    window.__QA_APP__ = app.mount('#app');
+                    window.__QA_COMPONENT__ = (name) => {
+                        const find = (v) => {
+                            if (v.component?.type?.name === name) return v.component.proxy;
+                            for (const child of Array.isArray(v.children) ? v.children : []) {
+                                const result = find(child);
+                                if (result) return result;
+                            }
+                            if (v.component?.subTree) return find(v.component.subTree);
+                        };
+                        return find(window.__QA_APP__.$.subTree);
+                    };
+                    window.__QA_SET_SIZE__ = (width, height) => {
+                        const modal = window.__QA_COMPONENT__('CheatModal');
+                        modal.overlayWidth = width;
+                        modal.overlayHeight = height;
+                    };
+                    const { ensureTranslateCacheRuntime, notifyTranslateCacheRuntimeChanged } =
+                        await import('../cheat-engine/www/cheat/js/TranslateCacheRuntime.js');
+                    window.__QA_SEED_CACHE__ = () => {
+                        const { cache } = ensureTranslateCacheRuntime();
+                        for (const [original, translated] of [
+                            ['コンティニュー', 'Continue'],
+                            ['ニューゲーム', 'New Game'],
+                            ['各種設定', 'Settings'],
+                            ['回想モード', 'Gallery Mode'],
+                            ['イチカ', 'Ichika'],
+                        ])
+                            cache.set('command:ja-en-' + original, translated);
+                        notifyTranslateCacheRuntimeChanged('fixture');
+                    };
+                    window.__QA_PANELS__ = Object.keys(CheatModal.components);
+                    window.__QA_READY__ = true;
+                } catch (error) {
+                    window.__QA_ERRORS__.push(error.stack || String(error));
+                }
+                document.getElementById('errors').textContent = window.__QA_ERRORS__.join('\n');
+            })();
+        </script>
+    </body>
+</html>

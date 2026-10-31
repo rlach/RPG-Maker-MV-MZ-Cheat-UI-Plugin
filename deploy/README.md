@@ -18,6 +18,8 @@ From the repository root you can also run:
 npm run deploy
 ```
 
+Both ZIP and tar.gz archives are generated for MV and MZ.
+
 ## Build output path
 
 `{repository_root}/deploy/output`

@@ -234,18 +234,16 @@ export default {
     },
 
     template: `
-<v-dialog :value="visible" max-width="700" @keydown.stop @input="$emit('update:visible', $event)">
-    <v-card dark class="pt-2">
-        <v-card-title class="subtitle-1 font-weight-bold d-flex align-center">
+<v-dialog :model-value="visible" max-width="700" @keydown.stop @update:model-value="$emit('update:visible', $event)">
+    <v-card class="pt-2">
+        <v-card-title class="text-subtitle-1 font-weight-bold d-flex align-center">
             <span>Find Possible Unknown Tags</span>
             <v-spacer></v-spacer>
-            <v-btn
-                small
-                outlined
+            <v-btn size="small" variant="outlined"
                 color="primary"
                 :loading="isScanning"
                 @click="scanCache">
-                <v-icon small left>mdi-refresh</v-icon>
+                <v-icon size="small" left>mdi-refresh</v-icon>
                 Scan cache
             </v-btn>
         </v-card-title>
@@ -253,45 +251,42 @@ export default {
         <v-card-text class="pb-1">
             <v-btn-toggle
                 v-model="unknownTagStyleFilter"
-                mandatory
-                dense
+                mandatory density="compact"
                 class="mb-2">
-                <v-btn small value="escape">Escape style ({{ escapeStyleCount }})</v-btn>
-                <v-btn small value="xml">XML style ({{ xmlStyleCount }})</v-btn>
-                <v-btn small value="both">Both ({{ totalUnknownTagsCount }})</v-btn>
+                <v-btn size="small" value="escape">Escape style ({{ escapeStyleCount }})</v-btn>
+                <v-btn size="small" value="xml">XML style ({{ xmlStyleCount }})</v-btn>
+                <v-btn size="small" value="both">Both ({{ totalUnknownTagsCount }})</v-btn>
             </v-btn-toggle>
 
-            <div v-if="filteredUnknownTagsList.length === 0 && !isScanning" class="caption grey--text text--lighten-1">
+            <div v-if="filteredUnknownTagsList.length === 0 && !isScanning" class="text-caption text-grey-lighten-1">
                 {{ emptyMessage }}
             </div>
         </v-card-text>
 
-        <v-data-table
+        <v-data-table return-object
             v-if="filteredUnknownTagsList.length > 0"
-            :headers="unknownTagsHeaders"
+            :headers="uiTableHeaders(unknownTagsHeaders)"
             :items="filteredUnknownTagsList"
             :items-per-page="20"
-            :sort-by="'count'"
-            :sort-desc="true"
-            dense
-            class="mx-4"
+            :sort-by="uiTableSort('count', true)" density="compact"
+            class="cheat-unknown-tags-table mx-4"
             style="background: transparent;">
             <template v-slot:item.pattern="{ item }">
-                <span class="caption font-weight-bold" style="font-family: monospace;">{{ item.pattern }}</span>
+                <span class="text-caption font-weight-bold" style="font-family: monospace;">{{ item.pattern }}</span>
             </template>
             <template v-slot:item.count="{ item }">
-                <span class="caption">{{ item.count }}</span>
+                <span class="text-caption">{{ item.count }}</span>
             </template>
             <template v-slot:item.add="{ item }">
-                <v-btn icon x-small color="primary" @click="requestCreateTag(item)">
-                    <v-icon small>mdi-plus</v-icon>
+                <v-btn variant="text" icon size="x-small" color="primary" @click="requestCreateTag(item)">
+                    <v-icon size="small">mdi-plus</v-icon>
                 </v-btn>
             </template>
         </v-data-table>
 
         <v-card-actions>
             <v-spacer></v-spacer>
-            <v-btn text color="grey" @click="close">Close</v-btn>
+            <v-btn variant="text" color="grey" @click="close">Close</v-btn>
         </v-card-actions>
     </v-card>
 </v-dialog>

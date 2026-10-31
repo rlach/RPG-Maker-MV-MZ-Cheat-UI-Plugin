@@ -1,4 +1,5 @@
 import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
+import { gameObjectReference } from '../js/Tools.js';
 import { tableSessionMixin } from '../js/TableSessionState.js';
 
 export default {
@@ -6,86 +7,72 @@ export default {
     mixins: [tableSessionMixin()],
 
     template: `
-<v-card flat class="ma-0 pa-0 fill-height panel-with-sticky-table">
-    <v-card-text class="pt-1 pb-1">
+<v-card flat class="cheat-refresh-panel ma-0 pa-0 fill-height panel-with-sticky-table">
+    <v-card-text  class="cheat-panel-header pt-1 pb-1">
         <v-text-field
-            label="Search..."
-            solo
-            background-color="grey darken-3"
-            v-model="search"
-            dense
+            label="Search..." variant="solo" single-line
+            bg-color="grey-darken-3"
+            v-model="search" density="compact"
             hide-details
-            @keydown.self.stop
+            @keydown.stop
             @focus="$event.target.select()">
         </v-text-field>
         <div class="d-flex align-center mt-2">
             <v-checkbox
-                v-model="excludeNameless"
-                dense
+                v-model="excludeNameless" density="compact"
                 hide-details
                 label="Hide Nameless Items"
-                @change="onTableFilterChange">
+                @update:model-value="onTableFilterChange">
             </v-checkbox>
             <v-spacer></v-spacer>
             <v-checkbox
-                v-model="onlyOwnedItems"
-                dense
+                v-model="onlyOwnedItems" density="compact"
                 hide-details
                 label="Only Owned Items"
-                @change="onTableFilterChange">
+                @update:model-value="onTableFilterChange">
             </v-checkbox>
         </div>
     </v-card-text>
-    <v-data-table
+    <v-data-table return-object
         v-if="tableReady && tableHeaders"
-        class="table-with-sticky-footer"
-        :headers="tableHeaders"
+        class="cheat-inventory-table table-with-sticky-footer"
+        :headers="uiTableHeaders(tableHeaders)"
         :items="filteredTableItems"
         :search="search"
-        :custom-filter="tableItemFilter"
-        :items-per-page.sync="rowsPerPage"
-        :page.sync="page"
-        :sort-by.sync="tableSession.sortBy"
-        :sort-desc.sync="tableSession.sortDesc">
+        :custom-filter="(value, query, item) => tableItemFilter(value, query, item.raw)"
+        v-model:items-per-page="rowsPerPage"
+        v-model:page="page"
+        :sort-by="uiTableSort(tableSession.sortBy, tableSession.sortDesc)" @update:sort-by="updateUiTableSort($event, 'tableSession.sortBy', 'tableSession.sortDesc')"
+        >
         <template
             v-slot:item.amount="{ item }">
-            <v-text-field
-                background-color="grey darken-3"
+            <v-text-field type="number" step="1"
+
                 class="d-inline-flex"
-                height="10"
-                style="width: 60px;"
-                hide-details
-                solo
-                v-model="item.amount"
-                label="Amount"
-                dense
-                @keydown.self.stop
-                @change="onItemChange(item)"
+
+                style="width: 100%; min-width: 70px;"
+                hide-details variant="outlined"
+                v-model="item.amount" density="compact"
+                @keydown.stop
+                @update:model-value="onItemChange(item)"
                 @focus="$event.target.select()">
             </v-text-field>
         </template>
     </v-data-table>
-    
-    <v-tooltip
-        bottom>
+
+    <cheat-tooltip location="bottom">
         <span>Reload from game data</span>
-        <template v-slot:activator="{ on, attrs }">
-            <v-btn
-                style="top: 0px; right: 0px;"
-                color="pink"
-                dark
-                small
-                absolute
-                top
-                right
-                fab
-                v-bind="attrs"
-                v-on="on"
+        <template v-slot:activator="{ props: activatorProps }">
+            <v-btn class="cheat-refresh" variant="elevated"
+
+                color="pink" aria-label="Reload from game data" size="small" icon
+                v-bind="activatorProps"
+
                 @click="initializeVariables">
                 <v-icon>mdi-refresh</v-icon>
             </v-btn>
         </template>
-    </v-tooltip>
+    </cheat-tooltip>
 </v-card>
     `,
 
@@ -155,15 +142,24 @@ export default {
 
     methods: {
         initializeVariables() {
-            this.tableHeaders = this.headers.slice(0);
+            this.tableHeaders = this.headers.map((header) => ({
+                ...header,
+                ...(header.value === 'id'
+                    ? { width: 40 }
+                    : header.value === 'name'
+                      ? { width: '22%' }
+                      : {}),
+            }));
             this.tableHeaders.push({
                 text: 'Amount',
                 value: 'amount',
+                width: 100,
             });
 
             this.tableItems = this.items
                 .filter((item) => !!item)
                 .map((item) => {
+                    item = gameObjectReference(item);
                     const tableItem = this.asTableData(item);
                     tableItem._item = item;
                     tableItem.amount = $gameParty.numItems(item);
@@ -191,7 +187,7 @@ export default {
 
             search = search.toLowerCase();
             for (const attr of this.searchableAttrs) {
-                if (item[attr].toLowerCase().contains(search)) {
+                if (item[attr].toLowerCase().includes(search)) {
                     return true;
                 }
             }

@@ -9,84 +9,72 @@ export default {
     <v-card-text class="pt-1 pb-1">
         <v-row>
             <v-col
-                cols="12"
-                md="6">
-                <v-text-field
+                cols="6">
+                <v-text-field type="number" step="1"
                     v-model="inputX"
-                    label="X"
-                    dense
-                    background-color="grey darken-3"
-                    hide-details
-                    outlined
-                    @keydown.self.stop
+                    label="X" density="compact"
+                    bg-color="grey-darken-3"
+                    hide-details variant="outlined"
+                    @keydown.stop
                     @focus="$event.target.select()">
                 </v-text-field>
             </v-col>
             <v-col
-                cols="12"
-                md="6">
-                <v-text-field
+                cols="6">
+                <v-text-field type="number" step="1"
                     v-model="inputY"
-                    label="Y"
-                    dense
-                    background-color="grey darken-3"
-                    hide-details
-                    outlined
-                    @keydown.self.stop
+                    label="Y" density="compact"
+                    bg-color="grey-darken-3"
+                    hide-details variant="outlined"
+                    @keydown.stop
                     @focus="$event.target.select()">
                 </v-text-field>
             </v-col>
         </v-row>
         <v-text-field
-            label="Search..."
-            solo
-            background-color="grey darken-3"
-            v-model="search"
-            dense
+            label="Search..." variant="solo" single-line
+            bg-color="grey-darken-3"
+            v-model="search" density="compact"
             hide-details
             class="mt-2"
-            @keydown.self.stop
+            @keydown.stop
             @focus="$event.target.select()">
         </v-text-field>
         <div class="d-flex align-center mt-2">
             <v-checkbox
-                v-model="excludeFullPath"
-                dense
+                v-model="excludeFullPath" density="compact"
                 hide-details
                 label="Hide Full Path Field">
             </v-checkbox>
         </div>
     </v-card-text>
-    <v-data-table
+    <v-data-table return-object
         v-if="tableHeaders"
         class="table-with-sticky-footer"
-        :headers="filteredTableHeaders"
+        :headers="uiTableHeaders(filteredTableHeaders)"
         :items="maps"
         :search="search"
-        :custom-filter="tableItemFilter"
-        :items-per-page.sync="rowsPerPage">
+        :custom-filter="(value, query, item) => tableItemFilter(value, query, item.raw)"
+        v-model:items-per-page="rowsPerPage">
         <template
             v-slot:item.fullPath="{ item }">
             {{item.fullPathJoin}}
         </template>
         <template
             v-slot:item.actions="{ item, index }">
-            <v-tooltip
-                bottom>
+            <cheat-tooltip location="bottom">
                 <span>Teleport</span>
-                <template v-slot:activator="{ on, attrs }">
+                <template v-slot:activator="{ props: activatorProps }">
 
-                    <v-btn
-                        color="green"
-                        x-small
-                        fab
-                        v-bind="attrs"
-                        v-on="on"
+                    <v-btn variant="text"
+                        color="green" size="x-small" icon
+                        v-bind="activatorProps"
+
                         @click="teleportLocation(item.id, Number(inputX), Number(inputY))">
-                        <v-icon small>mdi-map-marker</v-icon>
+                        <v-icon size="small">mdi-map-marker</v-icon>
                     </v-btn>
                 </template>
-            </v-tooltip>
+            </cheat-tooltip>
         </template>
     </v-data-table>
 </v-card>
@@ -210,9 +198,9 @@ export default {
             search = search.toLowerCase();
 
             return (
-                item.name.toLowerCase().contains(search) ||
-                item.fullPathJoin.toLowerCase().contains(search) ||
-                String(item.id).toLowerCase().contains(search)
+                item.name.toLowerCase().includes(search) ||
+                item.fullPathJoin.toLowerCase().includes(search) ||
+                String(item.id).toLowerCase().includes(search)
             );
         },
     },

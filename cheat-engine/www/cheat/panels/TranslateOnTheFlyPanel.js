@@ -32,37 +32,33 @@ export default {
     <v-card-text class="py-0">
         <v-switch
             v-model="enableTranslation"
-            label="Enable translation"
-            dense
+            label="Enable translation" density="compact"
             hide-details
             @click.self.stop
-            @change="onChangeEnableTranslation">
+            @update:model-value="onChangeEnableTranslation">
         </v-switch>
 
         <v-switch
             v-model="enableImageReplacement"
-            label="Enable image replacement"
-            dense
+            label="Enable image replacement" density="compact"
             hide-details
             @click.self.stop
-            @change="onChangeEnableImageReplacement">
+            @update:model-value="onChangeEnableImageReplacement">
         </v-switch>
 
         <v-switch
             v-model="enableRealtime"
-            label="Enable real-time events translation"
-            dense
+            label="Enable real-time events translation" density="compact"
             hide-details
             @click.self.stop
-            @change="onChangeEnableRealtime">
+            @update:model-value="onChangeEnableRealtime">
         </v-switch>
         <v-switch
             v-model="autoSwitchNameInputLanguage"
             label="Use translation language for the name-input keyboard"
             hint="Disable to keep the game's original characters, including full-width passwords. Saved with this game's translation cache."
-            persistent-hint
-            dense
-            @change="callRuntime('saveSettings')">
+            persistent-hint density="compact"
+            @update:model-value="callRuntime('saveSettings')">
         </v-switch>
     </v-card-text>
 
@@ -71,20 +67,18 @@ export default {
     <v-card-text class="py-0">
         <v-switch
             v-model="translateFullEventInRealtime"
-            label="Try to translate full event"
-            dense
+            label="Try to translate full event" density="compact"
             hide-details
             @click.self.stop
-            @change="onChangeTranslateFullEventInRealtime">
+            @update:model-value="onChangeTranslateFullEventInRealtime">
         </v-switch>
 
         <v-switch
             v-model="interruptQueueForRealtime"
-            label="Interrupt translation queue for real-time"
-            dense
+            label="Interrupt translation queue for real-time" density="compact"
             hide-details
             @click.self.stop
-            @change="onChangeInterruptQueueForRealtime">
+            @update:model-value="onChangeInterruptQueueForRealtime">
         </v-switch>
     </v-card-text>
 
@@ -93,20 +87,18 @@ export default {
     <v-card-text class="py-0">
         <v-switch
           v-model="changeToCurrentMapInMassTranslationMidPhase"
-          label="Change to current map in mass translation mid-phase"
-          dense
+          label="Change to current map in mass translation mid-phase" density="compact"
           hide-details
           @click.self.stop
-          @change="onChangeCurrentMapMidPhasePriority">
+          @update:model-value="onChangeCurrentMapMidPhasePriority">
         </v-switch>
 
                 <v-switch
                         v-model="flatProgressWindow"
-                        label="Flat progress window"
-                        dense
+                        label="Flat progress window" density="compact"
                         hide-details
                         @click.self.stop
-                        @change="onChangeFlatProgressWindow">
+                        @update:model-value="onChangeFlatProgressWindow">
                 </v-switch>
     </v-card-text>
 
@@ -116,33 +108,27 @@ export default {
         <v-select
             v-model="translationEngine"
             :items="translationEngineOptions"
-            label="Translation Engine"
-            outlined
-            dense
+            label="Translation Engine" variant="outlined" density="compact"
             hide-details
-            @change="onChangeTranslationEngine"
-            class="mb-2">
+            @update:model-value="onChangeTranslationEngine"
+            class="mb-2" item-title="text">
         </v-select>
 
         <v-select
             v-model="sourceLang"
             :items="languageOptions"
-            label="Source Language"
-            outlined
-            dense
+            label="Source Language" variant="outlined" density="compact"
             hide-details
-            @change="onChangeSourceLang"
-            class="mb-2">
+            @update:model-value="onChangeSourceLang"
+            class="mb-2" item-title="text">
         </v-select>
 
         <v-select
             v-model="targetLang"
             :items="languageOptions"
-            label="Target Language"
-            outlined
-            dense
+            label="Target Language" variant="outlined" density="compact"
             hide-details
-            @change="onChangeTargetLang">
+            @update:model-value="onChangeTargetLang" item-title="text">
         </v-select>
 
         <!-- Engine-specific configuration -->
@@ -150,23 +136,19 @@ export default {
         <div v-if="translationEngine === 'libretranslate'" class="mt-3">
             <v-text-field
                 v-model="libreTranslateHost"
-                label="LibreTranslate Host"
-                outlined
-                dense
+                label="LibreTranslate Host" variant="outlined" density="compact"
                 hide-details
                 @keydown.stop
-                @change="onChangeLibreTranslateHost"
+                @update:model-value="onChangeLibreTranslateHost"
                 class="mb-2"
             ></v-text-field>
             <v-text-field
                 v-model="libreTranslateApiKey"
-                label="LibreTranslate API Key (optional)"
-                outlined
-                dense
+                label="LibreTranslate API Key (optional)" variant="outlined" density="compact"
                 hide-details
                 type="password"
                 @keydown.stop
-                @change="onChangeLibreTranslateApiKey"
+                @update:model-value="onChangeLibreTranslateApiKey"
             ></v-text-field>
         </div>
 
@@ -180,11 +162,10 @@ export default {
     <v-card-text class="py-0">
         <v-switch
             v-model="enableTextWrapping"
-            label="Keep translated strings under max width (in characters)"
-            dense
+            label="Keep translated strings under max width (in characters)" density="compact"
             hide-details
             @click.self.stop
-            @change="onChangeTextWrapping">
+            @update:model-value="onChangeTextWrapping">
         </v-switch>
     </v-card-text>
 
@@ -192,24 +173,20 @@ export default {
         <div class="d-flex align-center" style="gap: 8px;">
             <v-text-field
                 v-model.number="maxLineWidth"
-                label="Maximum line width for dialogue"
-                outlined
-                dense
+                label="Maximum line width for dialogue" variant="outlined" density="compact"
                 type="number"
                 min="20"
                 max="200"
                 hide-details
                 :disabled="!enableTextWrapping"
-                @keydown.self.stop
-                @change="onChangeMaxWidth"
+                @keydown.stop
+                @update:model-value="onChangeMaxWidth"
                 @focus="$event.target.select()"
                 style="flex: 1 1 auto;">
             </v-text-field>
             <v-text-field
-                :value="textWrapLevel1RegularWidth"
-                label="size +1 \{"
-                outlined
-                dense
+                :model-value="textWrapLevel1RegularWidth"
+                label="size +1 \{" variant="outlined" density="compact"
                 type="number"
                 hide-details
                 disabled
@@ -217,10 +194,8 @@ export default {
                 style="flex: 0 0 100px; max-width: 100px;">
             </v-text-field>
             <v-text-field
-                :value="textWrapLevel2RegularWidth"
-                label="size +2 \{\{"
-                outlined
-                dense
+                :model-value="textWrapLevel2RegularWidth"
+                label="size +2 \{\{" variant="outlined" density="compact"
                 type="number"
                 hide-details
                 disabled
@@ -231,37 +206,33 @@ export default {
 
         <div
             v-if="amountOfPortraitMessages > 0"
-            class="caption orange--text text--darken-2 mb-1">
+            class="text-caption text-orange mb-1">
             Cache contains {{amountOfPortraitMessages}} messages with portraits
         </div>
 
         <div
             v-if="showNoPortraitMessagesDetectedInfo"
-            class="caption orange--text text--darken-2 mb-1">
+            class="text-caption text-orange mb-1">
             No messages with portraits detected in game.
         </div>
 
         <div class="d-flex align-center" style="gap: 8px;">
             <v-text-field
                 v-model.number="maxLineWidthWithPortrait"
-                label="Maximum line width for dialogue with portrait"
-                outlined
-                dense
+                label="Maximum line width for dialogue with portrait" variant="outlined" density="compact"
                 type="number"
                 min="20"
                 max="200"
                 hide-details
                 :disabled="!enableTextWrapping"
-                @keydown.self.stop
-                @change="onChangeMaxWidthWithPortrait"
+                @keydown.stop
+                @update:model-value="onChangeMaxWidthWithPortrait"
                 @focus="$event.target.select()"
                 style="flex: 1 1 auto;">
             </v-text-field>
             <v-text-field
-                :value="textWrapLevel1PortraitWidth"
-                label="size +1 \{"
-                outlined
-                dense
+                :model-value="textWrapLevel1PortraitWidth"
+                label="size +1 \{" variant="outlined" density="compact"
                 type="number"
                 hide-details
                 disabled
@@ -269,10 +240,8 @@ export default {
                 style="flex: 0 0 100px; max-width: 100px;">
             </v-text-field>
             <v-text-field
-                :value="textWrapLevel2PortraitWidth"
-                label="size +2 \{\{"
-                outlined
-                dense
+                :model-value="textWrapLevel2PortraitWidth"
+                label="size +2 \{\{" variant="outlined" density="compact"
                 type="number"
                 hide-details
                 disabled
@@ -282,17 +251,16 @@ export default {
         </div>
 
         <div class="d-flex align-center" style="gap: 8px;">
-            <v-tooltip bottom>
-                <template v-slot:activator="{ on, attrs }">
-                    <v-btn
-                        icon
-                        small
-                        v-bind="attrs"
-                        v-on="on"
-                        :color="linkDescriptionMaxWidthToDialogue ? 'primary' : 'grey lighten-1'"
+            <cheat-tooltip location="bottom">
+                <template v-slot:activator="{ props: activatorProps }">
+                    <v-btn variant="text"
+                        icon size="small"
+                        v-bind="activatorProps"
+
+                        :color="linkDescriptionMaxWidthToDialogue ? 'primary' : 'grey-lighten-1'"
                         :disabled="!enableTextWrapping"
                         @click="toggleDescriptionWidthLink">
-                        <v-icon small>
+                        <v-icon size="small">
                             {{
                                 linkDescriptionMaxWidthToDialogue
                                     ? 'mdi-link-variant'
@@ -308,35 +276,31 @@ export default {
                             : 'Unlinked: description width is independent'
                     }}
                 </span>
-            </v-tooltip>
+            </cheat-tooltip>
 
             <v-text-field
                 v-model.number="descriptionMaxLineWidth"
-                label="Maximum line width for descriptions (items, skills etc.)"
-                outlined
-                dense
+                label="Maximum line width for descriptions (items, skills etc.)" variant="outlined" density="compact"
                 type="number"
                 min="20"
                 max="200"
                 hide-details
                 :disabled="!enableTextWrapping || linkDescriptionMaxWidthToDialogue"
-                @keydown.self.stop
-                @change="onChangeDescriptionMaxWidth"
+                @keydown.stop
+                @update:model-value="onChangeDescriptionMaxWidth"
                 @focus="$event.target.select()"
                 style="flex: 1 1 auto;">
             </v-text-field>
             <v-text-field
                 v-model.number="descriptionMaxRows"
-                label="Max rows"
-                outlined
-                dense
+                label="Max rows" variant="outlined" density="compact"
                 type="number"
                 min="1"
                 max="20"
                 hide-details
                 :disabled="!enableTextWrapping"
-                @keydown.self.stop
-                @change="onChangeDescriptionMaxRows"
+                @keydown.stop
+                @update:model-value="onChangeDescriptionMaxRows"
                 @focus="$event.target.select()"
                 style="flex: 0 0 110px; max-width: 110px;">
             </v-text-field>
@@ -344,45 +308,41 @@ export default {
 
         <v-checkbox
             v-model="addBoxWidthInfoToLlmPrompt"
-            label="Add box width info to LLM prompt with descriptions"
-            dense
+            label="Add box width info to LLM prompt with descriptions" density="compact"
             hide-details
             class="mt-1 mb-1"
-            @change="onChangeAddBoxWidthInfoToLlmPrompt">
+            @update:model-value="onChangeAddBoxWidthInfoToLlmPrompt">
         </v-checkbox>
 
-        <div class="d-flex align-center mt-2" style="gap: 8px;">
-            <span class="caption grey--text text--lighten-1" style="white-space: nowrap;">Remove existing newlines before wrapping if there are</span>
+        <div class="cheat-newline-threshold d-flex align-center mt-2">
+            <span class="text-caption text-grey-lighten-1">Remove existing newlines before wrapping</span>
+            <span class="text-caption text-grey-lighten-1">if there are</span>
             <v-text-field
                 v-model.number="removeNewlinesBeforeWrappingMaxCount"
-                label="newlines"
-                outlined
-                dense
+                aria-label="Maximum consecutive newlines" variant="outlined" density="compact"
                 type="number"
                 min="0"
                 max="20"
                 hide-details
                 :disabled="!enableTextWrapping"
-                @keydown.self.stop
-                @change="onChangeRemoveNewlinesBeforeWrappingMaxCount"
+                @keydown.stop
+                @update:model-value="onChangeRemoveNewlinesBeforeWrappingMaxCount"
                 @focus="$event.target.select()"
                 style="flex: 0 0 auto; width: 80px;">
             </v-text-field>
-            <span class="caption grey--text text--lighten-1" style="white-space: nowrap;">or less in a row</span>
+            <span class="text-caption text-grey-lighten-1" style="white-space: nowrap;">or less newlines in a row</span>
         </div>
 
         <v-text-field
             v-model="textWrapFontScaleMultiplier"
-            label="Text scale width multiplier per \{ level"
-            outlined
-            dense
+            label="Text scale width multiplier per \{ level" variant="outlined" density="compact"
             type="number"
             min="0.01"
             step="0.01"
             hide-details
             :disabled="!enableTextWrapping"
-            @keydown.self.stop
-            @change="onChangeTextWrapFontScaleMultiplier"
+            @keydown.stop
+            @update:model-value="onChangeTextWrapFontScaleMultiplier"
             @focus="$event.target.select()">
         </v-text-field>
     </v-card-text>
@@ -391,58 +351,50 @@ export default {
     <v-card-text class="py-0">
         <v-text-field
             v-model.number="charLimit"
-            label="Max characters per translation batch"
-            outlined
-            dense
+            label="Max characters per translation batch" variant="outlined" density="compact"
             type="number"
             min="200"
             max="10000"
             hide-details
-            @keydown.self.stop
-            @change="onChangeCharLimit"
+            @keydown.stop
+            @update:model-value="onChangeCharLimit"
             class="mb-2"
         ></v-text-field>
 
         <v-text-field
             v-model.number="batchItemsLimit"
-            label="Max items per translation batch"
-            outlined
-            dense
+            label="Max items per translation batch" variant="outlined" density="compact"
             type="number"
             min="1"
             max="100"
             hide-details
-            @keydown.self.stop
-            @change="onChangeBatchItemsLimit"
+            @keydown.stop
+            @update:model-value="onChangeBatchItemsLimit"
         ></v-text-field>
     </v-card-text>
 
     <v-card-subtitle class="pb-0 mt-4 font-weight-bold">Translation Status</v-card-subtitle>
     <v-card-text class="py-0">
-        <div class="caption">
+        <div class="text-caption">
             <div>Total Translations: {{translationCount}}</div>
             <div>Cached Texts: {{cachedCount}}</div>
         </div>
     </v-card-text>
 
     <v-card-text class="py-2">
-      <v-btn
-        small
-        outlined
+      <v-btn size="small" variant="outlined"
         color="primary"
         class="mr-2"
         @click="MessageCheat.openObjectTranslationModal()">
-        <v-icon small left>mdi-translate</v-icon>
+        <v-icon size="small" left>mdi-translate</v-icon>
         Translate items
       </v-btn>
 
-        <v-btn
-            small
-            outlined
+        <v-btn size="small" variant="outlined"
             color="warning"
             :disabled="cachedCount === 0"
             @click="clearCache">
-            <v-icon small left>mdi-delete</v-icon>
+            <v-icon size="small" left>mdi-delete</v-icon>
             Clear Cache
         </v-btn>
     </v-card-text>
@@ -467,7 +419,7 @@ export default {
         });
     },
 
-    beforeDestroy() {
+    beforeUnmount() {
         if (this.stateUnsubscribe) {
             this.stateUnsubscribe();
             this.stateUnsubscribe = null;

@@ -1,6 +1,7 @@
+import { bindSharedUiState } from '../js/SharedUiState.js';
 import { OBJECT_TRANSLATION_SERVICE } from '../js/translation-runtime/ObjectTranslationService.js';
 
-export default {
+const component = {
     name: 'ObjectTranslationModalHost',
 
     template: `
@@ -16,11 +17,11 @@ export default {
     @click.stop
     @wheel.stop
   >
-    <v-card dark>
-      <v-card-title class="subtitle-1 font-weight-bold">Mass Translation</v-card-title>
+    <v-card>
+      <v-card-title class="text-subtitle-1 font-weight-bold">Mass Translation</v-card-title>
       <template v-if="objectTranslationDataGathering">
         <v-card-text class="pt-6 pb-8 d-flex flex-column align-center justify-center" style="min-height: 240px;">
-          <div class="subtitle-2 mb-4">Gathering data</div>
+          <div class="text-subtitle-2 mb-4">Gathering data</div>
           <v-progress-circular
             indeterminate
             color="primary"
@@ -30,14 +31,14 @@ export default {
         </v-card-text>
       </template>
       <template v-else>
-      <v-card-text class="caption pb-1">Select what to translate. Counts show remaining objects and total.</v-card-text>
+      <v-card-text class="text-caption pb-1">Select what to translate. Counts show remaining objects and total.</v-card-text>
       <v-card-text class="pt-1">
         <template
           v-for="(item, index) in objectTranslationModalStats"
         >
           <div
             :key="item.id"
-            class="d-flex align-center justify-space-between py-1"
+            class="cheat-mass-translation-row d-flex align-center justify-space-between"
             @dragover.prevent="onItemDragOver($event, index)"
             @drop.prevent="onItemDrop($event, index)"
           >
@@ -50,28 +51,26 @@ export default {
                 @dragstart="onItemDragStart($event, index)"
                 @dragend="onItemDragEnd"
               >
-                <v-icon small color="grey lighten-1">mdi-drag-vertical</v-icon>
+                <v-icon size="small" color="grey-lighten-1">mdi-drag-vertical</v-icon>
               </div>
               <v-checkbox
                 v-model="objectTranslationSelection[item.id]"
                 :label="item.label"
                 :disabled="item.id !== 'cacheEmptyStrings' && item.total <= 0"
-                hide-details
-                dense
+                hide-details density="compact"
                 class="ma-0 pa-0"
               ></v-checkbox>
             </div>
             <div class="d-flex align-center">
-              <span class="caption grey--text text--lighten-1 mr-2">{{item.metaText || ('left ' + item.left + ' of ' + item.total)}}</span>
-              <v-btn
+              <span class="text-caption text-grey-lighten-1 mr-2">{{item.metaText || ('left ' + item.left + ' of ' + item.total)}}</span>
+              <v-btn variant="text"
                 v-if="item.id === 'mapEvents' || item.id === 'plugins'"
-                icon
-                x-small
-                color="grey lighten-1"
+                icon size="x-small"
+                color="grey-lighten-1"
                 :disabled="item.total <= 0"
                 @click.stop="openObjectTranslationSubSelection(item.id)"
               >
-                <v-icon small>mdi-cog</v-icon>
+                <v-icon size="small">mdi-cog</v-icon>
               </v-btn>
             </div>
           </div>
@@ -84,8 +83,7 @@ export default {
               v-model="cacheEmptyStringsRepeatUntilSuccess"
               label="Repeat until success"
               :disabled="!objectTranslationSelection['cacheEmptyStrings']"
-              hide-details
-              dense
+              hide-details density="compact"
               class="ma-0 pa-0"
             ></v-checkbox>
           </div>
@@ -93,9 +91,9 @@ export default {
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn text color="grey" @click="closeObjectTranslationModal">Cancel</v-btn>
-        <v-btn text color="orange" @click="startObjectTranslationFromModal(true)">Dry Run</v-btn>
-        <v-btn text color="primary" @click="startObjectTranslationFromModal(false)">Start</v-btn>
+        <v-btn variant="text" color="grey" @click="closeObjectTranslationModal">Cancel</v-btn>
+        <v-btn variant="text" color="orange" @click="startObjectTranslationFromModal(true)">Dry Run</v-btn>
+        <v-btn variant="text" color="primary" @click="startObjectTranslationFromModal(false)">Start</v-btn>
       </v-card-actions>
       </template>
     </v-card>
@@ -111,28 +109,26 @@ export default {
     @click.stop
     @wheel.stop
   >
-    <v-card dark>
-      <v-card-title class="subtitle-1 font-weight-bold">Plugins selection</v-card-title>
-      <v-card-text class="caption pb-1">Choose which detected plugins should be included in object translation.</v-card-text>
+    <v-card>
+      <v-card-title class="text-subtitle-1 font-weight-bold">Plugins selection</v-card-title>
+      <v-card-text class="text-caption pb-1">Choose which detected plugins should be included in object translation.</v-card-text>
       <v-card-text class="pt-1">
         <v-text-field
           v-model="objectTranslationPluginsSearch"
-          label="Search plugins"
-          solo
-          dense
+          label="Search plugins" variant="solo" single-line density="compact"
           hide-details
-          background-color="grey darken-3"
+          bg-color="grey-darken-3"
           class="mb-2"
-          @keydown.self.stop
+          @keydown.stop
           @focus="$event.target.select()"
         ></v-text-field>
 
         <div class="d-flex justify-end mb-2">
-          <v-btn text small color="primary" @click="selectAllPluginsForObjectTranslation">Select all</v-btn>
-          <v-btn text small color="grey lighten-1" @click="deselectAllPluginsForObjectTranslation">Deselect all</v-btn>
+          <v-btn variant="text" size="small" color="primary" @click="selectAllPluginsForObjectTranslation">Select all</v-btn>
+          <v-btn variant="text" size="small" color="grey-lighten-1" @click="deselectAllPluginsForObjectTranslation">Deselect all</v-btn>
         </div>
 
-        <div v-if="objectTranslationPluginsLoading" class="caption grey--text text--lighten-1 py-4 text-center">
+        <div v-if="objectTranslationPluginsLoading" class="text-caption text-grey-lighten-1 py-4 text-center">
           Loading plugins...
         </div>
 
@@ -140,24 +136,23 @@ export default {
           <div
             v-for="item in filteredObjectTranslationPluginDetails"
             :key="item.id"
-            class="d-flex align-center justify-space-between py-1"
+            class="cheat-mass-translation-row d-flex align-center justify-space-between"
           >
             <v-checkbox
               v-model="objectTranslationPluginDraftSelection[item.id]"
               :label="item.label"
               :disabled="item.totalStrings <= 0"
-              hide-details
-              dense
+              hide-details density="compact"
               class="ma-0 pa-0"
             ></v-checkbox>
-            <span class="caption grey--text text--lighten-1">left {{item.leftStrings}} of {{item.totalStrings}}</span>
+            <span class="text-caption text-grey-lighten-1">left {{item.leftStrings}} of {{item.totalStrings}}</span>
           </div>
         </div>
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn text color="grey" @click="closePluginsSelectionModal">Cancel</v-btn>
-        <v-btn text color="primary" :disabled="objectTranslationPluginsLoading" @click="savePluginsSelection">Save</v-btn>
+        <v-btn variant="text" color="grey" @click="closePluginsSelectionModal">Cancel</v-btn>
+        <v-btn variant="text" color="primary" :disabled="objectTranslationPluginsLoading" @click="savePluginsSelection">Save</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -172,28 +167,26 @@ export default {
     @click.stop
     @wheel.stop
   >
-    <v-card dark>
-      <v-card-title class="subtitle-1 font-weight-bold">Map events selection</v-card-title>
-      <v-card-text class="caption pb-1">Choose which maps should be included in object translation.</v-card-text>
+    <v-card>
+      <v-card-title class="text-subtitle-1 font-weight-bold">Map events selection</v-card-title>
+      <v-card-text class="text-caption pb-1">Choose which maps should be included in object translation.</v-card-text>
       <v-card-text class="pt-1">
         <v-text-field
           v-model="objectTranslationMapEventsSearch"
-          label="Search maps"
-          solo
-          dense
+          label="Search maps" variant="solo" single-line density="compact"
           hide-details
-          background-color="grey darken-3"
+          bg-color="grey-darken-3"
           class="mb-2"
-          @keydown.self.stop
+          @keydown.stop
           @focus="$event.target.select()"
         ></v-text-field>
 
         <div class="d-flex justify-end mb-2">
-          <v-btn text small color="primary" @click="selectAllMapEventsForObjectTranslation">Select all</v-btn>
-          <v-btn text small color="grey lighten-1" @click="deselectAllMapEventsForObjectTranslation">Deselect all</v-btn>
+          <v-btn variant="text" size="small" color="primary" @click="selectAllMapEventsForObjectTranslation">Select all</v-btn>
+          <v-btn variant="text" size="small" color="grey-lighten-1" @click="deselectAllMapEventsForObjectTranslation">Deselect all</v-btn>
         </div>
 
-        <div v-if="objectTranslationMapEventsLoading" class="caption grey--text text--lighten-1 py-4 text-center">
+        <div v-if="objectTranslationMapEventsLoading" class="text-caption text-grey-lighten-1 py-4 text-center">
           Loading map statistics...
         </div>
 
@@ -201,24 +194,23 @@ export default {
           <div
             v-for="item in filteredObjectTranslationMapEventDetails"
             :key="item.id"
-            class="d-flex align-center justify-space-between py-1"
+            class="cheat-mass-translation-row d-flex align-center justify-space-between"
           >
             <v-checkbox
               v-model="objectTranslationMapEventDraftSelection[item.id]"
               :label="item.label"
               :disabled="item.totalStrings <= 0"
-              hide-details
-              dense
+              hide-details density="compact"
               class="ma-0 pa-0"
             ></v-checkbox>
-            <span class="caption grey--text text--lighten-1">left {{item.leftStrings}} of {{item.totalStrings}}</span>
+            <span class="text-caption text-grey-lighten-1">left {{item.leftStrings}} of {{item.totalStrings}}</span>
           </div>
         </div>
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn text color="grey" @click="closeMapEventsSelectionModal">Cancel</v-btn>
-        <v-btn text color="primary" :disabled="objectTranslationMapEventsLoading" @click="saveMapEventsSelection">Save</v-btn>
+        <v-btn variant="text" color="grey" @click="closeMapEventsSelectionModal">Cancel</v-btn>
+        <v-btn variant="text" color="primary" :disabled="objectTranslationMapEventsLoading" @click="saveMapEventsSelection">Save</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -467,3 +459,5 @@ export default {
         },
     },
 };
+
+export default bindSharedUiState(component, OBJECT_TRANSLATION_SERVICE);
