@@ -5,6 +5,7 @@ import { BasePluginTranslator } from '../BasePluginTranslator.js';
  *
  * Supported plugin versions:
  * - EquipAndShopStatusR.js v1.09 (MV)
+ * - RJ404094 MV variant: direct drawParamName/drawEffectText vocabulary.
  *
  * Translation notes:
  * - Text is sourced from plugin parameters, including vocabulary CSV fields
@@ -15,10 +16,6 @@ import { BasePluginTranslator } from '../BasePluginTranslator.js';
 
 const PLUGIN_NAME = 'EquipAndShopStatusR';
 const CACHE_TYPE = 'plugin_equip_and_shop_status_r';
-
-const HOOK_FLAG_EQUIP_STATUS_DRAW = '__CHEAT_EQUIP_SHOP_STATUSR_EQUIP_DRAW_HOOKED__';
-const HOOK_FLAG_SHOP_STATUS_EFFECT = '__CHEAT_EQUIP_SHOP_STATUSR_SHOP_EFFECT_HOOKED__';
-const HOOK_FLAG_SHOP_STATUS_META = '__CHEAT_EQUIP_SHOP_STATUSR_SHOP_META_HOOKED__';
 
 const DIRECT_TEXT_KEYS = new Set([
     'Effect Name',
@@ -217,82 +214,24 @@ export class EquipAndShopStatusRTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
-        const equipStatusProto = window.Window_EquipStatus?.prototype;
-        const refineShopStatusProto = window.Window_RefineShopStatus?.prototype;
-
+        const prototype = window.Window_EquipStatus?.prototype;
         if (
-            !equipStatusProto ||
-            typeof equipStatusProto.drawExParams !== 'function' ||
-            !refineShopStatusProto ||
-            typeof refineShopStatusProto.drawEffectText !== 'function' ||
-            typeof refineShopStatusProto.drawMetaTag !== 'function'
-        ) {
-            console.log(
-                '[EquipAndShopStatusRTranslator] Required prototypes or methods not found. Runtime translation patches will not be applied.',
-                {
-                    equipStatusProto,
-                    refineShopStatusProto,
-                    drawExParams: equipStatusProto?.drawExParams,
-                    drawEffectText: refineShopStatusProto?.drawEffectText,
-                    drawMetaTag: refineShopStatusProto?.drawMetaTag,
-                }
-            );
+            typeof prototype?.drawExParams !== 'function' ||
+            typeof prototype.drawText !== 'function'
+        )
             return false;
-        }
 
-        if (!equipStatusProto[HOOK_FLAG_EQUIP_STATUS_DRAW]) {
-            const originalDrawExParams = equipStatusProto.drawExParams;
-            const translateRuntimeText = this._translateRuntimeText.bind(this);
-            equipStatusProto.drawExParams = function (text) {
-                const nextText = translateRuntimeText(text, true);
-                const nextArguments = Array.from(arguments);
-                nextArguments[0] = nextText;
-                return originalDrawExParams.apply(this, nextArguments);
-            };
-
-            Object.defineProperty(equipStatusProto, HOOK_FLAG_EQUIP_STATUS_DRAW, {
-                value: true,
-                configurable: true,
-                enumerable: false,
-                writable: false,
-            });
-        }
-
-        if (!refineShopStatusProto[HOOK_FLAG_SHOP_STATUS_EFFECT]) {
-            const originalDrawEffectText = refineShopStatusProto.drawEffectText;
-            const translateRuntimeText = this._translateRuntimeText.bind(this);
-            refineShopStatusProto.drawEffectText = function (text1, text2) {
-                const nextArguments = Array.from(arguments);
-                nextArguments[0] = translateRuntimeText(text1, false);
-                nextArguments[1] = translateRuntimeText(text2, false);
-                return originalDrawEffectText.apply(this, nextArguments);
-            };
-
-            Object.defineProperty(refineShopStatusProto, HOOK_FLAG_SHOP_STATUS_EFFECT, {
-                value: true,
-                configurable: true,
-                enumerable: false,
-                writable: false,
-            });
-        }
-
-        if (!refineShopStatusProto[HOOK_FLAG_SHOP_STATUS_META]) {
-            const originalDrawMetaTag = refineShopStatusProto.drawMetaTag;
-            const translateRuntimeText = this._translateRuntimeText.bind(this);
-            refineShopStatusProto.drawMetaTag = function (text) {
-                const nextArguments = Array.from(arguments);
-                nextArguments[0] = translateRuntimeText(text, true);
-                return originalDrawMetaTag.apply(this, nextArguments);
-            };
-
-            Object.defineProperty(refineShopStatusProto, HOOK_FLAG_SHOP_STATUS_META, {
-                value: true,
-                configurable: true,
-                enumerable: false,
-                writable: false,
-            });
-        }
-
+        // Window_RefineShopStatus is local to the plugin's IIFE and inherits
+        // this draw method. One hook covers both windows, including direct
+        // vocabulary draws. Never translate drawMetaTag's argument: it is also
+        // the lookup key for this._item.meta[text].
+        if (Object.getOwnPropertyDescriptor(prototype, '__cheatStatusRVocabularyHook')) return true;
+        const translator = this;
+        const drawText = prototype.drawText;
+        prototype.drawText = function (text, ...args) {
+            return drawText.call(this, translator._translateRuntimeText(text), ...args);
+        };
+        Object.defineProperty(prototype, '__cheatStatusRVocabularyHook', { value: true });
         return true;
     }
 
@@ -355,7 +294,9 @@ export class EquipAndShopStatusRTranslator extends BasePluginTranslator {
             return;
         }
 
-        if (/^meta\[[^\]]+\]$/i.test(normalized)) {
+        const metaMatch = /^meta\[([^\]]+)\]$/i.exec(text);
+        if (metaMatch) {
+            this._appendTextEntry(output, metaMatch[1], { scope, field: key, kind: 'meta_label' });
             return;
         }
 
@@ -402,14 +343,14 @@ export class EquipAndShopStatusRTranslator extends BasePluginTranslator {
         return knownTexts;
     }
 
-    _translateRuntimeText(text, allowUnknown) {
+    _translateRuntimeText(text) {
         if (!this.isUsableText(text)) {
             return text;
         }
 
         const sourceText = String(text);
         const knownTexts = this._getKnownTexts();
-        if (!allowUnknown && !knownTexts.has(sourceText)) {
+        if (!knownTexts.has(sourceText)) {
             return sourceText;
         }
 
@@ -418,11 +359,7 @@ export class EquipAndShopStatusRTranslator extends BasePluginTranslator {
             return sourceText;
         }
 
-        if (!this.isRuntimeTranslationActive(runtime)) {
-            const cacheKey = runtime.getCacheKey(sourceText, this.getCacheType());
-            runtime.trackCacheKeyUsage(cacheKey);
-            return sourceText;
-        }
+        if (!this.isRuntimeTranslationActive(runtime)) return sourceText;
 
         return this.resolveRuntimeTranslation(sourceText, runtime, this.getCacheType(), {
             requireRuntimeTranslationActive: true,
