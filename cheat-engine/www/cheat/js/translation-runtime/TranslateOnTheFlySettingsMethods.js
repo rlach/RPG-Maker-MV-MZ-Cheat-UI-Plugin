@@ -1,4 +1,5 @@
 import { TranslateOnTheFlyState } from '../TranslateOnTheFlyState.js';
+import { translationTaskbarFor } from '../TranslationTaskbar.js';
 import { createEngine } from '../../translate-engines/index.js';
 import { ensureKnowledgeForLangPair } from '../KnowledgeBaseRuntime.js';
 import {
@@ -156,6 +157,7 @@ export const translateOnTheFlySettingsMethods = {
     },
 
     saveSettings() {
+        translationTaskbarFor(this).sync();
         this.saveGameTranslationSettings();
         // Collect engine-specific settings before saving
         if (this.engine) {

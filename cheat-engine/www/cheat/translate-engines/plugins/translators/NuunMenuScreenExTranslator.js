@@ -27,6 +27,7 @@ const NUUN_FALLBACK_STATUS_LABELS = [
  *
  * Supported versions:
  * - 3.1.13+ (MZ)
+ * - NUUN_MenuScreen_2 (MZ): top-level PageList1..10 parameters.
  *
  * Notes:
  * - Translatable text is primarily stored in plugin parameters (`HelpList`, `MenuLayout` nested
@@ -49,6 +50,10 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
 
     getPluginLabel() {
         return 'NUUN MenuScreenEX';
+    }
+
+    getPluginAliases() {
+        return [this.getPluginName(), 'NUUN_MenuScreen_2'];
     }
 
     getCacheType() {
@@ -194,7 +199,8 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
 
     async buildScanEntries() {
         const entries = [];
-        const pluginEntry = this.findPluginEntry();
+        const pluginEntry =
+            this.findPluginEntry(this.getPluginName()) || this.findPluginEntry('NUUN_MenuScreen_2');
         const parameters = pluginEntry?.parameters;
 
         if (!parameters || typeof parameters !== 'object') {
@@ -203,6 +209,7 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
 
         this.collectHelpListEntries(parameters, entries);
         this.collectMenuLayoutEntries(parameters, entries);
+        this.collectLayoutPageListEntries(parameters, -1, entries);
         this.collectBuiltInFallbackEntries(entries);
 
         return entries;
@@ -221,15 +228,9 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
             return text;
         }
 
-        const cacheKey = runtime.getCacheKey(text, this.getCacheType());
-        runtime.trackCacheKeyUsage(cacheKey);
-
-        if (!this.isRuntimeTranslationActive(runtime) || !runtime.hasUsableCacheValue(cacheKey)) {
-            return text;
-        }
-
-        const cached = runtime.translationCache.get(cacheKey);
-        return this.isUsableText(cached) ? cached : text;
+        return this.resolveRuntimeTranslation(text, runtime, this.getCacheType(), {
+            requireRuntimeTranslationActive: true,
+        });
     }
 
     applyTranslatedParamFields(data, runtime) {
@@ -397,6 +398,9 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
             };
         }
 
+        this.precomputeCounts().catch((error) =>
+            console.error('[NuunMenuScreenExTranslator] Scan failed', error)
+        );
         return true;
     }
 

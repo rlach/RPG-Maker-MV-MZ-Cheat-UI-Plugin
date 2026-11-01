@@ -4,6 +4,22 @@ import { TagManager } from '../../../../../../cheat-engine/www/cheat/translate-e
 import { preprocessPayloadForLlm } from '../../../../../../cheat-engine/www/cheat/translate-engines/ai-engine/utils.js';
 
 describe('TagManager preprocess long scroll payload', () => {
+    it('protects four full-width indentation spaces on each line before sending to the LLM', () => {
+        const manager = new TagManager(null);
+        const source = '　　　　「薬草の丘」で薬草を5個拾う\n　　　　次の目的';
+        const prepared = manager.preprocessTags(source);
+        expect(prepared.preprocessedText).not.toContain('　');
+        const translated = prepared.preprocessedText
+            .replace('「薬草の丘」で薬草を5個拾う', 'Pick up 5 Herbs')
+            .replace('次の目的', 'Next objective');
+        const restored = manager.postprocessTags(translated, prepared.tagCounts, prepared.caseMap);
+        expect(restored.valid).toBe(true);
+        expect(restored.text).toBe('　　　　Pick up 5 Herbs\n　　　　Next objective');
+        const missingIndentation = translated.replace(/^.*?⟫/, '');
+        expect(
+            manager.postprocessTags(missingIndentation, prepared.tagCounts, prepared.caseMap).valid
+        ).toBe(false);
+    });
     it('builds JSON payload with m0 and compresses long whitespace runs', () => {
         const sourceText = readFileSync(
             new URL('../../mocks/longScroll.mock.txt', import.meta.url),

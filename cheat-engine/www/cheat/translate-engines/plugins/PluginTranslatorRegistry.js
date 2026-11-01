@@ -11,6 +11,9 @@ import { CustomizeConfigItemTranslator } from './translators/CustomizeConfigItem
 import { ExternMessageTranslator } from './translators/ExternMessageTranslator.js';
 import { LicoUiTranslator } from './translators/LicoUiTranslator.js';
 import { FCustomUiTranslator } from './translators/FCustomUiTranslator.js';
+import { InfoWindowTranslator } from './translators/InfoWindowTranslator.js';
+import { LLTrackNameWindowTranslator } from './translators/LLTrackNameWindowTranslator.js';
+import { NuunDestinationTranslator } from './translators/NuunDestinationTranslator.js';
 import { FtkrCssDetailedStatusTranslator } from './translators/FtkrCssDetailedStatusTranslator.js';
 import { FtkrCssShopStatusTranslator } from './translators/FtkrCssShopStatusTranslator.js';
 import { FtkrGdmWindowEditorTranslator } from './translators/FtkrGdmWindowEditorTranslator.js';
@@ -194,6 +197,9 @@ class PluginTranslatorRegistry {
             ExternMessageTranslator,
             LicoUiTranslator,
             FCustomUiTranslator,
+            InfoWindowTranslator,
+            LLTrackNameWindowTranslator,
+            NuunDestinationTranslator,
             FtkrCssDetailedStatusTranslator,
             FtkrCssShopStatusTranslator,
             FtkrCustomSimpleActorStatusTranslator,

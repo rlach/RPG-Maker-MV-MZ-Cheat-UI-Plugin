@@ -11,6 +11,8 @@ import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslati
  *
  * Supported in this translator:
  * - v1.0.0: name box text from \N<name> escape tags in message text.
+ * - Runtime compatibility with PANDA_KeywordColor: protect name tags from
+ *   its <S...> color parser before Window_Base converts message characters.
  *
  * Notes:
  * - Uses actor_name cache (no plugin-specific name cache) for both runtime and mass translation.
@@ -57,7 +59,8 @@ export class LunatlazurActorNameWindowTranslator extends BasePluginTranslator {
         if (
             !window.Window_Message ||
             !Window_Message.prototype ||
-            typeof Window_Message.prototype.createSubWindows !== 'function'
+            typeof Window_Message.prototype.createSubWindows !== 'function' ||
+            typeof Window_Message.prototype.convertEscapeCharacters !== 'function'
         ) {
             return false;
         }
@@ -83,8 +86,47 @@ export class LunatlazurActorNameWindowTranslator extends BasePluginTranslator {
             this.patchNameWindowSetText(currentMessageWindow._nameWindow);
         }
 
+        this.patchMessageNameParsing();
+
         this.registerPluginCustomTags(LUNATLAZUR_ACTOR_NAME_WINDOW_PLUGIN_TAGS);
         return true;
+    }
+
+    patchMessageNameParsing() {
+        const prototype = window.Window_Message.prototype;
+        const original = prototype.convertEscapeCharacters;
+        const translator = this;
+        prototype.convertEscapeCharacters = function (text) {
+            if (
+                !translator.isRuntimeTranslationActive(translator.getRuntime()) ||
+                !this._nameWindow
+            ) {
+                return original.call(this, text);
+            }
+            const names = [];
+            let prefix = '\uE000LUNATL_NAME_';
+            while (text.includes(prefix)) prefix += '_';
+            // Hide whole tags, so neither the color parser nor the name-window
+            // translator can observe a temporary name as an original cache key.
+            // eslint-disable-next-line no-control-regex -- RPG Maker uses ESC for converted commands.
+            const protectedText = text.replace(/(?<!\\)(?:\\|\x1b)N<([^>]*)>/gi, (_tag, name) => {
+                const token = prefix + names.length + '\uE001';
+                names.push({ token, name });
+                return token;
+            });
+            let converted = original.call(this, protectedText);
+            if (!names.length) return converted;
+            for (const { token, name } of names) {
+                // Preserve normal variable/actor escape expansion inside names,
+                // but never expose the surrounding <name> to color parsing.
+                const convertedName = window.Window_Base.prototype.convertEscapeCharacters.call(
+                    this,
+                    name
+                );
+                converted = converted.split(token).join('\x1bN<' + convertedName + '>');
+            }
+            return this._nameWindow.processActorName(converted);
+        };
     }
 
     patchNameWindowSetText(nameWindow) {

@@ -12,9 +12,10 @@ import { parseJsonSafely } from './TranslatorHelpers.js';
  * - Legacy style: ContentsList.ParamName + SetAnyName plugin command payloads.
  *
  * Notes:
- * - Runtime hooks translate only visible label payloads and AnyName text.
- * - Dynamic values are not targeted; label hooks intercept only the first drawText call
- *   inside label renderer methods.
+ * - Runtime hooks translate visible labels, AnyName text and saved map names.
+ * - Saved map names reuse map_name translations through a display-only copy.
+ * - Other dynamic values are not targeted; label hooks intercept only the first
+ *   drawText call inside label renderer methods.
  */
 
 const LEGACY_COMMAND_SET_ANY_NAME = 'SetAnyName';
@@ -87,6 +88,7 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
 
         this._hookDrawContentsBase(savefileListProto);
         this._hookDrawAnyName(savefileListProto);
+        this._hookMapNameValue(savefileListProto);
         this._hookFirstDrawTextOfMethod(savefileListProto, 'drawPlaytime');
         this._hookFirstDrawTextOfMethod(savefileListProto, 'drawMapName');
         this._hookFirstDrawTextOfMethod(savefileListProto, 'drawGold');
@@ -133,6 +135,22 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
             }
 
             return original.call(this, info, x, y, width, effectiveData, savefileId, r);
+        };
+    }
+
+    _hookMapNameValue(prototype) {
+        const translator = this;
+        const original = prototype.drawMapName;
+        prototype.drawMapName = function (info, ...args) {
+            const runtime = translator.getRuntime();
+            if (!translator.isRuntimeTranslationActive(runtime))
+                return original.call(this, info, ...args);
+            const mapname = translator.resolveRuntimeTranslation(
+                info?.mapname,
+                runtime,
+                'map_name'
+            );
+            return original.call(this, { ...info, mapname }, ...args);
         };
     }
 

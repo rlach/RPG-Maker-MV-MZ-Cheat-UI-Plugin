@@ -102,6 +102,20 @@ export default {
                 </v-switch>
     </v-card-text>
 
+    <v-card-subtitle class="pb-0 mt-2 font-weight-bold">Taskbar notifications</v-card-subtitle>
+    <v-card-text class="py-0">
+        <v-switch v-model="flashTaskbarOnTranslationComplete"
+            label="Flash taskbar icon when translation finishes"
+            hint="After success or failure, flash the game window's icon until it receives focus. Requires NW.js."
+            persistent-hint density="compact" @update:model-value="callRuntime('saveSettings')">
+        </v-switch>
+        <v-switch v-model="showTranslationTaskbarProgress"
+            label="Show translation progress on the taskbar"
+            hint="Show overall batch progress on the game window's taskbar icon. Requires NW.js."
+            persistent-hint density="compact" @update:model-value="callRuntime('saveSettings')">
+        </v-switch>
+    </v-card-text>
+
     <v-card-subtitle class="pb-0 mt-4 font-weight-bold">Language Settings</v-card-subtitle>
 
     <v-card-text class="py-0">

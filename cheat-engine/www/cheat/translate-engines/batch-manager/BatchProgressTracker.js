@@ -1,3 +1,4 @@
+import { translationTaskbarFor } from '../../js/TranslationTaskbar.js';
 import { BatchSummaryReporter } from './BatchSummaryReporter.js';
 
 export class BatchProgressTracker {
@@ -131,6 +132,11 @@ export class BatchProgressTracker {
     }
 
     _render() {
+        if (this.runtime)
+            translationTaskbarFor(this.runtime).update(
+                this.progressChannel,
+                this.runtime.getQueueScopedCompletionStats?.(this.progressChannel)
+            );
         const activeTitle = this.currentStepLabel || 'translating';
         const title = this.paused
             ? `${activeTitle} (paused for ${this.pauseReason || 'OTF'})`

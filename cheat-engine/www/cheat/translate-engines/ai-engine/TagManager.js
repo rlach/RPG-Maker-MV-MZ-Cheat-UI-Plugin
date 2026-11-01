@@ -141,7 +141,13 @@ export class TagManager {
             tagId,
             character,
             requiredConsistency: true,
-            prePattern: new RegExp(`${escapedCharacter}{${SPACE_RUN_TRIGGER_THRESHOLD},}`, 'g'),
+            // Short line indentation is presentation data too, not model prose.
+            prePattern: /[^\S\r\n]/.test(character)
+                ? new RegExp(
+                      `^${escapedCharacter}+|${escapedCharacter}{${SPACE_RUN_TRIGGER_THRESHOLD},}`,
+                      'gm'
+                  )
+                : new RegExp(`${escapedCharacter}{${SPACE_RUN_TRIGGER_THRESHOLD},}`, 'g'),
             postPattern: this.syntax.pattern(String.raw`${tagId}(\d+)`),
         };
     }
@@ -580,13 +586,6 @@ export class TagManager {
             }
         }
 
-        const newlineMatches = result.match(this.simpleNEntry.prePattern) || [];
-        tagCounts[this.simpleNEntry.key] = newlineMatches.length;
-        result = result.replace(
-            this.simpleNEntry.prePattern,
-            this.syntax.encode(`${this.simpleNEntry.tagId}`)
-        );
-
         caseMap.expectedLongRunLengthsByTagKey = {};
         for (const entry of this.longRunEntries) {
             const expectedRunLengths = [];
@@ -598,6 +597,13 @@ export class TagManager {
             });
             caseMap.expectedLongRunLengthsByTagKey[entry.key] = expectedRunLengths;
         }
+
+        const newlineMatches = result.match(this.simpleNEntry.prePattern) || [];
+        tagCounts[this.simpleNEntry.key] = newlineMatches.length;
+        result = result.replace(
+            this.simpleNEntry.prePattern,
+            this.syntax.encode(`${this.simpleNEntry.tagId}`)
+        );
 
         return { preprocessedText: result, tagCounts, caseMap };
     }
@@ -1406,6 +1412,21 @@ export class TagManager {
             const compactPrompt = extraPrompt.replace(/\s+/g, ' ').trim();
             result.push(
                 `${this.syntax.encode(entry.tagId)} - ${this.syntax.formatPrompt(compactPrompt)}`
+            );
+        }
+
+        for (const entry of this.longRunEntries) {
+            if (!/[^\S\r\n]/.test(entry.character)) continue;
+            if (
+                !texts.some(
+                    (text) =>
+                        typeof text === 'string' &&
+                        text.includes(`${this.syntax.open}${entry.tagId}`)
+                )
+            )
+                continue;
+            result.push(
+                `${this.syntax.encode(`${entry.tagId}N`)} - Encoded spacing for presentation. Preserve its count and position. Keep line indentation at the start of its line; never move it to match grammar.`
             );
         }
 

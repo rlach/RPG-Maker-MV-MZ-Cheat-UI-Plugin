@@ -5,6 +5,7 @@ import { BatchSummaryReporter } from './BatchSummaryReporter.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../plugins/PluginTranslatorRegistry.js';
 import { QueueWorkEstimate } from './QueueWorkEstimate.js';
 import { LLM_CONNECTION_ERROR } from '../ai-engine/LlmConnectionError.js';
+import { translationTaskbarFor } from '../../js/TranslationTaskbar.js';
 
 export class TranslationBatchManager {
     constructor(runtime, options = {}) {
@@ -342,6 +343,20 @@ export class TranslationBatchManager {
     }
 
     async runBatchedTranslation(items, options = {}) {
+        const dryRun =
+            !!options.dryRun ||
+            (Array.isArray(items) && items.length > 0 && items.every((item) => item.dryRun));
+        const finish = this.runtime
+            ? translationTaskbarFor(this.runtime).begin(this.progressChannel, dryRun)
+            : () => {};
+        try {
+            return await this._runBatchedTranslation(items, options);
+        } finally {
+            finish();
+        }
+    }
+
+    async _runBatchedTranslation(items, options = {}) {
         let connectionFailed = false;
         if (this.runtime) {
             this.runtime.clearQueueCompletionScope(this.progressChannel);
