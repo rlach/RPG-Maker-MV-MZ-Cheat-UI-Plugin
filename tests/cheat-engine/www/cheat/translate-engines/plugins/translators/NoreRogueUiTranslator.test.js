@@ -81,6 +81,8 @@ function fixture() {
     vi.stubGlobal('Window_Message', MessageWindow);
     vi.stubGlobal('Window_Message2', undefined);
     vi.stubGlobal('Window_Fukidashi', Bubble);
+    vi.stubGlobal('$textSplitter', undefined);
+    vi.stubGlobal('Nore', undefined);
     vi.stubGlobal('$gameMessage', { _texts: [] });
     const runtime = {
         enabled: true,
@@ -119,6 +121,38 @@ it('catalogs vocabulary, UI templates and visible metadata, excluding assets and
     expect(values).not.toContain('未閲覧画像');
     expect(values).not.toContain('hidden');
     expect(fetch.mock.calls.some(([url]) => url.includes('Nore_Medal'))).toBe(false);
+});
+
+it('supports the dungeon-item variant and translates before pixel wrapping and glyph drawing', async () => {
+    const { translator, runtime } = fixture();
+    window.$plugins[0].name = 'Nore_DungeonItemParam';
+    expect(translator.detectPlugin()).toBe(true);
+    const split = vi.fn((texts) => texts.flatMap((text) => [text.slice(0, 8), text.slice(8)]));
+    vi.stubGlobal('$textSplitter', { split });
+    class StatusBase {
+        drawTextEx2(text) {
+            return [...text];
+        }
+    }
+    vi.stubGlobal('Nore', { Window_EroStatusBase: StatusBase });
+    translator.enablePluginTranslation();
+    await translator.precomputeCounts();
+    translator.entries.set('黄金に似た鉱石', { text: '黄金に似た鉱石' });
+    translator.entries.set('さすらいの東国剣士', { text: 'さすらいの東国剣士' });
+    runtime.translationCache.set('plugin_nore_rogue_ui:黄金に似た鉱石', 'Ore resembling gold');
+    runtime.translationCache.set(
+        'plugin_nore_rogue_ui:さすらいの東国剣士',
+        'Wandering Swordswoman'
+    );
+    const texts = ['黄金に似た鉱石'];
+    expect($textSplitter.split(texts, 20, 330).join('')).toBe('Ore resembling gold');
+    expect(split).toHaveBeenCalledWith(['Ore resembling gold'], 20, 330);
+    expect(texts).toEqual(['黄金に似た鉱石']);
+    expect(new StatusBase().drawTextEx2('さすらいの東国剣士').join('')).toBe(
+        'Wandering Swordswoman'
+    );
+    runtime.enabled = false;
+    expect($textSplitter.split(texts, 20, 330).join('')).toBe('黄金に似た鉱石');
 });
 
 it('translates dynamic equipment, EXP and skill prompts without rewriting source data', async () => {

@@ -60,6 +60,33 @@ it('keeps main progress during nested OTF work and notifies only when all operat
     expect(native.requestAttention).toHaveBeenLastCalledWith(true);
 });
 
+it('keeps Windows attention pending until game focus without replacing game focus handlers', () => {
+    const { controller, native, host } = fixture();
+    const listeners = {};
+    host.process = { platform: 'win32' };
+    host.onfocus = vi.fn();
+    const gameFocus = host.onfocus;
+    host.addEventListener = vi.fn((name, listener) => {
+        listeners[name] = listener;
+    });
+    controller.begin()();
+    expect(native.requestAttention).toHaveBeenLastCalledWith(0x7fffffff);
+    expect(native.on).not.toHaveBeenCalledWith('focus', expect.anything());
+    expect(host.onfocus).toBe(gameFocus);
+    controller.sync();
+    expect(native.requestAttention).toHaveBeenCalledTimes(1);
+    listeners.focus();
+    expect(native.requestAttention).toHaveBeenLastCalledWith(false);
+    expect(controller.attentionRequested).toBe(false);
+});
+
+it('does not flash when the game already has focus', () => {
+    const { controller, native, host } = fixture();
+    host.document.hasFocus = () => true;
+    controller.begin()();
+    expect(native.requestAttention).not.toHaveBeenCalled();
+});
+
 it('is disabled by default, skips dry runs, and can clear feedback when settings turn off', () => {
     const { controller, runtime, native } = fixture();
     controller.begin('main', true)();

@@ -233,6 +233,11 @@ class BoxingService {
         this.refreshTypeStats(runtime);
     }
 
+    setTypeSelected(type, selected) {
+        // Publish a new object so each window's Vue computed value changes too.
+        this.state.selection = { ...this.state.selection, [type]: !!selected };
+    }
+
     openModal() {
         let runtime;
         try {
@@ -486,7 +491,8 @@ const component = {
             class="d-flex align-center justify-space-between py-1"
           >
             <v-checkbox
-              v-model="selection[stat.type]"
+              :model-value="!!selection[stat.type]"
+              @update:model-value="setTypeSelected(stat.type, $event)"
               :label="stat.type"
               :disabled="stat.translatedCount === 0"
               hide-details density="compact"
@@ -654,6 +660,9 @@ const component = {
     },
 
     methods: {
+        setTypeSelected(type, selected) {
+            BOXING_SERVICE.setTypeSelected(type, selected);
+        },
         closeModal() {
             BOXING_SERVICE.closeModal();
         },

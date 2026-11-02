@@ -13,6 +13,8 @@ import { LicoUiTranslator } from './translators/LicoUiTranslator.js';
 import { FCustomUiTranslator } from './translators/FCustomUiTranslator.js';
 import { InfoWindowTranslator } from './translators/InfoWindowTranslator.js';
 import { DKToolsLocalizationTranslator } from './translators/DKToolsLocalizationTranslator.js';
+import { HendrixLocalizationTranslator } from './translators/HendrixLocalizationTranslator.js';
+import { SttlaSynthesisTranslator } from './translators/SttlaSynthesisTranslator.js';
 import { NoreRogueUiTranslator } from './translators/NoreRogueUiTranslator.js';
 import { LLTrackNameWindowTranslator } from './translators/LLTrackNameWindowTranslator.js';
 import { NuunDestinationTranslator } from './translators/NuunDestinationTranslator.js';
@@ -201,6 +203,8 @@ class PluginTranslatorRegistry {
             FCustomUiTranslator,
             InfoWindowTranslator,
             DKToolsLocalizationTranslator,
+            HendrixLocalizationTranslator,
+            SttlaSynthesisTranslator,
             NoreRogueUiTranslator,
             LLTrackNameWindowTranslator,
             NuunDestinationTranslator,

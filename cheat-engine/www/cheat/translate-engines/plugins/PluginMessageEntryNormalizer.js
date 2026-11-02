@@ -5,6 +5,12 @@ function isMessageTextType(type) {
 }
 
 export function normalizeMessageEntryForPlugins(runtime, entry) {
+    if (!entry) return entry;
+    for (const translator of PLUGIN_TRANSLATOR_REGISTRY.getDetectedTranslatorInstances()) {
+        if (typeof translator.normalizeTranslationEntry === 'function') {
+            entry = translator.normalizeTranslationEntry(entry, { runtime });
+        }
+    }
     if (!entry || !isMessageTextType(entry.type)) {
         return entry;
     }

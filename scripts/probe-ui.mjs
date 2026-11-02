@@ -100,6 +100,11 @@ try {
             writeFileSync(`${output}/${panel}.png`, Buffer.from(shot.data, 'base64'));
         }
         console.log(await evaluate('({errors:window.__QA_ERRORS__})'));
+    } else if (process.argv.includes('--boxing-check')) {
+        const { runUiBoxingChecks } = await import('./ui-boxing-check.mjs');
+        const report = await runUiBoxingChecks(call, evaluate);
+        console.log(JSON.stringify(report, null, 2));
+        if (report.failures.length) process.exitCode = 1;
     } else if (process.argv.includes('--keyboard-check')) {
         const { runUiKeyboardChecks } = await import('./ui-keyboard-check.mjs');
         const report = await runUiKeyboardChecks(call, evaluate);

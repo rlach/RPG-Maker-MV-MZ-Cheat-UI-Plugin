@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { DKToolsLocalizationTranslator } from '../../../../../../../cheat-engine/www/cheat/translate-engines/plugins/translators/DKToolsLocalizationTranslator.js';
+import { applyTranslationsToCommands } from '../../../../../../../cheat-engine/www/cheat/js/CommandTranslationManager.js';
 
 afterEach(() => {
     vi.restoreAllMocks();
@@ -168,4 +169,59 @@ it('keeps variable IDs in dictionary and message keys and registers plugin tags'
     expect(translator.resolveMessageCacheSourceText({ text: '胞子 7' })).toBe('胞子 \\VAR[1]');
     runtime.translationCache.set('plugin_dktools_localization:胞子 \\VAR[1]', 'Spores: \\VAR[1]');
     expect(localization.getText('{count}')).toBe('Spores: 7');
+});
+
+it('keeps separately added speaker and body lines original until whole-message cache lookup', async () => {
+    const { translator, localization, runtime } = fixture();
+    localization._data.name = 'バンダナつけてる女子校生';
+    localization._data.body = 'はい......';
+    class Message {
+        constructor() {
+            this._texts = [];
+        }
+        add(text) {
+            this._texts.push(localization.getText(text));
+        }
+    }
+    vi.stubGlobal('Game_Message', Message);
+    runtime.translationCache.set('plugin_dktools_localization:はい......', 'Yes.....');
+    const source = 'バンダナつけてる女子校生:\nはい......';
+    runtime.translationCache.set(`message:${source}`, 'Schoolgirl wearing a bandana: Yes.....');
+    translator.enablePluginTranslation();
+    await translator.precomputeCounts();
+    const message = new Message();
+    message.add('{name}:');
+    message.add('{body}');
+    const observed = translator.resolveMessageCacheSourceText({ text: message._texts.join('\n') });
+    expect(observed).toBe(source);
+    expect(runtime.translationCache.get(runtime.getCacheKey(observed, 'message'))).toBe(
+        'Schoolgirl wearing a bandana: Yes.....'
+    );
+    expect(runtime.trackCacheKeyUsage).not.toHaveBeenCalled();
+    // Other UI can still use the standalone dictionary translation.
+    expect(localization.getText('{body}')).toBe('Yes.....');
+});
+
+it('canonicalizes dictionary-translated commands back to reference keys, even with a stale core reverse map', async () => {
+    const { translator, localization, runtime } = fixture();
+    localization._data.new_game = 'ニューゲーム';
+    runtime.getCanonicalSystemCommandName = (name) => name;
+    runtime.translationCache.set('plugin_dktools_localization:ニューゲーム', 'New game');
+    runtime.translationCache.set('command:{new_game}', 'New game');
+    translator.enablePluginTranslation();
+    await translator.precomputeCounts();
+    expect(localization.getText('{new_game}')).toBe('New game');
+    for (let i = 0; i < 2; i++) {
+        const command = { name: 'New game', symbol: 'newGame' };
+        applyTranslationsToCommands([command], runtime);
+        expect(command.name).toBe('New game');
+        expect(command.symbol).toBe('newGame');
+    }
+    expect(
+        runtime.trackCacheKeyUsage.mock.calls.every(
+            ([key]) => !key.startsWith('command:') || key === 'command:{new_game}'
+        )
+    ).toBe(true);
+    runtime.enabled = false;
+    expect(runtime.getCanonicalSystemCommandName('New game')).toBe('New game');
 });

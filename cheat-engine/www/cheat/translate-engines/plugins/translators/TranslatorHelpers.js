@@ -26,6 +26,37 @@ export function normalizeText(value) {
     return String(value || '').trim();
 }
 
+/** CSV table parser preserving quoted newlines, delimiters and escaped quotes. */
+export function parseCsvTable(text, separator = ',') {
+    const rows = [];
+    let row = [];
+    let field = '';
+    let quoted = false;
+    for (let index = 0; index < text.length; index++) {
+        const char = text[index];
+        if (char === '"') {
+            if (quoted && text[index + 1] === '"') {
+                field += '"';
+                index++;
+            } else quoted = !quoted;
+        } else if (!quoted && char === separator) {
+            row.push(field);
+            field = '';
+        } else if (!quoted && (char === '\n' || char === '\r')) {
+            if (char === '\r' && text[index + 1] === '\n') index++;
+            row.push(field);
+            rows.push(row);
+            row = [];
+            field = '';
+        } else field += char;
+    }
+    if (field || row.length) {
+        row.push(field);
+        rows.push(row);
+    }
+    return rows;
+}
+
 /**
  * Parse a plugin struct-array style value into an array of plain objects.
  * Supports already-parsed arrays and stringified JSON arrays.

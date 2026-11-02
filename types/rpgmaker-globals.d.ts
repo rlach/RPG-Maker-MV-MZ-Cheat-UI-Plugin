@@ -130,6 +130,8 @@ declare function require(name: string): any;
 declare const Bitmap: any;
 
 declare interface Window {
+    $textSplitter?: any;
+    Nore?: any;
     Window_Fukidashi?: any;
     Window_Message2?: any;
     DKTools?: any;

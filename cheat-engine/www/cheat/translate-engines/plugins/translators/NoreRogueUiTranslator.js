@@ -7,6 +7,8 @@ import { parseJsonSafely } from './TranslatorHelpers.js';
  * templates and database hint/desc metadata. Source metadata, item identities,
  * gallery unlock rules, assets and scenario commands are never rewritten.
  * Nore_Tes scenario extraction remains owned by SabaSimpleScenarioTranslator.
+ * RJ01507389 MZ: Nore_MedalParam/DungeonItemParam tables and Nore_Text
+ * split descriptions into lines before drawing; translate before layout.
  */
 export class NoreRogueUiTranslator extends SourceTextCatalogTranslator {
     getPluginName() {
@@ -15,6 +17,10 @@ export class NoreRogueUiTranslator extends SourceTextCatalogTranslator {
 
     getPluginLabel() {
         return 'Nore Rogue menus and statistics';
+    }
+
+    getPluginAliases() {
+        return [this.getPluginName(), 'Nore_DungeonItemParam'];
     }
 
     getCacheType() {
@@ -69,11 +75,30 @@ export class NoreRogueUiTranslator extends SourceTextCatalogTranslator {
     }
 
     enablePluginTranslation() {
-        if (typeof window.Window_Fukidashi?.prototype.startMessage !== 'function') return false;
+        if (
+            this.findPluginEntry('Nore_Fukidashi')?.status &&
+            typeof window.Window_Fukidashi?.prototype.startMessage !== 'function'
+        )
+            return false;
         if (!super.enablePluginTranslation()) return false;
         const translator = this;
+        const splitter = window.$textSplitter;
+        if (typeof splitter?.split === 'function') {
+            const split = splitter.split;
+            splitter.split = function (texts, ...args) {
+                const runtime = translator.getRuntime();
+                return split.call(
+                    this,
+                    texts.map((text) => translator.resolveText(text, runtime)),
+                    ...args
+                );
+            };
+        }
+        const statusBase = window.Nore?.Window_EroStatusBase?.prototype;
+        if (typeof statusBase?.drawTextEx2 === 'function')
+            this.hookDrawing(statusBase, 'drawTextEx2');
         for (const prototype of [
-            window.Window_Fukidashi.prototype,
+            window.Window_Fukidashi?.prototype,
             window.Window_Message2?.prototype,
         ]) {
             if (!prototype || !Object.prototype.hasOwnProperty.call(prototype, 'startMessage'))

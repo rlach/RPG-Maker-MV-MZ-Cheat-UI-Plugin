@@ -11,6 +11,8 @@ export class DKToolsLocalizationTranslator extends SourceTextCatalogTranslator {
     constructor() {
         super();
         this.translatedSources = new Map();
+        this.commandReferences = new Map();
+        this.messageSourceDepth = 0;
     }
 
     getPluginName() {
@@ -73,12 +75,18 @@ export class DKToolsLocalizationTranslator extends SourceTextCatalogTranslator {
         const locale = localization.locale;
         const data = localization._data || (await localization._loadData(locale));
         this.entries.clear();
-        const visit = (value) => {
+        this.commandReferences.clear();
+        const visit = (value, path = []) => {
             if (typeof value === 'string') {
                 const text = this.localizeSource(value);
-                if (this.isUsableText(text)) this.entries.set(text, { text });
+                if (this.isUsableText(text)) {
+                    this.entries.set(text, { text });
+                    if (!this.commandReferences.has(text))
+                        this.commandReferences.set(text, new Set());
+                    this.commandReferences.get(text).add(`{${path.join('.')}}`);
+                }
             } else if (value && typeof value === 'object') {
-                Object.values(value).forEach(visit);
+                for (const [key, child] of Object.entries(value)) visit(child, [...path, key]);
             }
         };
         visit(data);
@@ -111,6 +119,11 @@ export class DKToolsLocalizationTranslator extends SourceTextCatalogTranslator {
         this.originalGetText = localization.getText;
         const original = this.originalGetText;
         localization.getText = function (text) {
+            // DK resolves each Game_Message.add line separately. Keep these lines
+            // in the source language until the standard pipeline translates the
+            // complete speaker + body, rather than harvesting a mixed message.
+            if (translator.messageSourceDepth && translator.isRuntimeTranslationActive(runtime))
+                return translator.localizeSource(text);
             const nativeText = original.call(this, text);
             if (!translator.isRuntimeTranslationActive(runtime)) return nativeText;
             // Plain already-translated output must not become another source entry.
@@ -123,6 +136,33 @@ export class DKToolsLocalizationTranslator extends SourceTextCatalogTranslator {
             if (result !== source) translator.translatedSources.set(result, source);
             return result;
         };
+
+        const messagePrototype = window.Game_Message?.prototype;
+        if (typeof messagePrototype?.add === 'function') {
+            const add = messagePrototype.add;
+            messagePrototype.add = function (...args) {
+                translator.messageSourceDepth++;
+                try {
+                    return add.apply(this, args);
+                } finally {
+                    translator.messageSourceDepth--;
+                }
+            };
+        }
+        const canonicalCommand = runtime.getCanonicalSystemCommandName;
+        if (typeof canonicalCommand === 'function') {
+            runtime.getCanonicalSystemCommandName = function (name) {
+                const canonical = canonicalCommand.call(this, name);
+                if (!translator.isRuntimeTranslationActive(this) || canonical !== name)
+                    return canonical;
+                const source = translator.translatedSources.get(name) ?? name;
+                const references = translator.commandReferences.get(source);
+                for (const reference of references || [])
+                    if (this.hasUsableCacheValue(this.getCacheKey(reference, 'command')))
+                        return reference;
+                return references?.size === 1 ? [...references][0] : source;
+            };
+        }
 
         // Messages translated by getText still use their source key in Seen and
         // the foreground queue. Include the dictionary cache in normal lookup.

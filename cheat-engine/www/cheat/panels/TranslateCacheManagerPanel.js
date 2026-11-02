@@ -299,7 +299,11 @@ export default {
         this.translationCache = runtime.cache;
         this.lastSeenByCacheKey = runtime.lastSeenByCacheKey;
 
-        this.unsubscribeRuntime = onTranslateCacheRuntimeChanged(() => {
+        this.unsubscribeRuntime = onTranslateCacheRuntimeChanged((detail) => {
+            if (detail?.reason === 'cache-manager-remove-translation' && detail.key) {
+                this.updateEntryTranslation(detail.key);
+                return;
+            }
             this.scheduleRefresh();
         });
 
@@ -742,7 +746,20 @@ export default {
                 return;
             }
 
-            this.onTranslationInput(item, '');
+            delete this.draftByKey[item.key];
+            this.translationCache.set(item.key, '');
+            this.updateEntryTranslation(item.key);
+            const runtime = ensureTranslationRuntime();
+            runtime.persistCache([item.key]);
+            runtime.notifyCacheRuntime('cache-manager-remove-translation', item.key);
+        },
+
+        updateEntryTranslation(cacheKey) {
+            const index = this.entries.findIndex((entry) => entry.key === cacheKey);
+            if (index < 0) return;
+            const translation = this.normalizeCacheValue(this.translationCache.get(cacheKey));
+            if (this.entries[index].translation === translation) return;
+            this.entries.splice(index, 1, { ...this.entries[index], translation });
         },
 
         isEmptyTranslationEntry(entry) {

@@ -221,6 +221,14 @@ export class SourceTextCatalogTranslator extends BasePluginTranslator {
         this.tagEngine = runtime.engine;
     }
 
+    cacheMessageTranslation(text, message, runtime = this.getRuntime()) {
+        const translated = this.resolveText(text, runtime, 0, false);
+        if (translated !== text) {
+            const key = runtime.getMessageCacheKey(text, { hasPortrait: !!message.faceName() });
+            runtime.setCacheValue(key, translated, { persist: false, notify: false });
+        }
+    }
+
     enablePluginTranslation() {
         if (
             typeof window.Window_Base?.prototype.drawText !== 'function' ||
@@ -253,14 +261,8 @@ export class SourceTextCatalogTranslator extends BasePluginTranslator {
         }
         const add = window.Game_Message.prototype.add;
         window.Game_Message.prototype.add = function (text) {
-            const runtime = translator.getRuntime();
-            const translated = translator.resolveText(text, runtime, 0, false);
-            if (translated !== text) {
-                // Feed the standard message pipeline without replacing source
-                // buffers or letting translated dialogue become a new source key.
-                const key = runtime.getMessageCacheKey(text, { hasPortrait: !!this.faceName() });
-                runtime.setCacheValue(key, translated, { persist: false, notify: false });
-            }
+            // Feed the standard pipeline without turning translations into sources.
+            translator.cacheMessageTranslation(text, this);
             return add.apply(this, arguments);
         };
         const start = window.Window_Message.prototype.startMessage;

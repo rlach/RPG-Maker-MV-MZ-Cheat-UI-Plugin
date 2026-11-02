@@ -1,4 +1,7 @@
 const controllers = new WeakMap();
+// NW.js accepts an explicit flash count. A boolean delegates the duration to
+// the platform; keep Windows flashing until focus explicitly cancels it.
+const WINDOWS_ATTENTION_FLASH_COUNT = 0x7fffffff;
 
 /** Optional native NW.js taskbar feedback, owned by the game window. */
 export class TranslationTaskbar {
@@ -18,7 +21,16 @@ export class TranslationTaskbar {
                 const native = this.host?.nw?.Window?.get(this.host);
                 if (!native) return;
                 this.nativeWindow = native;
-                native.on?.('focus', () => this.invoke('requestAttention', false));
+                const stopAttention = () => {
+                    if (this.attentionRequested) this.invoke('requestAttention', false);
+                };
+                // NW.js 0.49 implements on('focus') by assigning window.onfocus.
+                // Use an independent DOM listener so game handlers remain intact.
+                if (this.host.addEventListener) {
+                    this.host.addEventListener('focus', stopAttention);
+                } else {
+                    native.on?.('focus', stopAttention);
+                }
             }
             this.nativeWindow[method]?.(value);
             if (method === 'requestAttention') this.attentionRequested = value;
@@ -46,7 +58,13 @@ export class TranslationTaskbar {
                 this.runtime.flashTaskbarOnTranslationComplete &&
                 !this.host?.document?.hasFocus?.()
             )
-                this.invoke('requestAttention', true);
+                this.invoke(
+                    'requestAttention',
+                    this.host?.process?.platform === 'win32' ||
+                        this.host?.navigator?.platform?.startsWith('Win')
+                        ? WINDOWS_ATTENTION_FLASH_COUNT
+                        : true
+                );
         };
     }
 
