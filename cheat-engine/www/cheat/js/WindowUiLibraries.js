@@ -1,5 +1,6 @@
 import CheatTooltip from '../components/CheatTooltip.js';
 import { installUiKeyboardGuard } from './UiKeyboardGuard.js';
+import { installUiScrollGuard } from './UiScrollGuard.js';
 
 /** Evaluate bundled libraries in the document that owns their DOM and events. */
 export async function loadWindowUiLibraries(hostWindow, readSource = null) {
@@ -88,6 +89,7 @@ export const uiTableMethods = {
 
 export function createWindowUiApp(hostWindow, options) {
     installUiKeyboardGuard(hostWindow);
+    installUiScrollGuard(hostWindow);
     const app = hostWindow.Vue.createApp(isolateWindowComponent(options));
     app.component('CheatTooltip', isolateWindowComponent(CheatTooltip));
     app.mixin({ methods: uiTableMethods });

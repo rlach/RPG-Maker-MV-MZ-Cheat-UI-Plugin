@@ -12,6 +12,8 @@ import { ExternMessageTranslator } from './translators/ExternMessageTranslator.j
 import { LicoUiTranslator } from './translators/LicoUiTranslator.js';
 import { FCustomUiTranslator } from './translators/FCustomUiTranslator.js';
 import { InfoWindowTranslator } from './translators/InfoWindowTranslator.js';
+import { DKToolsLocalizationTranslator } from './translators/DKToolsLocalizationTranslator.js';
+import { NoreRogueUiTranslator } from './translators/NoreRogueUiTranslator.js';
 import { LLTrackNameWindowTranslator } from './translators/LLTrackNameWindowTranslator.js';
 import { NuunDestinationTranslator } from './translators/NuunDestinationTranslator.js';
 import { FtkrCssDetailedStatusTranslator } from './translators/FtkrCssDetailedStatusTranslator.js';
@@ -198,6 +200,8 @@ class PluginTranslatorRegistry {
             LicoUiTranslator,
             FCustomUiTranslator,
             InfoWindowTranslator,
+            DKToolsLocalizationTranslator,
+            NoreRogueUiTranslator,
             LLTrackNameWindowTranslator,
             NuunDestinationTranslator,
             FtkrCssDetailedStatusTranslator,
@@ -467,6 +471,16 @@ class PluginTranslatorRegistry {
                 .filter(Boolean);
 
             if (!aliases.some((alias) => enabledPluginNames.has(alias))) {
+                continue;
+            }
+
+            // An available manifest can explicitly reject an incompatible
+            // same-name replacement. Do not undo that decision via alias fallback.
+            if (
+                Array.isArray(window.$plugins) &&
+                window.$plugins.length &&
+                !translator.detectPlugin()
+            ) {
                 continue;
             }
 

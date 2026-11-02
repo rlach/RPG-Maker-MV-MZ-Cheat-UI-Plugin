@@ -4,6 +4,7 @@ import {
     isTranslationActive,
 } from '../CommandTranslationManager.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../../translate-engines/plugins/PluginTranslatorRegistry.js';
+import { createEncryptedImageLoader, findTranslatedImagePath } from './TranslatedImageResource.js';
 
 export const translateOnTheFlyRuntimeMethods = {
     setupTranslationHook() {
@@ -382,15 +383,14 @@ export const translateOnTheFlyRuntimeMethods = {
                 return null;
             }
 
-            const translatedImagePath = path.resolve(
+            const translatedImageDirectory = path.resolve(
                 splitCacheDirectory,
                 'img',
                 self.targetLang,
-                relativeImageFolder,
-                `${baseFileName}.png`
+                relativeImageFolder
             );
 
-            return fs.existsSync(translatedImagePath) ? translatedImagePath : null;
+            return findTranslatedImagePath(fs, path, translatedImageDirectory, baseFileName);
         };
 
         const applyBitmapHighlightBorder = (bitmap) => {
@@ -489,6 +489,7 @@ export const translateOnTheFlyRuntimeMethods = {
             return bitmap;
         };
 
+        const loadEncryptedImage = createEncryptedImageLoader();
         const installImageManagerBitmapHook = () => {
             if (
                 (typeof ImageManager !== 'object' && typeof ImageManager !== 'function') ||
@@ -569,6 +570,11 @@ export const translateOnTheFlyRuntimeMethods = {
                     }
 
                     try {
+                        if (/\.rpgmvp$/i.test(translatedImagePath)) {
+                            return applyBitmapHighlightBorder(
+                                loadEncryptedImage(translatedImagePath, this, hue, smooth)
+                            );
+                        }
                         const translatedBitmap = ImageManager._translateOriginalLoadBitmap.call(
                             this,
                             translatedFolder,

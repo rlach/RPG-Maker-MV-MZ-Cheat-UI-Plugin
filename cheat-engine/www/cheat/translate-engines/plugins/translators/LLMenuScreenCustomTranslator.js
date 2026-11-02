@@ -26,6 +26,8 @@ const LABEL_PARAM_FIELDS = [
  * Supported versions:
  * - LL_MenuScreenCustom / LL_MenuScreenBase (MZ, version not specified in source)
  * - LL_MenuScreenCustomMV v1.4.4 / LL_MenuScreenBaseMV v1.1.0 (MV)
+ * - RJ01705945's picture-only compact replacement uses the same filename but
+ *   has no help/label text surfaces; exclude it from translator detection.
  *
  * Translatable surfaces:
  * - menuHelpTexts[].helpText in plugin parameters
@@ -49,6 +51,16 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
 
     getPluginAliases() {
         return [this.getPluginName(), PLUGIN_NAME_CUSTOM_MV];
+    }
+
+    detectPlugin() {
+        if (!super.detectPlugin()) return false;
+        const parameters = this._findCustomPluginEntry()?.parameters || {};
+        const owns = (key) => Object.prototype.hasOwnProperty.call(parameters, key);
+        const compactPictureReplacement =
+            owns('commandImages') && owns('actorPictures') && owns('hideUnconfiguredCommands');
+        const hasStandardTextSurface = owns('menuHelpTexts') || LABEL_PARAM_FIELDS.some(owns);
+        return !compactPictureReplacement || hasStandardTextSurface;
     }
 
     getPluginLabel() {
@@ -252,6 +264,13 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
                 return originalText;
             }
 
+            // LL evaluates $gameMap.displayName() for the current-location block.
+            // Reuse the map-name phase without translating other dynamic values
+            // such as playtime or changing the map's identity/displayName source.
+            if (originalText === window.$gameMap?.displayName()) {
+                return resolveRuntimeTranslation(originalText, runtime, 'map_name');
+            }
+
             if (this.translatedValues.has(originalText)) {
                 return originalText;
             }
@@ -383,8 +402,8 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
         // globally, so we cannot patch its prototype directly. Instead, we patch
         // Scene_Menu.prototype.createMenuHelpWindow to intercept the newly created
         // instance and override drawText on it. Only strings present in the
-        // plugin_ll_menu_screen cache will be translated; dynamic values like the
-        // current map name or playtime text are not in the cache and pass through.
+        // plugin_ll_menu_screen cache will be translated; current location uses
+        // the map_name cache, while playtime and other dynamic values pass through.
         //
         // Known limitation: measureTextWidth calls inside drawLeftBlock/drawRightBlock
         // use the original (untranslated) label text for positioning the adjacent value

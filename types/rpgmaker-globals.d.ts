@@ -130,6 +130,10 @@ declare function require(name: string): any;
 declare const Bitmap: any;
 
 declare interface Window {
+    Window_Fukidashi?: any;
+    Window_Message2?: any;
+    DKTools?: any;
+    _?: any;
     EventIndicators?: any;
     nw?: any;
     Vue?: any;
