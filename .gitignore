@@ -1,4 +1,5 @@
 .idea/
+deploy/tmp/
 venv/
 node_modules/
 .jscpd-report/

@@ -165,6 +165,7 @@ import { SoRGabWindowTranslator } from './translators/SoRGabWindowTranslator.js'
 import { VisuVisualTextWindowsTranslator } from './translators/VisuVisualTextWindowsTranslator.js';
 import { VisuSideChatterTranslator } from './translators/VisuSideChatterTranslator.js';
 import { XoMgrSentenceTranslator } from './translators/XoMgrSentenceTranslator.js';
+import { CustomSaveLoadTranslator } from './translators/CustomSaveLoadTranslator.js';
 import { TorigoyaBalloonInBattleTranslator } from './translators/TorigoyaBalloonInBattleTranslator.js';
 import { PHQuestBookTranslator } from './translators/PHQuestBookTranslator.js';
 import { SaveFilePlusTranslator } from './translators/SaveFilePlusTranslator.js';
@@ -384,6 +385,7 @@ class PluginTranslatorRegistry {
             VisuVisualTextWindowsTranslator,
             VisuSideChatterTranslator,
             XoMgrSentenceTranslator,
+            CustomSaveLoadTranslator,
             TorigoyaBalloonInBattleTranslator,
             YepEventMiniLabelTranslator,
             YepMessageCoreTranslator,
