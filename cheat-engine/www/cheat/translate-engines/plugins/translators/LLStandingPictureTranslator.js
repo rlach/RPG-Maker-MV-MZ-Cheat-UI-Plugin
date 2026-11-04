@@ -1,5 +1,8 @@
 // Registers LL_StandingPicture control-character tags with the translation engine
 // so their command prefixes and bracketed values remain protected during translation.
+// MV v2.6.3: the native display filter misses picture IDs containing a variable
+// plus a literal suffix (RJ01141769). Strip those controls only from the display
+// conversion input; startMessage must retain them for native portrait execution.
 
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 
@@ -67,7 +70,22 @@ export class LLStandingPictureTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
+        const prototype = window.Window_Base?.prototype;
+        if (typeof prototype?.convertEscapeCharacters !== 'function') return false;
         this.registerPluginCustomTags(LL_STANDING_PICTURE_PLUGIN_TAGS);
+        const translator = this;
+        const convert = prototype.convertEscapeCharacters;
+        prototype.convertEscapeCharacters = function (text) {
+            if (translator.isRuntimeTranslationActive() && typeof text === 'string') {
+                text = text.replace(
+                    // RPG Maker represents converted escape prefixes as ESC.
+                    // eslint-disable-next-line no-control-regex
+                    /(?:\\|\x1b)(?:F{1,4}|F[1-8]|M{1,4}|M[1-8]|AA|FH)\[(?:(?:\\|\x1b)V\[\d+\]|[^[\]])*\]/gi,
+                    ''
+                );
+            }
+            return convert.call(this, text);
+        };
         return true;
     }
 

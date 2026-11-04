@@ -111,3 +111,14 @@ export function walkNestedJsonLike(value, visitor, path = []) {
         }
     }
 }
+/** Convert RPG Maker positional display placeholders into catalog slots. */
+export function createPositionalFormatCatalogEntry(text) {
+    const parts = text.split(/%\d+/);
+    if (parts.length === 1) return { text };
+    return {
+        text: parts
+            .map((part, index) => part + (index < parts.length - 1 ? `\\COT[${index}]` : ''))
+            .join(''),
+        parts,
+    };
+}

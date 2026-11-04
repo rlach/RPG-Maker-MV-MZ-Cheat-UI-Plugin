@@ -17,8 +17,8 @@ import {
  * - Mass-translation scanning builds cumulative keys from contiguous message text
  *   command runs (Show Text + Scroll Text payload lines), so runtime-combined
  *   pages from line/window modifiers can match without per-plugin hardcoding.
- * - Runtime translation hooks Window_Message.convertMessageCharacters so final
- *   assembled YEP text can resolve against plugin cache entries.
+ * - MV v1.19 addText injects <WordWrap>. Track the authored source separately
+ *   and retain the injected marker only for presentation (RJ01065668).
  */
 
 const YEP_MESSAGE_CORE_PLUGIN_TAGS = [
@@ -265,6 +265,7 @@ export class YepMessageCoreTranslator extends BasePluginTranslator {
         this._scanPrepared = false;
         this._scanEntries = [];
         this._scanPromise = null;
+        this.wordWrapSources = new WeakMap();
     }
 
     getPluginName() {
@@ -280,8 +281,71 @@ export class YepMessageCoreTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
+        const message = window.Game_Message?.prototype;
+        const messageWindow = window.Window_Message?.prototype;
+        if (
+            typeof message?.addText !== 'function' ||
+            typeof message?.clear !== 'function' ||
+            typeof messageWindow?.convertEscapeCharacters !== 'function'
+        )
+            return false;
         this.registerPluginCustomTags(YEP_MESSAGE_CORE_PLUGIN_TAGS);
+        const translator = this;
+        const addText = message.addText;
+        message.addText = function (text) {
+            if (window.$gameSystem?.wordWrap()) {
+                let sources = translator.wordWrapSources.get(this);
+                if (!sources) {
+                    sources = new Map();
+                    translator.wordWrapSources.set(this, sources);
+                }
+                sources.set('<WordWrap>' + text, text);
+            }
+            return addText.apply(this, arguments);
+        };
+        const clear = message.clear;
+        message.clear = function () {
+            translator.wordWrapSources.delete(this);
+            return clear.apply(this, arguments);
+        };
+        const convert = messageWindow.convertEscapeCharacters;
+        messageWindow.convertEscapeCharacters = function (text) {
+            // Boxed translations already contain deliberate line breaks. Both YEP
+            // and YED would otherwise discard them or wrap the text a second time.
+            if (
+                translator.isRuntimeTranslationActive() &&
+                typeof text === 'string' &&
+                /<(?:br|line break)>/i.test(text)
+            ) {
+                text = text
+                    .replace(/<(?:WordWrap|wrap)>/gi, '')
+                    .replace(/<(?:br|line break)>/gi, '\n');
+                const result = convert.call(this, text);
+                this._wordWrap = false;
+                return result;
+            }
+            if (
+                translator.isRuntimeTranslationActive() &&
+                translator.wordWrapSources.has(window.$gameMessage) &&
+                typeof text === 'string' &&
+                !/<WordWrap>/i.test(text)
+            )
+                text = '<WordWrap>' + text;
+            return convert.call(this, text);
+        };
         return true;
+    }
+
+    resolveMessageCacheSourceText(context = {}) {
+        // Authored markers are meaningful and must survive mass collection.
+        if (context.mode === 'collection') return null;
+        const sources = this.wordWrapSources.get(context.gameMessage || window.$gameMessage);
+        if (!sources || typeof context.text !== 'string') return null;
+        if (sources.has(context.text)) return sources.get(context.text);
+        return context.text
+            .split('\n')
+            .map((line) => sources.get(line) ?? line)
+            .join('\n');
     }
 
     async precomputeCounts() {

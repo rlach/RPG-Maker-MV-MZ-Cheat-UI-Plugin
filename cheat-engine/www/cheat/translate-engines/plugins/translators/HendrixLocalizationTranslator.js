@@ -1,5 +1,5 @@
 import { SourceTextCatalogTranslator } from '../SourceTextCatalogTranslator.js';
-import { parseCsvTable } from './TranslatorHelpers.js';
+import { parseCsvTable, parseJsonSafely } from './TranslatorHelpers.js';
 
 /**
  * Hendrix_Localization v1.5.9 (MV/MZ), RJ01414782.
@@ -7,7 +7,8 @@ import { parseCsvTable } from './TranslatorHelpers.js';
  * The native processMessageBuffer replaces entire dialogues before our core sees
  * them. Keep authored text in that buffer's output while cheat translation is on.
  * Legacy DKTools {references} in this game's Original column have no active DK
- * dictionary; use their payload as the canonical source. No CSV/game edits.
+ * dictionary; use their payload as the canonical source. Gameus quest steps
+ * still reference the bundled Chinese DKTools quest dictionary. No game edits.
  */
 export class HendrixLocalizationTranslator extends SourceTextCatalogTranslator {
     getPluginName() {
@@ -20,16 +21,20 @@ export class HendrixLocalizationTranslator extends SourceTextCatalogTranslator {
         return 'plugin_hendrix_localization';
     }
 
-    sourceText(text) {
+    sourceText(text, resolveReference = (key) => this.questTexts?.[key] ?? key) {
         return (
             String(text)
                 .replace(/\{\{LINEBREAK\}\}/g, '\n')
                 // eslint-disable-next-line no-control-regex -- Preserve RPG Maker ESC-prefixed font controls.
-                .replace(/(?<![\\\x1b])\{([^{}]*)\}/g, '$1')
+                .replace(/(?<![\\\x1b])\{([^{}]*)\}/g, (_, key) => resolveReference(key))
         );
     }
 
     async buildCatalog() {
+        if (this.findPluginEntry('GameusQuestSystem')?.status) {
+            const quests = await fetch('locales/zh-CN/quests.json');
+            if (quests.ok) this.questTexts = parseJsonSafely(await quests.text());
+        }
         const response = await fetch('game_messages.csv');
         if (!response.ok) throw new Error(`Cannot read game_messages.csv: ${response.status}`);
         const content = (await response.text()).replace(/^\uFEFF/, '');
@@ -49,6 +54,9 @@ export class HendrixLocalizationTranslator extends SourceTextCatalogTranslator {
             )
                 continue;
             this.entries.set(text, { text });
+        }
+        for (const text of Object.values(this.questTexts || {})) {
+            if (this.isUsableText(text)) this.entries.set(text, { text });
         }
     }
 
@@ -82,7 +90,13 @@ export class HendrixLocalizationTranslator extends SourceTextCatalogTranslator {
 
     resolveText(text, runtime, ...args) {
         if (typeof text !== 'string' || !this.isRuntimeTranslationActive(runtime)) return text;
-        return this.sourceText(super.resolveText(this.sourceText(text), runtime, ...args));
+        const source = this.questTexts?.[text] ?? this.sourceText(text);
+        const translated = super.resolveText(source, runtime, ...args);
+        if (translated !== source || this.questTexts?.[text]) return this.sourceText(translated);
+        return this.sourceText(text, (key) => {
+            const value = this.questTexts?.[key];
+            return value ? super.resolveText(value, runtime, ...args) : key;
+        });
     }
 
     enablePluginTranslation() {

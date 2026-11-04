@@ -178,3 +178,32 @@ it('canonicalizes choices and commands and removes legacy braces only while acti
     expect(runtime.getCanonicalSystemCommandName('{装备}')).toBe('{装备}');
     expect(new window.Bitmap().drawText('{defence}')).toBe('{defence}');
 });
+
+it('resolves legacy Gameus quest references before collection and drawing', async () => {
+    const { translator, runtime } = fixture();
+    window.$plugins.push({ name: 'GameusQuestSystem', status: true, parameters: {} });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (url) =>
+        url === 'locales/zh-CN/quests.json'
+            ? {
+                  ok: true,
+                  text: async () =>
+                      JSON.stringify({ task_object1: '打开背包使用食物', Steps: '当前进度' }),
+              }
+            : originalFetch(url)
+    );
+    translator.enablePluginTranslation();
+    await translator.precomputeCounts();
+    expect(translator.entries.has('打开背包使用食物')).toBe(true);
+    expect(translator.sourceText('- {task_object1}')).toBe('- 打开背包使用食物');
+    runtime.translationCache.set(
+        'plugin_hendrix_localization:打开背包使用食物',
+        'Open the inventory and use food'
+    );
+    expect(new window.Bitmap().drawText('- {task_object1}')).toBe(
+        '- Open the inventory and use food'
+    );
+    expect(new window.Bitmap().drawText('task_object1')).toBe('Open the inventory and use food');
+    runtime.enabled = false;
+    expect(new window.Bitmap().drawText('- {task_object1}')).toBe('- {task_object1}');
+});

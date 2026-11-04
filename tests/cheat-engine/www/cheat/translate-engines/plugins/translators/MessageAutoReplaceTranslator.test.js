@@ -20,7 +20,8 @@ beforeEach(() => {
             return this.applyTextReplace(this._texts.join('\n'));
         }
         applyTextReplace(text) {
-            return text.replace(/[♡♥❤]/g, '\\I[12]');
+            text = text.replace(/[♡♥❤]/g, '\\I[12]');
+            return this.colorShortcuts ? text.replace(/r/g, '\\C[23]') : text;
         }
     }
     vi.stubGlobal('Game_Message', GameMessage);
@@ -36,6 +37,25 @@ function resolve(text) {
 }
 
 describe('MessageAutoReplace authored cache keys', () => {
+    it('does not interpret color shortcut letters in a translated dialogue buffer', () => {
+        message.colorShortcuts = true;
+        const source = 'r（仕事しようと思いました）';
+        message._texts = [source];
+        const rendered = message.allText();
+        expect(resolve(rendered)).toBe(source);
+        message._translateOriginalText = source;
+        const translated = '(...No, I thought about working, but it is already past closing time.)';
+        message._texts = [translated];
+        expect(message.allText()).toBe(translated);
+        message._texts = ['r' + translated];
+        expect(message.allText()).toBe('\\C[23]' + translated);
+        message._texts = [translated];
+        expect(resolve(rendered)).toBe(source);
+        // Other presentation strings still use the native replacements.
+        expect(message.applyTextReplace('r説明')).toBe('\\C[23]説明');
+        runtime.enabled = false;
+        expect(message.allText()).not.toBe(translated);
+    });
     it('keeps mass-translation keys and recovers exact mixed symbols at runtime', () => {
         const source = '  Original♡ text♥\nnext❤';
         message._texts = source.split('\n');

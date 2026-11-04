@@ -73,6 +73,8 @@ declare const Window_Selectable: any;
 declare const Window_SavefileList: any;
 declare const Window_Message: any;
 declare const Window_Command: any;
+declare const Window_EroStatus: any;
+declare const Scene_InnDiary: any;
 declare const Game_Party: any;
 
 declare const Alert: any;
@@ -134,6 +136,7 @@ declare interface Window {
     Nore?: any;
     Window_Fukidashi?: any;
     Window_Message2?: any;
+    ClickerDialogue?: any;
     DKTools?: any;
     _?: any;
     EventIndicators?: any;
@@ -203,6 +206,8 @@ declare interface Window {
     Scene_Map?: any;
     Window_Base?: any;
     Window_Command?: any;
+    Window_EroStatus?: any;
+    Scene_InnDiary?: any;
     Window_Message?: any;
     Window_SavefileList?: any;
     Window_Options?: any;

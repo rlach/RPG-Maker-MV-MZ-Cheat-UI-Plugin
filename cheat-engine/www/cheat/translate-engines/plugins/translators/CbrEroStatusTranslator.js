@@ -1,4 +1,5 @@
-import { BasePluginTranslator } from '../BasePluginTranslator.js';
+import { SourceTextCatalogTranslator } from '../SourceTextCatalogTranslator.js';
+import { extractJavaScriptTextCatalog } from './JavaScriptTextCatalog.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
 import { isRpgMakerMv } from '../../../js/RpgMakerRuntime.js';
 
@@ -50,12 +51,24 @@ function buildTranslatedDataLine(line, translator, runtime, cacheType) {
     return `${TEXT_LINE_PREFIX}${cached}`;
 }
 
-export class CbrEroStatusTranslator extends BasePluginTranslator {
+/** CBR_EroStatus MZ, including script-generated impressions in RJ01683605.
+ * Scan JavaScript display text without executing events. Translate evaluated
+ * segments before measuring/drawing; keep script expressions and state intact.
+ */
+export class CbrEroStatusTranslator extends SourceTextCatalogTranslator {
     constructor() {
         super();
         this._scanPrepared = false;
         this._scanEntries = [];
         this._scanPromise = null;
+        this.extractCatalog = extractJavaScriptTextCatalog;
+    }
+
+    getSourcePluginNames() {
+        return [];
+    }
+    shouldScanEventData() {
+        return false;
     }
 
     detectPlugin() {
@@ -85,7 +98,9 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
         if (
             !window.CBR ||
             typeof window.CBR !== 'object' ||
-            typeof window.CBR['エロステータス'] !== 'function'
+            typeof window.CBR['エロステータス'] !== 'function' ||
+            typeof window.Window_EroStatus?.prototype.refresh !== 'function' ||
+            typeof window.Window_EroStatus?.prototype.drawText !== 'function'
         ) {
             return false;
         }
@@ -93,6 +108,27 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
         const original = window.CBR['エロステータス'];
         const cacheType = this.getCacheType();
         const translator = this;
+        this.hookDrawing(window.Window_EroStatus.prototype, 'drawText');
+        const refresh = window.Window_EroStatus.prototype.refresh;
+        window.Window_EroStatus.prototype.refresh = function (...args) {
+            if (!translator._scanPrepared && !translator._scanPromise) {
+                translator.precomputeCounts().then(() => {
+                    if (translator._scanPrepared && this.contents) this.refresh();
+                });
+            }
+            const bitmap = this.contents;
+            const measure = bitmap.measureTextWidth;
+            const ownMeasure = Object.prototype.hasOwnProperty.call(bitmap, 'measureTextWidth');
+            bitmap.measureTextWidth = function (text) {
+                return measure.call(this, translator.resolveText(text, translator.getRuntime()));
+            };
+            try {
+                return refresh.apply(this, args);
+            } finally {
+                if (ownMeasure) bitmap.measureTextWidth = measure;
+                else delete bitmap.measureTextWidth;
+            }
+        };
 
         window.CBR['エロステータス'] = function (ary) {
             try {
@@ -130,8 +166,9 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
         }
 
         this._scanPromise = this.buildScanEntries()
-            .then((entries) => {
+            .then(async (entries) => {
                 this._scanEntries = Array.isArray(entries) ? entries : [];
+                await super.buildCatalog();
                 this._scanPrepared = true;
             })
             .catch((error) => {
@@ -241,6 +278,8 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
             return;
         }
 
+        this.collectCommandTexts(list);
+
         for (let cmdIdx = 0; cmdIdx < list.length; cmdIdx++) {
             const cmd = list[cmdIdx];
             if (!cmd || Number(cmd.code) !== 355) {
@@ -281,7 +320,7 @@ export class CbrEroStatusTranslator extends BasePluginTranslator {
     buildUniquePendingItems(runtime) {
         const byCacheKey = new Map();
 
-        for (const entry of this._scanEntries) {
+        for (const entry of [...this._scanEntries, ...this.entries.values()]) {
             const text = typeof entry.text === 'string' ? entry.text : '';
             if (!this.isUsableText(text)) {
                 continue;

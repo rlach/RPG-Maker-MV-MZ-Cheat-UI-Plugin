@@ -4,6 +4,55 @@ import { FailedResourcesModal } from '../cheat-engine/www/cheat/js/FailedResourc
 
 afterEach(() => vi.useRealTimers());
 
+it('promotes the native printer and Retry into the top layer and restores it on dismissal', () => {
+    const doc = {};
+    const element = () => ({
+        ownerDocument: doc,
+        style: { pointerEvents: 'none', zIndex: '99' },
+        children: [],
+        listeners: {},
+        addEventListener(name, handler) {
+            this.listeners[name] = handler;
+        },
+        appendChild(child) {
+            child.remove();
+            this.children.push(child);
+            child.parentNode = this;
+        },
+        remove() {
+            if (this.parentNode)
+                this.parentNode.children = this.parentNode.children.filter(
+                    (child) => child !== this
+                );
+            this.parentNode = null;
+        },
+        showModal: vi.fn(),
+        close: vi.fn(),
+    });
+    doc.createElement = element;
+    doc.body = element();
+    const printer = element();
+    const retry = element();
+    retry.onclick = vi.fn();
+    printer.appendChild(retry);
+    doc.body.appendChild(printer);
+    const hack = new FailedResourcesModal({ document: doc, Graphics: { _errorPrinter: printer } });
+    hack.setEnabled(true);
+    hack.show('img/missing.png', vi.fn());
+    const dialog = hack.portal.dialog;
+    expect(dialog.showModal).toHaveBeenCalledOnce();
+    expect(printer.parentNode).toBe(dialog);
+    expect(printer.style.pointerEvents).toBe('auto');
+    expect(printer.children).toContain(retry);
+    retry.onclick();
+    expect(retry.onclick).toHaveBeenCalledOnce();
+    hack.removeButtons();
+    expect(printer.parentNode).toBe(doc.body);
+    expect(printer.style.pointerEvents).toBe('none');
+    expect(dialog.close).toHaveBeenCalledOnce();
+    expect(printer.children).toEqual([retry]);
+});
+
 function fixture(mz = false) {
     const doc = {
         baseURI: 'file:///C:/Game/www/index.html',

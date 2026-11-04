@@ -1,5 +1,6 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { parseJsonSafely } from './TranslatorHelpers.js';
+import { parse } from '../../../libs/acorn.js';
 
 /**
  * TMSoloMenu translator
@@ -12,6 +13,8 @@ import { parseJsonSafely } from './TranslatorHelpers.js';
  * - Translatable plugin text is stored in plugin parameters (JSON struct `name` fields and EXP text templates).
  * - Runtime integration patches the created solo status window instance from Scene_Menu,
  *   so only TMSoloMenu-specific labels are translated without broad Window_Base hooks.
+ * - RJ316098 profiles use free-text variable references. Catalog literal event
+ *   assignments for those variables and translate their values only at drawing.
  */
 
 const PLUGIN_NAME = 'TMSoloMenu';
@@ -160,6 +163,61 @@ export class TMSoloMenuTranslator extends BasePluginTranslator {
         return entries;
     }
 
+    getDisplayVariableIds() {
+        const ids = new Set();
+        for (const entry of this.buildScanEntries()) {
+            for (const match of entry.text.matchAll(/\\+V\[(\d+)\]/gi)) ids.add(Number(match[1]));
+        }
+        return ids;
+    }
+
+    collectVariableAssignments(list, ids, output) {
+        for (const command of list || []) {
+            const p = command?.parameters;
+            if (
+                command?.code !== 122 ||
+                p[2] !== 0 ||
+                p[3] !== 4 ||
+                ![...ids].some((id) => id >= p[0] && id <= p[1])
+            )
+                continue;
+            let expression;
+            try {
+                expression = parse(p[4], { ecmaVersion: 'latest' }).body[0]?.expression;
+            } catch {
+                continue;
+            } // Non-literal game expressions stay owned by the game.
+            if (expression?.type === 'Literal' && typeof expression.value === 'string')
+                this.appendEntry(output, expression.value, {
+                    scope: 'displayVariable',
+                    variableId: p[0],
+                });
+        }
+    }
+
+    async collectDisplayVariableTexts(output) {
+        const ids = this.getDisplayVariableIds();
+        if (!ids.size) return;
+        const read = async (name) => {
+            const response = await fetch(`data/${name}.json`);
+            if (!response.ok) throw new Error(`Cannot read ${name}: ${response.status}`);
+            return parseJsonSafely(await response.text());
+        };
+        const [commonEvents, mapInfos] = await Promise.all([
+            read('CommonEvents'),
+            read('MapInfos'),
+        ]);
+        for (const event of commonEvents || [])
+            this.collectVariableAssignments(event?.list, ids, output);
+        for (const info of mapInfos || []) {
+            if (!info?.id) continue;
+            const map = await read(`Map${String(info.id).padStart(3, '0')}`);
+            for (const event of map?.events || [])
+                for (const page of event?.pages || [])
+                    this.collectVariableAssignments(page.list, ids, output);
+        }
+    }
+
     async precomputeCounts() {
         if (this._scanPrepared) {
             return;
@@ -170,7 +228,8 @@ export class TMSoloMenuTranslator extends BasePluginTranslator {
         }
 
         this._scanPromise = Promise.resolve(this.buildScanEntries())
-            .then((entries) => {
+            .then(async (entries) => {
+                await this.collectDisplayVariableTexts(entries);
                 this._scanEntries = Array.isArray(entries) ? entries : [];
                 this._scanPrepared = true;
                 this._knownTexts = null;
@@ -367,6 +426,7 @@ export class TMSoloMenuTranslator extends BasePluginTranslator {
         const getRuntime = this.getRuntime.bind(this);
         const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
         const resolveKnownRuntimeText = this.resolveKnownRuntimeText.bind(this);
+        const resolveRuntimeTranslation = this.resolveRuntimeTranslation.bind(this);
         const resolveExpRuntimeText = this.resolveExpRuntimeText.bind(this);
 
         const originalDrawSoloParameter = statusWindow.drawSoloParameter;
@@ -380,7 +440,15 @@ export class TMSoloMenuTranslator extends BasePluginTranslator {
                     typeof parameter === 'object' &&
                     typeof parameter.name === 'string'
                 ) {
-                    const translatedName = resolveKnownRuntimeText(parameter.name, runtime);
+                    const translatedName = resolveKnownRuntimeText(parameter.name, runtime).replace(
+                        /\\+V\[(\d+)\]/gi,
+                        (token, id) => {
+                            const source = window.$gameVariables.value(Number(id));
+                            if (typeof source !== 'string') return token;
+                            const translated = resolveRuntimeTranslation(source, runtime);
+                            return translated !== source ? translated : token;
+                        }
+                    );
                     if (translatedName !== parameter.name) {
                         const nextParameter = {
                             ...parameter,

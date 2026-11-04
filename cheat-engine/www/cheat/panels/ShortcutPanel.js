@@ -23,10 +23,8 @@ export default {
         Unavailable in external window mode (main shortcuts not reachable)
     </v-alert>
     <template v-if="!showUnavailable">
-    <v-row>
-        <v-col
-            cols="12"
-            md="8">
+    <div class="d-flex flex-wrap" style="gap: 12px; margin-bottom: 12px;">
+        <div style="flex: 2 1 260px; min-width: 0;">
             <v-text-field
                 label="Search..." variant="solo" single-line
                 bg-color="grey-darken-3"
@@ -36,10 +34,8 @@ export default {
                 @update:model-value="onSearchChange"
                 @focus="$event.target.select()">
             </v-text-field>
-        </v-col>
-        <v-col
-            cols="12"
-            md="4">
+        </div>
+        <div style="flex: 1 1 180px; min-width: 0;">
             <key-input-field
                 v-model:shortcut="shortcutSearch"
                 label="Shortcut"
@@ -50,8 +46,8 @@ export default {
                 combining-key-alone
                 @change="onShortcutSearchChange">
             </key-input-field>
-        </v-col>
-    </v-row>
+        </div>
+    </div>
     <v-card-text
         class="pa-0 d-flex justify-space-between align-center">
         <v-checkbox

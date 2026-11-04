@@ -6,6 +6,7 @@ import { ensureTranslateCacheRuntime, isMapLike } from '../js/TranslateCacheRunt
 import { nameIsTag } from '../js/EventCommandTraversal.js';
 import { Alert } from '../js/AlertHelper.js';
 import { previewNamePatternRepair, applyNamePatternRepair } from '../js/NamePatternCacheRepair.js';
+import { PLUGIN_TRANSLATOR_REGISTRY } from '../translate-engines/plugins/PluginTranslatorRegistry.js';
 
 export default {
     name: 'TranslateNamesPanel',
@@ -567,6 +568,7 @@ export default {
             try {
                 const { sourceLang, targetLang } = this.getLanguagePair();
                 const { cache } = ensureTranslateCacheRuntime();
+                const runtime = ensureTranslationRuntime();
                 const prefix = `actor_name:${sourceLang}-${targetLang}-`;
 
                 // Collect all actor_name cache entries
@@ -589,9 +591,15 @@ export default {
                     for (let i = 1; i < dataActors.length; i++) {
                         const actor = dataActors[i];
                         if (!actor?.name) continue;
-                        const originalName = actor._translateOriginal
+                        const storedName = actor._translateOriginal
                             ? actor._translateOriginal.name
                             : actor.name;
+                        const originalName =
+                            PLUGIN_TRANSLATOR_REGISTRY.resolveMessageCacheSourceText({
+                                runtime,
+                                text: storedName,
+                                mode: 'collection',
+                            });
                         if (!originalName) continue;
 
                         dbOriginalNames.add(originalName);
@@ -963,7 +971,13 @@ export default {
                 }
 
                 const originalName = entry.originalName || '';
-                const currentSpawnedName = gameActor._name || '';
+                const currentSpawnedName = PLUGIN_TRANSLATOR_REGISTRY.resolveMessageCacheSourceText(
+                    {
+                        runtime: ensureTranslationRuntime(),
+                        text: gameActor._name || '',
+                        mode: 'collection',
+                    }
+                );
 
                 if (onlyOriginal && currentSpawnedName !== originalName) {
                     skippedCount += 1;

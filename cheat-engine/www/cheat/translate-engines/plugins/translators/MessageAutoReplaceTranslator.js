@@ -7,6 +7,8 @@ import { BasePluginTranslator } from '../BasePluginTranslator.js';
  * reversing replacement rules is unsafe (multiple symbols may become one icon).
  * Standard map/common-event traversal already collects the authored messages.
  * Description replacements remain presentation-only; their source data is intact.
+ * Do not run source-language replacement shortcuts on translated message buffers
+ * (RJ01259035 uses r/h/p/d as color commands, corrupting English words).
  */
 export class MessageAutoReplaceTranslator extends BasePluginTranslator {
     constructor() {
@@ -37,6 +39,28 @@ export class MessageAutoReplaceTranslator extends BasePluginTranslator {
         const translator = this;
         const originalReplace = prototype.applyTextReplace;
         prototype.applyTextReplace = function (text) {
+            const source = this._translateOriginalText;
+            if (
+                translator.isRuntimeTranslationActive() &&
+                typeof source === 'string' &&
+                text === this._texts.join('\n') &&
+                text !== source &&
+                text !== originalReplace.call(this, source)
+            ) {
+                // Retained source prefixes can still contain presentation shortcuts.
+                // Only process that unchanged prefix, never letters in translated words.
+                let prefixLength = 0;
+                while (
+                    prefixLength < source.length &&
+                    prefixLength < text.length &&
+                    source[prefixLength] === text[prefixLength]
+                )
+                    prefixLength++;
+                return (
+                    originalReplace.call(this, text.slice(0, prefixLength)) +
+                    text.slice(prefixLength)
+                );
+            }
             const result = originalReplace.apply(this, arguments);
             if (
                 translator.isRuntimeTranslationActive() &&

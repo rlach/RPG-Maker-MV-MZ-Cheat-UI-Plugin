@@ -1,3 +1,5 @@
+import { Inn15DayUiTranslator } from './translators/Inn15DayUiTranslator.js';
+import { ChimakiLangTranslator } from './translators/ChimakiLangTranslator.js';
 import { AutoNamePopupTranslator } from './translators/AutoNamePopupTranslator.js';
 import { AKUNOUOptionMessageSpeedTranslator } from './translators/AKUNOU_OptionMessageSpeedTranslator.js';
 import { BBCustomSaveWindowTranslator } from './translators/BBCustomSaveWindowTranslator.js';
@@ -16,6 +18,14 @@ import { DKToolsLocalizationTranslator } from './translators/DKToolsLocalization
 import { HendrixLocalizationTranslator } from './translators/HendrixLocalizationTranslator.js';
 import { SttlaSynthesisTranslator } from './translators/SttlaSynthesisTranslator.js';
 import { NoreRogueUiTranslator } from './translators/NoreRogueUiTranslator.js';
+import { NoreClickerUiTranslator } from './translators/NoreClickerUiTranslator.js';
+import { TMLogWindowTranslator } from './translators/TMLogWindowTranslator.js';
+import { TMCardTranslator } from './translators/TMCardTranslator.js';
+import { TMBunnyTouchTranslator } from './translators/TMBunnyTouchTranslator.js';
+import { TrpCustomWindowTranslator } from './translators/TrpCustomWindowTranslator.js';
+import { GachaTranslator } from './translators/GachaTranslator.js';
+import { GraceDungeonUiTranslator } from './translators/GraceDungeonUiTranslator.js';
+import { SonStatusCustomTranslator } from './translators/SonStatusCustomTranslator.js';
 import { LLTrackNameWindowTranslator } from './translators/LLTrackNameWindowTranslator.js';
 import { NuunDestinationTranslator } from './translators/NuunDestinationTranslator.js';
 import { FtkrCssDetailedStatusTranslator } from './translators/FtkrCssDetailedStatusTranslator.js';
@@ -152,6 +162,9 @@ import { SabaTachieTranslator } from './translators/SabaTachieTranslator.js';
 import { SaiScenefileTranslator } from './translators/SaiScenefileTranslator.js';
 import { YepGabWindowTranslator } from './translators/YepGabWindowTranslator.js';
 import { SoRGabWindowTranslator } from './translators/SoRGabWindowTranslator.js';
+import { VisuVisualTextWindowsTranslator } from './translators/VisuVisualTextWindowsTranslator.js';
+import { VisuSideChatterTranslator } from './translators/VisuSideChatterTranslator.js';
+import { XoMgrSentenceTranslator } from './translators/XoMgrSentenceTranslator.js';
 import { TorigoyaBalloonInBattleTranslator } from './translators/TorigoyaBalloonInBattleTranslator.js';
 import { PHQuestBookTranslator } from './translators/PHQuestBookTranslator.js';
 import { SaveFilePlusTranslator } from './translators/SaveFilePlusTranslator.js';
@@ -206,6 +219,16 @@ class PluginTranslatorRegistry {
             HendrixLocalizationTranslator,
             SttlaSynthesisTranslator,
             NoreRogueUiTranslator,
+            NoreClickerUiTranslator,
+            TMLogWindowTranslator,
+            TMCardTranslator,
+            TMBunnyTouchTranslator,
+            TrpCustomWindowTranslator,
+            GachaTranslator,
+            SonStatusCustomTranslator,
+            GraceDungeonUiTranslator,
+            ChimakiLangTranslator,
+            Inn15DayUiTranslator,
             LLTrackNameWindowTranslator,
             NuunDestinationTranslator,
             FtkrCssDetailedStatusTranslator,
@@ -358,6 +381,9 @@ class PluginTranslatorRegistry {
             YepBattleEngineCoreTranslator,
             YepGabWindowTranslator,
             SoRGabWindowTranslator,
+            VisuVisualTextWindowsTranslator,
+            VisuSideChatterTranslator,
+            XoMgrSentenceTranslator,
             TorigoyaBalloonInBattleTranslator,
             YepEventMiniLabelTranslator,
             YepMessageCoreTranslator,

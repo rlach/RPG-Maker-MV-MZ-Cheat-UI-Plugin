@@ -60,6 +60,41 @@ export class FailedResourcesModal {
     removeButtons() {
         for (const button of this.buttons) button.remove();
         this.buttons = [];
+        if (this.portal) {
+            const { dialog, printer, parent, next, pointerEvents, zIndex } = this.portal;
+            if (next?.parentNode === parent) parent.insertBefore(printer, next);
+            else parent.appendChild(printer);
+            printer.style.pointerEvents = pointerEvents;
+            printer.style.zIndex = zIndex;
+            dialog.close?.();
+            dialog.remove();
+            this.portal = null;
+        }
+    }
+
+    promotePrinter(printer) {
+        const doc = printer.ownerDocument;
+        if (!doc.body || !printer.parentNode) return;
+        const dialog = doc.createElement('dialog');
+        this.portal = {
+            dialog,
+            printer,
+            parent: printer.parentNode,
+            next: printer.nextSibling,
+            pointerEvents: printer.style.pointerEvents,
+            zIndex: printer.style.zIndex,
+        };
+        dialog.style.cssText =
+            'position:fixed;inset:0;margin:0;padding:0;border:0;width:100%;height:100%;max-width:none;max-height:none;background:transparent;color:inherit;z-index:2147483647;pointer-events:auto';
+        for (const event of ['mousedown', 'touchstart', 'pointerdown', 'click'])
+            dialog.addEventListener(event, (event) => event.stopPropagation());
+        dialog.addEventListener('cancel', (event) => event.preventDefault());
+        doc.body.appendChild(dialog);
+        dialog.appendChild(printer);
+        printer.style.pointerEvents = 'auto';
+        printer.style.zIndex = '2147483647';
+        if (typeof dialog.showModal === 'function') dialog.showModal();
+        else dialog.setAttribute('open', '');
     }
 
     show(url, cancel) {
@@ -67,6 +102,7 @@ export class FailedResourcesModal {
         this.removeButtons();
         const printer = this.root.Graphics._errorPrinter;
         if (!this.enabled || !printer) return;
+        this.promotePrinter(printer);
         for (const [label, action] of [
             ['Copy path', () => this.copyPath(url)],
             ['Cancel', cancel],

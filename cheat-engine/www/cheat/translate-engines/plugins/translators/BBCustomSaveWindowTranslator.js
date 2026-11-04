@@ -8,8 +8,8 @@
  * - ItemNtitle labels (e.g. playtime / gold labels)
  * - ItemValueNunit suffix text appended to variable values
  *
- * Dynamic values (playtime, map names, numbers, etc.) are intentionally not
- * collected for Mass Translate.
+ * Saved map names resolve through the standard map_name cache at draw time.
+ * Map-name collection stays owned by the core map phase; save data is unchanged.
  */
 
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
@@ -129,11 +129,15 @@ export class BBCustomSaveWindowTranslator extends BasePluginTranslator {
 
         const original = prototype.drawContents;
         prototype.drawContents = function (info, rect, valid) {
+            const previousContext = this._bbCustomSaveWindowTranslatorDrawContext;
+            const previousMapName = this._bbCustomSaveWindowTranslatorMapName;
             this._bbCustomSaveWindowTranslatorDrawContext = true;
+            this._bbCustomSaveWindowTranslatorMapName = info?.mapname;
             try {
                 return original.call(this, info, rect, valid);
             } finally {
-                this._bbCustomSaveWindowTranslatorDrawContext = false;
+                this._bbCustomSaveWindowTranslatorDrawContext = previousContext;
+                this._bbCustomSaveWindowTranslatorMapName = previousMapName;
             }
         };
 
@@ -170,6 +174,11 @@ export class BBCustomSaveWindowTranslator extends BasePluginTranslator {
 
                 const runtime = getRuntime();
                 if (!isRuntimeTranslationActive(runtime)) {
+                    return original.call(this, rendered, x, y, maxWidth, align);
+                }
+
+                if (text === this._bbCustomSaveWindowTranslatorMapName) {
+                    rendered = resolveRuntimeTranslation(text, runtime, 'map_name');
                     return original.call(this, rendered, x, y, maxWidth, align);
                 }
 

@@ -1,5 +1,5 @@
 import { SourceTextCatalogTranslator } from '../SourceTextCatalogTranslator.js';
-import { parseJsonSafely } from './TranslatorHelpers.js';
+import { parseJsonSafely, createPositionalFormatCatalogEntry } from './TranslatorHelpers.js';
 
 /**
  * Nore rogue UI family, unversioned TypeScript-compiled MZ build (RJ333870).
@@ -45,13 +45,7 @@ export class NoreRogueUiTranslator extends SourceTextCatalogTranslator {
         const catalog = super.collectSourceCatalog(source);
         for (const entry of catalog.entries) {
             if (entry.parts || !/%\d+/.test(entry.text)) continue;
-            entry.parts = entry.text.split(/%\d+/);
-            entry.text = entry.parts
-                .map(
-                    (part, index) =>
-                        part + (index < entry.parts.length - 1 ? `\\COT[${index}]` : '')
-                )
-                .join('');
+            Object.assign(entry, createPositionalFormatCatalogEntry(entry.text));
         }
         return catalog;
     }
