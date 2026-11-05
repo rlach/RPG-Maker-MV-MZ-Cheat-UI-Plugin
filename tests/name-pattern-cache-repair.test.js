@@ -44,6 +44,14 @@ it('previews only real active-pair changes and replaces group 1 without touching
             after: '\\N<Eugene>Ugh...\\!Nggghhh...! ユージン',
         },
     ]);
+    expect(
+        plan.example.beforeParts.filter((part) => part.changed).map((part) => part.text)
+    ).toEqual(['ユージン']);
+    expect(plan.example.afterParts.filter((part) => part.changed).map((part) => part.text)).toEqual(
+        ['Eugene']
+    );
+    expect(plan.example.beforeParts.map((part) => part.text).join('')).toBe(plan.changes[0].before);
+    expect(plan.example.afterParts.map((part) => part.text).join('')).toBe(plan.changes[0].after);
     expect(runtime.translationCache).toEqual(before);
     expect(runtime.persistCache).not.toHaveBeenCalled();
     expect(applyNamePatternRepair(runtime, plan)).toBe(1);

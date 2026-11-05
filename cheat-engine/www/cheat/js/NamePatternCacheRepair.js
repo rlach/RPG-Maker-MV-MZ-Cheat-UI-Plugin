@@ -86,6 +86,7 @@ export function previewNamePatternRepair(runtime, pattern) {
     const matcher = compileNameMatcher(pattern);
     const names = buildOfficialNameMap(runtime);
     const changes = [];
+    let example = null;
     for (const [cacheKey, before] of runtime.translationCache) {
         if (
             !parseCacheKeyForLangPair(cacheKey, runtime.sourceLang, runtime.targetLang) ||
@@ -109,11 +110,29 @@ export function previewNamePatternRepair(runtime, pattern) {
             edits.push({ start: range[0], end: range[1], replacement });
         }
         let after = before;
+        if (!example && edits.length) {
+            const beforeParts = [];
+            const afterParts = [];
+            let end = 0;
+            for (const edit of edits) {
+                const unchanged = { text: before.slice(end, edit.start), changed: false };
+                beforeParts.push(unchanged, {
+                    text: before.slice(edit.start, edit.end),
+                    changed: true,
+                });
+                afterParts.push(unchanged, { text: edit.replacement, changed: true });
+                end = edit.end;
+            }
+            const suffix = { text: before.slice(end), changed: false };
+            beforeParts.push(suffix);
+            afterParts.push(suffix);
+            example = { beforeParts, afterParts };
+        }
         for (const edit of edits.reverse())
             after = after.slice(0, edit.start) + edit.replacement + after.slice(edit.end);
         if (after !== before) changes.push({ cacheKey, before, after });
     }
-    return { sourceLang: runtime.sourceLang, targetLang: runtime.targetLang, changes };
+    return { sourceLang: runtime.sourceLang, targetLang: runtime.targetLang, changes, example };
 }
 
 export function applyNamePatternRepair(runtime, plan) {

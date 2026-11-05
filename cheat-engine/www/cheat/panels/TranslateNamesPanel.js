@@ -138,10 +138,14 @@ export default {
                 <p>{{ nameRepairPreview.count }} cache entries will be changed. Only capture group 1 of the selected pattern is replaced.</p>
                 <p v-if="!nameRepairPreview.count">No matching names need replacement. Unknown names and already translated names are left unchanged.</p>
                 <template v-if="nameRepairPreview.count">
-                <div class="text-caption">Example before</div>
-                <pre style="white-space:pre-wrap;word-break:break-word;max-height:200px;overflow:auto">{{ nameRepairPreview.before }}</pre>
-                <div class="text-caption">Example after</div>
-                <pre style="white-space:pre-wrap;word-break:break-word;max-height:200px;overflow:auto">{{ nameRepairPreview.after }}</pre>
+                <div class="mt-4 pa-3 rounded border">
+                    <div class="text-subtitle-2 font-weight-bold mb-2">Original cached text</div>
+                    <pre style="white-space:pre-wrap;word-break:break-word;max-height:200px;overflow:auto"><span v-for="(part, index) in nameRepairPreview.beforeParts" :key="index" :style="part.changed ? 'color:#ff8a80;background:#4a2020;font-weight:bold' : ''">{{ part.text }}</span></pre>
+                </div>
+                <div class="mt-3 mb-4 pa-3 rounded border">
+                    <div class="text-subtitle-2 font-weight-bold mb-2">Result after repair</div>
+                    <pre style="white-space:pre-wrap;word-break:break-word;max-height:200px;overflow:auto"><span v-for="(part, index) in nameRepairPreview.afterParts" :key="index" :style="part.changed ? 'color:#b9f6ca;background:#193b26;font-weight:bold' : ''">{{ part.text }}</span></pre>
+                </div>
                 Apply these changes?
                 </template>
             </v-card-text>
@@ -737,6 +741,7 @@ export default {
                     count: plan.changes.length,
                     before: example.before,
                     after: example.after,
+                    ...plan.example,
                 };
                 this.nameRepairOpen = true;
             } catch (error) {

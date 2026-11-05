@@ -111,6 +111,33 @@ export function guessConfigFromPattern(pattern) {
     };
 }
 
+export function findTagExamples(cache, pattern) {
+    const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    let source = escaped
+        .replace(/…/g, '[^\\n]*?')
+        .replace(/\\\[N\\\]$/, '\\[\\d+\\]')
+        .replace(/:N>$/, ':\\d+>');
+    if (pattern.startsWith('\\')) source = '(?:\\\\|\\x1b)' + source.slice(2);
+    const hasParameter = /[>\])}]$/.test(pattern);
+    const regex = new RegExp(source + (hasParameter ? '' : '(?![A-Za-z0-9\\[<({])'), 'gi');
+    const examples = [];
+    for (const key of cache?.keys() || []) {
+        if (typeof key !== 'string') continue;
+        const text = key.replace(/^[^:]+:[^-]+-[^-]+-/, '');
+        const parts = [];
+        let end = 0;
+        for (const match of text.matchAll(regex)) {
+            parts.push({ text: text.slice(end, match.index), highlighted: false });
+            parts.push({ text: match[0], highlighted: true });
+            end = match.index + match[0].length;
+        }
+        if (!parts.length) continue;
+        parts.push({ text: text.slice(end), highlighted: false });
+        examples.push(parts);
+    }
+    return examples;
+}
+
 export default {
     name: 'UnknownTagsModal',
 
@@ -135,10 +162,14 @@ export default {
             unknownTagStyleFilter: 'both',
             unknownTagsCacheStringCount: 0,
             isScanning: false,
+            exampleOpen: false,
+            examplePattern: '',
+            examples: [],
+            exampleIndex: -1,
             unknownTagsHeaders: [
                 { text: 'Pattern', value: 'pattern' },
                 { text: 'Count', value: 'count', width: 90 },
-                { text: 'Add', value: 'add', width: 60, sortable: false },
+                { text: 'Actions', value: 'add', width: 100, sortable: false },
             ],
         };
     },
@@ -225,6 +256,34 @@ export default {
             }, 0);
         },
 
+        showExamples(item) {
+            this.examplePattern = item.pattern;
+            this.examples = findTagExamples(this.runtime?.translationCache, item.pattern);
+            this.exampleIndex = -1;
+            this.recycleExample();
+            this.$emit('update:visible', false);
+            this.$nextTick(() => {
+                this.exampleOpen = true;
+            });
+        },
+
+        recycleExample() {
+            const count = this.examples.length;
+            if (!count) return;
+            const skip = this.exampleIndex >= 0 && count > 1;
+            let index = Math.floor(Math.random() * (count - (skip ? 1 : 0)));
+            if (skip && index >= this.exampleIndex) index++;
+            this.exampleIndex = index;
+        },
+
+        closeExample(value) {
+            if (value) return;
+            this.exampleOpen = false;
+            this.$nextTick(() => {
+                this.$emit('update:visible', true);
+            });
+        },
+
         requestCreateTag(item) {
             this.$emit('create-custom-tag', {
                 pattern: item.pattern,
@@ -278,15 +337,34 @@ export default {
                 <span class="text-caption">{{ item.count }}</span>
             </template>
             <template v-slot:item.add="{ item }">
-                <v-btn variant="text" icon size="x-small" color="primary" @click="requestCreateTag(item)">
+                <div class="d-flex flex-nowrap">
+                <v-btn variant="text" icon size="x-small" color="primary" aria-label="Show usage examples" @click="showExamples(item)">
+                    <v-icon size="small">mdi-text-search</v-icon>
+                </v-btn>
+                <v-btn variant="text" icon size="x-small" color="primary" aria-label="Add custom tag" @click="requestCreateTag(item)">
                     <v-icon size="small">mdi-plus</v-icon>
                 </v-btn>
+                </div>
             </template>
         </v-data-table>
 
         <v-card-actions>
             <v-spacer></v-spacer>
             <v-btn variant="text" color="grey" @click="close">Close</v-btn>
+        </v-card-actions>
+    </v-card>
+</v-dialog>
+<v-dialog :model-value="exampleOpen" max-width="800" @keydown.stop @update:model-value="closeExample">
+    <v-card>
+        <v-card-title>Usage examples — {{ examplePattern }}</v-card-title>
+        <v-card-text>
+            <p v-if="!examples.length">No matching examples remain in the cache.</p>
+            <pre v-else class="pa-4 rounded border" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:55vh;overflow:auto"><template v-for="(part, index) in examples[exampleIndex]" :key="index"><mark v-if="part.highlighted" style="background:#ffeb3b;color:#111">{{ part.text }}</mark><span v-else>{{ part.text }}</span></template></pre>
+        </v-card-text>
+        <v-card-actions>
+            <v-btn variant="text" :disabled="examples.length < 2" @click="recycleExample"><v-icon start>mdi-recycle</v-icon>Another example</v-btn>
+            <v-spacer></v-spacer>
+            <v-btn variant="text" @click="closeExample(false)">Close</v-btn>
         </v-card-actions>
     </v-card>
 </v-dialog>
