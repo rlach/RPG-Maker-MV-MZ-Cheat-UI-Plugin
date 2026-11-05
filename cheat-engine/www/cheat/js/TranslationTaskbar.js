@@ -1,8 +1,4 @@
 const controllers = new WeakMap();
-// NW.js accepts an explicit flash count. A boolean delegates the duration to
-// the platform; keep Windows flashing until focus explicitly cancels it.
-const WINDOWS_ATTENTION_FLASH_COUNT = 0x7fffffff;
-
 /** Optional native NW.js taskbar feedback, owned by the game window. */
 export class TranslationTaskbar {
     constructor(runtime, hostWindow = globalThis.window) {
@@ -22,6 +18,8 @@ export class TranslationTaskbar {
                 if (!native) return;
                 this.nativeWindow = native;
                 const stopAttention = () => {
+                    clearInterval(this.attentionTimer);
+                    this.attentionTimer = null;
                     if (this.attentionRequested) this.invoke('requestAttention', false);
                 };
                 // NW.js 0.49 implements on('focus') by assigning window.onfocus.
@@ -32,7 +30,32 @@ export class TranslationTaskbar {
                     native.on?.('focus', stopAttention);
                 }
             }
-            this.nativeWindow[method]?.(value);
+            if (
+                method === 'requestAttention' &&
+                this.host?.chrome?.windows?.update &&
+                Number.isInteger(this.nativeWindow.cWindow?.id)
+            ) {
+                // NW.js issue #7659: requestAttentionInternal loses its AppWindow.
+                // Target the native Chromium window explicitly instead.
+                this.host.chrome.windows.update(
+                    this.nativeWindow.cWindow.id,
+                    { drawAttention: !!value },
+                    () => {
+                        const error = this.host.chrome.runtime?.lastError;
+                        if (error && !this.warned) {
+                            console.warn('[TranslationTaskbar] Native taskbar unavailable', error);
+                            this.warned = true;
+                        }
+                        if (error) {
+                            this.attentionRequested = false;
+                            clearInterval(this.attentionTimer);
+                            this.attentionTimer = null;
+                        }
+                    }
+                );
+            } else {
+                this.nativeWindow[method]?.(value);
+            }
             if (method === 'requestAttention') this.attentionRequested = value;
         } catch (error) {
             // Native desktop feedback must never fail a translation request.
@@ -40,6 +63,25 @@ export class TranslationTaskbar {
                 console.warn('[TranslationTaskbar] Native taskbar unavailable', error);
             this.warned = true;
         }
+    }
+
+    flash() {
+        if (this.host?.document?.hasFocus?.()) return;
+        clearInterval(this.attentionTimer);
+        const value = true;
+        this.invoke('requestAttention', value);
+        this.attentionTimer = setInterval(() => {
+            if (this.host?.document?.hasFocus?.() || !this.attentionRequested) {
+                clearInterval(this.attentionTimer);
+                this.attentionTimer = null;
+                if (this.attentionRequested) this.invoke('requestAttention', false);
+                return;
+            }
+            // Rearm attention after the platform-defined flash duration.
+            this.invoke('requestAttention', false);
+            this.invoke('requestAttention', value);
+        }, 3000);
+        this.attentionTimer.unref?.();
     }
 
     begin(channel = 'main', dryRun = false) {
@@ -58,13 +100,7 @@ export class TranslationTaskbar {
                 this.runtime.flashTaskbarOnTranslationComplete &&
                 !this.host?.document?.hasFocus?.()
             )
-                this.invoke(
-                    'requestAttention',
-                    this.host?.process?.platform === 'win32' ||
-                        this.host?.navigator?.platform?.startsWith('Win')
-                        ? WINDOWS_ATTENTION_FLASH_COUNT
-                        : true
-                );
+                this.flash();
         };
     }
 

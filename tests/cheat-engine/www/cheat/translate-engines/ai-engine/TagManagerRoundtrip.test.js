@@ -390,7 +390,7 @@ function createTagManagerWithEscapeSpacingTags() {
 describe('TagManager postprocess escape tag spacing', () => {
     it('adds a space when a restored letter-ended tag would merge with plain text', () => {
         const tagManager = createTagManagerWithEscapeSpacingTags();
-        const { tagCounts, caseMap } = tagManager.preprocessTags(String.raw`\ctest`);
+        const { tagCounts, caseMap } = tagManager.preprocessTags(String.raw`\c test`);
         const tagEntry = tagManager.tagEntries.find((entry) => entry.tagSymbol === 'c');
 
         const postResult = tagManager.postprocessTags(
@@ -453,3 +453,17 @@ blah>
 <SGピクチャ5:プリテンド> `;
 
 const LLM_OUTPUT_REAL_2 = `<SG種別:2> ⟪TAG:sn⟫⟪TAG:sg<blah⟪TAG:sn⟫blah⟪TAG:sn⟫blah⟪TAG:sn⟫blah⟪TAG:sn⟫⟪TAG:sn⟫blah>⟫⟪TAG:sn⟫⟪TAG:sn⟫⟪TAG:si<blah⟪TAG:sn⟫blah⟪TAG:sn⟫blah⟪TAG:sn⟫⟪TAG:sn⟫blah⟪TAG:sn⟫blah>⟪TAG:sn⟫⟪TAG:sn⟫⟪TAG:sq<blah⟪TAG:sn⟫blah⟪TAG:sn⟫blah⟪TAG:sn⟫blah⟪TAG:sn⟫⟪TAG:sn⟫blah⟪TAG:sn⟫blah⟪TAG:sn⟫>⟫⟪TAG:sn⟫⟪TAG:sn⟫⟪TAG:sx<blah⟪TAG:sn⟫blah>⟪TAG:sn⟫<SGピクチャ5:プリテンド>`;
+
+it('protects explicit br line breaks and rejects malformed raw replacements', () => {
+    const manager = new TagManager({});
+    const original = String.raw`\c[13]【来白】\c[0]<br>「早く……見つける……」`;
+    const pre = manager.preprocessTags(original);
+    expect(pre.preprocessedText).not.toContain('<br>');
+    expect(pre.preprocessedText).toContain('TAG:');
+    const restored = manager.postprocessTags(pre.preprocessedText, pre.tagCounts, pre.caseMap);
+    expect(restored.valid).toBe(true);
+    expect(restored.text).toBe(original.replaceAll('\\c[', '\\C['));
+    expect(manager.postprocessTags('<br">Must find it', pre.tagCounts, pre.caseMap).valid).toBe(
+        false
+    );
+});

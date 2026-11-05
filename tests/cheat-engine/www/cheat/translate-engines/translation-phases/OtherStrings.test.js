@@ -78,3 +78,20 @@ describe('OtherStrings', () => {
         expect(strategy.applyDataOnLifecycle({ runtime })).toBe(false);
     });
 });
+
+it('updates the document title when applying the translated game title', () => {
+    const originalDocument = globalThis.document;
+    globalThis.document = { title: 'Original title' };
+    globalThis.$dataSystem = { gameTitle: 'Original title' };
+    try {
+        const phase = new OtherStrings();
+        phase.applyTranslatedToField('gameTitle', 'Translated title');
+        expect(globalThis.document.title).toBe('Translated title');
+        globalThis.document.title = 'Custom debug title';
+        phase.applyTranslatedToField('gameTitle', 'Another title');
+        expect(globalThis.document.title).toBe('Custom debug title');
+    } finally {
+        globalThis.document = originalDocument;
+        delete globalThis.$dataSystem;
+    }
+});

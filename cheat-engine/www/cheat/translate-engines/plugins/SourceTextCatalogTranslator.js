@@ -72,9 +72,7 @@ export class SourceTextCatalogTranslator extends BasePluginTranslator {
             for (const mapInfo of mapInfos) {
                 if (!mapInfo?.id) continue;
                 const map = await loadMapDataById(mapInfo.id);
-                for (const text of [mapInfo.name, map.displayName]) {
-                    if (this.isUsableText(text)) this.entries.set(text, { text });
-                }
+                this.collectMapTexts(mapInfo, map);
                 for (const event of map.events || [])
                     for (const page of event?.pages || []) this.collectCommandTexts(page.list);
             }
@@ -95,6 +93,12 @@ export class SourceTextCatalogTranslator extends BasePluginTranslator {
         this.fragmentPattern = fragments.length
             ? new RegExp(fragments.map(escapeCatalogPattern).join('|'), 'g')
             : null;
+    }
+
+    collectMapTexts(mapInfo, map) {
+        for (const text of [mapInfo.name, map.displayName]) {
+            if (this.isUsableText(text)) this.entries.set(text, { text });
+        }
     }
 
     isDisplayFragment(text) {

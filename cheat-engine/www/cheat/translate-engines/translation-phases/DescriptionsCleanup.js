@@ -80,6 +80,10 @@ export class DescriptionsCleanup extends BasePhase {
         // Failures are intentionally ignored — keep original translations on failure
     }
 
+    finalizePhase({ runtime }) {
+        runtime.applyCachedTranslationsToData();
+    }
+
     async createEntries({ request }) {
         const { cacheTypes = [], boxingSystemMessage = '' } = request;
         this.configure(cacheTypes, boxingSystemMessage);

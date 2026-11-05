@@ -204,3 +204,19 @@ describe('portable game translation settings', () => {
         expect(store.read().tags.tagFormat).toBe('tags');
     });
 });
+
+it('keeps translator settings portable across restart and engine settings replacement', () => {
+    const runtime = runtimeWith();
+    runtime.loadSettings();
+    runtime.pluginTranslatorSettings = { NRP_MessageWindow: { textOffsetY: -80 } };
+    runtime.saveGameTranslationSettings();
+    const restarted = runtimeWith({
+        pluginTranslatorSettings: {},
+        engineSettings: { openApi: {} },
+    });
+    restarted.loadSettings();
+    expect(restarted.pluginTranslatorSettings).toEqual({ NRP_MessageWindow: { textOffsetY: -80 } });
+    expect(
+        new GameTranslationSettings(directory).read().translation.pluginTranslatorSettings
+    ).toEqual(restarted.pluginTranslatorSettings);
+});

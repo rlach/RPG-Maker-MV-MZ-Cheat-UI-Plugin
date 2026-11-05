@@ -25,14 +25,6 @@ export default {
             Select folders from game image directory and export decoded PNG files to translation cache.
         </div>
 
-        <v-switch
-            v-model="highlightImages"
-            label="Highlight images (requires game restart)" density="compact"
-            hide-details
-            class="mb-2"
-            @click.self.stop
-            @update:model-value="onChangeHighlightImages">
-        </v-switch>
 
         <div class="d-flex align-center cheat-export-toolbar">
             <v-select
@@ -98,7 +90,6 @@ export default {
             exportProcessedCount: 0,
             isExportInProgress: false,
             _progressPollIntervalId: 0,
-            highlightImages: false,
         };
     },
 
@@ -118,8 +109,6 @@ export default {
         ) {
             this.selectedTargetLang = this._runtime.targetLang;
         }
-
-        this.highlightImages = !!this._runtime?.highlightImages;
 
         if (!this.languageOptions.some((item) => item.value === this.selectedTargetLang)) {
             this.languageOptions.unshift({
@@ -143,21 +132,6 @@ export default {
     },
 
     methods: {
-        onChangeHighlightImages() {
-            if (!this._runtime) {
-                this._runtime = ensureTranslationRuntime();
-            }
-
-            if (!this._runtime) {
-                return;
-            }
-
-            this._runtime.highlightImages = !!this.highlightImages;
-            if (typeof this._runtime.onChangeHighlightImages === 'function') {
-                this._runtime.onChangeHighlightImages();
-            }
-        },
-
         getNodeRequire() {
             const nodeRequire = globalThis && globalThis.require;
             return typeof nodeRequire === 'function' ? nodeRequire : null;

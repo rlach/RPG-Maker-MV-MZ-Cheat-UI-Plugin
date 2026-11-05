@@ -214,10 +214,6 @@ export const translateOnTheFlySettingsMethods = {
         this.saveSettings();
     },
 
-    onChangeHighlightImages() {
-        this.saveSettings();
-    },
-
     onChangeEnabled() {
         TranslateOnTheFlyState.setEnabled(this.enabled);
         if (this.enabled) {

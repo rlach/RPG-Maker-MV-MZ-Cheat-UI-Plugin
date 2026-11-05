@@ -113,6 +113,27 @@ export class XoMgrSentenceTranslator extends SourceTextCatalogTranslator {
             return convert.call(this, translator.resolveText(text, translator.getRuntime()));
         };
         const interpreter = window.Game_Interpreter?.prototype;
+        if (typeof interpreter?.command355 === 'function') {
+            const script = interpreter.command355;
+            interpreter.command355 = function (...args) {
+                // Xo events use editor map names as scene identifiers. A failed
+                // lookup leaves the shared numeric variable holding an unrelated
+                // value (for example 200), which then becomes the transfer map ID.
+                const maps = window.$dataMapInfos;
+                if (!translator.isRuntimeTranslationActive(translator.getRuntime()) || !maps)
+                    return script.apply(this, args);
+                window.$dataMapInfos = maps.map((map) =>
+                    map && typeof map._translateOriginal?.name === 'string'
+                        ? { ...map, name: map._translateOriginal.name }
+                        : map
+                );
+                try {
+                    return script.apply(this, args);
+                } finally {
+                    window.$dataMapInfos = maps;
+                }
+            };
+        }
         if (typeof interpreter?.pluginCommand === 'function') {
             const command = interpreter.pluginCommand;
             interpreter.pluginCommand = function (name, args) {

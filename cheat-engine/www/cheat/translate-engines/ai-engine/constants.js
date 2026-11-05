@@ -69,6 +69,13 @@ export const SIMPLE_NEWLINE_TAG_CONFIG = Object.freeze({
 // Base tag configuration. Regex patterns are generated once in TagManager initialization.
 export const TAG_CONFIGS = [
     {
+        description: 'Explicit presentation line break.',
+        type: TAG_TYPE.WITHOUT_PARAMETER,
+        style: TAG_STYLE.XML,
+        tagSymbol: 'br',
+        requiredConsistency: true,
+    },
+    {
         description: 'Will be replaced with the value of the nth variable.',
         type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
         tagSymbol: 'V',

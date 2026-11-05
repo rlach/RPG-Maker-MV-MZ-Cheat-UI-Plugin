@@ -31,6 +31,49 @@ export class BasePluginTranslator extends BasePhase {
         return this.getPluginName();
     }
 
+    /** Optional portable presentation settings. Fields use number, boolean or text types. */
+    getSettingsSchema() {
+        return [];
+    }
+
+    getPluginSettings() {
+        const saved = this.getRuntime()?.pluginTranslatorSettings?.[this.getPluginName()] || {};
+        return Object.fromEntries(
+            this.getSettingsSchema().map((field) => {
+                let value = saved[field.key] ?? field.default;
+                if (field.type === 'number') {
+                    value = Number(value);
+                    if (!Number.isFinite(value)) value = field.default;
+                    value = Math.min(
+                        field.max ?? Infinity,
+                        Math.max(field.min ?? -Infinity, value)
+                    );
+                } else if (field.type === 'boolean') {
+                    value = value === true;
+                } else {
+                    value = String(value ?? '');
+                }
+                return [field.key, value];
+            })
+        );
+    }
+
+    savePluginSettings(values) {
+        const runtime = this.getRuntime();
+        const name = this.getPluginName();
+        const previous = runtime.pluginTranslatorSettings || {};
+        runtime.pluginTranslatorSettings = { ...previous, [name]: { ...values } };
+        const normalized = this.getPluginSettings();
+        runtime.pluginTranslatorSettings = { ...previous, [name]: normalized };
+        runtime.saveGameTranslationSettings();
+        this.onPluginSettingsChanged();
+        return normalized;
+    }
+
+    onPluginSettingsChanged() {
+        // Optional immediate refresh of the plugin's presentation.
+    }
+
     getPluginAliases() {
         return [this.getPluginName()];
     }

@@ -60,15 +60,45 @@ export default {
             </div>
         </template>
 
+        <template v-slot:item.actions="{ item }">
+            <v-btn v-if="item.hasSettings" icon="mdi-cog" variant="text" size="small"
+                :aria-label="'Settings for ' + item.label" @click="openPluginSettings(item)"></v-btn>
+        </template>
         <template v-slot:item.activationRetryCount="{ item }">
             <span class="text-caption">{{ item.activationRetryCount }}</span>
         </template>
     </v-data-table>
+    <v-dialog v-model="settingsOpen" max-width="600">
+        <v-card>
+            <v-card-title>{{ settingsTitle }} settings</v-card-title>
+            <v-card-text>
+                <p class="text-caption mb-4">These settings are saved with the translation cache and travel with the translation.</p>
+                <template v-for="field in settingsFields" :key="field.key">
+                    <v-switch v-if="field.type === 'boolean'" v-model="settingsDraft[field.key]"
+                        :label="field.label" density="compact"></v-switch>
+                    <v-text-field v-else v-model="settingsDraft[field.key]" :label="field.label"
+                        :type="field.type === 'number' ? 'number' : 'text'" :min="field.min" :max="field.max"
+                        :step="field.step || 1" variant="outlined" density="compact" class="mb-3" hide-details></v-text-field>
+                </template>
+            </v-card-text>
+            <v-card-actions>
+                <v-btn variant="text" @click="resetPluginSettings">Reset defaults</v-btn>
+                <v-spacer></v-spacer>
+                <v-btn variant="text" @click="settingsOpen = false">Cancel</v-btn>
+                <v-btn variant="text" color="primary" @click="savePluginSettings">Save</v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
 </v-card>
     `,
 
     data() {
         return {
+            settingsOpen: false,
+            settingsPluginName: '',
+            settingsTitle: '',
+            settingsFields: [],
+            settingsDraft: {},
             rowsPerPage: getRowsPerPage(),
             sortBy: 'label',
             sortDesc: false,
@@ -90,6 +120,7 @@ export default {
                     value: 'activationRetryCount',
                     width: 170,
                 },
+                { text: 'Actions', value: 'actions', sortable: false, width: 80 },
             ],
             tableItems: [],
             _refreshTimerId: 0,
@@ -165,12 +196,40 @@ export default {
     },
 
     methods: {
+        openPluginSettings(item) {
+            const translator = PLUGIN_TRANSLATOR_REGISTRY.getDetectedTranslatorInstances().find(
+                (entry) => entry.getPluginName() === item.pluginName
+            );
+            if (!translator) return;
+            this.settingsPluginName = item.pluginName;
+            this.settingsTitle = item.label;
+            this.settingsFields = translator.getSettingsSchema();
+            this.settingsDraft = translator.getPluginSettings();
+            this.settingsOpen = true;
+        },
+
+        resetPluginSettings() {
+            this.settingsDraft = Object.fromEntries(
+                this.settingsFields.map((field) => [field.key, field.default])
+            );
+        },
+
+        savePluginSettings() {
+            const translator = PLUGIN_TRANSLATOR_REGISTRY.getDetectedTranslatorInstances().find(
+                (entry) => entry.getPluginName() === this.settingsPluginName
+            );
+            if (!translator) return;
+            translator.savePluginSettings(this.settingsDraft);
+            this.settingsOpen = false;
+        },
+
         async refreshEntries() {
             await PLUGIN_TRANSLATOR_REGISTRY.ensureDetectionCompleted({ runtime: this._runtime });
 
             this.tableItems = PLUGIN_TRANSLATOR_REGISTRY.getDetectedPluginActivationSummaries().map(
                 (summary) => ({
                     pluginName: summary.pluginName,
+                    hasSettings: summary.hasSettings,
                     label: summary.label || summary.pluginName,
                     activationSucceeded: !!summary.activationSucceeded,
                     activationRetryCount: Math.max(0, Number(summary.activationRetryCount) || 0),

@@ -454,7 +454,10 @@ export class TagManager {
                 ...config,
                 key,
                 tagId,
-                prePattern: new RegExp(`${ESCAPE_PREFIX_PATTERN}${escapedSymbol}`, 'gi'),
+                prePattern: new RegExp(
+                    `${ESCAPE_PREFIX_PATTERN}${escapedSymbol}(?![A-Za-z])`,
+                    'gi'
+                ),
                 postPattern: this.syntax.pattern(tagId),
             };
         }
@@ -670,6 +673,16 @@ export class TagManager {
     }
 
     postprocessTagsOnce(text, tagCounts, caseMap, options = {}) {
+        const malformedBreak = /<br["'][^>]*>/i.exec(text);
+        if (malformedBreak) {
+            return {
+                text,
+                valid: false,
+                errorReason: `Malformed line-break tag: ${malformedBreak[0]}`,
+                expectedCounts: tagCounts,
+                actualCounts: {},
+            };
+        }
         let result = text;
         const actualCounts = {};
         const usedMaskedIdsByTagKey = {};

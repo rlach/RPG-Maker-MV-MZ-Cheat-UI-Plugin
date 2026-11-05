@@ -132,6 +132,8 @@ declare function require(name: string): any;
 declare const Bitmap: any;
 
 declare interface Window {
+    MMChoiceButtonEx?: any;
+    gl_translate?: (text: string) => string;
     $textSplitter?: any;
     Nore?: any;
     Window_Fukidashi?: any;

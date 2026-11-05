@@ -7,6 +7,7 @@ import {
 } from '../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslationRuntimeDefaults.js';
 
 afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
 });
@@ -70,7 +71,7 @@ it('keeps Windows attention pending until game focus without replacing game focu
         listeners[name] = listener;
     });
     controller.begin()();
-    expect(native.requestAttention).toHaveBeenLastCalledWith(0x7fffffff);
+    expect(native.requestAttention).toHaveBeenLastCalledWith(true);
     expect(native.on).not.toHaveBeenCalledWith('focus', expect.anything());
     expect(host.onfocus).toBe(gameFocus);
     controller.sync();
@@ -146,3 +147,51 @@ it.each([false, true])(
         expect(native.requestAttention).toHaveBeenLastCalledWith(true);
     }
 );
+
+it('rearms flashing until focus', () => {
+    vi.useFakeTimers();
+    const { controller, host, native } = fixture();
+    host.document.hasFocus = () => true;
+    setTimeout(() => controller.flash(), 5000);
+    vi.advanceTimersByTime(4000);
+    expect(native.requestAttention).not.toHaveBeenCalled();
+    host.document.hasFocus = () => false;
+    vi.advanceTimersByTime(1000);
+    expect(native.requestAttention).toHaveBeenLastCalledWith(true);
+    vi.advanceTimersByTime(3000);
+    expect(native.requestAttention).toHaveBeenCalledWith(false);
+    host.document.hasFocus = () => true;
+    vi.advanceTimersByTime(3000);
+    expect(native.requestAttention).toHaveBeenLastCalledWith(false);
+    expect(vi.getTimerCount()).toBe(0);
+});
+
+it('uses the explicit Chromium window workaround from delayed external callbacks', () => {
+    vi.useFakeTimers();
+    const { host, runtime, native } = fixture();
+    native.cWindow = { id: 42 };
+    host.chrome = {
+        windows: { update: vi.fn((id, properties, callback) => callback()) },
+        runtime: {},
+    };
+    const controller = new TranslationTaskbar(runtime, {
+        __CHEAT_EXTERNAL_WINDOW__: true,
+        opener: host,
+    });
+    setTimeout(() => controller.flash(), 5000);
+    vi.advanceTimersByTime(5000);
+    expect(host.chrome.windows.update).toHaveBeenLastCalledWith(
+        42,
+        { drawAttention: true },
+        expect.any(Function)
+    );
+    expect(native.requestAttention).not.toHaveBeenCalled();
+    host.document.hasFocus = () => true;
+    vi.advanceTimersByTime(3000);
+    expect(host.chrome.windows.update).toHaveBeenLastCalledWith(
+        42,
+        { drawAttention: false },
+        expect.any(Function)
+    );
+    expect(vi.getTimerCount()).toBe(0);
+});

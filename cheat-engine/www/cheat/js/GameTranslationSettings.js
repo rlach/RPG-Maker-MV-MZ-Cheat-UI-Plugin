@@ -15,6 +15,7 @@ export const GAME_TRANSLATION_SETTINGS_KEYS = Object.freeze([
     'enableImageReplacement',
     'autoSwitchNameInputLanguage',
     'enabledPluginTranslators',
+    'pluginTranslatorSettings',
     'nameProfilesByLangPair',
     'namePatternForEnforcing',
     'officialNameEnforcementMode',

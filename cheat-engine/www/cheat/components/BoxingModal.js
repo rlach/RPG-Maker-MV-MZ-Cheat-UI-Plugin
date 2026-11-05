@@ -299,7 +299,8 @@ class BoxingService {
             const newlineNormalized = removeShortNewlines(currentValue, removeShortCount);
             const wrapped = runtime.wrapText(
                 runtime.cleanTranslatedText(newlineNormalized),
-                widthInChars
+                widthInChars,
+                { flattenExistingNewlines: true }
             );
 
             if (wrapped === currentValue) {
@@ -314,6 +315,7 @@ class BoxingService {
         }
 
         if (updatedCount > 0) {
+            runtime.applyCachedTranslationsToData();
             runtime.persistCache();
             runtime.notifyCacheRuntime('cache-set');
         }

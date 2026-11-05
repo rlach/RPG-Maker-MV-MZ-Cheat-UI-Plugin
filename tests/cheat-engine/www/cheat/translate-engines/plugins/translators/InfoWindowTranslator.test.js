@@ -86,3 +86,25 @@ it('retries while the plugin menu method is unavailable', () => {
     vi.stubGlobal('window', { Scene_Menu: class {} });
     expect(new InfoWindowTranslator().enablePluginTranslation()).toBe(false);
 });
+
+it('hooks the map HUD variant created in Scene_Map.start', async () => {
+    vi.stubGlobal('window', globalThis);
+    vi.stubGlobal('Scene_Menu', class {});
+    class MapScene {
+        start() {
+            this._InfoWindow = { drawText: (text) => text };
+        }
+    }
+    vi.stubGlobal('Scene_Map', MapScene);
+    vi.stubGlobal('SceneManager', {});
+    const translator = new InfoWindowTranslator();
+    vi.spyOn(translator, 'precomputeCounts').mockResolvedValue();
+    vi.spyOn(translator, 'resolveText').mockImplementation((text) =>
+        text === '日目' ? 'Day' : text
+    );
+    vi.spyOn(translator, 'getRuntime').mockReturnValue({});
+    expect(translator.enablePluginTranslation()).toBe(true);
+    const scene = new MapScene();
+    scene.start();
+    expect(scene._InfoWindow.drawText('日目')).toBe('Day');
+});

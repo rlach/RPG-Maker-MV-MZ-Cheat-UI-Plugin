@@ -80,6 +80,12 @@ it('scans all scene sentences and resolves rotating variable dialogue through no
     const button = { value: '　決　定　' };
     vi.stubGlobal('document', { querySelectorAll: () => [button] });
     class Interpreter {
+        command355(shouldThrow = false) {
+            if (shouldThrow) throw new Error('script failed');
+            const index = $dataMapInfos.findIndex((map) => map?.name === '00_マイルーム');
+            if (index >= 0) $gameVariables._data[1] = index;
+            return $gameVariables._data[1];
+        }
         pluginCommand(name, args) {
             return { name, args };
         }
@@ -91,6 +97,22 @@ it('scans all scene sentences and resolves rotating variable dialogue through no
     const message = new Message();
     vi.stubGlobal('$gameMessage', message);
     expect(translator.enablePluginTranslation()).toBe(true);
+    const maps = [
+        null,
+        ...Array(6).fill(null),
+        {
+            id: 7,
+            name: '00_My Room',
+            _translateOriginal: { name: '00_マイルーム' },
+        },
+    ];
+    vi.stubGlobal('$dataMapInfos', maps);
+    $gameVariables._data[1] = 200;
+    expect(new Interpreter().command355()).toBe(7);
+    expect($dataMapInfos).toBe(maps);
+    expect($dataMapInfos[7].name).toBe('00_My Room');
+    expect(() => new Interpreter().command355(true)).toThrow('script failed');
+    expect($dataMapInfos).toBe(maps);
     message.add('\\v[510]');
     expect(translator.resolveMessageCacheSourceText({ text: '\\v[510]', runtime })).toBe(first);
     expect(runtime.getMessageCacheLookupKeys(first)).toContain(

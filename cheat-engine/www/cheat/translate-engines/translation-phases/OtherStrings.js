@@ -150,7 +150,12 @@ export class OtherStrings extends BasePhase {
             return false;
         }
 
-        return this.setValueByPath(dataSystem, field.path, translatedValue);
+        const previousValue = this.getValueByPath(dataSystem, field.path);
+        const applied = this.setValueByPath(dataSystem, field.path, translatedValue);
+        if (applied && fieldId === 'gameTitle' && globalThis.document?.title === previousValue) {
+            globalThis.document.title = translatedValue;
+        }
+        return applied;
     }
 
     applyCachedDataForField({ runtime, field }) {

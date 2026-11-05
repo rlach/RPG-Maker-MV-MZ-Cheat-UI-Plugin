@@ -617,3 +617,15 @@ describe('TranslateOnTheFly realtime flow', () => {
         expect(runtime.requestForegroundDialogBatch).not.toHaveBeenCalled();
     });
 });
+
+it('uses cached dialogue while cheat skip is held without starting LLM work', () => {
+    installRpgMakerGlobals({ messageLines: ['JP line 1'], speaker: '' });
+    const runtime = createRuntime({ skipActive: true });
+    const key = runtime.getMessageCacheKey('JP line 1', { hasPortrait: false });
+    runtime.translationCache.set(key, 'EN line 1');
+    translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
+    const messageWindow = new globalThis.Window_Message();
+    expect(messageWindow.canStart()).toBe(true);
+    expect(globalThis.$gameMessage._texts.join('\n')).toBe('EN line 1');
+    expect(runtime.requestForegroundDialogBatch).not.toHaveBeenCalled();
+});

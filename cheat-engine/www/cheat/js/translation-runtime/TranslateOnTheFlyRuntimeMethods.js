@@ -393,102 +393,6 @@ export const translateOnTheFlyRuntimeMethods = {
             return findTranslatedImagePath(fs, path, translatedImageDirectory, baseFileName);
         };
 
-        const applyBitmapHighlightBorder = (bitmap) => {
-            if (!self.highlightImages || !bitmap) {
-                return bitmap;
-            }
-
-            const drawBorder = () => {
-                if (
-                    !self.highlightImages ||
-                    !bitmap?._canvas ||
-                    bitmap._loadingState === 'none' ||
-                    bitmap._highlighted
-                ) {
-                    return;
-                }
-
-                const canvas = bitmap._canvas;
-
-                /* ignore tilesets, system, characters
-                 */
-                if (
-                    bitmap._url.startsWith('img/tilesets') ||
-                    bitmap._url.startsWith('img/system')
-                    // bitmap._url.startsWith('img/characters')
-                ) {
-                    return;
-                }
-                console.log(
-                    `[TranslateOnTheFly] Highlighting loaded image: ${bitmap._url}`,
-                    bitmap
-                );
-
-                const width = Number(canvas.width) || 0;
-                const height = Number(canvas.height) || 0;
-                if (width <= 1 || height <= 1) {
-                    return;
-                }
-
-                const context = canvas.getContext('2d');
-                if (!context) {
-                    return;
-                }
-
-                context.save();
-                context.strokeStyle = '#ff00ff';
-                context.lineWidth = 4;
-                context.strokeRect(2, 2, width - 4, height - 4);
-
-                // then draw checkerboard pattern on the whole image (4x4 squares)
-                const patternSize = 4;
-                context.fillStyle = 'rgba(255, 0, 255, 0.2)';
-                for (let y = 0; y < height; y += patternSize) {
-                    for (let x = 0; x < width; x += patternSize) {
-                        if (((x / patternSize) | 0) % 2 === ((y / patternSize) | 0) % 2) {
-                            context.fillRect(x, y, patternSize, patternSize);
-                        }
-                    }
-                }
-
-                // // then draw cross trough the whole image
-                // context.beginPath();
-                // context.moveTo(0, 0);
-                // context.lineTo(width, height);
-                // context.moveTo(width, 0);
-                // context.lineTo(0, height);
-                // context.stroke();
-
-                // tint the whole image with semi-transparent magenta
-                context.fillStyle = 'rgba(255, 0, 30, 0.1)';
-                context.fillRect(0, 0, width, height);
-
-                // set every single pixel to 100% transparent
-                // const imageData = context.getImageData(0, 0, width, height);
-                // const data = imageData.data;
-                // for (let i = 0; i < data.length; i += 4) {
-                //     data[i + 3] = 0; // set alpha to 0
-                // }
-                // context.putImageData(imageData, 0, 0);
-
-                context.restore();
-
-                bitmap._highlighted = true;
-
-                if (typeof bitmap._setDirty === 'function') {
-                    bitmap._setDirty();
-                }
-            };
-
-            if (typeof bitmap.addLoadListener === 'function') {
-                bitmap.addLoadListener(drawBorder);
-                return bitmap;
-            }
-
-            drawBorder();
-            return bitmap;
-        };
-
         const loadEncryptedImage = createEncryptedImageLoader();
         const installImageManagerBitmapHook = () => {
             if (
@@ -518,7 +422,7 @@ export const translateOnTheFlyRuntimeMethods = {
                         smooth
                     );
 
-                    return applyBitmapHighlightBorder(originalBitmap);
+                    return originalBitmap;
                 }
 
                 try {
@@ -571,9 +475,7 @@ export const translateOnTheFlyRuntimeMethods = {
 
                     try {
                         if (/\.rpgmvp$/i.test(translatedImagePath)) {
-                            return applyBitmapHighlightBorder(
-                                loadEncryptedImage(translatedImagePath, this, hue, smooth)
-                            );
+                            return loadEncryptedImage(translatedImagePath, this, hue, smooth);
                         }
                         const translatedBitmap = ImageManager._translateOriginalLoadBitmap.call(
                             this,
@@ -583,7 +485,7 @@ export const translateOnTheFlyRuntimeMethods = {
                             smooth
                         );
 
-                        return applyBitmapHighlightBorder(translatedBitmap);
+                        return translatedBitmap;
                     } finally {
                         if (restoreMZEncryptedImages !== null) {
                             Utils._hasEncryptedImages = restoreMZEncryptedImages;
@@ -605,7 +507,7 @@ export const translateOnTheFlyRuntimeMethods = {
                         smooth
                     );
 
-                    return applyBitmapHighlightBorder(fallbackBitmap);
+                    return fallbackBitmap;
                 }
             };
 
@@ -752,10 +654,6 @@ export const translateOnTheFlyRuntimeMethods = {
                 ) {
                     self.requestBatchQueueAbort();
                 }
-
-                // Keep current message exactly as it is while skip is held.
-                this._translationApplied = true;
-                return originalCanStart;
             }
 
             if (translationEnabled && allowTranslation && !$gameMessage._translateOriginalText) {
@@ -1146,10 +1044,6 @@ export const translateOnTheFlyRuntimeMethods = {
                     (translationEnabled && skipping) ||
                     (!translationEnabled && self.enableTranslation);
 
-                if (translationEnabled && skipping) {
-                    return result;
-                }
-
                 if (!allowTranslation && !useCacheOnly) {
                     return result;
                 }
@@ -1392,9 +1286,6 @@ export const translateOnTheFlyRuntimeMethods = {
                 if (self.isForegroundDialogBatchActive()) {
                     self.requestBatchQueueAbort();
                 }
-
-                this._translationApplied = true;
-                return Window_Message.prototype._originalStartInput.call(this);
             }
 
             const originalText = getSafeCurrentMessageText();

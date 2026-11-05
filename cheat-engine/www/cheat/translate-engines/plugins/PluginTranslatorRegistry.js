@@ -1,3 +1,6 @@
+import { NYAInfoMenuWindowTranslator } from './translators/NYAInfoMenuWindowTranslator.js';
+import { VitsunoDifficultyTranslator } from './translators/VitsunoDifficultyTranslator.js';
+import { AnimationMapNameTranslator } from './translators/AnimationMapNameTranslator.js';
 import { Inn15DayUiTranslator } from './translators/Inn15DayUiTranslator.js';
 import { ChimakiLangTranslator } from './translators/ChimakiLangTranslator.js';
 import { AutoNamePopupTranslator } from './translators/AutoNamePopupTranslator.js';
@@ -16,6 +19,8 @@ import { FCustomUiTranslator } from './translators/FCustomUiTranslator.js';
 import { InfoWindowTranslator } from './translators/InfoWindowTranslator.js';
 import { DKToolsLocalizationTranslator } from './translators/DKToolsLocalizationTranslator.js';
 import { HendrixLocalizationTranslator } from './translators/HendrixLocalizationTranslator.js';
+import { LanguageTranslationTranslator } from './translators/LanguageTranslationTranslator.js';
+import { MMChoiceButtonExTranslator } from './translators/MMChoiceButtonExTranslator.js';
 import { SttlaSynthesisTranslator } from './translators/SttlaSynthesisTranslator.js';
 import { NoreRogueUiTranslator } from './translators/NoreRogueUiTranslator.js';
 import { NoreClickerUiTranslator } from './translators/NoreClickerUiTranslator.js';
@@ -166,6 +171,7 @@ import { VisuVisualTextWindowsTranslator } from './translators/VisuVisualTextWin
 import { VisuSideChatterTranslator } from './translators/VisuSideChatterTranslator.js';
 import { XoMgrSentenceTranslator } from './translators/XoMgrSentenceTranslator.js';
 import { CustomSaveLoadTranslator } from './translators/CustomSaveLoadTranslator.js';
+import { MessageCommonTranslator } from './translators/MessageCommonTranslator.js';
 import { TorigoyaBalloonInBattleTranslator } from './translators/TorigoyaBalloonInBattleTranslator.js';
 import { PHQuestBookTranslator } from './translators/PHQuestBookTranslator.js';
 import { SaveFilePlusTranslator } from './translators/SaveFilePlusTranslator.js';
@@ -216,8 +222,14 @@ class PluginTranslatorRegistry {
             LicoUiTranslator,
             FCustomUiTranslator,
             InfoWindowTranslator,
+            NYAInfoMenuWindowTranslator,
+            VitsunoDifficultyTranslator,
+            AnimationMapNameTranslator,
+
             DKToolsLocalizationTranslator,
             HendrixLocalizationTranslator,
+            LanguageTranslationTranslator,
+            MMChoiceButtonExTranslator,
             SttlaSynthesisTranslator,
             NoreRogueUiTranslator,
             NoreClickerUiTranslator,
@@ -386,6 +398,7 @@ class PluginTranslatorRegistry {
             VisuSideChatterTranslator,
             XoMgrSentenceTranslator,
             CustomSaveLoadTranslator,
+            MessageCommonTranslator,
             TorigoyaBalloonInBattleTranslator,
             YepEventMiniLabelTranslator,
             YepMessageCoreTranslator,
@@ -624,6 +637,7 @@ class PluginTranslatorRegistry {
 
                 return {
                     pluginName: translator.getPluginName(),
+                    hasSettings: translator.getSettingsSchema().length > 0,
                     label: translator.getPluginLabel(),
                     activationSucceeded: !!status.enabled,
                     activationFinalized: !!status.finalized,
