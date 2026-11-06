@@ -89,6 +89,20 @@ export class PopupMessageTranslator extends BasePluginTranslator {
                     }
                     sourceText = sourceText.replace(/\] {2}/, '] '); // Normalize double spaces after marker to single space for better cache hits
 
+                    // MV also accepts markers after the payload. Those keys are
+                    // harvested verbatim by the standard message scanner.
+                    for (const candidate of [line + prefix, line + ' ' + prefix, line]) {
+                        const cached = pluginTranslator.resolveRuntimeTranslation(
+                            candidate,
+                            runtime,
+                            ['message', 'message_portrait'],
+                            { harvestMissing: false }
+                        );
+                        if (cached !== candidate) {
+                            changed = true;
+                            return stripPopupMarker(cached);
+                        }
+                    }
                     let translated = pluginTranslator.resolveRuntimeTranslation(
                         sourceText,
                         runtime,

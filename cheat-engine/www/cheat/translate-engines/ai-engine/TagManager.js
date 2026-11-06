@@ -1,3 +1,4 @@
+import { getTagConsistencyMode } from './constants.js';
 /**
  * TagManager
  * Game script tag escaping/unescaping
@@ -85,6 +86,7 @@ export class TagManager {
 
         this.simpleNConfig = {
             requiredConsistency: config?.requiredConsistency === true,
+            consistencyMode: getTagConsistencyMode(config),
             reservedWidth:
                 Number.isFinite(parsedReservedWidth) && parsedReservedWidth > 0
                     ? Math.floor(parsedReservedWidth)
@@ -256,6 +258,7 @@ export class TagManager {
             description: 'simpleN',
             tagId: simpleNId,
             requiredConsistency: this.simpleNConfig.requiredConsistency === true,
+            consistencyMode: getTagConsistencyMode(this.simpleNConfig),
             addSpace: false,
             reservedWidth: this.simpleNConfig.reservedWidth,
             extraPromptForLlm: this.simpleNConfig.extraPromptForLlm,
@@ -838,30 +841,7 @@ export class TagManager {
             result = result.replace(this.syntax.closingPattern(), '');
         }
 
-        let hasUnresolvedEscapedTag = this.syntax.prefixPattern().test(result);
-        const knownIds = [...this.tagEntries, ...this.longRunEntries, this.simpleNEntry]
-            .map((entry) => escapeRegExp(entry.tagId))
-            .filter(Boolean);
-        const brokenTags = [
-            ...result.matchAll(new RegExp(`\\bTAG:(?:${knownIds.join('|')})(?=$|[^a-z])`, 'gi')),
-        ];
-        if (brokenTags.length && !hasUnresolvedEscapedTag) {
-            return {
-                text: result,
-                valid: false,
-                errorReason: 'Broken encoded tags left in output',
-                unresolvedTags: brokenTags.map((match) => ({
-                    tag: match[0],
-                    index: match.index,
-                    context: result.slice(
-                        Math.max(0, match.index - 40),
-                        match.index + match[0].length + 40
-                    ),
-                })),
-                expectedCounts: tagCounts,
-                actualCounts,
-            };
-        }
+        let hasUnresolvedEscapedTag = this.syntax.tokens(result).length > 0;
         if (hasUnresolvedEscapedTag && onlyLooseXmlTagIds instanceof Set) {
             hasUnresolvedEscapedTag = false;
             for (const entry of this.customParameterEntries) {
@@ -923,6 +903,9 @@ export class TagManager {
         const maskedIdsValid = Object.keys(expectedMaskedIdsByTagKey).every((key) => {
             const expected = expectedMaskedIdsByTagKey[key] || [];
             const seenSet = usedMaskedIdsByTagKey[key] || new Set();
+            const mode = getTagConsistencyMode(this.tagEntries.find((entry) => entry.key === key));
+            if (mode === 'any' || mode === 'missing')
+                return [...seenSet].every((id) => expected.includes(id));
             if (expected.length !== seenSet.size) {
                 return false;
             }
@@ -979,17 +962,38 @@ export class TagManager {
             errorReason: 'Tag count mismatch',
             expectedCounts: tagCounts,
             actualCounts,
+            suspicions: this.getConsistencySuspicions(tagCounts, actualCounts),
         };
     }
 
     areAllTagsWithRequiredConsistencyValid(expectedCounts, actualCounts) {
-        const requiredTypes = this.tagEntries
-            .filter((entry) => entry.requiredConsistency)
-            .map((entry) => entry.key);
+        return this.tagEntries.every((entry) => {
+            const expected = Number(expectedCounts?.[entry.key] || 0);
+            const actual = Number(actualCounts?.[entry.key] || 0);
+            const mode = getTagConsistencyMode(entry);
+            return mode === 'full' ? actual === expected : mode !== 'missing' || actual <= expected;
+        });
+    }
 
-        return requiredTypes.every(
-            (typeKey) => actualCounts[typeKey] === (expectedCounts[typeKey] || 0)
-        );
+    getConsistencySuspicions(expectedCounts, actualCounts) {
+        return [...this.tagEntries, this.simpleNEntry].flatMap((entry) => {
+            const expected = Number(expectedCounts?.[entry.key] || 0);
+            const actual = Number(actualCounts?.[entry.key] || 0);
+            const mode = getTagConsistencyMode(entry);
+            if (expected === actual || !['missing', 'any'].includes(mode)) return [];
+            const symbol = entry.tagSymbol || 'n';
+            const tag =
+                entry.style === TAG_STYLE.XML
+                    ? `<${symbol}>`
+                    : `\\${symbol}${entry.type === TAG_TYPE.WITH_NUMERIC_PARAMETER ? '[N]' : ''}`;
+            return [
+                {
+                    id: `tag-${actual < expected ? 'missing' : 'inconsistent'}:${tag}`,
+                    label: `${actual < expected ? 'Missing' : 'Inconsistent'} ${tag} tag`,
+                    message: `Tag ${tag} appeared ${actual} times instead of ${expected}.`,
+                },
+            ];
+        });
     }
 
     /**

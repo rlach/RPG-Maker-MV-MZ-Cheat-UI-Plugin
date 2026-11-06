@@ -40,6 +40,11 @@ export function applyTranslationsToCommands(commandList, runtime) {
         }
 
         const canonicalName = runtime.getCanonicalSystemCommandName(name);
+        const displayKey = runtime.getKnownCommandDisplayCacheKey?.(name);
+        if (displayKey) {
+            runtime.trackCacheKeyUsage(displayKey, { harvestMissing: false });
+            continue;
+        }
         const cacheKey = runtime.getCacheKey(canonicalName, 'command');
 
         runtime.trackCacheKeyUsage(cacheKey);
@@ -76,6 +81,7 @@ export function collectUntranslatedCommands(commandList, runtime) {
         }
 
         const canonicalName = runtime.getCanonicalSystemCommandName(name);
+        if (runtime.getKnownCommandDisplayCacheKey?.(name)) continue;
         const cacheKey = runtime.getCacheKey(canonicalName, 'command');
 
         if (!runtime.hasUsableCacheValue(cacheKey)) {

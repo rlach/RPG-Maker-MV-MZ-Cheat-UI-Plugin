@@ -57,12 +57,13 @@ export function getTranslateCacheRuntimeEventName() {
     return RUNTIME_EVENT_NAME;
 }
 
-export function notifyTranslateCacheRuntimeChanged(reason = 'unknown', key = null) {
+export function notifyTranslateCacheRuntimeChanged(reason = 'unknown', key = null, extra = {}) {
     const runtime = ensureTranslateCacheRuntime();
     const version = Number.isFinite(runtime.version) ? runtime.version + 1 : 1;
     setRootWindowStateValue('__TranslateOnTheFlyCacheVersion', version);
 
     const detail = {
+        ...extra,
         reason,
         key,
         version,

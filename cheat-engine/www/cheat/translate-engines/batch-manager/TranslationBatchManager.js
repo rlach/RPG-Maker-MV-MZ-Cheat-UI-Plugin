@@ -270,6 +270,7 @@ export class TranslationBatchManager {
             }
 
             this.runtime.setCacheValue(success.cacheKey, success.translated, {
+                suspicions: success.suspicions || [],
                 persist: false,
             });
             changedKeys.push(success.cacheKey);

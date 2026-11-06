@@ -122,7 +122,7 @@ describe.each(['tags', 'legacy'])('%s tag transport', (format) => {
         expect(entry).toBeTruthy();
     });
 
-    it('rejects missing, duplicated, unknown, malformed and invalid masked tags', () => {
+    it('rejects missing, duplicated, unknown and invalid masked tags', () => {
         const tm = manager();
         const syntax = tm.syntax;
         const packed = tm.preprocessTags('A\\V[1]\n\\PORTRAIT[secret]');
@@ -131,10 +131,16 @@ describe.each(['tags', 'legacy'])('%s tag transport', (format) => {
             packed.preprocessedText.replace(variable, ''),
             packed.preprocessedText + variable,
             packed.preprocessedText + syntax.encode('unknown'),
-            packed.preprocessedText + syntax.open + 'broken',
         ]) {
             expect(tm.postprocessTags(text, packed.tagCounts, packed.caseMap).valid).toBe(false);
         }
+        expect(
+            tm.postprocessTags(
+                packed.preprocessedText + syntax.open + 'broken',
+                packed.tagCounts,
+                packed.caseMap
+            ).valid
+        ).toBe(true);
         const masked = tm.customParameterEntries.find((e) => e.tagSymbol === 'PORTRAIT');
         const badMask = packed.preprocessedText.replace(
             syntax.encode(`${masked.tagId}[0]`),

@@ -13,6 +13,42 @@ vi.mock('../../../../../../cheat-engine/www/cheat/js/TranslateCacheRuntime.js', 
 }));
 
 import { translateOnTheFlyCoreMethods } from '../../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslateOnTheFlyCoreMethods.js';
+import {
+    applyTranslationsToCommands,
+    collectUntranslatedCommands,
+} from '../../../../../../cheat-engine/www/cheat/js/CommandTranslationManager.js';
+
+it('does not harvest translated plugin, actor, item or decorated choice labels as commands', () => {
+    const entries = [
+        ['plugin_cultivator_ui:ja-en-土', 'Soil'],
+        ['actor_name:ja-en-アルロ', 'Arlo'],
+        ['item_name:ja-en-種', 'Spinach Seed LV1'],
+        ['choice:ja-en-耕す', 'Plow and Sow'],
+    ];
+    const runtime = {
+        ...translateOnTheFlyCoreMethods,
+        translationCache: new Map(entries),
+        isTranslationEnabled: () => true,
+        getCacheKey: (text, type) => `${type}:ja-en-${text}`,
+        hasUsableCacheValue(key) {
+            return !!this.translationCache.get(key);
+        },
+        trackCacheKeyUsage: vi.fn(),
+    };
+    const commands = ['Soil', 'Arlo', '»\\i[310]Spinach Seed LV1', '»Plow and Sow'].map((name) => ({
+        name,
+        symbol: 'custom',
+    }));
+    applyTranslationsToCommands(commands, runtime);
+    expect(collectUntranslatedCommands(commands, runtime)).toEqual([]);
+    expect(runtime.trackCacheKeyUsage.mock.calls.map((call) => call[0])).toEqual(
+        entries.map((e) => e[0])
+    );
+    runtime.translationCache.set(entries[0][0], 'Ground');
+    runtime.updateReverseCommandLookup(entries[0][0], 'Ground');
+    expect(runtime.getKnownCommandDisplayCacheKey('Soil')).toBe(null);
+    expect(runtime.getKnownCommandDisplayCacheKey('Ground')).toBe(entries[0][0]);
+});
 
 function createRuntimeFixture({
     nonOtfActive = false,

@@ -37,6 +37,11 @@ export const translateOnTheFlyCacheMethods = {
         const count = this.translationCache.size;
         const seenCount = this.lastSeenByCacheKey ? this.lastSeenByCacheKey.size : 0;
         this.translationCache.clear();
+        if (this.translationSuspicionStore) {
+            this.translationSuspicionStore.entries = {};
+            this.translationSuspicionStore.dirty = true;
+            this.translationSuspicionStore.save();
+        }
         if (this.reverseCommandLookup instanceof Map) {
             this.reverseCommandLookup.clear();
         }
@@ -132,6 +137,7 @@ export const translateOnTheFlyCacheMethods = {
         }
 
         this.translationCache.delete(cacheKey);
+        if (this.translationSuspicionStore) this.translationSuspicionStore.set(cacheKey, []);
         if (
             typeof cacheKey === 'string' &&
             cacheKey.startsWith('command:') &&
@@ -153,7 +159,7 @@ export const translateOnTheFlyCacheMethods = {
         }
     },
 
-    notifyCacheRuntime(reason, key) {
-        notifyTranslateCacheRuntimeChanged(reason || 'unknown', key);
+    notifyCacheRuntime(reason, key, extra) {
+        notifyTranslateCacheRuntimeChanged(reason || 'unknown', key, extra);
     },
 };

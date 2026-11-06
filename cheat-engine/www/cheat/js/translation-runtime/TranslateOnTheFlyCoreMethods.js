@@ -1,3 +1,4 @@
+import { TranslationSuspicionStore } from '../TranslationSuspicionStore.js';
 import { TranslateOnTheFlyState } from '../TranslateOnTheFlyState.js';
 import { ensureTranslateCacheRuntime } from '../TranslateCacheRuntime.js';
 import {
@@ -273,9 +274,11 @@ export const translateOnTheFlyCoreMethods = {
         if (!(this.translationCache instanceof Map)) {
             return;
         }
+        this.reverseCommandLookup.clear();
+        this.reverseCommandValues = new Map();
 
         for (const [cacheKey, translatedValue] of this.translationCache.entries()) {
-            if (typeof cacheKey !== 'string' || !cacheKey.startsWith('command:')) {
+            if (typeof cacheKey !== 'string') {
                 continue;
             }
 
@@ -286,7 +289,21 @@ export const translateOnTheFlyCoreMethods = {
             }
 
             this.reverseCommandLookup.set(normalizedTranslatedValue, cacheKey);
+            this.reverseCommandValues.set(cacheKey, normalizedTranslatedValue);
         }
+        this._commandDisplayLookupPrepared = true;
+    },
+
+    getKnownCommandDisplayCacheKey(text) {
+        if (!this._commandDisplayLookupPrepared) this.buildReverseCommandLookupFromCache();
+        // Some custom menus decorate already translated item/choice labels.
+        const display = String(text || '').trim();
+        const undecorated = display.replace(/^»\s*/, '').replace(/^\\i\[\d+\]\s*/i, '');
+        for (const candidate of [display, undecorated]) {
+            const key = this.reverseCommandLookup.get(candidate);
+            if (key && this.hasUsableCacheValue(key)) return key;
+        }
+        return null;
     },
 
     resolveCanonicalCommandNameFromCacheKey(commandCacheKey, fallbackName) {
@@ -326,6 +343,13 @@ export const translateOnTheFlyCoreMethods = {
         if (!(this.reverseCommandLookup instanceof Map) || !cacheKey) {
             return;
         }
+        if (this.reverseCommandValues instanceof Map) {
+            const value = this.reverseCommandValues.get(cacheKey);
+            if (this.reverseCommandLookup.get(value) === cacheKey)
+                this.reverseCommandLookup.delete(value);
+            this.reverseCommandValues.delete(cacheKey);
+            return;
+        }
 
         for (const [lookupText, mappedCacheKey] of this.reverseCommandLookup.entries()) {
             if (mappedCacheKey === cacheKey) {
@@ -335,7 +359,7 @@ export const translateOnTheFlyCoreMethods = {
     },
 
     updateReverseCommandLookup(cacheKey, normalizedValue) {
-        if (typeof cacheKey !== 'string' || !cacheKey.startsWith('command:')) {
+        if (typeof cacheKey !== 'string') {
             return;
         }
 
@@ -351,6 +375,8 @@ export const translateOnTheFlyCoreMethods = {
         }
 
         this.reverseCommandLookup.set(normalizedLookupKey, cacheKey);
+        if (!(this.reverseCommandValues instanceof Map)) this.reverseCommandValues = new Map();
+        this.reverseCommandValues.set(cacheKey, normalizedLookupKey);
     },
 
     resolveCommandCacheWriteKey(cacheKey) {
@@ -371,6 +397,28 @@ export const translateOnTheFlyCoreMethods = {
         }
 
         return this.getCacheKey(canonicalName, 'command');
+    },
+
+    getTranslationSuspicionStore() {
+        if (!this.translationSuspicionStore) {
+            this.ensureSplitCacheDirectorySync();
+            this.translationSuspicionStore = new TranslationSuspicionStore(
+                this.getCacheFileSystem(),
+                require('path').join(this.getSplitCacheDirectoryPath(), 'suspicions.json')
+            );
+        }
+        return this.translationSuspicionStore;
+    },
+
+    getTranslationSuspicions(key) {
+        return this.getTranslationSuspicionStore().get(key, this.translationCache.get(key));
+    },
+
+    acceptTranslationSuspicions(keys) {
+        const store = this.getTranslationSuspicionStore();
+        for (const key of keys) store.set(key, []);
+        store.save();
+        this.notifyCacheRuntime('suspicions-updated', null, { keys });
     },
 
     setCacheValue(key, value, options = {}) {
@@ -395,6 +443,21 @@ export const translateOnTheFlyCoreMethods = {
             changedKeys.add(resolvedKey);
         }
 
+        if (
+            changedKeys.has(resolvedKey) &&
+            (normalizedValue !== currentValue ||
+                Object.prototype.hasOwnProperty.call(options, 'suspicions')) &&
+            (options.suspicions?.length || this.translationSuspicionStore)
+        ) {
+            const store = this.getTranslationSuspicionStore();
+            store.set(
+                resolvedKey,
+                options.suspicions || [],
+                this.translationCache.get(resolvedKey)
+            );
+            if (resolvedKey !== key) store.set(key, []);
+            if (options.persist !== false) store.save();
+        }
         this.updateReverseCommandLookup(resolvedKey, this.translationCache.get(resolvedKey));
         this.rememberCacheBucketForKey(resolvedKey);
 
@@ -794,6 +857,8 @@ export const translateOnTheFlyCoreMethods = {
             this.reverseCommandLookup = new Map();
             this.cacheBucketByCompositeKey = new Map();
             this.loadSplitCacheFromDisk();
+            this.translationSuspicionStore = null;
+            this.getTranslationSuspicionStore();
             runCacheMigrationsIfNeeded(this);
             this.loadVariableTranslationSettingsFromDisk();
 
@@ -905,6 +970,7 @@ export const translateOnTheFlyCoreMethods = {
     cacheBucketByCompositeKey: null,
 
     persistCache(changedKeys = null) {
+        this.translationSuspicionStore?.save();
         this.scheduled = true;
 
         if (!this.dirtyCacheBuckets) {

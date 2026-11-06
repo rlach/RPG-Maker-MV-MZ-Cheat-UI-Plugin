@@ -3,7 +3,7 @@ import AIEngine from '../../../../../../cheat-engine/www/cheat/translate-engines
 
 afterEach(() => vi.unstubAllGlobals());
 
-it('rejects only the batch item containing a broken known tag', async () => {
+it('accepts tag fragments with an advisory on each affected batch item', async () => {
     vi.stubGlobal('window', globalThis);
     const engine = new AIEngine({
         sourceLang: 'ja',
@@ -27,7 +27,8 @@ it('rejects only the batch item containing a broken known tag', async () => {
         { type: 'item_name', id: 1, value: '原文一', cacheKey: 'one' },
         { type: 'item_name', id: 2, value: '原文二', cacheKey: 'two' },
     ]);
-    expect(result.successes.map((entry) => entry.id)).toEqual([2]);
-    expect(result.failures.map((entry) => entry.id)).toEqual([1]);
-    expect(result.failures[0].rejectReason).toBe('Broken encoded tags left in output');
+    expect(result.successes.map((entry) => entry.id)).toEqual([1, 2]);
+    expect(result.failures).toEqual([]);
+    expect(result.successes[0].suspicions.map((reason) => reason.id)).toContain('partial-tags');
+    expect(result.successes[1].suspicions.map((reason) => reason.id)).toContain('partial-tags');
 });

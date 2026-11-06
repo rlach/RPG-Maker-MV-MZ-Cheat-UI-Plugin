@@ -1,7 +1,9 @@
+import { TAG_CONSISTENCY_OPTIONS } from '../../translate-engines/ai-engine/constants.js';
 import { TAG_OVERRIDABLE_FIELDS } from '../../translate-engines/ai-engine/constants.js';
 
 export default {
     name: 'CustomTagDialog',
+    data: () => ({ consistencyOptions: TAG_CONSISTENCY_OPTIONS }),
 
     props: {
         visible: {
@@ -110,13 +112,15 @@ export default {
                 class="mb-2"
              item-title="text"></v-select>
 
-            <v-checkbox
-                v-model="form.requiredConsistency"
-                label="Required consistency"
+            <v-select
+                v-model="form.consistencyMode"
+                :items="consistencyOptions"
+                item-title="text" item-value="value"
+                label="Consistency" variant="outlined" density="compact"
                 hide-details
-                :disabled="isFieldDisabled('requiredConsistency')"
+                :disabled="isFieldDisabled('consistencyMode')"
                 class="mt-0 mb-2"
-            ></v-checkbox>
+            ></v-select>
 
             <v-text-field
                 v-model.number="form.reservedWidth"

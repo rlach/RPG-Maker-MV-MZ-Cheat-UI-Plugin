@@ -191,6 +191,11 @@ export const translateOnTheFlyMessageMethods = {
             if (!cleanName) {
                 return commandName;
             }
+            const displayKey = this.getKnownCommandDisplayCacheKey?.(cleanName);
+            if (displayKey) {
+                this.trackCacheKeyUsage(displayKey, { harvestMissing: false });
+                return commandName;
+            }
 
             const sourceName = this.getCanonicalSystemCommandName(cleanName);
 

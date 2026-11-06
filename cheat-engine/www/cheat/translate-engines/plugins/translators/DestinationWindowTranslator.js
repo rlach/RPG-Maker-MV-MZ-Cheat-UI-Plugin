@@ -145,7 +145,7 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
 
         for (const sourceText of sourceCandidates) {
             const cacheKey = runtime.getCacheKey(sourceText, this.getCacheType());
-            runtime.trackCacheKeyUsage(cacheKey);
+            runtime.trackCacheKeyUsage(cacheKey, { harvestMissing: false });
 
             if (!runtime.hasUsableCacheValue(cacheKey)) {
                 continue;
@@ -254,6 +254,29 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
         }
 
         const getRuntime = this.getRuntime.bind(this);
+        const translator = this;
+        const interpreter = window.Game_Interpreter?.prototype;
+        if (typeof interpreter?.command357 === 'function') {
+            const originalCommand = interpreter.command357;
+            interpreter.command357 = function (params) {
+                const command = params || this._params;
+                const parsed =
+                    translator.isDestinationWindowPlugin(command?.[0]) &&
+                    translator.isSetDestinationMZCommand(command?.[1])
+                        ? translator.parseMZSetDestinationArgs(command[3])
+                        : null;
+                const result = originalCommand.apply(this, arguments);
+                if (parsed) $gameSystem._cheatDestinationSource = parsed.text;
+                return result;
+            };
+        }
+        const originalSet = Game_System.prototype.setDestination;
+        if (typeof originalSet === 'function') {
+            Game_System.prototype.setDestination = function () {
+                delete this._cheatDestinationSource;
+                return originalSet.apply(this, arguments);
+            };
+        }
         const translateRuntimeDestinationValue = this.translateRuntimeDestinationValue.bind(this);
         const originalGetDestination = Game_System.prototype.getDestination;
 
@@ -261,6 +284,18 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
             const destinationText = originalGetDestination.apply(this, arguments);
 
             try {
+                const runtime = getRuntime();
+                if (
+                    this._cheatDestinationSource &&
+                    translator.isRuntimeTranslationActive(runtime)
+                ) {
+                    const translated = translator.translateRuntimeDestinationValue(
+                        this._cheatDestinationSource.split('\n'),
+                        runtime
+                    );
+                    const converter = Object.create(window.Window_Base.prototype);
+                    return translated.map((line) => converter.convertEscapeCharacters(line));
+                }
                 return translateRuntimeDestinationValue(destinationText, getRuntime());
             } catch (error) {
                 console.warn(

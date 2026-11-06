@@ -170,7 +170,10 @@ export class Troops extends BasePhase {
 
             for (const originalType of originalTypes) {
                 const cacheKey = runtime.getCacheKey(originalValue, originalType);
-                runtime.setCacheValue(cacheKey, success.translated, { persist: false });
+                runtime.setCacheValue(cacheKey, success.translated, {
+                    persist: false,
+                    suspicions: success.suspicions || [],
+                });
                 changedKeys.push(cacheKey);
             }
         }

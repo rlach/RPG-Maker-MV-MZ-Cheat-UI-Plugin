@@ -139,3 +139,23 @@ it('observes compiled original pages at command101, preserving source and disabl
     interpreter.command101();
     expect(runtime.trackCacheKeyUsage).not.toHaveBeenCalled();
 });
+
+it('collects the inherited first page returned as bare text commands by 1.3', () => {
+    vi.stubGlobal('parseCmd', (text) => text);
+    vi.stubGlobal('convertScript', () => null);
+    vi.stubGlobal('$externMessage', { _map: { ROOT: ['【カナデ】\nFirst\nsecond'] } });
+    vi.stubGlobal('convertMessageCommand', () => [
+        { code: 401, parameters: ['【カナデ】'] },
+        { code: 401, parameters: ['First'] },
+        { code: 401, parameters: ['second'] },
+        { code: 101, parameters: ['face', 0, 0, 2, 'Speaker'] },
+        { code: 401, parameters: ['Next page'] },
+    ]);
+    const translator = new ExternMessageTranslator();
+    expect(translator.buildScanEntries().map(({ cacheType, text }) => [cacheType, text])).toEqual([
+        ['message', '【カナデ】\nFirst\nsecond'],
+        ['speaker', 'Speaker'],
+        ['message_portrait', 'Next page'],
+    ]);
+    expect($externMessage._map.ROOT).toEqual(['【カナデ】\nFirst\nsecond']);
+});

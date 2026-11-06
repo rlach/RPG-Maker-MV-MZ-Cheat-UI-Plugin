@@ -4,6 +4,7 @@ import { BasePluginTranslator } from '../BasePluginTranslator.js';
  * ItemNameEscape.js translator
  *
  * Supported plugin versions:
+ * - 1.0.1 (MV), native escape conversion without PluginManagerEx
  * - 1.1.0 - 1.1.2 (MZ)
  *
  * Translation notes:
@@ -53,64 +54,67 @@ export class ItemNameEscapeTranslator extends BasePluginTranslator {
         }
 
         const originalConvertName = DataManager.convertName;
-        const getRuntime = this.getRuntime.bind(this);
-        const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
-        const resolveRuntimeTranslation = this.resolveRuntimeTranslation.bind(this);
-        const isUsableText = this.isUsableText.bind(this);
-
+        const translator = this;
         DataManager.convertName = function (data) {
-            try {
-                const runtime = getRuntime();
-                if (
-                    runtime &&
-                    isRuntimeTranslationActive(runtime) &&
-                    data &&
-                    typeof data === 'object'
-                ) {
-                    if (isUsableText(data.preName) && !!data.preName.set) {
-                        const translatedPreName = resolveRuntimeTranslation(
-                            data.preName,
-                            runtime,
-                            NAME_CACHE_TYPES,
-                            {
-                                requireRuntimeTranslationActive: true,
-                                missValue: data.preName,
-                                harvestMissing: false,
-                            }
-                        );
-
-                        if (isUsableText(translatedPreName)) {
-                            data.preName = translatedPreName;
-                        }
-                    }
-
-                    if (isUsableText(data.preDescription) && !!data.preDescription.set) {
-                        const translatedPreDescription = resolveRuntimeTranslation(
-                            data.preDescription,
-                            runtime,
-                            DESCRIPTION_CACHE_TYPES,
-                            {
-                                requireRuntimeTranslationActive: true,
-                                missValue: data.preDescription,
-                                harvestMissing: false,
-                            }
-                        );
-
-                        if (isUsableText(translatedPreDescription)) {
-                            data.preDescription = translatedPreDescription;
-                        }
+            if (data) {
+                for (const [field, sourceField] of [
+                    ['name', 'preName'],
+                    ['description', 'preDescription'],
+                ]) {
+                    if (translator.isUsableText(data[sourceField])) {
+                        data._translateOriginal ??= {};
+                        data._translateOriginal[field] = data[sourceField];
                     }
                 }
-            } catch (error) {
-                console.warn(
-                    '[ItemNameEscapeTranslator] Failed to apply cached translation to preName/preDescription',
-                    data
-                );
-                throw error;
             }
-
-            return originalConvertName.apply(this, arguments);
+            const runtime = translator.getRuntime();
+            if (!data || !translator.isRuntimeTranslationActive(runtime))
+                return originalConvertName.apply(this, arguments);
+            const preName = data.preName;
+            const preDescription = data.preDescription;
+            try {
+                for (const [field, sourceField, types] of [
+                    ['name', 'preName', NAME_CACHE_TYPES],
+                    ['description', 'preDescription', DESCRIPTION_CACHE_TYPES],
+                ]) {
+                    const source = data[sourceField] ?? data._translateOriginal?.[field];
+                    if (!translator.isUsableText(source)) continue;
+                    const translated = translator.resolveRuntimeTranslation(
+                        source,
+                        runtime,
+                        types,
+                        {
+                            harvestMissing: false,
+                        }
+                    );
+                    if (data[sourceField] != null) data[sourceField] = translated;
+                    else data[field] = translated;
+                }
+                return originalConvertName.apply(this, arguments);
+            } finally {
+                // The native plugin re-evaluates these sources on scene changes.
+                // Keep their control codes available for future variable updates.
+                if (preName !== undefined) data.preName = preName;
+                if (preDescription !== undefined) data.preDescription = preDescription;
+            }
         };
+
+        const runtime = this.getRuntime();
+        const originalApplyField = runtime.applyTranslatedFieldValueSafely;
+        if (typeof originalApplyField === 'function') {
+            runtime.applyTranslatedFieldValueSafely = function (options) {
+                const assigned = originalApplyField.call(this, options);
+                const sourceField = {
+                    name: 'preName',
+                    description: 'preDescription',
+                }[options.field];
+                if (assigned && sourceField && options.item[sourceField] != null) {
+                    // Cache refreshes can run after the native scene/map refresh.
+                    DataManager.convertName(options.item);
+                }
+                return assigned;
+            };
+        }
 
         return true;
     }

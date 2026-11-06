@@ -1,3 +1,4 @@
+import { getTagConsistencyMode } from '../translate-engines/ai-engine/constants.js';
 import { TagSyntax, TAG_FORMAT_OPTIONS } from '../translate-engines/ai-engine/TagSyntax.js';
 import { getRowsPerPage, setRowsPerPage as setTableRowsPerPage } from '../js/TableSettings.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
@@ -180,7 +181,8 @@ export default {
                 description: '',
                 tagSymbol: '',
                 type: 'withNumericParameter',
-                requiredConsistency: false,
+                requiredConsistency: true,
+                consistencyMode: 'full',
                 style: 'escape',
                 bracket: '<',
                 maskValue: false,
@@ -510,7 +512,8 @@ export default {
                 description: '',
                 tagSymbol: '',
                 type: 'withNumericParameter',
-                requiredConsistency: false,
+                requiredConsistency: true,
+                consistencyMode: 'full',
                 style: 'escape',
                 bracket: '<',
                 maskValue: false,
@@ -536,6 +539,7 @@ export default {
                 tagSymbol: String(tag.tagSymbol || ''),
                 type: String(tag.type || 'withNumericParameter'),
                 requiredConsistency: !!tag.requiredConsistency,
+                consistencyMode: getTagConsistencyMode(tag),
                 style: String(tag.style || 'escape'),
                 bracket: String(tag.bracket || '<'),
                 maskValue: !!tag.maskValue,
@@ -562,6 +566,7 @@ export default {
                 tagSymbol: String(tag.tagSymbol || ''),
                 type: String(tag.type || 'withNumericParameter'),
                 requiredConsistency: !!tag.requiredConsistency,
+                consistencyMode: getTagConsistencyMode(tag),
                 style: String(tag.style || 'escape'),
                 bracket: String(tag.bracket || (tag.style === 'xml' ? 'none' : '<')),
                 maskValue: !!tag.maskValue,
@@ -597,7 +602,8 @@ export default {
                         this.customTagForm.reservedWidth
                     ),
                     extraPromptForLlm: String(this.customTagForm.extraPromptForLlm || '').trim(),
-                    requiredConsistency: !!this.customTagForm.requiredConsistency,
+                    requiredConsistency: this.customTagForm.consistencyMode === 'full',
+                    consistencyMode: this.customTagForm.consistencyMode,
                 },
                 pluginName || ''
             );
@@ -631,7 +637,8 @@ export default {
                 description: String(this.customTagForm.description || '').trim(),
                 tagSymbol: String(this.customTagForm.tagSymbol || '').trim(),
                 type: String(this.customTagForm.type || 'withNumericParameter'),
-                requiredConsistency: !!this.customTagForm.requiredConsistency,
+                requiredConsistency: this.customTagForm.consistencyMode === 'full',
+                consistencyMode: this.customTagForm.consistencyMode,
                 style: String(this.customTagForm.style || 'escape'),
                 reservedWidth: this.normalizeReservedWidthInput(this.customTagForm.reservedWidth),
                 extraPromptForLlm: String(this.customTagForm.extraPromptForLlm || '').trim(),
@@ -678,7 +685,11 @@ export default {
                 pluginName: '',
                 tagConfig: null,
             };
-            this.customTagForm = { ...payload.form };
+            this.customTagForm = {
+                ...payload.form,
+                requiredConsistency: true,
+                consistencyMode: 'full',
+            };
 
             // Vuetify focus trap can recurse with two dialogs open at once.
             // Close unknown modal first, then open custom tag dialog.

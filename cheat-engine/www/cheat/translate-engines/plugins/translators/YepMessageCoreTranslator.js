@@ -1,3 +1,4 @@
+import { ACTOR_NAME_TAG_PROMPT } from '../../ai-engine/constants.js';
 import { TAG_BRACKET, TAG_STYLE, TAG_TYPE } from '../../ai-engine/constants.js';
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
@@ -142,6 +143,8 @@ const YEP_MESSAGE_CORE_PLUGIN_TAGS = [
         description: "Writes out actor's nickname.",
         type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
         tagSymbol: 'AN',
+        consistencyMode: 'missing',
+        extraPromptForLlm: ACTOR_NAME_TAG_PROMPT,
         reservedWidth: 6,
         requiredConsistency: false,
     },
@@ -170,6 +173,8 @@ const YEP_MESSAGE_CORE_PLUGIN_TAGS = [
         description: "Writes out party member x's nickname.",
         type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
         tagSymbol: 'PN',
+        consistencyMode: 'missing',
+        extraPromptForLlm: ACTOR_NAME_TAG_PROMPT,
         reservedWidth: 6,
         requiredConsistency: false,
     },

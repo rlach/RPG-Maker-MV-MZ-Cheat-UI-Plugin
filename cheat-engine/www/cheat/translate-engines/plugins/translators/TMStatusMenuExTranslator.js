@@ -15,6 +15,10 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
         return PLUGIN_NAME;
     }
 
+    getPluginAliases() {
+        return [PLUGIN_NAME, 'Av_TMStatusMenuEx'];
+    }
+
     getPluginLabel() {
         return 'TMStatusMenuEx';
     }
@@ -24,7 +28,7 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
     }
 
     detectPlugin() {
-        const pluginNameLower = PLUGIN_NAME.toLowerCase();
+        const pluginNames = this.getPluginAliases().map((name) => name.toLowerCase());
 
         if (Array.isArray(window.$plugins)) {
             const matched = window.$plugins.some((plugin) => {
@@ -32,7 +36,7 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
                     return false;
                 }
 
-                return plugin.name.trim().toLowerCase() === pluginNameLower;
+                return pluginNames.includes(plugin.name.trim().toLowerCase());
             });
 
             if (matched) {
@@ -42,7 +46,11 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
 
         const pluginManager = window['PluginManager'];
         if (pluginManager && typeof pluginManager.parameters === 'function') {
-            const parameters = pluginManager.parameters(PLUGIN_NAME);
+            const parameters = pluginManager.parameters(
+                this.getPluginAliases()
+                    .map((name) => this.findPluginEntry(name))
+                    .find((entry) => entry?.status !== false && entry)?.name || PLUGIN_NAME
+            );
             const hasAnyParam = PARAM_FIELDS.some((field) => {
                 const value =
                     parameters && typeof parameters[field] === 'string' ? parameters[field] : '';
@@ -98,7 +106,9 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
     buildScanEntries() {
         const entries = [];
 
-        const pluginEntry = this.findPluginEntry();
+        const pluginEntry = this.getPluginAliases()
+            .map((name) => this.findPluginEntry(name))
+            .find((entry) => entry?.status !== false && entry);
         if (pluginEntry?.parameters) {
             this.appendEntriesFromParameters(
                 pluginEntry.parameters,
@@ -109,7 +119,11 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
 
         const pluginManager = window['PluginManager'];
         if (pluginManager && typeof pluginManager.parameters === 'function') {
-            const runtimeParameters = pluginManager.parameters(PLUGIN_NAME);
+            const runtimeParameters = pluginManager.parameters(
+                this.getPluginAliases()
+                    .map((name) => this.findPluginEntry(name))
+                    .find((entry) => entry?.status !== false && entry)?.name || PLUGIN_NAME
+            );
             this.appendEntriesFromParameters(
                 runtimeParameters,
                 'runtimePluginManagerParameter',

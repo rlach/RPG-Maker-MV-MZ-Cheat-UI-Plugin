@@ -19,6 +19,7 @@ const cacheManagerTableStateMemory = {
     selectedTypeFilter: '',
     searchIn: 'both',
     onlyEmpty: false,
+    suspicionFilter: 'any',
 };
 
 export default {
@@ -141,6 +142,15 @@ export default {
                                 class="mt-0 pt-0"
                                 @keydown.stop>
                             </v-switch>
+                            <span class="text-caption" style="white-space: nowrap;">Suspicious</span>
+                            <v-select v-model="suspicionFilter" :items="suspicionFilterOptions"
+                                item-title="text" item-value="value" aria-label="Suspicious"
+                                variant="outlined" single-line density="compact" hide-details style="max-width: 300px;" @keydown.stop />
+                            <v-btn variant="text" icon size="small" color="success"
+                                title="Accept all matching suspicions" :disabled="suspicionFilter === 'any' || matchingFilterEntryCount <= 1"
+                                @click="confirmAcceptMatchingSuspicions">
+                                <v-icon>mdi-check-all</v-icon>
+                            </v-btn>
                         </div>
                     </div>
                 </template>
@@ -192,6 +202,10 @@ export default {
                     </v-btn>
                 </template>
                 <template v-else>
+                    <v-btn v-if="item.suspicions?.length" variant="text" icon size="x-small" color="warning"
+                        title="Review translation suspicions" @click="reviewSuspicion(item)">
+                        <v-icon size="small">mdi-alert</v-icon>
+                    </v-btn>
                     <cheat-tooltip location="bottom">
                         <span>Edit translation</span>
                         <template v-slot:activator="{ props: activatorProps }">
@@ -251,6 +265,7 @@ export default {
             replaceInput: '',
             searchIn: 'both',
             onlyEmpty: false,
+            suspicionFilter: 'any',
             editingKey: null,
             sourceLang: 'ja',
             targetLang: 'en',
@@ -300,6 +315,13 @@ export default {
         this.lastSeenByCacheKey = runtime.lastSeenByCacheKey;
 
         this.unsubscribeRuntime = onTranslateCacheRuntimeChanged((detail) => {
+            if (detail?.reason === 'suspicions-updated') {
+                const keys = new Set(detail.keys || []);
+                for (const entry of this.entries) {
+                    if (keys.has(entry.key)) entry.suspicions = [];
+                }
+                return;
+            }
             if (detail?.reason === 'cache-manager-remove-translation' && detail.key) {
                 this.updateEntryTranslation(detail.key);
                 return;
@@ -386,12 +408,29 @@ export default {
             this.saveTableState();
         },
 
+        suspicionFilter() {
+            this.saveTableState();
+        },
+
         onlyEmpty() {
             this.saveTableState();
         },
     },
 
     computed: {
+        suspicionFilterOptions() {
+            const reasons = new Map();
+            for (const entry of this.entries) {
+                for (const reason of entry.suspicions || []) reasons.set(reason.id, reason.label);
+            }
+            return [
+                { text: 'Any', value: 'any' },
+                { text: 'Only', value: 'only' },
+                ...Array.from(reasons, ([value, text]) => ({ value, text })).sort((a, b) =>
+                    a.text.localeCompare(b.text)
+                ),
+            ];
+        },
         activeLanguagePairLabel() {
             const completion = computeLangPairCompletionByKeyLength({
                 translationCache: this.translationCache,
@@ -464,6 +503,58 @@ export default {
     },
 
     methods: {
+        acceptSuspicions(keys) {
+            ensureTranslationRuntime().acceptTranslationSuspicions(keys);
+            const accepted = new Set(keys);
+            for (const entry of this.entries) {
+                if (accepted.has(entry.key)) entry.suspicions = [];
+            }
+        },
+
+        reviewSuspicion(item) {
+            ConfirmDialog.show({
+                title: 'Suspicious translation',
+                width: 600,
+                message: item.suspicions.map((reason) => reason.message).join('\n\n'),
+                actions: [
+                    { label: 'Close', action: ConfirmDialog.close },
+                    {
+                        label: 'Accept translation',
+                        color: 'green',
+                        icon: 'mdi-check',
+                        action: () => {
+                            this.acceptSuspicions([item.key]);
+                            ConfirmDialog.close();
+                        },
+                    },
+                ],
+            });
+        },
+
+        confirmAcceptMatchingSuspicions() {
+            if (this.suspicionFilter === 'any') return;
+            const keys = this.getEntriesMatchingFilter(
+                this.searchInput,
+                this.selectedTypeFilter
+            ).map((entry) => entry.key);
+            if (keys.length <= 1) return;
+            ConfirmDialog.show({
+                width: 500,
+                message: `Accept all suspicions for ${keys.length} translations matching all current filters?`,
+                actions: [
+                    { label: 'Cancel', action: ConfirmDialog.close },
+                    {
+                        label: 'Accept',
+                        color: 'green',
+                        icon: 'mdi-check-all',
+                        action: () => {
+                            this.acceptSuspicions(keys);
+                            ConfirmDialog.close();
+                        },
+                    },
+                ],
+            });
+        },
         scheduleSearchDebounce(value) {
             if (this.searchDebounceTimer) {
                 clearTimeout(this.searchDebounceTimer);
@@ -642,6 +733,7 @@ export default {
             ) {
                 this.searchIn = state.searchIn;
             }
+            this.suspicionFilter = state.suspicionFilter || 'any';
             if (typeof state.onlyEmpty === 'boolean') {
                 this.onlyEmpty = state.onlyEmpty;
             }
@@ -655,6 +747,7 @@ export default {
             cacheManagerTableStateMemory.selectedTypeFilter = this.selectedTypeFilter;
             cacheManagerTableStateMemory.searchIn = this.searchIn;
             cacheManagerTableStateMemory.onlyEmpty = !!this.onlyEmpty;
+            cacheManagerTableStateMemory.suspicionFilter = this.suspicionFilter;
         },
 
         flushPendingCacheEdits(reason = 'unknown') {
@@ -685,6 +778,7 @@ export default {
             }
 
             const runtime = ensureTranslationRuntime();
+            runtime.acceptTranslationSuspicions(changedKeys);
             runtime.persistCache(changedKeys);
             runtime.notifyCacheRuntime(reason);
 
@@ -696,6 +790,7 @@ export default {
             this.sourceLang = pair.sourceLang;
             this.targetLang = pair.targetLang;
 
+            const runtime = ensureTranslationRuntime();
             const items = [];
             for (const [cacheKey, value] of this.translationCache.entries()) {
                 const parsed = parseCacheKeyForLangPair(cacheKey, this.sourceLang, this.targetLang);
@@ -715,6 +810,7 @@ export default {
                     original: parsed.original,
                     translation,
                     actionsSort: parsed.original,
+                    suspicions: runtime.getTranslationSuspicions(cacheKey),
                 });
             }
 
@@ -750,6 +846,7 @@ export default {
             this.translationCache.set(item.key, '');
             this.updateEntryTranslation(item.key);
             const runtime = ensureTranslationRuntime();
+            runtime.acceptTranslationSuspicions([item.key]);
             runtime.persistCache([item.key]);
             runtime.notifyCacheRuntime('cache-manager-remove-translation', item.key);
         },
@@ -801,6 +898,14 @@ export default {
                     return false;
                 }
 
+                const suspicions = entry.suspicions || [];
+                if (this.suspicionFilter === 'only' && !suspicions.length) return false;
+                if (
+                    this.suspicionFilter &&
+                    !['any', 'only'].includes(this.suspicionFilter) &&
+                    !suspicions.some((reason) => reason.id === this.suspicionFilter)
+                )
+                    return false;
                 if (!this.onlyEmpty) {
                     return true;
                 }
@@ -872,6 +977,7 @@ export default {
             }
 
             const runtime = ensureTranslationRuntime();
+            runtime.acceptTranslationSuspicions(changedKeys);
             runtime.persistCache(changedKeys);
             runtime.notifyCacheRuntime('cache-manager-clear-filtered');
 
@@ -1019,6 +1125,7 @@ export default {
             }
 
             const runtime = ensureTranslationRuntime();
+            runtime.acceptTranslationSuspicions(changedKeys);
             runtime.persistCache(changedKeys);
             runtime.notifyCacheRuntime('cache-manager-replace');
             this.refreshEntries();

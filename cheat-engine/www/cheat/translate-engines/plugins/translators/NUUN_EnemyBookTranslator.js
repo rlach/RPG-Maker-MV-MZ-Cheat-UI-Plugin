@@ -1,5 +1,5 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
-import { walkNestedJsonLike } from './TranslatorHelpers.js';
+import { parseJsonSafely, walkNestedJsonLike } from './TranslatorHelpers.js';
 
 /**
  * NUUN_EnemyBook translator.
@@ -49,6 +49,9 @@ const NESTED_PARAMETER_KEYS = [
     'PageSetting',
     'InfoPageSetting',
     'AnalyzeListData',
+    'ListData',
+    'ListData1_10',
+    'ListData11_20',
     'CategoryListDateSetting',
 ];
 
@@ -120,7 +123,7 @@ export class NUUN_EnemyBookTranslator extends BasePluginTranslator {
         }
     }
 
-    buildScanEntries() {
+    buildScanEntries(enemies = window.$dataEnemies || []) {
         const entries = [];
 
         const pluginEntry = this.findPluginEntry(this.getPluginName());
@@ -133,6 +136,21 @@ export class NUUN_EnemyBookTranslator extends BasePluginTranslator {
             this._appendParameterEntries(runtimeParameters, 'runtimeParameters', entries);
         }
 
+        this._appendEntry(entries, '倒した数', { scope: 'defaultLabel' });
+        for (const enemy of enemies) {
+            for (const [field, text] of Object.entries({
+                ...Object.fromEntries(
+                    Array.from((enemy?.note || '').matchAll(/<([^:<>]+):([^<>]*)>/g), (match) => [
+                        match[1],
+                        match[2],
+                    ])
+                ),
+                ...enemy?.meta,
+            })) {
+                if (/^desc\d+$/i.test(field))
+                    this._appendEntry(entries, text, { scope: 'enemyNote', field, id: enemy.id });
+            }
+        }
         return entries;
     }
 
@@ -149,7 +167,16 @@ export class NUUN_EnemyBookTranslator extends BasePluginTranslator {
             return this._scanPromise;
         }
 
-        this._scanPromise = Promise.resolve(this.buildScanEntries())
+        this._scanPromise = Promise.resolve()
+            .then(async () => {
+                let enemies = window.$dataEnemies;
+                if (!Array.isArray(enemies)) {
+                    const response = await fetch('data/Enemies.json');
+                    if (!response.ok) throw new Error('Cannot read enemy book descriptions');
+                    enemies = parseJsonSafely(await response.text(), []);
+                }
+                return this.buildScanEntries(enemies);
+            })
             .then((entries) => {
                 this._scanEntries = Array.isArray(entries) ? entries : [];
                 this._scanPrepared = true;
@@ -352,6 +379,14 @@ export class NUUN_EnemyBookTranslator extends BasePluginTranslator {
                     }
 
                     const ctorName = String(this?.constructor?.name || '');
+                    if (
+                        ctorName.startsWith('Window_EnemyBook') &&
+                        isRuntimeTranslationActive(runtime)
+                    ) {
+                        nextText = resolveRuntimeTranslation(text, runtime, cacheType, {
+                            harvestMissing: false,
+                        });
+                    }
                     if (ctorName === PERCENT_WINDOW_CTOR) {
                         const sourceText = String(text);
                         const separatorIndex = sourceText.indexOf(' : ');
@@ -393,6 +428,21 @@ export class NUUN_EnemyBookTranslator extends BasePluginTranslator {
                 writable: false,
             });
         }
+
+        const originalDrawTextEx = baseProto.drawTextEx;
+        baseProto.drawTextEx = function (text, ...args) {
+            const runtime = getRuntime();
+            if (
+                String(this.constructor?.name || '').startsWith('Window_EnemyBook') &&
+                isRuntimeTranslationActive(runtime) &&
+                isUsableText(text)
+            ) {
+                text = resolveRuntimeTranslation(text, runtime, cacheType, {
+                    harvestMissing: false,
+                });
+            }
+            return originalDrawTextEx.call(this, text, ...args);
+        };
 
         return true;
     }

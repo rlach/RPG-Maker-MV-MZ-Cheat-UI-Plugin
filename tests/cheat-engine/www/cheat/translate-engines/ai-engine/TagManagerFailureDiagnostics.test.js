@@ -18,10 +18,10 @@ it('identifies each unresolved occurrence including repeated and unclosed tags',
 });
 
 it.each(['TAG:sn', '.TAG:sn⟫', '<<TAG:sn>', '⟪TAG:sn', 'TAG:sp12'])(
-    'rejects broken known transport marker %s',
+    'accepts broken transport fragments for advisory inspection %s',
     (text) => {
         const manager = new TagManager(null);
-        expect(manager.postprocessTags(text, {}, {}).valid).toBe(false);
+        expect(manager.postprocessTags(text, {}, {}).valid).toBe(true);
     }
 );
 

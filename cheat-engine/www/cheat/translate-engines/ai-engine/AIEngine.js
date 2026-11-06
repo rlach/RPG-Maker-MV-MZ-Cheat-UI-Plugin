@@ -1,3 +1,5 @@
+import { getTagConsistencyMode } from './constants.js';
+import { detectTranslationSuspicions } from './TranslationSuspicions.js';
 import { TagSyntax } from './TagSyntax.js';
 import { LlmConnectionError, LLM_CONNECTION_ERROR } from './LlmConnectionError.js';
 import { buildOfficialNameMap } from '../../js/NamePatternCacheRepair.js';
@@ -329,6 +331,7 @@ class AIEngine extends BaseTranslationEngine {
             type: String(config.type || ''),
             tagSymbol: String(config.tagSymbol || '').trim(),
             requiredConsistency: !!config.requiredConsistency,
+            consistencyMode: getTagConsistencyMode(config),
             style: config.style === 'xml' ? 'xml' : 'escape',
         };
 
@@ -393,8 +396,15 @@ class AIEngine extends BaseTranslationEngine {
                     return;
                 }
 
+                if (fieldName === 'consistencyMode') {
+                    normalizedOverride.consistencyMode = getTagConsistencyMode(value);
+                    return;
+                }
+
                 if (fieldName === 'requiredConsistency') {
                     normalizedOverride[fieldName] = !!value[fieldName];
+                    if (!value.consistencyMode)
+                        normalizedOverride.consistencyMode = getTagConsistencyMode(value);
                 }
             });
 
@@ -1393,6 +1403,14 @@ class AIEngine extends BaseTranslationEngine {
                     id: itemD.id,
                     value: itemD.value,
                     translated: finalTranslated,
+                    suspicions: [
+                        ...(postprocessResult.suspicions || []),
+                        ...detectTranslationSuspicions(
+                            itemD.value,
+                            finalTranslated,
+                            this.tagManager
+                        ),
+                    ],
                     cacheKey: itemD.cacheKey,
                 });
             }
@@ -1800,7 +1818,8 @@ class AIEngine extends BaseTranslationEngine {
 
     validateNewlineCounts(item, postprocessResult) {
         const newlineTagConfig = this.getSimpleNewlineTagConfig();
-        const shouldValidateConsistency = newlineTagConfig.requiredConsistency === true;
+        const mode = getTagConsistencyMode(newlineTagConfig);
+        const shouldValidateConsistency = mode === 'full' || mode === 'missing';
         const expectedNewlineCount = this.getNewlineCountFromTagCounts(item?.tagCounts);
         const actualNewlineCount = this.getNewlineCountFromTagCounts(
             postprocessResult?.actualCounts
@@ -1823,7 +1842,11 @@ class AIEngine extends BaseTranslationEngine {
             return { valid: true };
         }
 
-        if (actualNewlineCount !== expectedNewlineCount) {
+        if (
+            mode === 'missing'
+                ? actualNewlineCount > expectedNewlineCount
+                : actualNewlineCount !== expectedNewlineCount
+        ) {
             return {
                 valid: false,
                 errorReason: 'Newline count mismatch',

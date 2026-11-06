@@ -1,3 +1,8 @@
+import { DarkPlasmaChoiceExtensionTranslator } from './translators/DarkPlasmaChoiceExtensionTranslator.js';
+import { LevelUpMessagePlusTranslator } from './translators/LevelUpMessagePlusTranslator.js';
+import { KekeSpeedStarBattleTranslator } from './translators/KekeSpeedStarBattleTranslator.js';
+import { PHWarehouseTranslator } from './translators/PHWarehouseTranslator.js';
+import { AbilitySystemTranslator } from './translators/AbilitySystemTranslator.js';
 import { NYAInfoMenuWindowTranslator } from './translators/NYAInfoMenuWindowTranslator.js';
 import { VitsunoDifficultyTranslator } from './translators/VitsunoDifficultyTranslator.js';
 import { AnimationMapNameTranslator } from './translators/AnimationMapNameTranslator.js';
@@ -21,6 +26,11 @@ import { DKToolsLocalizationTranslator } from './translators/DKToolsLocalization
 import { HendrixLocalizationTranslator } from './translators/HendrixLocalizationTranslator.js';
 import { LanguageTranslationTranslator } from './translators/LanguageTranslationTranslator.js';
 import { MMChoiceButtonExTranslator } from './translators/MMChoiceButtonExTranslator.js';
+import { MMUltimateTextAnimationTranslator } from './translators/MMUltimateTextAnimationTranslator.js';
+import { EquipRemoveUiTranslator } from './translators/EquipRemoveUiTranslator.js';
+import { TrpParticleOptionTranslator } from './translators/TrpParticleOptionTranslator.js';
+import { CultivatorUiTranslator } from './translators/CultivatorUiTranslator.js';
+import { YknrMessageKeyWordTranslator } from './translators/YknrMessageKeyWordTranslator.js';
 import { SttlaSynthesisTranslator } from './translators/SttlaSynthesisTranslator.js';
 import { NoreRogueUiTranslator } from './translators/NoreRogueUiTranslator.js';
 import { NoreClickerUiTranslator } from './translators/NoreClickerUiTranslator.js';
@@ -230,6 +240,16 @@ class PluginTranslatorRegistry {
             HendrixLocalizationTranslator,
             LanguageTranslationTranslator,
             MMChoiceButtonExTranslator,
+            MMUltimateTextAnimationTranslator,
+            EquipRemoveUiTranslator,
+            AbilitySystemTranslator,
+            PHWarehouseTranslator,
+            KekeSpeedStarBattleTranslator,
+            LevelUpMessagePlusTranslator,
+            DarkPlasmaChoiceExtensionTranslator,
+            TrpParticleOptionTranslator,
+            CultivatorUiTranslator,
+            YknrMessageKeyWordTranslator,
             SttlaSynthesisTranslator,
             NoreRogueUiTranslator,
             NoreClickerUiTranslator,

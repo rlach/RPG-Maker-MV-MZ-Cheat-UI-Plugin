@@ -148,6 +148,12 @@ export class ExternMessageTranslator extends ExternBaseTranslator {
                         window.parseCmd = parse;
                     }
                 } else Game_Interpreter.convertMessageCommand(commands, command);
+                // 1.3 emits the first page as bare 401 commands because it
+                // inherits the event's existing 101 at runtime. Supply that
+                // boundary only to the scanner so the first page is collected.
+                if (commands[0]?.code === 401) {
+                    commands.unshift({ code: 101, indent: 0, parameters: ['', 0, 0, 2] });
+                }
                 for (const item of collectEventCommandEntries(commands)) {
                     if (!['message', 'message_portrait', 'speaker'].includes(item.type)) continue;
                     entries.push({

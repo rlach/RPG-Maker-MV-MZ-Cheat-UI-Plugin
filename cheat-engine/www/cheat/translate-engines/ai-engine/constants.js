@@ -52,6 +52,7 @@ export const TAG_OVERRIDABLE_FIELDS = Object.freeze([
     'reservedWidth',
     'extraPromptForLlm',
     'requiredConsistency',
+    'consistencyMode',
 ]);
 
 export const SIMPLE_NEWLINE_TAG_CONFIG = Object.freeze({
@@ -65,6 +66,24 @@ export const SIMPLE_NEWLINE_TAG_CONFIG = Object.freeze({
         'This tag represents newline, put it in places where newline typically would appear',
     _isSimpleNTag: true,
 });
+
+export const TAG_CONSISTENCY_OPTIONS = Object.freeze([
+    { text: "Don't check consistency", value: 'none' },
+    { text: 'Require full consistency', value: 'full' },
+    { text: 'Allow only missing, mark as suspicious', value: 'missing' },
+    { text: 'Allow inconsistency, mark as suspicious', value: 'any' },
+]);
+
+export function getTagConsistencyMode(config = {}) {
+    return TAG_CONSISTENCY_OPTIONS.some((option) => option.value === config.consistencyMode)
+        ? config.consistencyMode
+        : config.requiredConsistency
+          ? 'full'
+          : 'none';
+}
+
+export const ACTOR_NAME_TAG_PROMPT =
+    'This tag represents a character name. Keep it when the name is needed. You may omit it when natural translation uses a pronoun or an implied subject, including a character referring to themselves. Never add occurrences or change its parameter.';
 
 // Base tag configuration. Regex patterns are generated once in TagManager initialization.
 export const TAG_CONFIGS = [
@@ -87,14 +106,16 @@ export const TAG_CONFIGS = [
         type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
         tagSymbol: 'N',
         reservedWidth: 6,
-        extraPromptForLlm:
-            'This tag represents names, so treat them as such in text. NEVER change those tags into pronouns or implied subject.',
+        extraPromptForLlm: ACTOR_NAME_TAG_PROMPT,
+        consistencyMode: 'missing',
         requiredConsistency: true,
     },
     {
         description: 'Will be replaced by the name of the nth (arranged order) party member.',
         type: TAG_TYPE.WITH_NUMERIC_PARAMETER,
         tagSymbol: 'P',
+        consistencyMode: 'missing',
+        extraPromptForLlm: ACTOR_NAME_TAG_PROMPT,
         reservedWidth: 6,
         requiredConsistency: true,
     },
