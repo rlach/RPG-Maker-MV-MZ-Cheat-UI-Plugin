@@ -262,7 +262,7 @@ export default {
             try {
                 const releaseInfo = (
                     await axios.get(
-                        'https://api.github.com/repos/paramonos/RPG-Maker-MV-MZ-Cheat-UI-Plugin/releases/latest'
+                        'https://api.github.com/repos/rlach/RPG-Maker-MV-MZ-Cheat-UI-Plugin/releases/latest'
                     )
                 ).data;
 

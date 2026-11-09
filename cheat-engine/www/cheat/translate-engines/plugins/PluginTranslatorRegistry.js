@@ -7,6 +7,8 @@ import { NYAInfoMenuWindowTranslator } from './translators/NYAInfoMenuWindowTran
 import { VitsunoDifficultyTranslator } from './translators/VitsunoDifficultyTranslator.js';
 import { AnimationMapNameTranslator } from './translators/AnimationMapNameTranslator.js';
 import { Inn15DayUiTranslator } from './translators/Inn15DayUiTranslator.js';
+import { RirikaManagementUiTranslator } from './translators/RirikaManagementUiTranslator.js';
+import { ElleMenuTranslator } from './translators/ElleMenuTranslator.js';
 import { ChimakiLangTranslator } from './translators/ChimakiLangTranslator.js';
 import { AutoNamePopupTranslator } from './translators/AutoNamePopupTranslator.js';
 import { AKUNOUOptionMessageSpeedTranslator } from './translators/AKUNOU_OptionMessageSpeedTranslator.js';
@@ -262,6 +264,8 @@ class PluginTranslatorRegistry {
             GraceDungeonUiTranslator,
             ChimakiLangTranslator,
             Inn15DayUiTranslator,
+            RirikaManagementUiTranslator,
+            ElleMenuTranslator,
             LLTrackNameWindowTranslator,
             NuunDestinationTranslator,
             FtkrCssDetailedStatusTranslator,

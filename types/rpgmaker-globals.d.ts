@@ -58,6 +58,7 @@ declare const Game_Screen: any;
 
 declare const Scene_Base: any;
 declare const Scene_Map: any;
+declare const Window_MenuEx: any;
 declare const Scene_Message: any;
 declare const Scene_Battle: any;
 declare const Scene_HelpWindow: any;
@@ -207,6 +208,7 @@ declare interface Window {
     Spriteset_Map?: any;
     DataManager?: any;
     Scene_Map?: any;
+    Window_MenuEx?: any;
     Window_Base?: any;
     Window_Command?: any;
     Window_EroStatus?: any;
