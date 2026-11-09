@@ -98,3 +98,46 @@ it('scans destination text and translates both display getters without changing 
     runtime.enabled = false;
     expect(new WindowBase().getDestinationList()).toBe(source);
 });
+
+it('renders menu locations through existing map translations and preserves map data', () => {
+    vi.stubGlobal('window', globalThis);
+    vi.stubGlobal('$gameMap', { displayName: () => 'ビスクの港' });
+    const translator = new NuunMenuScreenExTranslator();
+    const runtime = runtimeFor(translator);
+    runtime.translationCache.set('map_name:ビスクの港', 'Bisk Port');
+    const drawn = [];
+    const prototype = {
+        drawText(text) { drawn.push(text); },
+        nuun_DrawMenuInfoContentsCurrentLocation() {
+            this.drawText('Current Location');
+            this.drawText($gameMap.displayName());
+        },
+    };
+    translator.hookCurrentLocation(prototype);
+    const instance = Object.create(prototype);
+    instance.nuun_DrawMenuInfoContentsCurrentLocation();
+    expect(drawn).toEqual(['Current Location', 'Bisk Port']);
+    expect($gameMap.displayName()).toBe('ビスクの港');
+    expect(Object.hasOwn(instance, 'drawText')).toBe(false);
+    expect(runtime.trackCacheKeyUsage).toHaveBeenCalledWith('map_name:ビスクの港', { harvestMissing: true });
+    runtime.enabled = false;
+    instance.nuun_DrawMenuInfoContentsCurrentLocation();
+    expect(drawn.slice(-2)).toEqual(['Current Location', 'ビスクの港']);
+});
+
+it('translates map values in closure-local NUUN info windows', () => {
+    vi.stubGlobal('window', globalThis);
+    vi.stubGlobal('$gameMap', { displayName: () => 'ビスクの港' });
+    class WindowBase { drawText(text) { return text; } }
+    class Window_InfoMenu extends WindowBase {}
+    vi.stubGlobal('Window_Base', WindowBase);
+    const translator = new NuunMenuScreenExTranslator();
+    const runtime = runtimeFor(translator);
+    runtime.translationCache.set('map_name:ビスクの港', 'Bisk Port');
+    vi.spyOn(translator, 'precomputeCounts').mockResolvedValue();
+    expect(translator.enablePluginTranslation()).toBe(true);
+    expect(new Window_InfoMenu().drawText('ビスクの港')).toBe('Bisk Port');
+    expect(new WindowBase().drawText('ビスクの港')).toBe('ビスクの港');
+    runtime.enabled = false;
+    expect(new Window_InfoMenu().drawText('ビスクの港')).toBe('ビスクの港');
+});

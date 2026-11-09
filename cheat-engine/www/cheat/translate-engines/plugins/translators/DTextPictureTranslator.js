@@ -8,6 +8,8 @@ import { TAG_BRACKET, TAG_STYLE, TAG_TYPE } from '../../ai-engine/constants.js';
  * Supported plugin versions:
  * - DTextPicture.js v1.6.1 (MV): runtime hook on Game_Screen#setDTextPicture,
  *   plus Game_Picture#updateDTextVariable for REAL_TIME refresh parity.
+ * - v1.10.1 (MV), renamed 動的文字列ピクチャ生成プラグイン.js:
+ *   same Game_Screen#setDTextPicture pipeline (Fallen Noble Ver1.07).
  * - DTextPicture.js v1.20.3 (MV): runtime hook on Game_Screen#setDTextPicture,
  *   plus Game_Picture#updateDTextVariable for REAL_TIME refresh parity.
  * - DTextPicture.js v1.20.5 (MV/MZ): runtime hook on Game_Screen#setDTextPicture,
@@ -97,6 +99,10 @@ export class DTextPictureTranslator extends BasePluginTranslator {
 
     getPluginName() {
         return 'DTextPicture';
+    }
+
+    getPluginAliases() {
+        return ['DTextPicture', '動的文字列ピクチャ生成プラグイン'];
     }
 
     getPluginLabel() {

@@ -35,6 +35,15 @@ export class NRP_MessageWindowTranslator extends BasePluginTranslator {
     getSettingsSchema() {
         return [
             {
+                key: 'maxLinesPerPage',
+                label: 'Maximum lines per message page (0 = plugin default)',
+                type: 'number',
+                default: 0,
+                min: 0,
+                max: 20,
+                step: 1,
+            },
+            {
                 key: 'textOffsetX',
                 label: 'Text horizontal offset (px)',
                 type: 'number',
@@ -102,6 +111,34 @@ export class NRP_MessageWindowTranslator extends BasePluginTranslator {
         const translator = this;
         const textSettings = () =>
             translator.isRuntimeTranslationActive() ? translator.getPluginSettings() : {};
+        const pageLines = new WeakMap();
+        const newPage = messageProto.newPage;
+        const processNewLine = messageProto.processNewLine;
+        const needsNewPage = messageProto.needsNewPage;
+        if (
+            typeof newPage === 'function' &&
+            typeof processNewLine === 'function' &&
+            typeof needsNewPage === 'function'
+        ) {
+            messageProto.newPage = function (...args) {
+                pageLines.set(this, 1);
+                return newPage.apply(this, args);
+            };
+            messageProto.processNewLine = function (...args) {
+                // The engine checks pagination inside processNewLine, so count
+                // the new line before delegating. Its normal pause resumes the
+                // remaining text on a fresh page, including animated glyphs.
+                pageLines.set(this, (pageLines.get(this) || 1) + 1);
+                return processNewLine.apply(this, args);
+            };
+            messageProto.needsNewPage = function (textState) {
+                const limit = Math.floor(textSettings().maxLinesPerPage || 0);
+                return (
+                    needsNewPage.apply(this, arguments) ||
+                    (limit > 0 && !this.isEndOfText(textState) && pageLines.get(this) > limit)
+                );
+            };
+        }
         const updateClientArea = messageProto._updateClientArea;
         if (typeof updateClientArea === 'function') {
             // MZ animations added with addInnerChild share this container with

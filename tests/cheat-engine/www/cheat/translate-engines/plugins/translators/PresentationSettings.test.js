@@ -42,7 +42,7 @@ it('offers settings only on opt-in translators and applies offsets without drift
     };
     vi.spyOn(translator, 'getRuntime').mockReturnValue(runtime);
     expect(new BasePluginTranslator().getSettingsSchema()).toEqual([]);
-    expect(translator.getSettingsSchema()).toHaveLength(3);
+    expect(translator.getSettingsSchema()).toHaveLength(4);
     expect(translator.enablePluginTranslation()).toBe(true);
     const message = new Message();
     vi.stubGlobal('SceneManager', { _scene: { _messageWindow: message } });
@@ -59,6 +59,7 @@ it('offers settings only on opt-in translators and applies offsets without drift
     expect(message.y).toBe(100);
     translator.savePluginSettings({ textOffsetX: NaN, textOffsetY: -99999 });
     expect(translator.getPluginSettings()).toEqual({
+        maxLinesPerPage: 0,
         textOffsetX: 0,
         textOffsetY: -2048,
         windowOffsetY: 0,

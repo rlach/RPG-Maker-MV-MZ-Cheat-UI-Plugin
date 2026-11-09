@@ -710,8 +710,9 @@ export const translateOnTheFlyRuntimeMethods = {
                 ? originalChoices.map((choice) => self.getCacheKey(choice, 'choice'))
                 : [];
 
-            const originalSpeakerName =
-                $gameMessage._translateOriginalSpeaker || $gameMessage._speakerName || '';
+            const originalSpeakerName = self.resolveSpeakerSourceName(
+                $gameMessage._translateOriginalSpeaker || $gameMessage._speakerName || ''
+            );
             const hasSpeakerName = !!(originalSpeakerName && originalSpeakerName.trim().length > 0);
             const speakerKey = hasSpeakerName
                 ? self.getCacheKey(originalSpeakerName, 'speaker')
@@ -1301,8 +1302,9 @@ export const translateOnTheFlyRuntimeMethods = {
                       resolvedKey: null,
                   };
             const textKey = textCacheState.activeKey;
-            const originalSpeakerName =
-                $gameMessage._translateOriginalSpeaker || $gameMessage._speakerName || '';
+            const originalSpeakerName = self.resolveSpeakerSourceName(
+                $gameMessage._translateOriginalSpeaker || $gameMessage._speakerName || ''
+            );
             const originalChoices = Array.isArray($gameMessage._translateOriginalChoices)
                 ? $gameMessage._translateOriginalChoices
                 : Array.isArray($gameMessage.choices && $gameMessage.choices())

@@ -26,7 +26,7 @@ const NUUN_FALLBACK_STATUS_LABELS = [
  * Translator for NUUN_MenuScreenEX.
  *
  * Supported versions:
- * - 3.1.13+ (MZ)
+ * - 3.1.13+ (MZ), including CurrentLocation values resolved through map_name
  * - NUUN_MenuScreen_2 (MZ): top-level PageList1..10 parameters.
  *
  * Notes:
@@ -250,7 +250,35 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
         return translated;
     }
 
+    hookCurrentLocation(prototype) {
+        const original = prototype?.nuun_DrawMenuInfoContentsCurrentLocation;
+        if (typeof original !== 'function') return;
+        const translator = this;
+        prototype.nuun_DrawMenuInfoContentsCurrentLocation = function () {
+            const runtime = translator.getRuntime();
+            if (!translator.isRuntimeTranslationActive(runtime))
+                return original.apply(this, arguments);
+            const source = window.$gameMap.displayName();
+            const drawText = this.drawText;
+            const ownDrawText = Object.getOwnPropertyDescriptor(this, 'drawText');
+            this.drawText = function (text, ...args) {
+                const rendered =
+                    text === source
+                        ? translator.resolveRuntimeTranslation(text, runtime, 'map_name')
+                        : text;
+                return drawText.call(this, rendered, ...args);
+            };
+            try {
+                return original.apply(this, arguments);
+            } finally {
+                if (ownDrawText) Object.defineProperty(this, 'drawText', ownDrawText);
+                else delete this.drawText;
+            }
+        };
+    }
+
     enablePluginTranslation() {
+        const translator = this;
         const getRuntime = this.getRuntime.bind(this);
         const applyTranslatedParamFields = this.applyTranslatedParamFields.bind(this);
         const resolveRuntimeTextWithOptions = this.resolveRuntimeTextWithOptions.bind(this);
@@ -285,6 +313,8 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
         ) {
             return false;
         }
+
+        this.hookCurrentLocation(window.Window_InfoMenu?.prototype);
 
         if (canHookStatusBase) {
             const originalDrawContentsBase = Window_StatusBase.prototype.nuunMenu_drawContentsBase;
@@ -361,9 +391,15 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
                 try {
                     const runtime = getRuntime();
                     if (runtime && typeof text === 'string') {
-                        arguments[0] = resolveRuntimeTextWithOptions(text, runtime, {
-                            onlyKnown: true,
-                        });
+                        // Some NUUN versions keep Window_InfoMenu local to their closure.
+                        // Resolve its map value at the shared draw entry point as well.
+                        arguments[0] =
+                            this.constructor?.name === 'Window_InfoMenu' &&
+                            text === window.$gameMap?.displayName()
+                                ? translator.resolveRuntimeTranslation(text, runtime, 'map_name', {
+                                      requireRuntimeTranslationActive: true,
+                                  })
+                                : resolveRuntimeTextWithOptions(text, runtime, { onlyKnown: true });
                     }
                 } catch (error) {
                     console.warn(
@@ -383,9 +419,15 @@ export class NuunMenuScreenExTranslator extends BasePluginTranslator {
                 try {
                     const runtime = getRuntime();
                     if (runtime && typeof text === 'string') {
-                        arguments[0] = resolveRuntimeTextWithOptions(text, runtime, {
-                            onlyKnown: true,
-                        });
+                        // Some NUUN versions keep Window_InfoMenu local to their closure.
+                        // Resolve its map value at the shared draw entry point as well.
+                        arguments[0] =
+                            this.constructor?.name === 'Window_InfoMenu' &&
+                            text === window.$gameMap?.displayName()
+                                ? translator.resolveRuntimeTranslation(text, runtime, 'map_name', {
+                                      requireRuntimeTranslationActive: true,
+                                  })
+                                : resolveRuntimeTextWithOptions(text, runtime, { onlyKnown: true });
                     }
                 } catch (error) {
                     console.warn(

@@ -41,6 +41,7 @@ vi.mock('../../../../../../cheat-engine/www/cheat/js/TranslateOnTheFlyState.js',
     },
 }));
 
+import { translateOnTheFlyMessageMethods } from '../../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslateOnTheFlyMessageMethods.js';
 import { translateOnTheFlyCoreMethods } from '../../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslateOnTheFlyCoreMethods.js';
 import { translateOnTheFlyRuntimeMethods } from '../../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslateOnTheFlyRuntimeMethods.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../../../../../../cheat-engine/www/cheat/translate-engines/plugins/PluginTranslatorRegistry.js';
@@ -216,6 +217,7 @@ function createRuntime({
     });
 
     const runtime = {
+        resolveSpeakerSourceName: translateOnTheFlyMessageMethods.resolveSpeakerSourceName,
         enabled: false,
         enableTranslation: false,
         _isMessageSkipActive: () => false,

@@ -7,6 +7,9 @@ import { NYAInfoMenuWindowTranslator } from './translators/NYAInfoMenuWindowTran
 import { VitsunoDifficultyTranslator } from './translators/VitsunoDifficultyTranslator.js';
 import { AnimationMapNameTranslator } from './translators/AnimationMapNameTranslator.js';
 import { Inn15DayUiTranslator } from './translators/Inn15DayUiTranslator.js';
+import { ArigachiImgFusionTranslator } from './translators/ArigachiImgFusionTranslator.js';
+import { HiromonTransferTranslator } from './translators/HiromonTransferTranslator.js';
+import { HypnozmStatusTranslator } from './translators/HypnozmStatusTranslator.js';
 import { RirikaManagementUiTranslator } from './translators/RirikaManagementUiTranslator.js';
 import { ElleMenuTranslator } from './translators/ElleMenuTranslator.js';
 import { ChimakiLangTranslator } from './translators/ChimakiLangTranslator.js';
@@ -265,6 +268,9 @@ class PluginTranslatorRegistry {
             ChimakiLangTranslator,
             Inn15DayUiTranslator,
             RirikaManagementUiTranslator,
+            HypnozmStatusTranslator,
+            HiromonTransferTranslator,
+            ArigachiImgFusionTranslator,
             ElleMenuTranslator,
             LLTrackNameWindowTranslator,
             NuunDestinationTranslator,

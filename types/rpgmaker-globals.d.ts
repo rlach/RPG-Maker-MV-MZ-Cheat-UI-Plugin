@@ -235,3 +235,5 @@ declare interface Window {
     ConfigManager?: any;
     Alert?: any;
 }
+
+declare const CBR: any;

@@ -92,15 +92,19 @@ function toLogicalRelativeDirectory(relativeLogicalPath) {
     return toPosixPath(path.dirname(relativeLogicalPath)).replace(/^\.$/, '');
 }
 
-export function buildExportPlanFromSourceFiles(sourceFiles, selectedFolders) {
+export function buildExportPlanFromSourceFiles(sourceFiles, selectedFolders, selectedFiles = []) {
     const selectedFolderSet = new Set(normalizeSelectedFolders(selectedFolders));
+    const selectedFileSet = new Set(selectedFiles);
     const plan = [];
 
     for (const relativeFilePath of Array.isArray(sourceFiles) ? sourceFiles : []) {
         const logicalRelativePath = toLogicalRelativePath(relativeFilePath);
         const relativeDirectoryPath = toLogicalRelativeDirectory(logicalRelativePath);
 
-        if (!selectedFolderSet.has(relativeDirectoryPath)) {
+        if (
+            !selectedFolderSet.has(relativeDirectoryPath) &&
+            !selectedFileSet.has(relativeFilePath)
+        ) {
             continue;
         }
 
@@ -153,11 +157,12 @@ class ImageExporterRuntime {
 
         const fs = nodeRequire('fs');
         const path = nodeRequire('path');
+        if (!rootPath || !fs.existsSync(rootPath)) return [];
         const queue = [rootPath];
         const relFiles = [];
 
-        while (queue.length > 0) {
-            const currentDir = queue.shift();
+        for (let directoryIndex = 0; directoryIndex < queue.length; directoryIndex++) {
+            const currentDir = queue[directoryIndex];
             const entries = fs.readdirSync(currentDir, { withFileTypes: true });
 
             for (const entry of entries) {
@@ -287,7 +292,14 @@ class ImageExporterRuntime {
         return BufferApi.from(base64, 'base64');
     }
 
-    async startExport({ sourceRoot, cacheRoot, selectedFolders, targetLang = '' }) {
+    async startExport({
+        sourceRoot,
+        cacheRoot,
+        selectedFolders,
+        selectedFiles = [],
+        skipExisting = false,
+        targetLang = '',
+    }) {
         const nodeRequire = this.getNodeRequire();
         if (!nodeRequire) {
             throw new Error('Filesystem API unavailable in this environment');
@@ -305,7 +317,7 @@ class ImageExporterRuntime {
             throw new Error('Image export cache directory is unavailable');
         }
 
-        if (normalizedSelectedFolders.length <= 0) {
+        if (normalizedSelectedFolders.length <= 0 && selectedFiles.length <= 0) {
             throw new Error('Select at least one folder');
         }
 
@@ -318,7 +330,15 @@ class ImageExporterRuntime {
         }
 
         const sourceFiles = this.collectSourceImageFiles(sourceRoot);
-        const exportPlan = buildExportPlanFromSourceFiles(sourceFiles, normalizedSelectedFolders);
+        const exportPlan = buildExportPlanFromSourceFiles(
+            sourceFiles,
+            normalizedSelectedFolders,
+            selectedFiles
+        ).filter(
+            (item) =>
+                !skipExisting ||
+                !fs.existsSync(path.join(cacheRoot, `${item.logicalRelativePath}.png`))
+        );
 
         patchImageExporterState(
             {
@@ -348,24 +368,28 @@ class ImageExporterRuntime {
             for (const item of exportPlan) {
                 const logicalUrl = `img/${this.encodeRelativeLogicalPath(item.logicalRelativePath)}.png`;
 
+                let bitmap;
                 try {
-                    const bitmap = await this.loadBitmapByUrl(logicalUrl);
+                    bitmap = await this.loadBitmapByUrl(logicalUrl);
                     const pngBuffer = this.bitmapToPngBuffer(bitmap);
                     const targetFilePath = path.join(cacheRoot, `${item.logicalRelativePath}.png`);
                     fs.mkdirSync(path.dirname(targetFilePath), { recursive: true });
-                    fs.writeFileSync(targetFilePath, pngBuffer);
+                    fs.writeFileSync(
+                        targetFilePath,
+                        pngBuffer,
+                        skipExisting ? { flag: 'wx' } : undefined
+                    );
                     processedCount += 1;
-
-                    if (bitmap && typeof bitmap.destroy === 'function') {
-                        bitmap.destroy();
-                    }
                 } catch (error) {
+                    if (skipExisting && error.code === 'EEXIST') continue;
                     failedCount += 1;
                     console.warn('[ImageExporterRuntime] Failed to decode image', {
                         relativeFilePath: item.relativeFilePath,
                         logicalUrl,
                         error,
                     });
+                } finally {
+                    if (bitmap && typeof bitmap.destroy === 'function') bitmap.destroy();
                 }
 
                 const now = Date.now();

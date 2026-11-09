@@ -94,6 +94,13 @@ export const translateOnTheFlyMessageMethods = {
         $gameMessage._choices = translatedChoices.slice();
     },
 
+    resolveSpeakerSourceName(speaker) {
+        return String(speaker || '').replace(/\\N\[(\d+)\]/gi, (tag, actorId) => {
+            const actor = window.$gameActors?.actor(Number(actorId));
+            return actor ? actor.name() : tag;
+        });
+    },
+
     replaceSpeakerName(translatedSpeaker) {
         const safeSpeaker = this.normalizeSpeakerNameCase((translatedSpeaker || '').trim());
         if (!safeSpeaker) {
@@ -101,6 +108,8 @@ export const translateOnTheFlyMessageMethods = {
         }
 
         $gameMessage._speakerName = safeSpeaker;
+        // MZ keeps a rendered copy in Window_NameBox after the message starts.
+        this.currentMessageWindow?._nameBoxWindow?.setName(safeSpeaker);
     },
 
     protectSpecialSequences(text) {

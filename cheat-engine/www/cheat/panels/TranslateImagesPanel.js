@@ -1,13 +1,6 @@
 import { Alert } from '../js/AlertHelper.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
-import {
-    ensureImageExporterRuntime,
-    isSupportedImageFileName,
-} from '../js/ImageExporterRuntime.js';
-
-function sortByName(a, b) {
-    return String(a.name || '').localeCompare(String(b.name || ''));
-}
+import { ensureImageExporterRuntime, toLogicalRelativePath } from '../js/ImageExporterRuntime.js';
 
 function toPosixPath(value) {
     return String(value || '').replace(/\\/g, '/');
@@ -22,7 +15,7 @@ export default {
 
     <v-card-text class="pt-0 pb-2">
         <div class="text-caption mb-2">
-            Select folders from game image directory and export decoded PNG files to translation cache.
+            Select folders or images from the game image directory and export decoded PNG files to translation cache.
         </div>
 
 
@@ -46,6 +39,11 @@ export default {
             </v-btn>
         </div>
 
+        <div class="d-flex align-center flex-wrap mt-2" style="gap:16px">
+            <v-checkbox v-model="showImages" label="Show images" hide-details density="compact" />
+            <v-checkbox v-model="hideExported" label="Hide already exported" hide-details density="compact" />
+            <v-text-field v-model="filterText" placeholder="Filter images" hide-details density="compact" @keydown.stop />
+        </div>
         <div class="text-caption mt-2 text-grey-lighten-1">
             Source: {{ sourceImageRootDisplay }}
         </div>
@@ -54,25 +52,23 @@ export default {
     <v-divider></v-divider>
 
     <v-card-text class="cheat-export-tree pt-2 pb-2" style="min-height: 0; overflow-y: auto;">
-        <v-treeview
-            v-if="folderTreeItems.length > 0"
-            :items="folderTreeItems"
-            item-value="id" item-title="name"
-            open-all density="compact">
-            <template v-slot:prepend="{ item }">
-                <v-icon size="small" @click.stop="toggleFolderSelection(item.id)">
-                    {{ checkboxIconForFolder(item.id) }}
-                </v-icon>
+        <v-virtual-scroll :items="visibleRows" :item-height="40" height="100%">
+            <template #default="{ item }">
+                <div class="d-flex align-center" :style="{ height: '40px', paddingLeft: (item.depth * 20) + 'px' }">
+                    <v-btn v-if="item.folder" variant="text" size="small" icon
+                        :aria-label="expanded.has(item.id) ? 'Collapse folder' : 'Expand folder'"
+                        @click="toggleExpanded(item.id)">
+                        <v-icon>{{ expanded.has(item.id) ? 'mdi-chevron-down' : 'mdi-chevron-right' }}</v-icon>
+                    </v-btn>
+                    <span v-else style="width:40px;flex-shrink:0"></span>
+                    <v-btn variant="text" size="small" icon aria-label="Toggle selection" @click="toggleSelection(item)">
+                        <v-icon>{{ selectionIcon(item) }}</v-icon>
+                    </v-btn>
+                    <span class="text-caption text-truncate" :title="item.id">{{ item.name }}{{ item.folder ? ' (' + item.count + ')' : '' }}</span>
+                </div>
             </template>
-
-            <template v-slot:title="{ item }">
-                <span class="text-caption">{{ item.name }} ({{ item.directImageCount }})</span>
-            </template>
-        </v-treeview>
-
-        <div v-else class="text-caption text-grey-lighten-1">
-            No folders found in image directory.
-        </div>
+        </v-virtual-scroll>
+        <div v-if="!visibleRows.length" class="text-caption">No matching images.</div>
     </v-card-text>
 </v-card>
     `,
@@ -82,10 +78,14 @@ export default {
             languageOptions: [],
             selectedTargetLang: 'en',
             sourceImageRootDisplay: '',
-            folderTreeItems: [],
-            folderSelectionById: {},
-            folderChildrenById: {},
-            directImageCountByFolderId: {},
+            sourceFiles: Object.freeze([]),
+            selectedFiles: new Set(),
+            expanded: new Set(),
+            exportedFiles: new Set(),
+            showImages: false,
+            hideExported: false,
+            filterText: '',
+            appliedFilter: '',
             exportTotalCount: 0,
             exportProcessedCount: 0,
             isExportInProgress: false,
@@ -93,6 +93,88 @@ export default {
         };
     },
 
+    computed: {
+        eligibleFiles() {
+            return this.sourceFiles.filter(
+                (file) => !this.hideExported || !this.exportedFiles.has(toLogicalRelativePath(file))
+            );
+        },
+        matchingFiles() {
+            const filter = this.appliedFilter.toLowerCase();
+            return this.eligibleFiles.filter((file) => file.toLowerCase().includes(filter));
+        },
+        folderStats() {
+            const stats = new Map();
+            for (const file of this.matchingFiles) {
+                const parts = file.split('/');
+                parts.pop();
+                let id = '';
+                for (const part of parts) {
+                    id = id ? id + '/' + part : part;
+                    const stat = stats.get(id) || { count: 0, selected: 0 };
+                    stat.count++;
+                    if (this.selectedFiles.has(file)) stat.selected++;
+                    stats.set(id, stat);
+                }
+            }
+            return stats;
+        },
+        visibleRows() {
+            const children = new Map();
+            const add = (parent, row) => {
+                if (!children.has(parent)) children.set(parent, []);
+                children.get(parent).push(row);
+            };
+            for (const [id, stat] of this.folderStats) {
+                const parts = id.split('/');
+                add(parts.slice(0, -1).join('/'), {
+                    id,
+                    name: parts[parts.length - 1],
+                    folder: true,
+                    count: stat.count,
+                    depth: parts.length - 1,
+                });
+            }
+            if (this.showImages) {
+                for (const id of this.matchingFiles) {
+                    const parts = id.split('/');
+                    add(parts.slice(0, -1).join('/'), {
+                        id,
+                        name: parts[parts.length - 1],
+                        folder: false,
+                        depth: parts.length - 1,
+                    });
+                }
+            }
+            const rows = [];
+            const visit = (parent) => {
+                const entries = children.get(parent) || [];
+                entries.sort(
+                    (a, b) => Number(b.folder) - Number(a.folder) || a.name.localeCompare(b.name)
+                );
+                for (const row of entries) {
+                    rows.push(row);
+                    if (row.folder && this.expanded.has(row.id)) visit(row.id);
+                }
+            };
+            visit('');
+            return rows;
+        },
+        selectedExportFiles() {
+            return this.eligibleFiles.filter((file) => this.selectedFiles.has(file));
+        },
+    },
+    watch: {
+        filterText(value) {
+            clearTimeout(this._filterTimeout);
+            this._filterTimeout = setTimeout(() => {
+                this.appliedFilter = value;
+            }, 180);
+        },
+        selectedTargetLang() {
+            this.refreshExportedFiles();
+        },
+    },
     created() {
         this._runtime = ensureTranslationRuntime();
         this._imageExporterRuntime = ensureImageExporterRuntime();
@@ -125,6 +207,7 @@ export default {
     },
 
     beforeUnmount() {
+        clearTimeout(this._filterTimeout);
         if (this._progressPollIntervalId) {
             clearInterval(this._progressPollIntervalId);
             this._progressPollIntervalId = 0;
@@ -138,217 +221,89 @@ export default {
         },
 
         refreshFolderTree() {
+            this.sourceImageRootDisplay = toPosixPath(
+                this._imageExporterRuntime.getImageRootAbsolutePath()
+            );
+            this.sourceFiles = Object.freeze(
+                this._imageExporterRuntime.collectSourceImageFiles(this.sourceImageRootDisplay)
+            );
+            this.selectedFiles = new Set(
+                this.sourceFiles.filter((file) => file.startsWith('pictures/'))
+            );
+            const expanded = new Set();
+            for (const file of this.sourceFiles) {
+                const parts = file.split('/');
+                parts.pop();
+                if (parts[0] === 'pictures') expanded.add(parts.join('/'));
+                parts.pop();
+                while (parts.length) {
+                    expanded.add(parts.join('/'));
+                    parts.pop();
+                }
+            }
+            this.expanded = expanded;
+            this.refreshExportedFiles();
+        },
+        getCacheRoot() {
             const nodeRequire = this.getNodeRequire();
-            if (!nodeRequire) {
-                this.folderTreeItems = [];
-                this.folderSelectionById = {};
-                this.folderChildrenById = {};
-                this.directImageCountByFolderId = {};
-                this.sourceImageRootDisplay = '(filesystem unavailable)';
-                return;
-            }
-
-            const fs = nodeRequire('fs');
-            const path = nodeRequire('path');
-            const rootPath = this._imageExporterRuntime.getImageRootAbsolutePath();
-            this.sourceImageRootDisplay = toPosixPath(rootPath);
-
-            if (!rootPath || !fs.existsSync(rootPath)) {
-                this.folderTreeItems = [];
-                this.folderSelectionById = {};
-                this.folderChildrenById = {};
-                this.directImageCountByFolderId = {};
-                return;
-            }
-
-            const folderChildrenById = {};
-            const directImageCountByFolderId = {};
-            const folderSelectionById = {};
-
-            const buildNode = (absolutePath, relativePath) => {
-                const directoryEntriesRaw = fs.readdirSync(absolutePath, { withFileTypes: true });
-                const directoryEntries = directoryEntriesRaw
-                    .filter((entry) => entry.isDirectory())
-                    .map((entry) => {
-                        const childPath = `${relativePath}/${entry.name}`;
-                        return buildNode(path.join(absolutePath, entry.name), childPath);
-                    });
-
-                directoryEntries.sort(sortByName);
-
-                const directImageCount = directoryEntriesRaw.filter(
-                    (entry) => entry.isFile() && isSupportedImageFileName(entry.name)
-                ).length;
-
-                folderChildrenById[relativePath] = directoryEntries.map((entry) => entry.id);
-                directImageCountByFolderId[relativePath] = directImageCount;
-                folderSelectionById[relativePath] = false;
-
-                return {
-                    id: relativePath,
-                    relPath: relativePath,
-                    name: relativePath.split('/').pop() || relativePath,
-                    directImageCount,
-                    children: directoryEntries,
-                };
-            };
-
-            const topLevelItems = fs
-                .readdirSync(rootPath, { withFileTypes: true })
-                .filter((entry) => entry.isDirectory())
-                .map((entry) => buildNode(path.join(rootPath, entry.name), entry.name));
-
-            topLevelItems.sort(sortByName);
-            this.folderTreeItems = topLevelItems;
-
-            this.folderSelectionById = folderSelectionById;
-            this.folderChildrenById = folderChildrenById;
-            this.directImageCountByFolderId = directImageCountByFolderId;
-
-            if (Object.prototype.hasOwnProperty.call(this.folderSelectionById, 'pictures')) {
-                this.setSubtreeSelection('pictures', true);
-            }
-        },
-
-        getFolderChildren(folderId) {
-            return Array.isArray(this.folderChildrenById[folderId])
-                ? this.folderChildrenById[folderId]
-                : [];
-        },
-
-        collectSubtreeFolderIds(folderId) {
-            const result = [];
-            const stack = [folderId];
-
-            while (stack.length > 0) {
-                const currentId = stack.pop();
-                if (!Object.prototype.hasOwnProperty.call(this.folderSelectionById, currentId)) {
-                    continue;
-                }
-
-                result.push(currentId);
-                const childIds = this.getFolderChildren(currentId);
-                for (let index = childIds.length - 1; index >= 0; index -= 1) {
-                    stack.push(childIds[index]);
-                }
-            }
-
-            return result;
-        },
-
-        isFolderSelected(folderId) {
-            return !!this.folderSelectionById[folderId];
-        },
-
-        getSelectedFolderIds() {
-            return Object.keys(this.folderSelectionById).filter((folderId) =>
-                this.isFolderSelected(folderId)
+            if (!nodeRequire || !this._runtime) return '';
+            return nodeRequire('path').join(
+                this._runtime.getSplitCacheDirectoryPath(),
+                'img',
+                this.selectedTargetLang
             );
         },
-
+        refreshExportedFiles() {
+            if (!this._imageExporterRuntime) return;
+            const root = this.getCacheRoot();
+            this.exportedFiles = new Set(
+                root
+                    ? this._imageExporterRuntime
+                          .collectSourceImageFiles(root)
+                          .filter((file) => /\.png$/i.test(file))
+                          .map(toLogicalRelativePath)
+                    : []
+            );
+        },
+        toggleExpanded(id) {
+            const next = new Set(this.expanded);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            this.expanded = next;
+        },
+        selectionIcon(item) {
+            if (!item.folder)
+                return this.selectedFiles.has(item.id)
+                    ? 'mdi-checkbox-marked'
+                    : 'mdi-checkbox-blank-outline';
+            const stat = this.folderStats.get(item.id);
+            if (stat.selected === stat.count) return 'mdi-checkbox-marked';
+            return stat.selected ? 'mdi-minus-box' : 'mdi-checkbox-blank-outline';
+        },
+        toggleSelection(item) {
+            const files = item.folder
+                ? this.matchingFiles.filter((file) => file.startsWith(item.id + '/'))
+                : [item.id];
+            const select = item.folder
+                ? this.folderStats.get(item.id).selected !== files.length
+                : !this.selectedFiles.has(item.id);
+            const next = new Set(this.selectedFiles);
+            for (const file of files) {
+                if (select) next.add(file);
+                else next.delete(file);
+            }
+            this.selectedFiles = next;
+        },
         getSelectedExportImageCount() {
-            let total = 0;
-            const selectedFolderIds = this.getSelectedFolderIds();
-            for (const folderId of selectedFolderIds) {
-                total += Number(this.directImageCountByFolderId[folderId] || 0);
-            }
-            return total;
+            return this.selectedExportFiles.length;
         },
-
         isExportButtonDisabled() {
-            return this.isExportInProgress || this.getSelectedExportImageCount() <= 0;
+            return this.isExportInProgress || !this.selectedExportFiles.length;
         },
-
         exportButtonLabel() {
-            if (this.isExportInProgress) {
-                return `Exporting. Progress: ${this.exportProcessedCount} of ${this.exportTotalCount}`;
-            }
-
-            return `Decompress images to png (${this.getSelectedExportImageCount()})`;
-        },
-
-        hasAnySelectionInSubtree(folderId) {
-            if (this.isFolderSelected(folderId)) {
-                return true;
-            }
-
-            const childIds = this.getFolderChildren(folderId);
-            for (const childId of childIds) {
-                if (this.hasAnySelectionInSubtree(childId)) {
-                    return true;
-                }
-            }
-
-            return false;
-        },
-
-        isSubtreeFullySelected(folderId) {
-            if (!this.isFolderSelected(folderId)) {
-                return false;
-            }
-
-            const childIds = this.getFolderChildren(folderId);
-            for (const childId of childIds) {
-                if (!this.isSubtreeFullySelected(childId)) {
-                    return false;
-                }
-            }
-
-            return true;
-        },
-
-        isFolderPartiallySelected(folderId) {
-            const childIds = this.getFolderChildren(folderId);
-            if (childIds.length <= 0) {
-                return false;
-            }
-
-            const selfSelected = this.isFolderSelected(folderId);
-            const anyChildSelected = childIds.some((childId) =>
-                this.hasAnySelectionInSubtree(childId)
-            );
-
-            if (!selfSelected && anyChildSelected) {
-                return true;
-            }
-
-            if (!selfSelected) {
-                return false;
-            }
-
-            return childIds.some((childId) => !this.isSubtreeFullySelected(childId));
-        },
-
-        checkboxIconForFolder(folderId) {
-            if (this.isFolderPartiallySelected(folderId)) {
-                return 'mdi-minus-box';
-            }
-            return this.isFolderSelected(folderId)
-                ? 'mdi-checkbox-marked'
-                : 'mdi-checkbox-blank-outline';
-        },
-
-        setSubtreeSelection(folderId, selected) {
-            const subtreeFolderIds = this.collectSubtreeFolderIds(folderId);
-            if (subtreeFolderIds.length <= 0) {
-                return;
-            }
-
-            const nextSelection = { ...this.folderSelectionById };
-            for (const subtreeFolderId of subtreeFolderIds) {
-                nextSelection[subtreeFolderId] = selected;
-            }
-
-            this.folderSelectionById = nextSelection;
-        },
-
-        toggleFolderSelection(folderId) {
-            if (!Object.prototype.hasOwnProperty.call(this.folderSelectionById, folderId)) {
-                return;
-            }
-
-            const shouldSelectWholeSubtree = !this.isSubtreeFullySelected(folderId);
-            this.setSubtreeSelection(folderId, shouldSelectWholeSubtree);
+            return this.isExportInProgress
+                ? `Exporting. Progress: ${this.exportProcessedCount} of ${this.exportTotalCount}`
+                : `Decompress images to png (${this.selectedExportFiles.length})`;
         },
 
         refreshExportStatus() {
@@ -369,12 +324,9 @@ export default {
                 return;
             }
 
-            const selectedFolders = this.getSelectedFolderIds()
-                .map((folderId) => toPosixPath(folderId).replace(/^\/+/, '').replace(/\/+$/, ''))
-                .filter((folderId) => folderId);
-
-            if (selectedFolders.length === 0) {
-                Alert.warn('Select at least one folder');
+            const selectedFiles = this.selectedExportFiles.slice();
+            if (!selectedFiles.length) {
+                Alert.warn('Select at least one image or folder');
                 return;
             }
 
@@ -397,7 +349,9 @@ export default {
                 const exportPromise = this._imageExporterRuntime.startExport({
                     sourceRoot,
                     cacheRoot,
-                    selectedFolders,
+                    selectedFolders: [],
+                    selectedFiles,
+                    skipExisting: this.hideExported,
                     targetLang: this.selectedTargetLang,
                 });
 
@@ -427,6 +381,7 @@ export default {
             }
 
             this.refreshExportStatus();
+            this.refreshExportedFiles();
         },
     },
 };
