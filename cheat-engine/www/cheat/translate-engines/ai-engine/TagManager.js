@@ -709,98 +709,115 @@ export class TagManager {
             );
         }
 
-        for (const entry of processingEntries) {
-            if (entry.type === TAG_TYPE.WITH_NUMERIC_PARAMETER) {
-                const matches = result.match(entry.postPattern) || [];
-                actualCounts[entry.key] = matches.length;
-                result = result.replace(entry.postPattern, (match, param, offset, sourceText) => {
-                    if (entry.style === TAG_STYLE.XML) {
-                        return `<${entry.tagSymbol}:${param}>`;
-                    }
+        // Unmasking an outer parameter can reveal encoded tags whose entries
+        // were already processed. Decode those in subsequent passes and retain
+        // their counts for consistency validation. Bound expansion by the number
+        // of masked values so malformed/cyclic input cannot loop indefinitely.
+        const maxDecodePasses = Object.values(maskedByTagKey).reduce(
+            (total, values) => total + values.length,
+            1
+        );
+        for (let pass = 0; pass < maxDecodePasses; pass++) {
+            const beforePass = result;
+            for (const entry of processingEntries) {
+                if (entry.type === TAG_TYPE.WITH_NUMERIC_PARAMETER) {
+                    const matches = result.match(entry.postPattern) || [];
+                    actualCounts[entry.key] = (actualCounts[entry.key] || 0) + matches.length;
+                    result = result.replace(
+                        entry.postPattern,
+                        (match, param, offset, sourceText) => {
+                            if (entry.style === TAG_STYLE.XML) {
+                                return `<${entry.tagSymbol}:${param}>`;
+                            }
 
-                    return this.appendSpaceAfterLetterEndedEscapeTag(
-                        `\\${entry.tagSymbol}[${param}]`,
-                        sourceText[offset + match.length] || ''
+                            return this.appendSpaceAfterLetterEndedEscapeTag(
+                                `\\${entry.tagSymbol}[${param}]`,
+                                sourceText[offset + match.length] || ''
+                            );
+                        }
                     );
-                });
-                continue;
-            }
-
-            if (entry.type === TAG_TYPE.WITHOUT_PARAMETER) {
-                const matches = result.match(entry.postPattern) || [];
-                actualCounts[entry.key] = matches.length;
-                result = result.replace(entry.postPattern, (match, offset, sourceText) => {
-                    if (entry.style === TAG_STYLE.XML) {
-                        return `<${entry.tagSymbol}>`;
-                    }
-                    const replacement = `\\${entry.tagSymbol}`;
-                    if (entry.addSpace) {
-                        return `${replacement} `;
-                    }
-
-                    return this.appendSpaceAfterLetterEndedEscapeTag(
-                        replacement,
-                        sourceText[offset + match.length] || ''
-                    );
-                });
-                continue;
-            }
-
-            if (entry.type === TAG_TYPE.WITH_CUSTOM_PARAMETER) {
-                if (
-                    onlyLooseXmlTagIds &&
-                    entry.style === TAG_STYLE.XML &&
-                    !onlyLooseXmlTagIds.has(entry.tagId)
-                ) {
-                    actualCounts[entry.key] = 0;
                     continue;
                 }
 
-                const replacementResult = this.replaceEncodedCustomTags(
-                    result,
-                    entry,
-                    (paramValue, context = {}) => {
-                        let resolvedValue = paramValue;
-
-                        if (entry.maskValue) {
-                            const maskedValues = maskedByTagKey[entry.key] || [];
-                            const maskId = Number(paramValue);
-                            if (!usedMaskedIdsByTagKey[entry.key]) {
-                                usedMaskedIdsByTagKey[entry.key] = new Set();
-                            }
-                            if (Number.isFinite(maskId)) {
-                                usedMaskedIdsByTagKey[entry.key].add(maskId);
-                            }
-                            resolvedValue =
-                                Number.isFinite(maskId) && maskedValues[maskId] !== undefined
-                                    ? maskedValues[maskId]
-                                    : paramValue;
-                        }
-
+                if (entry.type === TAG_TYPE.WITHOUT_PARAMETER) {
+                    const matches = result.match(entry.postPattern) || [];
+                    actualCounts[entry.key] = (actualCounts[entry.key] || 0) + matches.length;
+                    result = result.replace(entry.postPattern, (match, offset, sourceText) => {
                         if (entry.style === TAG_STYLE.XML) {
-                            return `<${entry.tagSymbol}:${resolvedValue}>`;
+                            return `<${entry.tagSymbol}>`;
+                        }
+                        const replacement = `\\${entry.tagSymbol}`;
+                        if (entry.addSpace) {
+                            return `${replacement} `;
                         }
 
                         return this.appendSpaceAfterLetterEndedEscapeTag(
-                            `\\${entry.tagSymbol}${entry.bracket}${resolvedValue}${entry.bracketClose}`,
-                            context.nextChar || ''
+                            replacement,
+                            sourceText[offset + match.length] || ''
                         );
-                    },
-                    {
-                        allowLooseXmlCustomTagClosing,
+                    });
+                    continue;
+                }
+
+                if (entry.type === TAG_TYPE.WITH_CUSTOM_PARAMETER) {
+                    if (
+                        onlyLooseXmlTagIds &&
+                        entry.style === TAG_STYLE.XML &&
+                        !onlyLooseXmlTagIds.has(entry.tagId)
+                    ) {
+                        actualCounts[entry.key] = 0;
+                        continue;
                     }
-                );
-                result = replacementResult.text;
-                actualCounts[entry.key] = replacementResult.count;
-                continue;
+
+                    const replacementResult = this.replaceEncodedCustomTags(
+                        result,
+                        entry,
+                        (paramValue, context = {}) => {
+                            let resolvedValue = paramValue;
+
+                            if (entry.maskValue) {
+                                const maskedValues = maskedByTagKey[entry.key] || [];
+                                const maskId = Number(paramValue);
+                                if (!usedMaskedIdsByTagKey[entry.key]) {
+                                    usedMaskedIdsByTagKey[entry.key] = new Set();
+                                }
+                                if (Number.isFinite(maskId)) {
+                                    usedMaskedIdsByTagKey[entry.key].add(maskId);
+                                }
+                                resolvedValue =
+                                    Number.isFinite(maskId) && maskedValues[maskId] !== undefined
+                                        ? maskedValues[maskId]
+                                        : paramValue;
+                            }
+
+                            if (entry.style === TAG_STYLE.XML) {
+                                return `<${entry.tagSymbol}:${resolvedValue}>`;
+                            }
+
+                            return this.appendSpaceAfterLetterEndedEscapeTag(
+                                `\\${entry.tagSymbol}${entry.bracket}${resolvedValue}${entry.bracketClose}`,
+                                context.nextChar || ''
+                            );
+                        },
+                        {
+                            allowLooseXmlCustomTagClosing,
+                        }
+                    );
+                    result = replacementResult.text;
+                    actualCounts[entry.key] =
+                        (actualCounts[entry.key] || 0) + replacementResult.count;
+                    continue;
+                }
+
+                // Legacy TAG_TYPE.XML — always restores as <symbol>
+                if (entry.type === TAG_TYPE.XML) {
+                    const matches = result.match(entry.postPattern) || [];
+                    actualCounts[entry.key] = (actualCounts[entry.key] || 0) + matches.length;
+                    result = result.replace(entry.postPattern, () => `<${entry.tagSymbol}>`);
+                }
             }
 
-            // Legacy TAG_TYPE.XML — always restores as <symbol>
-            if (entry.type === TAG_TYPE.XML) {
-                const matches = result.match(entry.postPattern) || [];
-                actualCounts[entry.key] = matches.length;
-                result = result.replace(entry.postPattern, () => `<${entry.tagSymbol}>`);
-            }
+            if (result === beforePass) break;
         }
 
         // LLMs sometimes insert raw line wraps inside escape-command chains

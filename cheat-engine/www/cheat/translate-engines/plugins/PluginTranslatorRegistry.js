@@ -7,6 +7,7 @@ import { NYAInfoMenuWindowTranslator } from './translators/NYAInfoMenuWindowTran
 import { VitsunoDifficultyTranslator } from './translators/VitsunoDifficultyTranslator.js';
 import { AnimationMapNameTranslator } from './translators/AnimationMapNameTranslator.js';
 import { Inn15DayUiTranslator } from './translators/Inn15DayUiTranslator.js';
+import { CeliaDungeonUiTranslator } from './translators/CeliaDungeonUiTranslator.js';
 import { ArigachiImgFusionTranslator } from './translators/ArigachiImgFusionTranslator.js';
 import { HiromonTransferTranslator } from './translators/HiromonTransferTranslator.js';
 import { HypnozmStatusTranslator } from './translators/HypnozmStatusTranslator.js';
@@ -267,6 +268,7 @@ class PluginTranslatorRegistry {
             GraceDungeonUiTranslator,
             ChimakiLangTranslator,
             Inn15DayUiTranslator,
+            CeliaDungeonUiTranslator,
             RirikaManagementUiTranslator,
             HypnozmStatusTranslator,
             HiromonTransferTranslator,

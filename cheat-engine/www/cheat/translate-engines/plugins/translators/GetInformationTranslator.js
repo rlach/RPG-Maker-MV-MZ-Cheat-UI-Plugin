@@ -5,7 +5,7 @@ const RUNTIME_HOOK_GUARD = '__CHEAT_GET_INFORMATION_TRANSLATOR_HOOKED__';
 const CACHE_TYPE = 'plugin_get_information';
 const COMMAND_CACHE_TYPE = 'plugin_get_information_command';
 const DIRECT_TEMPLATE_TYPE = '__CHEAT_GET_INFORMATION_DIRECT_TEMPLATE__';
-const COMMON_POPUP_PLUGIN_NAMES = new Set(['commonpopupcore']);
+const COMMON_POPUP_PLUGIN_NAMES = new Set(['commonpopupcore', 'skm_commonpopupcoremz']);
 
 const PARAM_TEXT_FIELDS = [
     'Get Gold Text',
@@ -88,6 +88,7 @@ function splitCommandLine(commandLine) {
  *
  * Supported versions:
  * - MV v1.171
+ * - SKM_GetInformationMZ v1.171 port (MZ)
  *
  * Notes:
  * - Preserves leading whitespace in ShowInfo command payload text.
@@ -107,6 +108,10 @@ export class GetInformationTranslator extends BasePluginTranslator {
 
     getPluginLabel() {
         return 'GetInformation';
+    }
+
+    getPluginAliases() {
+        return ['GetInformation', 'SKM_GetInformationMZ'];
     }
 
     getCacheType() {
@@ -137,14 +142,19 @@ export class GetInformationTranslator extends BasePluginTranslator {
             return null;
         }
 
-        const parameters = pluginManager.parameters(this.getPluginName());
+        const entry = this.getPluginAliases()
+            .map((name) => this.findPluginEntry(name))
+            .find((plugin) => plugin?.status);
+        const parameters = pluginManager.parameters(entry?.name || this.getPluginName());
         return parameters && typeof parameters === 'object' ? parameters : null;
     }
 
     getSourceTextByField() {
         const result = new Map();
 
-        const pluginEntry = this.findPluginEntry();
+        const pluginEntry = this.getPluginAliases()
+            .map((name) => this.findPluginEntry(name))
+            .find((plugin) => plugin?.status);
         if (pluginEntry?.parameters && typeof pluginEntry.parameters === 'object') {
             for (const field of PARAM_TEXT_FIELDS) {
                 const value = pluginEntry.parameters[field];
