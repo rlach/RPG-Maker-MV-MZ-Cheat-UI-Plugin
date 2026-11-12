@@ -260,16 +260,19 @@ export class ItemCombinationMZTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         const sceneCtor = window['Scene_CraftingMenu'];
-        if (!sceneCtor?.prototype) {
-            return false;
-        }
+        // Original releases keep the scene constructor private inside an IIFE.
+        const hasPrivateScene =
+            !sceneCtor?.prototype &&
+            typeof window.Game_Party?.prototype.ingredients === 'function' &&
+            typeof window.Game_Party?.prototype.canCombine === 'function';
+        if (!sceneCtor?.prototype && !hasPrivateScene) return false;
 
         const getRuntime = this.getRuntime.bind(this);
         const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
         const resolveOriginalRecipeKeyName = this.resolveOriginalRecipeKeyName.bind(this);
         const translateItemCombinationSceneText = this.translateItemCombinationSceneText.bind(this);
 
-        if (typeof sceneCtor.prototype.currentRecipeSymbol === 'function') {
+        if (typeof sceneCtor?.prototype.currentRecipeSymbol === 'function') {
             const originalCurrentRecipeSymbol = sceneCtor.prototype.currentRecipeSymbol;
 
             sceneCtor.prototype.currentRecipeSymbol = function () {
@@ -281,7 +284,7 @@ export class ItemCombinationMZTranslator extends BasePluginTranslator {
 
                 return resolveOriginalRecipeKeyName(result, runtime);
             };
-        } else {
+        } else if (!hasPrivateScene) {
             return false;
         }
 
@@ -290,7 +293,10 @@ export class ItemCombinationMZTranslator extends BasePluginTranslator {
 
             Window_Base.prototype.drawText = function () {
                 const runtime = getRuntime();
-                const isCraftingScene = window.SceneManager?._scene instanceof sceneCtor;
+                const scene = window.SceneManager?._scene;
+                const isCraftingScene = sceneCtor
+                    ? scene instanceof sceneCtor
+                    : scene?.constructor?.name === 'Scene_CraftingMenu';
 
                 if (
                     isCraftingScene &&

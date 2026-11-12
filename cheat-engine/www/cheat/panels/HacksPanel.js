@@ -12,6 +12,16 @@ export default {
         Keep them OFF by default and enable only when you hit the related issue.
     </v-card-text>
 
+    <v-card-subtitle class="mt-3 pb-0 font-weight-bold">Resource Loading</v-card-subtitle>
+    <v-card-text class="py-0">
+        <v-switch v-model="normalizeResourceUnicode"
+            label="Normalize resource filenames (Unicode NFC)" density="compact" hide-details
+            @click.self.stop @update:model-value="onNormalizeResourceUnicodeChange" />
+    </v-card-text>
+    <v-card-text class="pt-2 pb-0 caption text-grey-lighten-1">
+        Fixes image and audio loading when visually identical Japanese filenames use different Unicode forms.
+        Does not rename files. Restart the game after enabling if a resource has already failed to load.
+    </v-card-text>
     <v-card-subtitle class="mt-3 pb-0 font-weight-bold">Bitmap / Canvas Fixes</v-card-subtitle>
     <v-card-text class="py-0">
         <v-switch
@@ -86,6 +96,7 @@ export default {
 
     data() {
         return {
+            normalizeResourceUnicode: false,
             improveFailedResourcesModal: false,
             bitmapGetPixelLongFix: false,
             mvLocalSavePathFix: false,
@@ -112,6 +123,7 @@ export default {
 
     methods: {
         initializeVariables() {
+            this.normalizeResourceUnicode = HACKS_RUNTIME.isNormalizeResourceUnicodeEnabled();
             this.improveFailedResourcesModal = HACKS_RUNTIME.isImproveFailedResourcesModalEnabled();
             this.isMv = isRpgMakerMv();
             this.bitmapGetPixelLongFix = HACKS_RUNTIME.isBitmapGetPixelLongFixEnabled();
@@ -120,6 +132,10 @@ export default {
                 HACKS_RUNTIME.hasMessageSkipConfiguredSkipSwitch();
             this.messageSkipSwitchId = HACKS_RUNTIME.getMessageSkipForcedSkipSwitchId();
             this.messageSkipForcedSkipEnabled = HACKS_RUNTIME.isMessageSkipForcedSkipEnabled();
+        },
+
+        onNormalizeResourceUnicodeChange(enabled) {
+            HACKS_RUNTIME.setNormalizeResourceUnicodeEnabled(!!enabled);
         },
 
         onBitmapGetPixelLongFixChange(enabled) {

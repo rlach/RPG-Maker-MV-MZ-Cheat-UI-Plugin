@@ -85,6 +85,17 @@ export class FtkrSkillTreeSystemTranslator extends BasePluginTranslator {
         return 'FTKR_SkillTreeSystem';
     }
 
+    detectPlugin() {
+        if (!super.detectPlugin()) return false;
+        // The plugin exits before installing its UI when no tree database is configured.
+        const parameters = this.findPluginEntry(this.getPluginName())?.parameters;
+        return (
+            !parameters ||
+            !Object.prototype.hasOwnProperty.call(parameters, 'Skill Tree Id') ||
+            Number(parameters['Skill Tree Id']) > 0
+        );
+    }
+
     getPluginLabel() {
         return 'FTKR SkillTreeSystem';
     }

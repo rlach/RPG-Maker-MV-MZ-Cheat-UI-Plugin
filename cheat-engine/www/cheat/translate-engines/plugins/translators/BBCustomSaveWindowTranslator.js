@@ -112,10 +112,6 @@ export class BBCustomSaveWindowTranslator extends BasePluginTranslator {
         }
 
         const runtimeSource = this._getRuntimeSourceTextGroups();
-        if (!runtimeSource.translatableTexts.size && !runtimeSource.unitTexts.length) {
-            return false;
-        }
-
         this._hookDrawContentsContext();
         this._hookDrawText(runtimeSource);
         return true;

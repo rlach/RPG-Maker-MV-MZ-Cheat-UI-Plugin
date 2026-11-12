@@ -6,7 +6,7 @@ import {
 } from './TranslatorHelpers.js';
 
 /** RJ01590123 custom FastEnchantSystem v19 (MZ).
- * Catalogs presentation text from the installed options/equipment/toast plugins,
+ * Catalogs game-specific presentation text from FastEnchantSystem, RandomItem and LightweightToast,
  * event scripts and skill NameType metadata. Generated equipment names remain
  * unchanged in variables and dummy actors because upgrade scripts compare them.
  */
@@ -21,16 +21,7 @@ export class CeliaDungeonUiTranslator extends SourceTextCatalogTranslator {
         return 'plugin_celia_dungeon_ui';
     }
     getSourcePluginNames() {
-        return [
-            'FastEnchantSystem',
-            'LightweightToast',
-            'ManoUZ_MessageLogOption',
-            'MPP_EquipStatusEX',
-            'NUUN_RandomItems',
-            'RandomItem',
-            'NYA_FTKR_ItemSubCommand',
-            'Patch_ItemSubCommand_Hotbar',
-        ];
+        return ['FastEnchantSystem', 'LightweightToast', 'RandomItem'];
     }
 
     collectParameterTexts(parameters) {
@@ -38,7 +29,7 @@ export class CeliaDungeonUiTranslator extends SourceTextCatalogTranslator {
         walkNestedJsonLike(parameters, (value, { path }) => {
             if (typeof value !== 'string' || parseJsonSafely(value, value) !== value) return;
             if (
-                !/^(?:Terms |optionText$|textON$|textOFF$|keepAutoMode$|machinakaMode$|lines\/|Hotbar Command Name$)|(?:Text|Help|Message| Format)$/.test(
+                !/^(?:Terms |optionText$|textON$|textOFF$|keepAutoMode$|machinakaMode$|lines\/|Hotbar Command Name$|Attribute name$|Label of (?:stock Number|sold out)$|Exit Confirm Btn (?:Ok|Cancel)$)|(?:Text|Help|Message| Format| title| message)$/.test(
                     path.join('/')
                 )
             )

@@ -108,7 +108,9 @@ export class MppChoiceExTranslator extends BasePluginTranslator {
             typeof choices?.updateHelp !== 'function' ||
             typeof runtimeGlobal.Game_Message?.prototype.setChoiceHelpTexts !== 'function'
         ) {
-            return false;
+            // Op1 is also distributed standalone; its choices use the engine's
+            // standard choice translation path and do not expose help windows.
+            return typeof runtimeGlobal.Game_System?.prototype.getCustomChoices === 'function';
         }
         const translator = this;
         const updateHelp = choices.updateHelp;

@@ -74,17 +74,9 @@ it('catalogs generated equipment components, custom labels and reward templates 
     await translator.precomputeCounts();
     for (const text of [
         '中古の',
-        '使う',
-        '捨てる',
-        'やめる',
-        'ショートカット登録',
         'ガラス',
         'ガードナー',
-        'メッセージログ設定',
-        'オート維持',
-        '経験獲得率',
         '睡眠ボーナスステート！',
-        '\\COT[0]を手に入れた！',
     ])
         expect(translator.entries.has(text), text).toBe(true);
     const runtime = {
@@ -105,9 +97,6 @@ it('catalogs generated equipment components, custom labels and reward templates 
     translator.tagEngine = runtime.engine;
     const equipment = { Name: '中古のガラスガードナー' };
     expect(translator.resolveText(equipment.Name, runtime)).toBe('Used Glass Guard');
-    expect(translator.resolveText('★Glass Shoesを手に入れた！', runtime)).toBe(
-        'Obtained ★Glass Shoes!'
-    );
     expect(equipment.Name).toBe('中古のガラスガードナー');
     runtime.isTranslationEnabled = () => false;
     expect(translator.resolveText(equipment.Name, runtime)).toBe(equipment.Name);
@@ -125,4 +114,30 @@ it('recognizes the SKM MZ popup port and collects its actual parameter values', 
     expect(translator.detectPlugin()).toBe(true);
     expect(translator.getSourceTextByField().get('Exp Up Text')).toBe(parameters['Exp Up Text']);
     expect(PluginManager.parameters).toHaveBeenCalledWith('SKM_GetInformationMZ');
+});
+
+it('detects public plugins without Celia and keeps their catalogs separate', async () => {
+    const { NyaWarehouseTranslator } = await import('../../../../../../../cheat-engine/www/cheat/translate-engines/plugins/translators/NyaWarehouseTranslator.js');
+    const { HendrixHotbarTranslator } = await import('../../../../../../../cheat-engine/www/cheat/translate-engines/plugins/translators/HendrixHotbarTranslator.js');
+    vi.stubGlobal('window', globalThis);
+    vi.stubGlobal('$plugins', [{ name: 'NYA_PH_Warehouse', status: true, parameters: {} }]);
+    const warehouse = new NyaWarehouseTranslator();
+    expect(warehouse.detectPlugin()).toBe(true);
+    expect(new CeliaDungeonUiTranslator().detectPlugin()).toBe(false);
+    warehouse.collectParameterTexts({ 'Withdraw Text': '引き出す', 'Deposit Text': '預ける' });
+    warehouse.collectCommandTexts([{ code: 357, parameters: ['NYA_PH_Warehouse', 'show', '', { show_title: '預かり所' }] }]);
+    for (const text of ['引き出す', '預ける', '預かり所']) expect(warehouse.entries.has(text)).toBe(true);
+    const hotbar = new HendrixHotbarTranslator();
+    hotbar.collectParameterTexts({ UseNowText: '今すぐ使用', EmptySlotText: '空' });
+    expect(hotbar.entries.has('今すぐ使用')).toBe(true);
+    expect(hotbar.isDisplayFragment('空')).toBe(true);
+    expect(warehouse.entries.has('空')).toBe(false);
+    const runtime = {
+        getCacheKey: (text, type) => type + ':' + text,
+        translationCache: new Map([['plugin_celia_dungeon_ui:引き出す', 'Withdraw']]),
+        hasUsableCacheValue(key) { return this.translationCache.has(key); },
+        trackCacheKeyUsage: vi.fn(),
+    };
+    expect(warehouse.resolveRuntimeTranslation('引き出す', runtime, warehouse.getCatalogCacheTypes())).toBe('Withdraw');
+    expect(warehouse.collectUntranslated({ runtime }).map(item => item.value)).not.toContain('引き出す');
 });

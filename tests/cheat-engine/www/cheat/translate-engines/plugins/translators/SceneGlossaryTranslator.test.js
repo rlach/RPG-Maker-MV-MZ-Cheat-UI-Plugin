@@ -192,3 +192,29 @@ it('harvests the original description when item notes already translated metadat
         globalThis.window = previousWindow;
     }
 });
+
+it('resolves descriptions from original notes even if metadata was translated before initialization', () => {
+    const translator = new SceneGlossaryTranslator();
+    const source = 'Original complete biography';
+    const translated = 'Translated complete biography';
+    const runtime = {
+        enableTranslation: true,
+        isTranslationEnabled: () => true,
+        getCacheKey: (text, type) => `${type}:${text}`,
+        trackCacheKeyUsage: vi.fn(),
+        translationCache: new Map([[`plugin_scene_glossary:${source}`, translated]]),
+        hasUsableCacheValue(key) { return this.translationCache.has(key); },
+    };
+    const previousWindow = globalThis.window;
+    class GlossaryWindow { getDescription() { return this._itemData.meta.SG説明; } }
+    globalThis.window = { Window_Glossary: GlossaryWindow };
+    translator.getRuntime = () => runtime;
+    translator.registerPluginCustomTags = vi.fn();
+    try {
+        translator.enablePluginTranslation();
+        const view = new GlossaryWindow();
+        view._itemData = { note: 'Translated note', _translateOriginal: { note: `<SG説明:${source}>` }, meta: { SG説明: 'Mixed translated fragments' } };
+        expect(view.getDescription(0)).toBe(translated);
+        expect(runtime.trackCacheKeyUsage.mock.calls.map(([key]) => key)).not.toContain('plugin_scene_glossary:Mixed translated fragments');
+    } finally { globalThis.window = previousWindow; }
+});

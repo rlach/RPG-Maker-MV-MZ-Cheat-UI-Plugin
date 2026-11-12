@@ -1,3 +1,12 @@
+import { NyaLuggageCapacityTranslator } from './translators/NyaLuggageCapacityTranslator.js';
+import { SupponShopStockTranslator } from './translators/SupponShopStockTranslator.js';
+import { NyaWarehouseTranslator } from './translators/NyaWarehouseTranslator.js';
+import { HendrixHotbarTranslator } from './translators/HendrixHotbarTranslator.js';
+import { HotbarCommandPatchTranslator } from './translators/HotbarCommandPatchTranslator.js';
+import { NyaItemSubCommandTranslator } from './translators/NyaItemSubCommandTranslator.js';
+import { NuunRandomItemsTranslator } from './translators/NuunRandomItemsTranslator.js';
+import { MppEquipStatusExTranslator } from './translators/MppEquipStatusExTranslator.js';
+import { ManoMessageLogOptionTranslator } from './translators/ManoMessageLogOptionTranslator.js';
 import { DarkPlasmaChoiceExtensionTranslator } from './translators/DarkPlasmaChoiceExtensionTranslator.js';
 import { LevelUpMessagePlusTranslator } from './translators/LevelUpMessagePlusTranslator.js';
 import { KekeSpeedStarBattleTranslator } from './translators/KekeSpeedStarBattleTranslator.js';
@@ -11,6 +20,7 @@ import { CeliaDungeonUiTranslator } from './translators/CeliaDungeonUiTranslator
 import { ArigachiImgFusionTranslator } from './translators/ArigachiImgFusionTranslator.js';
 import { HiromonTransferTranslator } from './translators/HiromonTransferTranslator.js';
 import { HypnozmStatusTranslator } from './translators/HypnozmStatusTranslator.js';
+import { PretierePresentationTranslator } from './translators/PretierePresentationTranslator.js';
 import { RirikaManagementUiTranslator } from './translators/RirikaManagementUiTranslator.js';
 import { ElleMenuTranslator } from './translators/ElleMenuTranslator.js';
 import { ChimakiLangTranslator } from './translators/ChimakiLangTranslator.js';
@@ -104,6 +114,7 @@ import { LLMenuScreenShopTranslator } from './translators/LLMenuScreenShopTransl
 import { CageOfOrderTranslator } from './translators/CageOfOrderTranslator.js';
 import { EulKzmzUiTranslator } from './translators/EulKzmzUiTranslator.js';
 import { NameBoxNoUseTranslator } from './translators/NameBoxNoUseTranslator.js';
+import { QuestListMenuTranslator } from './translators/QuestListMenuTranslator.js';
 import { MppChoiceExTranslator } from './translators/MppChoiceExTranslator.js';
 import { MppRemovoEquipTextTranslator } from './translators/MppRemovoEquipTextTranslator.js';
 import { MppMessageExTranslator } from './translators/MppMessageExTranslator.js';
@@ -272,8 +283,18 @@ class PluginTranslatorRegistry {
             GraceDungeonUiTranslator,
             ChimakiLangTranslator,
             Inn15DayUiTranslator,
+            ManoMessageLogOptionTranslator,
+            MppEquipStatusExTranslator,
+            NuunRandomItemsTranslator,
+            NyaItemSubCommandTranslator,
+            HotbarCommandPatchTranslator,
+            HendrixHotbarTranslator,
+            NyaWarehouseTranslator,
+            SupponShopStockTranslator,
+            NyaLuggageCapacityTranslator,
             CeliaDungeonUiTranslator,
             RirikaManagementUiTranslator,
+            PretierePresentationTranslator,
             HypnozmStatusTranslator,
             HiromonTransferTranslator,
             ArigachiImgFusionTranslator,
@@ -349,6 +370,7 @@ class PluginTranslatorRegistry {
             NameBoxNoUseTranslator,
             NuunMenuScreenExTranslator,
             MppChoiceExTranslator,
+            QuestListMenuTranslator,
             MppRemovoEquipTextTranslator,
             MppMessageExTranslator,
             MenuSubCommandTranslator,

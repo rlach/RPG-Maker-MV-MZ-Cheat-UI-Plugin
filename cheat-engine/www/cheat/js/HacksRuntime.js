@@ -1,3 +1,4 @@
+import { installResourceUnicodeNormalization } from './ResourceUnicodeNormalization.js';
 import { KeyValueStorage } from './KeyValueStorage.js';
 import { GameTranslationSettings } from './GameTranslationSettings.js';
 import { FailedResourcesModal } from './FailedResourcesModal.js';
@@ -95,6 +96,7 @@ function toSwitchId(value) {
 class HacksRuntime {
     constructor() {
         this.state = {
+            normalizeResourceUnicode: false,
             improveFailedResourcesModal: false,
             [BITMAP_GET_PIXEL_LONG_FIX_KEY]: false,
             [MV_LOCAL_SAVE_PATH_FIX_KEY]: false,
@@ -115,6 +117,7 @@ class HacksRuntime {
                 { missingOnly: true }
             );
             if (data && typeof data === 'object') {
+                this.state.normalizeResourceUnicode = !!data.normalizeResourceUnicode;
                 this.state.improveFailedResourcesModal = !!data.improveFailedResourcesModal;
                 if (hasOwn(data, BITMAP_GET_PIXEL_LONG_FIX_KEY)) {
                     this.state[BITMAP_GET_PIXEL_LONG_FIX_KEY] =
@@ -156,7 +159,24 @@ class HacksRuntime {
         return this.removeBitmapGetPixelLongFix();
     }
 
+    isNormalizeResourceUnicodeEnabled() {
+        return !!this.state.normalizeResourceUnicode;
+    }
+
+    setNormalizeResourceUnicodeEnabled(enabled) {
+        this.state.normalizeResourceUnicode = !!enabled;
+        this._save();
+        this.applyResourceUnicodeNormalization();
+    }
+
+    applyResourceUnicodeNormalization() {
+        installResourceUnicodeNormalization(getRootWindow(), () =>
+            this.isNormalizeResourceUnicodeEnabled()
+        );
+    }
+
     applyEnabledHacks() {
+        if (this.isNormalizeResourceUnicodeEnabled()) this.applyResourceUnicodeNormalization();
         if (this.state.improveFailedResourcesModal) this.applyFailedResourcesModal();
         if (this.isBitmapGetPixelLongFixEnabled()) {
             this.applyBitmapGetPixelLongFix();

@@ -34,12 +34,14 @@ it('migrates enabled hacks, preserves cache overrides and saves changes alongsid
         const { HACKS_RUNTIME } =
             await import('../../../../../cheat-engine/www/cheat/js/HacksRuntime.js');
         expect(HACKS_RUNTIME.getState()).toEqual({
+            normalizeResourceUnicode: false,
             improveFailedResourcesModal: false,
             bitmapGetPixelLongFix: false,
             mvLocalSavePathFix: true,
         });
         HACKS_RUNTIME.setBitmapGetPixelLongFixEnabled(true);
         expect(store.read().hacks).toEqual({
+            normalizeResourceUnicode: false,
             improveFailedResourcesModal: false,
             bitmapGetPixelLongFix: true,
             mvLocalSavePathFix: true,

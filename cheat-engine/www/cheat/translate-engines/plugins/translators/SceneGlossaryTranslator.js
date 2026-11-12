@@ -461,7 +461,10 @@ function getOriginalItemMeta(item) {
 
     if (!hasOwn(item, '__CHEAT_ORIGINAL_SCENE_GLOSSARY_META__')) {
         Object.defineProperty(item, '__CHEAT_ORIGINAL_SCENE_GLOSSARY_META__', {
-            value: { ...(item.meta && typeof item.meta === 'object' ? item.meta : {}) },
+            value: {
+                ...(item.meta && typeof item.meta === 'object' ? item.meta : {}),
+                ...buildMetaPatchFromNoteText(getOriginalItemNote(item)),
+            },
             configurable: true,
             enumerable: false,
             writable: true,
@@ -670,9 +673,8 @@ function installGlossaryDescriptionHooks(translator, glossaryWindowPrototype) {
                 this._cheatGlossaryReadingSource = readingSource;
                 if (item) item.meta = displayMeta;
             }
-            const source = translator.isUsableText(sourceDescription)
-                ? sourceDescription
-                : extractDescriptionFromNoteText(getOriginalItemNote(item), index);
+            const rawSource = extractDescriptionFromNoteText(getOriginalItemNote(item), index);
+            const source = translator.isUsableText(rawSource) ? rawSource : sourceDescription;
             return translator.isUsableText(source)
                 ? translator.resolveRuntimeTranslation(
                       source,

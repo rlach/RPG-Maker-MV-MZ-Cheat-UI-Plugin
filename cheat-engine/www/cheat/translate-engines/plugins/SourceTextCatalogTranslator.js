@@ -170,10 +170,17 @@ export class SourceTextCatalogTranslator extends BasePluginTranslator {
         }));
     }
 
+    getCatalogCacheTypes() {
+        return [this.getCacheType()];
+    }
+
     collectUntranslated({ runtime }) {
         this.prepareDynamicValueTag(runtime);
         return this.buildPendingItems(runtime).filter(
-            (item) => !runtime.hasUsableCacheValue(item.cacheKey)
+            (item) =>
+                !this.getCatalogCacheTypes().some((type) =>
+                    runtime.hasUsableCacheValue(runtime.getCacheKey(item.value, type))
+                )
         );
     }
 
@@ -186,12 +193,17 @@ export class SourceTextCatalogTranslator extends BasePluginTranslator {
     resolveText(text, runtime, depth = 0, allowFragments = true) {
         if (!this.isUsableText(text) || !this.isRuntimeTranslationActive(runtime)) return text;
         this.prepareDynamicValueTag(runtime);
-        if (this.entries.has(text)) return this.resolveRuntimeTranslation(text, runtime);
+        if (this.entries.has(text))
+            return this.resolveRuntimeTranslation(text, runtime, this.getCatalogCacheTypes());
         if (depth < 2)
             for (const entry of this.templates) {
                 const match = entry.pattern.exec(text);
                 if (!match) continue;
-                const translated = this.resolveRuntimeTranslation(entry.text, runtime);
+                const translated = this.resolveRuntimeTranslation(
+                    entry.text,
+                    runtime,
+                    this.getCatalogCacheTypes()
+                );
                 if (translated === entry.text) continue;
                 return translated.replace(/\\COT\[(\d+)\]/g, (_, index) =>
                     this.resolveText(match[Number(index) + 1] ?? '', runtime, depth + 1)
@@ -199,7 +211,7 @@ export class SourceTextCatalogTranslator extends BasePluginTranslator {
             }
         if (allowFragments && this.fragmentPattern)
             return text.replace(this.fragmentPattern, (source) =>
-                this.resolveRuntimeTranslation(source, runtime)
+                this.resolveRuntimeTranslation(source, runtime, this.getCatalogCacheTypes())
             );
         return text;
     }
