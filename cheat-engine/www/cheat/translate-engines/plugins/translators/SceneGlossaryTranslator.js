@@ -657,9 +657,33 @@ function installGlossaryDescriptionHooks(translator, glossaryWindowPrototype) {
         const description = originalGetDescription.apply(this, arguments);
 
         try {
-            return translator.isUsableText(description)
-                ? resolveRuntimeTranslation(translator, description, [translator.getCacheType()])
-                : extractDescriptionFromNoteText(getOriginalItemNote(this._itemData), index);
+            // Resolve the source description even when item_note already translated meta.
+            const item = this._itemData;
+            const displayMeta = item?.meta;
+            let sourceDescription;
+            const readingSource = this._cheatGlossaryReadingSource;
+            try {
+                this._cheatGlossaryReadingSource = true;
+                if (item) item.meta = getOriginalItemMeta(item);
+                sourceDescription = originalGetDescription.apply(this, arguments);
+            } finally {
+                this._cheatGlossaryReadingSource = readingSource;
+                if (item) item.meta = displayMeta;
+            }
+            const source = translator.isUsableText(sourceDescription)
+                ? sourceDescription
+                : extractDescriptionFromNoteText(getOriginalItemNote(item), index);
+            return translator.isUsableText(source)
+                ? translator.resolveRuntimeTranslation(
+                      source,
+                      translator.getRuntime(),
+                      [translator.getCacheType()],
+                      {
+                          requireRuntimeTranslationActive: true,
+                          missValue: description || source,
+                      }
+                  )
+                : description;
         } catch (error) {
             console.warn(
                 '[SceneGlossaryTranslator] Failed to apply glossary description translation',
@@ -672,7 +696,9 @@ function installGlossaryDescriptionHooks(translator, glossaryWindowPrototype) {
     if (typeof glossaryWindowPrototype.getMetaContents === 'function') {
         const originalGetMetaContents = glossaryWindowPrototype.getMetaContents;
         glossaryWindowPrototype.getMetaContents = function () {
-            applyTranslatedGlossaryMeta(translator, this._itemData);
+            if (!this._cheatGlossaryReadingSource) {
+                applyTranslatedGlossaryMeta(translator, this._itemData);
+            }
             return originalGetMetaContents.apply(this, arguments);
         };
     }

@@ -25,6 +25,8 @@ import { ChangeSlotTranslator } from './translators/ChangeSlotTranslator.js';
 import { CbrEroStatusTranslator } from './translators/CbrEroStatusTranslator.js';
 import { CustomizeConfigItemTranslator } from './translators/CustomizeConfigItemTranslator.js';
 import { ExternMessageTranslator } from './translators/ExternMessageTranslator.js';
+import { ArcTogakiMessageTranslator } from './translators/ArcTogakiMessageTranslator.js';
+import { MaidUiTranslator } from './translators/MaidUiTranslator.js';
 import { LicoUiTranslator } from './translators/LicoUiTranslator.js';
 import { FCustomUiTranslator } from './translators/FCustomUiTranslator.js';
 import { InfoWindowTranslator } from './translators/InfoWindowTranslator.js';
@@ -235,6 +237,8 @@ class PluginTranslatorRegistry {
             CommonPopupCoreTranslator,
             CustomizeConfigItemTranslator,
             ExternMessageTranslator,
+            ArcTogakiMessageTranslator,
+            MaidUiTranslator,
             LicoUiTranslator,
             FCustomUiTranslator,
             InfoWindowTranslator,

@@ -914,6 +914,22 @@ export class TagManager {
             };
         }
 
+        // Inspect before the advisory checks strip surrounding game tags.
+        // A broken transport token can be nested inside a valid name command.
+        if (/⟪|TAG:|⟫/i.test(result)) {
+            return {
+                text: result,
+                valid: false,
+                errorReason: 'Unresolved encoded tags left in output',
+                unresolvedTags: [...result.matchAll(/⟪[^\r\n]*|TAG:[^\s]*|⟫/gi)].map((match) => ({
+                    tag: match[0],
+                    index: match.index,
+                    context: result,
+                })),
+                expectedCounts: tagCounts,
+                actualCounts,
+            };
+        }
         let valid = this.areAllTagsWithRequiredConsistencyValid(tagCounts, actualCounts);
 
         const expectedMaskedIdsByTagKey = caseMap?.expectedMaskedIdsByTagKey || {};

@@ -102,43 +102,18 @@ export class NameBoxNoUseTranslator extends BasePluginTranslator {
         return formattedSpeaker + (wrap ? '\n' : '');
     }
 
-    resolveMessageCacheSourceText(context = {}) {
-        const contextObject = context && typeof context === 'object' ? context : {};
-        const runtime = contextObject['runtime'] || null;
-        const text = contextObject['text'];
-        const gameMessage = contextObject['gameMessage'];
-
-        if (!this.isRuntimeTranslationActive(runtime)) {
-            return null;
-        }
-
-        const sourceText = toSafeString(text);
-        if (!sourceText || !sourceText.trim()) {
-            return null;
-        }
-
-        const pluginEntry = this.findPluginEntry();
-        if (!pluginEntry || !pluginEntry.status) {
-            return null;
-        }
-
-        const speakerName = this.resolveSpeakerName(
-            gameMessage || (typeof $gameMessage !== 'undefined' ? $gameMessage : null)
-        );
-        if (!speakerName) {
-            return null;
-        }
-
-        const prefix = this.buildSpeakerPrefix(speakerName, pluginEntry.parameters || {});
-        if (!prefix || !sourceText.startsWith(prefix)) {
-            return null;
-        }
-
-        const stripped = sourceText.slice(prefix.length);
-        if (!stripped) {
-            return null;
-        }
-
-        return stripped;
+    resolveMessageCacheSourceText({ text, mode, gameMessage } = {}) {
+        // The event text is the canonical source. allText adds presentation only.
+        // Static formats (including whitespace-only formats) do not require a
+        // speaker lookup: TRP_Skit can resolve that field differently at runtime.
+        if (mode === 'collection' || !text) return null;
+        const parameters = this.findPluginEntry(this.getPluginName())?.parameters || {};
+        const format = toSafeString(parameters.speakerFormat);
+        const speaker =
+            format && !format.includes('%1')
+                ? '_'
+                : this.resolveSpeakerName(gameMessage || window.$gameMessage);
+        const prefix = this.buildSpeakerPrefix(speaker, parameters);
+        return prefix && text.startsWith(prefix) ? text.slice(prefix.length) : null;
     }
 }

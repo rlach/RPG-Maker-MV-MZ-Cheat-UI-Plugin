@@ -116,3 +116,24 @@ it('keeps raw database identity authoritative over translated saved snapshots', 
         true
     );
 });
+
+it('does not harvest generated save timestamps while still observing help text', () => {
+    class CommandWindow {
+        drawItemSub() {}
+        drawText(text) { return text; }
+    }
+    const translator = new SceneCustomMenuTranslator();
+    const runtime = {
+        getCacheKey: (text) => text,
+        trackCacheKeyUsage: vi.fn(),
+        hasUsableCacheValue: () => false,
+    };
+    translator.getRuntime = () => runtime;
+    translator.isRuntimeTranslationActive = () => true;
+    translator._installCommandWindowHooks(CommandWindow.prototype);
+    const instance = new CommandWindow();
+    expect(instance.drawText('2026/11/12 01:15:59')).toBe('2026/11/12 01:15:59');
+    expect(runtime.trackCacheKeyUsage).not.toHaveBeenCalled();
+    instance.drawText('どのファイルにセーブしますか？');
+    expect(runtime.trackCacheKeyUsage).toHaveBeenCalledTimes(1);
+});

@@ -338,13 +338,13 @@ describe('Scene glossary roundtrip', () => {
         expect(postResult.text).toBe(SG_INPUT_REAL_2);
     });
 
-    it('Should allow LLM to miss ] bracket after > closure', () => {
+    it('rejects remaining transport fragments after loose glossary recovery', () => {
         const tagManager = new TagManager(null);
         tagManager.setCustomTagConfigs(SCENE_GLOSSARY_PLUGIN_TAGS);
 
         const { tagCounts, caseMap } = tagManager.preprocessTags(SG_INPUT_REAL);
         const postResult = tagManager.postprocessTags(LLM_OUTPUT_REAL, tagCounts, caseMap);
-        expect(postResult.valid).toBe(true);
+        expect(postResult.valid).toBe(false);
     });
 
     it('Should allow LLM to miss ] bracket after > closure 2', () => {

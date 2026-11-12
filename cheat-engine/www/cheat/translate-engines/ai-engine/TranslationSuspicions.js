@@ -10,13 +10,6 @@ export function detectTranslationSuspicions(original, translated, tagManager) {
     const source = stripTags(original);
     const output = stripTags(translated);
     const reasons = [];
-    if (/⟪|TAG:|⟫/i.test(output)) {
-        reasons.push({
-            id: 'partial-tags',
-            label: 'Partial tags',
-            message: 'The translation contains encoded tag fragments (⟪, TAG: or ⟫).',
-        });
-    }
     const hasExtraJsonParts = ['{', '}', '[', ']'].some(
         (part) => output.split(part).length > source.split(part).length
     );

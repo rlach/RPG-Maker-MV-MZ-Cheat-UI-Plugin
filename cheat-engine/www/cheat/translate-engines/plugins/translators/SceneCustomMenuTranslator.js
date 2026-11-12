@@ -16,7 +16,11 @@ const TranslatedTexts = new Set();
 
 function resolveCachedText(runtime, text, cacheType) {
     const normalizedText = normalizeCacheSourceText(text);
-    if (!normalizedText) {
+    // Save metadata is generated at runtime and has no translatable content.
+    if (
+        !normalizedText ||
+        /^\d{4}[/-]\d{1,2}[/-]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(normalizedText)
+    ) {
         return null;
     }
 

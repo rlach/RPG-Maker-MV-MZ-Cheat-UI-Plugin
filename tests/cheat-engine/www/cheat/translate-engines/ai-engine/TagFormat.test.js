@@ -140,7 +140,7 @@ describe.each(['tags', 'legacy'])('%s tag transport', (format) => {
                 packed.tagCounts,
                 packed.caseMap
             ).valid
-        ).toBe(true);
+        ).toBe(format === 'legacy');
         const masked = tm.customParameterEntries.find((e) => e.tagSymbol === 'PORTRAIT');
         const badMask = packed.preprocessedText.replace(
             syntax.encode(`${masked.tagId}[0]`),

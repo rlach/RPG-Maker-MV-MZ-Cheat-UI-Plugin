@@ -1,20 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock KnowledgeBaseRuntime before importing the translator
-vi.mock(
-    '../../../../../../../cheat-engine/www/cheat/js/KnowledgeBaseRuntime.js',
-    () => ({
-        mergeKnowledgeEntries: vi.fn(),
-    })
-);
+vi.mock('../../../../../../../cheat-engine/www/cheat/js/KnowledgeBaseRuntime.js', () => ({
+    mergeKnowledgeEntries: vi.fn(),
+}));
 
 // Mock HookGuardHelper
-vi.mock(
-    '../../../../../../../cheat-engine/www/cheat/js/HookGuardHelper.js',
-    () => ({
-        shouldApplyHook: vi.fn(() => true),
-    })
-);
+vi.mock('../../../../../../../cheat-engine/www/cheat/js/HookGuardHelper.js', () => ({
+    shouldApplyHook: vi.fn(() => true),
+}));
 
 import { SceneGlossaryTranslator } from '../../../../../../../cheat-engine/www/cheat/translate-engines/plugins/translators/SceneGlossaryTranslator.js';
 import { mergeKnowledgeEntries } from '../../../../../../../cheat-engine/www/cheat/js/KnowledgeBaseRuntime.js';
@@ -101,9 +95,7 @@ describe('SceneGlossaryTranslator.manageKnowledgeBase', () => {
         translator.manageKnowledgeBase(
             {},
             {
-                successes: [
-                    { value: 'plain text', translated: 'translated text' },
-                ],
+                successes: [{ value: 'plain text', translated: 'translated text' }],
             }
         );
 
@@ -161,4 +153,42 @@ describe('SceneGlossaryTranslator.manageKnowledgeBase', () => {
         expect(entries[1].key).toBe('防具');
         expect(entries[1].translation).toBe('Armor');
     });
+});
+
+it('harvests the original description when item notes already translated metadata', () => {
+    const translator = new SceneGlossaryTranslator();
+    const source = 'Original glossary description';
+    const translated = 'Translated glossary description';
+    const note = `<SG説明:${source}>`;
+    const runtime = {
+        enableTranslation: true,
+        isTranslationEnabled: () => true,
+        getCacheKey: (text, type) => `${type}:${text}`,
+        trackCacheKeyUsage: vi.fn(),
+        translationCache: new Map([[`item_note:${note}`, `<SG説明:${translated}>`]]),
+        hasUsableCacheValue(key) {
+            return this.translationCache.has(key);
+        },
+    };
+    const previousWindow = globalThis.window;
+    class GlossaryWindow {
+        getDescription() {
+            return this._itemData.meta.SG説明;
+        }
+    }
+    globalThis.window = { Window_Glossary: GlossaryWindow };
+    translator.getRuntime = () => runtime;
+    translator.registerPluginCustomTags = vi.fn();
+    try {
+        translator.enablePluginTranslation();
+        const view = new GlossaryWindow();
+        view._itemData = { note, meta: { SG説明: source } };
+        expect(view.getDescription(0)).toBe(translated);
+        expect(view.getDescription(0)).toBe(translated);
+        const harvested = runtime.trackCacheKeyUsage.mock.calls.map(([key]) => key);
+        expect(harvested).toContain(`plugin_scene_glossary:${source}`);
+        expect(harvested).not.toContain(`plugin_scene_glossary:${translated}`);
+    } finally {
+        globalThis.window = previousWindow;
+    }
 });

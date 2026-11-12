@@ -411,6 +411,11 @@ export default {
         suspicionFilter() {
             this.saveTableState();
         },
+        suspicionFilterOptions(options) {
+            if (!options.some((option) => option.value === this.suspicionFilter)) {
+                this.suspicionFilter = 'only';
+            }
+        },
 
         onlyEmpty() {
             this.saveTableState();

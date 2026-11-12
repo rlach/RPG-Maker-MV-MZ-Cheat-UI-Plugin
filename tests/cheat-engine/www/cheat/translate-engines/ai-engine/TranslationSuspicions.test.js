@@ -75,12 +75,16 @@ describe('tag consistency modes', () => {
     });
 });
 
-it.each(['⟪', 'TAG:', '⟫'])('flags the real transport fragment %s', (part) => {
-    expect(
-        detectTranslationSuspicions('原文', `Text ${part}`, manager()).map((r) => r.id)
-    ).toContain('partial-tags');
-});
-
+it.each(['⟪', 'TAG:', '⟫', '\\N<⟪TAG:wa5>'])(
+    'rejects transport fragments including nested name fragments %s',
+    (part) => {
+        const tags = manager();
+        const input = tags.preprocessTags('\\N[5]こんにちは。');
+        const result = tags.postprocessTags(`Text ${part}`, input.tagCounts, input.caseMap);
+        expect(result.valid).toBe(false);
+        expect(result.errorReason).toContain('Unresolved encoded');
+    }
+);
 it.each(['{', '}', '[', ']'])('flags a JSON fragment %s', (part) => {
     expect(
         detectTranslationSuspicions('原文', `Text ${part}`, manager()).map((r) => r.id)

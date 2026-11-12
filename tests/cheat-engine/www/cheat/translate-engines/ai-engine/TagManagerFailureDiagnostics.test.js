@@ -17,18 +17,21 @@ it('identifies each unresolved occurrence including repeated and unclosed tags',
     }
 });
 
-it.each(['TAG:sn', '.TAG:sn⟫', '<<TAG:sn>', '⟪TAG:sn', 'TAG:sp12'])(
-    'accepts broken transport fragments for advisory inspection %s',
-    (text) => {
-        const manager = new TagManager(null);
-        expect(manager.postprocessTags(text, {}, {}).valid).toBe(true);
-    }
-);
+it.each([
+    'TAG:sn',
+    '.TAG:sn⟫',
+    '<<TAG:sn>',
+    '⟪TAG:sn',
+    'TAG:sp12',
+    'TAG:',
+    'TAG:unknown',
+    'TAG:snow',
+])('rejects broken transport fragments %s', (text) => {
+    const manager = new TagManager(null);
+    expect(manager.postprocessTags(text, {}, {}).valid).toBe(false);
+});
 
-it.each(['TAG', 'TAG:', 'TAG:unknown', 'TAG:snow', '<< plain >>'])(
-    'preserves ordinary text %s',
-    (text) => {
-        const manager = new TagManager(null);
-        expect(manager.postprocessTags(text, {}, {}).valid).toBe(true);
-    }
-);
+it.each(['TAG', '<< plain >>'])('preserves ordinary text %s', (text) => {
+    const manager = new TagManager(null);
+    expect(manager.postprocessTags(text, {}, {}).valid).toBe(true);
+});
