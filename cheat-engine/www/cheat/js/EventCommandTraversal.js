@@ -496,10 +496,10 @@ export function collectEventCommandEntries(
 
 /**
  * @param {Array} list
- * @param {{ isUntranslated?: (entry: any) => boolean, transformEntry?: (entry: any) => any }} [options]
+ * @param {{ isUntranslated?: (entry: any) => boolean, transformEntry?: (entry: any) => any, traversalExtensions?: object[] }} [options]
  */
-export function countEventCommandEntries(list, { isUntranslated, transformEntry } = {}) {
-    const entries = collectEventCommandEntries(list, { transformEntry });
+export function countEventCommandEntries(list, { isUntranslated, ...traversalOptions } = {}) {
+    const entries = collectEventCommandEntries(list, traversalOptions);
     let totalStrings = 0;
     let leftStrings = 0;
 

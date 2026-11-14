@@ -25,6 +25,22 @@ export class EventUiTextTranslator extends SourceTextCatalogTranslator {
         return [];
     }
 
+    collectMapTexts() {
+        // Map names belong to map_name. The live database can already contain
+        // translated names; copying it into this catalog creates reverse translations.
+    }
+
+    resolveText(text, runtime, depth = 0, allowFragments = true) {
+        if (this.isUsableText(text) && this.isRuntimeTranslationActive(runtime)) {
+            const key = runtime.getCacheKey(text, 'map_name');
+            if (runtime.hasUsableCacheValue(key)) {
+                runtime.trackCacheKeyUsage(key, { harvestMissing: false });
+                return runtime.translationCache.get(key);
+            }
+        }
+        return super.resolveText(text, runtime, depth, allowFragments);
+    }
+
     collectCommandTexts(list = []) {
         this.assignments ??= [];
         this.displayVariables ??= new Set();

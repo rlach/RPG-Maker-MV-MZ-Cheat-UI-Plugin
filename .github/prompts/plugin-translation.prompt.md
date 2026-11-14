@@ -79,6 +79,7 @@ Plugins are managed by orchestrator.
 - Parse only the text payload; preserve non-text command structure.
 - Preserve leading spaces in extracted text keys exactly as authored (including full-width spaces), unless a single command separator space must be removed by syntax. Mass-translation extraction and runtime observation MUST use identical key text.
 - Deduplicate by cacheKey.
+- Store dialogue in the standard `message` (or `message_portrait`) namespace and speaker names in `actor_name` through `speaker` entries, even when a plugin supplies them. Never duplicate dialogue in a plugin-specific cache. Validate counting and collection through the mass-translation phases, not only the plugin extractor.
 - Before creating any new helper function, check `cheat-engine/www/cheat/translate-engines/plugins/translators/TranslatorHelpers.js` and reuse helpers from there.
 - For JSON parsing in translators, always import and use `parseJsonSafely` from `TranslatorHelpers.js`.
 - Do not re-implement local `parseJsonSafely`/`safeParseJSON` variants in translator files.

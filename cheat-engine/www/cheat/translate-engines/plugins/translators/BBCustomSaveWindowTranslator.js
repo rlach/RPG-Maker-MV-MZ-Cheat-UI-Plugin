@@ -8,18 +8,23 @@
  * - ItemNtitle labels (e.g. playtime / gold labels)
  * - ItemValueNunit suffix text appended to variable values
  *
+ * RJ01547841 MV fork: catalogs additional source captions, badges and day templates.
  * Saved map names resolve through the standard map_name cache at draw time.
  * Map-name collection stays owned by the core map phase; save data is unchanged.
  */
 
-import { BasePluginTranslator } from '../BasePluginTranslator.js';
+import { SourceTextCatalogTranslator } from '../SourceTextCatalogTranslator.js';
 
-export class BBCustomSaveWindowTranslator extends BasePluginTranslator {
+export class BBCustomSaveWindowTranslator extends SourceTextCatalogTranslator {
     constructor() {
         super();
         this._scanPrepared = false;
         this._scanEntries = [];
         this._scanPromise = null;
+    }
+
+    shouldScanEventData() {
+        return false;
     }
 
     getPluginName() {
@@ -30,6 +35,9 @@ export class BBCustomSaveWindowTranslator extends BasePluginTranslator {
         return 'BB Custom Save Window';
     }
 
+    isDisplayFragment() {
+        return false;
+    }
     getCacheType() {
         return 'plugin_bb_custom_save_window';
     }
@@ -48,8 +56,10 @@ export class BBCustomSaveWindowTranslator extends BasePluginTranslator {
         }
 
         this._scanPromise = Promise.resolve(this.buildScanEntries())
-            .then((entries) => {
+            .then(async (entries) => {
                 this._scanEntries = Array.isArray(entries) ? entries : [];
+                for (const entry of this._scanEntries) this.entries.set(entry.text, entry);
+                await super.buildCatalog();
                 this._scanPrepared = true;
             })
             .catch((error) => {
@@ -79,6 +89,7 @@ export class BBCustomSaveWindowTranslator extends BasePluginTranslator {
             return [];
         }
 
+        this.prepareDynamicValueTag(runtime);
         const items = this._buildUniquePendingItems(runtime);
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
@@ -114,6 +125,12 @@ export class BBCustomSaveWindowTranslator extends BasePluginTranslator {
         const runtimeSource = this._getRuntimeSourceTextGroups();
         this._hookDrawContentsContext();
         this._hookDrawText(runtimeSource);
+        this.hookDrawing(window.Window_SavefileList.prototype, 'drawText');
+        this.hookDrawing(window.Window_SavefileList.prototype, 'textWidth');
+        if (this._pluginDetected)
+            this.precomputeCounts().catch((error) =>
+                console.error('[BBCustomSaveWindowTranslator] Catalog scan failed', error)
+            );
         return true;
     }
 
@@ -273,13 +290,13 @@ export class BBCustomSaveWindowTranslator extends BasePluginTranslator {
     _getRuntimeSourceTextGroups() {
         if (!this._scanPrepared) {
             this._scanEntries = this.buildScanEntries();
-            this._scanPrepared = true;
+            for (const entry of this._scanEntries) this.entries.set(entry.text, entry);
         }
 
         const translatableTexts = new Set();
         const unitTexts = [];
 
-        for (const entry of this._scanEntries) {
+        for (const entry of this.entries.values()) {
             const text = String(entry?.text || '');
             if (!this.isUsableText(text)) {
                 continue;
@@ -299,11 +316,11 @@ export class BBCustomSaveWindowTranslator extends BasePluginTranslator {
     _buildUniquePendingItems(runtime) {
         if (!this._scanPrepared) {
             this._scanEntries = this.buildScanEntries();
-            this._scanPrepared = true;
+            for (const entry of this._scanEntries) this.entries.set(entry.text, entry);
         }
 
         const byCacheKey = new Map();
-        for (const entry of this._scanEntries) {
+        for (const entry of this.entries.values()) {
             const text = String(entry?.text || '');
             if (!this.isUsableText(text)) {
                 continue;

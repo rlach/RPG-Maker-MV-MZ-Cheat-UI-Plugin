@@ -10,10 +10,18 @@ const PLUGIN_TAGS = [
     },
 ];
 
-/** LL_InfoPopupWIndow v1.1.1 (MZ). Scan showMessage payloads and translate before layout. */
+/**
+ * LL_InfoPopupWIndow v1.1.1 (MZ): showMessage.messageText.
+ * LL_InfoPopupWIndowMV v1.0.0 (MV): showWindow text in the second argument.
+ * Scans map/common event commands and translates before popup width calculation.
+ */
 export class LLInfoPopupWIndowTranslator extends SourceTextCatalogTranslator {
     getPluginName() {
         return 'LL_InfoPopupWIndow';
+    }
+
+    getPluginAliases() {
+        return [this.getPluginName(), 'LL_InfoPopupWIndowMV'];
     }
 
     getPluginLabel() {
@@ -35,6 +43,16 @@ export class LLInfoPopupWIndowTranslator extends SourceTextCatalogTranslator {
     collectCommandTexts(list = []) {
         for (const command of list || []) {
             const args = command.parameters;
+            if (command.code === 356) {
+                const [name, action, text] = String(args[0] || '').split(' ');
+                if (
+                    name === 'LL_InfoPopupWIndowMV' &&
+                    action === 'showWindow' &&
+                    this.isUsableText(text)
+                )
+                    this.entries.set(text, { text });
+                continue;
+            }
             if (
                 command.code !== 357 ||
                 args[0]?.split('/').pop() !== this.getPluginName() ||
@@ -47,6 +65,24 @@ export class LLInfoPopupWIndowTranslator extends SourceTextCatalogTranslator {
     }
 
     enablePluginTranslation() {
+        if (this.findPluginEntry('LL_InfoPopupWIndowMV')?.status) {
+            const prototype = window.Game_Interpreter?.prototype;
+            if (typeof prototype?.pluginCommand !== 'function') return false;
+            const original = prototype.pluginCommand;
+            const translator = this;
+            prototype.pluginCommand = function (command, args) {
+                if (command !== 'LL_InfoPopupWIndowMV' || args[0] !== 'showWindow')
+                    return original.apply(this, arguments);
+                const runtime = translator.getRuntime();
+                if (!translator.isRuntimeTranslationActive(runtime))
+                    return original.apply(this, arguments);
+                const translated = translator.resolveRuntimeTranslation(args[1], runtime);
+                const translatedArgs = [...args];
+                translatedArgs[1] = translated;
+                return original.call(this, command, translatedArgs);
+            };
+            return true;
+        }
         const manager = window.PluginManager;
         const key = `${this.getPluginName()}:showMessage`;
         const original = manager?._commands?.[key];

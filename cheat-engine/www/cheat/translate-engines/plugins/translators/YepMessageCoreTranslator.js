@@ -13,6 +13,7 @@ import {
  *
  * Supported versions:
  * - MV v1.19 (Yanfly Message Core)
+ * - MV v1.19 header-only stub (Mirage Rebellion v1.0.1): no addText/word-wrap runtime.
  *
  * Notes:
  * - Mass-translation scanning builds cumulative keys from contiguous message text
@@ -289,25 +290,26 @@ export class YepMessageCoreTranslator extends BasePluginTranslator {
         const message = window.Game_Message?.prototype;
         const messageWindow = window.Window_Message?.prototype;
         if (
-            typeof message?.addText !== 'function' ||
             typeof message?.clear !== 'function' ||
             typeof messageWindow?.convertEscapeCharacters !== 'function'
         )
             return false;
         this.registerPluginCustomTags(YEP_MESSAGE_CORE_PLUGIN_TAGS);
         const translator = this;
-        const addText = message.addText;
-        message.addText = function (text) {
-            if (window.$gameSystem?.wordWrap()) {
-                let sources = translator.wordWrapSources.get(this);
-                if (!sources) {
-                    sources = new Map();
-                    translator.wordWrapSources.set(this, sources);
+        if (typeof message.addText === 'function') {
+            const addText = message.addText;
+            message.addText = function (text) {
+                if (window.$gameSystem?.wordWrap?.()) {
+                    let sources = translator.wordWrapSources.get(this);
+                    if (!sources) {
+                        sources = new Map();
+                        translator.wordWrapSources.set(this, sources);
+                    }
+                    sources.set('<WordWrap>' + text, text);
                 }
-                sources.set('<WordWrap>' + text, text);
-            }
-            return addText.apply(this, arguments);
-        };
+                return addText.apply(this, arguments);
+            };
+        }
         const clear = message.clear;
         message.clear = function () {
             translator.wordWrapSources.delete(this);

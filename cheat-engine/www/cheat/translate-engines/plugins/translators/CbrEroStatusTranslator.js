@@ -1,5 +1,6 @@
 import { SourceTextCatalogTranslator } from '../SourceTextCatalogTranslator.js';
 import { extractJavaScriptTextCatalog } from './JavaScriptTextCatalog.js';
+import { parseJsonSafely } from './TranslatorHelpers.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
 import { isRpgMakerMv } from '../../../js/RpgMakerRuntime.js';
 
@@ -26,32 +27,8 @@ function extractTextPayloadFromDataLine(line) {
     return safeLine.slice(TEXT_LINE_PREFIX.length);
 }
 
-function buildTranslatedDataLine(line, translator, runtime, cacheType) {
-    const payload = extractTextPayloadFromDataLine(line);
-    if (!translator.isUsableText(payload)) {
-        return line;
-    }
-
-    if (!runtime) {
-        return line;
-    }
-
-    const cacheKey = runtime.getCacheKey(payload, cacheType);
-    runtime.trackCacheKeyUsage(cacheKey);
-
-    if (!runtime.hasUsableCacheValue(cacheKey)) {
-        return line;
-    }
-
-    const cached = runtime.translationCache.get(cacheKey);
-    if (!translator.isUsableText(cached)) {
-        return line;
-    }
-
-    return `${TEXT_LINE_PREFIX}${cached}`;
-}
-
 /** CBR_EroStatus MZ, including script-generated impressions in RJ01683605.
+ * RJ01284200 v1.0.0 (MZ) adds hardcoded multipage labels and CBR_hSceneList.json.
  * Scan JavaScript display text without executing events. Translate evaluated
  * segments before measuring/drawing; keep script expressions and state intact.
  */
@@ -65,10 +42,31 @@ export class CbrEroStatusTranslator extends SourceTextCatalogTranslator {
     }
 
     getSourcePluginNames() {
-        return [];
+        return [this.getPluginName()];
     }
     shouldScanEventData() {
         return false;
+    }
+
+    async collectAdditionalTexts() {
+        const registered = window.DataManager?._databaseFiles?.some(
+            (file) => file.src === 'CBR_hSceneList.json'
+        );
+        if (!registered && !Array.isArray(window.CBR_hSceneList)) return;
+        let rows = window.CBR_hSceneList;
+        if (!Array.isArray(rows)) {
+            const response = await fetch('data/CBR_hSceneList.json');
+            if (!response.ok) throw new Error(`Cannot read CBR_hSceneList: ${response.status}`);
+            rows = parseJsonSafely(await response.text(), []);
+        }
+        if (!Array.isArray(rows)) throw new Error('Invalid CBR_hSceneList table');
+        for (const row of rows) {
+            for (const field of ['title', 'target', 'place', 'comment']) {
+                const text = row?.[field];
+                if (this.isUsableText(text) && text !== 'CBR_null')
+                    this.entries.set(text, { text });
+            }
+        }
     }
 
     detectPlugin() {
@@ -109,6 +107,10 @@ export class CbrEroStatusTranslator extends SourceTextCatalogTranslator {
         const cacheType = this.getCacheType();
         const translator = this;
         this.hookDrawing(window.Window_EroStatus.prototype, 'drawText');
+        if (typeof window.Window_EroStatus.prototype.textWidth === 'function')
+            this.hookDrawing(window.Window_EroStatus.prototype, 'textWidth');
+        if (window.Window_keikenReki?.prototype)
+            this.hookDrawing(window.Window_keikenReki.prototype, 'drawText');
         const refresh = window.Window_EroStatus.prototype.refresh;
         window.Window_EroStatus.prototype.refresh = function (...args) {
             if (!translator._scanPrepared && !translator._scanPromise) {
@@ -133,10 +135,13 @@ export class CbrEroStatusTranslator extends SourceTextCatalogTranslator {
         window.CBR['エロステータス'] = function (ary) {
             try {
                 const runtime = translator.getRuntime();
-                if (Array.isArray(ary) && runtime) {
-                    arguments[0] = ary.map((line) =>
-                        buildTranslatedDataLine(line, translator, runtime, cacheType)
-                    );
+                if (Array.isArray(ary) && translator.isRuntimeTranslationActive(runtime)) {
+                    arguments[0] = ary.map((line) => {
+                        const text = extractTextPayloadFromDataLine(line);
+                        return translator.isUsableText(text)
+                            ? `${TEXT_LINE_PREFIX}${translator.resolveRuntimeTranslation(text, runtime, cacheType)}`
+                            : line;
+                    });
                 }
             } catch (error) {
                 console.warn(
@@ -345,6 +350,7 @@ export class CbrEroStatusTranslator extends SourceTextCatalogTranslator {
             return [];
         }
 
+        this.prepareDynamicValueTag(runtime);
         const items = this.buildUniquePendingItems(runtime);
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }

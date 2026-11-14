@@ -1,6 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { TMLogWindowTranslator } from '../../../../../../../cheat-engine/www/cheat/translate-engines/plugins/translators/TMLogWindowTranslator.js';
 
+import { MNKRTMLogWindowMZTranslator } from '../../../../../../../cheat-engine/www/cheat/translate-engines/plugins/translators/MNKRTMLogWindowMZTranslator.js';
+
 afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -28,7 +30,7 @@ it('scans MV addLog and script entries without duplicating regular messages', ()
     ]);
 });
 
-it('renders mirrored messages through their standard whole-message cache and keeps stored logs original', () => {
+it.each([TMLogWindowTranslator, MNKRTMLogWindowMZTranslator])('renders mirrored messages through their standard whole-message cache and keeps stored logs original (%s)', (Translator) => {
     vi.stubGlobal('window', globalThis);
     class System {
         constructor() {
@@ -62,6 +64,7 @@ it('renders mirrored messages through their standard whole-message cache and kee
     vi.stubGlobal('Window_Base', Base);
     const cache = new Map([
         ['会話', 'Dialogue'],
+        ['アイテム\\I[322]', 'Item\\I[322]'],
         ['一行\n二行', 'First\nSecond'],
     ]);
     const runtime = {
@@ -70,20 +73,22 @@ it('renders mirrored messages through their standard whole-message cache and kee
             return this.enabled;
         },
         getPreferredMessageCacheEntry: (text) => ({ value: cache.get(text) }),
-        translationCache: new Map([['plugin_tm_log_window:追加情報', 'Extra information']]),
+        translationCache: new Map([[`${new Translator().getCacheType()}:追加情報`, 'Extra information']]),
         getCacheKey: (text, type) => `${type}:${text}`,
         hasUsableCacheValue(key) {
             return !!this.translationCache.get(key);
         },
         trackCacheKeyUsage: vi.fn(),
     };
-    const translator = new TMLogWindowTranslator();
+    const translator = new Translator();
     vi.spyOn(translator, 'getRuntime').mockReturnValue(runtime);
     expect(translator.enablePluginTranslation()).toBe(true);
     const log = new Window_MapLog();
     new Message().add('会話');
     expect(log.drawTextEx('会話')).toBe('Dialogue');
     expect(runtime.trackCacheKeyUsage).not.toHaveBeenCalled();
+    new Message().add('アイテム\\I[322]');
+    expect(log.drawTextEx('アイテム\\I[322]')).toBe('Item\\I[322]');
     const message = new Message();
     message.add('一行');
     message.add('二行');
@@ -91,7 +96,7 @@ it('renders mirrored messages through their standard whole-message cache and kee
     expect(log.drawTextEx('二行')).toBe('Second');
     system.addLog('追加情報');
     expect(log.drawTextEx('追加情報')).toBe('Extra information');
-    expect(system._actionLog).toEqual(['会話', '一行', '二行', '追加情報']);
+    expect(system._actionLog).toEqual(['会話', 'アイテム\\I[322]', '一行', '二行', '追加情報']);
     expect(new Base().drawTextEx('追加情報')).toBe('追加情報');
     runtime.enabled = false;
     expect(log.drawTextEx('会話')).toBe('会話');

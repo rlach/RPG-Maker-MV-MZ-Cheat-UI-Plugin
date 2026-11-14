@@ -1,10 +1,11 @@
-import { BasePluginTranslator } from '../BasePluginTranslator.js';
+import { SourceTextCatalogTranslator } from '../SourceTextCatalogTranslator.js';
 
 /**
  * EquipAndShopStatusR translator
  *
  * Supported plugin versions:
  * - EquipAndShopStatusR.js v1.09 (MV)
+ * - RJ01547841 MV fork and EquipAndShopStatusR+ trait vocabulary.
  * - RJ404094 MV variant: direct drawParamName/drawEffectText vocabulary.
  *
  * Translation notes:
@@ -114,7 +115,7 @@ const RESERVED_LIST_TOKENS = new Set([
     'etype',
 ]);
 
-export class EquipAndShopStatusRTranslator extends BasePluginTranslator {
+export class EquipAndShopStatusRTranslator extends SourceTextCatalogTranslator {
     constructor() {
         super();
         this._scanPrepared = false;
@@ -123,10 +124,17 @@ export class EquipAndShopStatusRTranslator extends BasePluginTranslator {
         this._knownTexts = null;
     }
 
+    shouldScanEventData() {
+        return false;
+    }
+
     getPluginName() {
         return PLUGIN_NAME;
     }
 
+    getPluginAliases() {
+        return [this.getPluginName(), 'EquipAndShopStatusR+'];
+    }
     getPluginLabel() {
         return 'Equip And Shop Status R';
     }
@@ -149,9 +157,10 @@ export class EquipAndShopStatusRTranslator extends BasePluginTranslator {
         }
 
         this._scanPromise = Promise.resolve(this.buildScanEntries())
-            .then((entries) => {
+            .then(async (entries) => {
                 this._scanEntries = Array.isArray(entries) ? entries : [];
-                this._knownTexts = null;
+                for (const entry of this._scanEntries) this.entries.set(entry.text, entry);
+                await super.buildCatalog();
                 this._scanPrepared = true;
             })
             .catch((error) => {
@@ -185,6 +194,7 @@ export class EquipAndShopStatusRTranslator extends BasePluginTranslator {
             return [];
         }
 
+        this.prepareDynamicValueTag(runtime);
         const items = this._buildUniquePendingItems(runtime);
         return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
     }
@@ -196,7 +206,7 @@ export class EquipAndShopStatusRTranslator extends BasePluginTranslator {
 
         if (!this._scanPrepared) {
             this._scanEntries = this.buildScanEntries();
-            this._scanPrepared = true;
+            for (const entry of this._scanEntries) this.entries.set(entry.text, entry);
         }
 
         const items = this._buildUniquePendingItems(runtime);
@@ -214,6 +224,7 @@ export class EquipAndShopStatusRTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
+        for (const entry of this.buildScanEntries()) this.entries.set(entry.text, entry);
         const prototype = window.Window_EquipStatus?.prototype;
         if (
             typeof prototype?.drawExParams !== 'function' ||
@@ -232,6 +243,10 @@ export class EquipAndShopStatusRTranslator extends BasePluginTranslator {
             return drawText.call(this, translator._translateRuntimeText(text), ...args);
         };
         Object.defineProperty(prototype, '__cheatStatusRVocabularyHook', { value: true });
+        if (this._pluginDetected)
+            this.precomputeCounts().catch((error) =>
+                console.error('[EquipAndShopStatusRTranslator] Catalog scan failed', error)
+            );
         return true;
     }
 
@@ -326,51 +341,14 @@ export class EquipAndShopStatusRTranslator extends BasePluginTranslator {
         });
     }
 
-    _getKnownTexts() {
-        if (this._knownTexts instanceof Set) {
-            return this._knownTexts;
-        }
-
-        const sourceEntries = this._scanPrepared ? this._scanEntries : this.buildScanEntries();
-        const knownTexts = new Set();
-        for (const entry of sourceEntries) {
-            if (this.isUsableText(entry?.text)) {
-                knownTexts.add(String(entry.text));
-            }
-        }
-
-        this._knownTexts = knownTexts;
-        return knownTexts;
-    }
-
     _translateRuntimeText(text) {
-        if (!this.isUsableText(text)) {
-            return text;
-        }
-
-        const sourceText = String(text);
-        const knownTexts = this._getKnownTexts();
-        if (!knownTexts.has(sourceText)) {
-            return sourceText;
-        }
-
-        const runtime = this.getRuntime();
-        if (!runtime) {
-            return sourceText;
-        }
-
-        if (!this.isRuntimeTranslationActive(runtime)) return sourceText;
-
-        return this.resolveRuntimeTranslation(sourceText, runtime, this.getCacheType(), {
-            requireRuntimeTranslationActive: true,
-            missValue: sourceText,
-        });
+        return this.resolveText(text, this.getRuntime());
     }
 
     _buildUniquePendingItems(runtime) {
         const byCacheKey = new Map();
 
-        for (const entry of this._scanEntries) {
+        for (const entry of this.entries.values()) {
             const text = entry?.text;
             if (!this.isUsableText(text)) {
                 continue;

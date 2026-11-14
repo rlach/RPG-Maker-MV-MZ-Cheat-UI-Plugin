@@ -1,3 +1,34 @@
+import { MapTalkBalloonTranslator } from './translators/MapTalkBalloonTranslator.js';
+import { EnemyPictureBookTranslator } from './translators/EnemyPictureBookTranslator.js';
+import { RadarChartTranslator } from './translators/RadarChartTranslator.js';
+import { ActorTextTranslator } from './translators/ActorTextTranslator.js';
+import { InfoEventTextTranslator } from './translators/InfoEventTextTranslator.js';
+import { RebirthPowerCommandTranslator } from './translators/RebirthPowerCommandTranslator.js';
+import { BattleFaceToggleTranslator } from './translators/BattleFaceToggleTranslator.js';
+import { BattleWindowHideTranslator } from './translators/BattleWindowHideTranslator.js';
+import { EventFastForwardTranslator } from './translators/EventFastForwardTranslator.js';
+import { SimpleEquipUpgradeTranslator } from './translators/SimpleEquipUpgradeTranslator.js';
+import { SrpgBattlePrepareTranslator } from './translators/SrpgBattlePrepareTranslator.js';
+import { SrpgCoreTranslator } from './translators/SrpgCoreTranslator.js';
+import { ManonMenuVariableTranslator } from './translators/ManonMenuVariableTranslator.js';
+import { YepCommonEventMenuTranslator } from './translators/YepCommonEventMenuTranslator.js';
+import { ShirokuronecoUiTranslator } from './translators/ShirokuronecoUiTranslator.js';
+import { WafuFormationScreenTranslator } from './translators/WafuFormationScreenTranslator.js';
+import { LlVariableWindowTranslator } from './translators/LlVariableWindowTranslator.js';
+import { NozomiUiTranslator } from './translators/NozomiUiTranslator.js';
+import { MnkrKmsSaveWithSnapTranslator } from './translators/MnkrKmsSaveWithSnapTranslator.js';
+import { FesStyleConfirmTranslator } from './translators/FesStyleConfirmTranslator.js';
+import { DbMenuStatusTranslator } from './translators/DbMenuStatusTranslator.js';
+import { KmsShopInventoryTranslator } from './translators/KmsShopInventoryTranslator.js';
+import { MapNameExtendTranslator } from './translators/MapNameExtendTranslator.js';
+import { TextResourceTranslator } from './translators/TextResourceTranslator.js';
+import { AdvExtentionTranslator } from './translators/AdvExtentionTranslator.js';
+import { SakuraShowChapterTitleTranslator } from './translators/SakuraShowChapterTitleTranslator.js';
+import { BbTextExTranslator } from './translators/BbTextExTranslator.js';
+import { SrdShakingTextTranslator } from './translators/SrdShakingTextTranslator.js';
+import { StandPictureECTranslator } from './translators/StandPictureECTranslator.js';
+import { KekeChangeLayoutLightTranslator } from './translators/KekeChangeLayoutLightTranslator.js';
+import { StvBeastBookTranslator } from './translators/StvBeastBookTranslator.js';
 import { NyaLuggageCapacityTranslator } from './translators/NyaLuggageCapacityTranslator.js';
 import { SupponShopStockTranslator } from './translators/SupponShopStockTranslator.js';
 import { NyaWarehouseTranslator } from './translators/NyaWarehouseTranslator.js';
@@ -20,6 +51,7 @@ import { CeliaDungeonUiTranslator } from './translators/CeliaDungeonUiTranslator
 import { ArigachiImgFusionTranslator } from './translators/ArigachiImgFusionTranslator.js';
 import { HiromonTransferTranslator } from './translators/HiromonTransferTranslator.js';
 import { HypnozmStatusTranslator } from './translators/HypnozmStatusTranslator.js';
+import { LlMenuScreenStatusMvTranslator } from './translators/LlMenuScreenStatusMvTranslator.js';
 import { PretierePresentationTranslator } from './translators/PretierePresentationTranslator.js';
 import { RirikaManagementUiTranslator } from './translators/RirikaManagementUiTranslator.js';
 import { ElleMenuTranslator } from './translators/ElleMenuTranslator.js';
@@ -269,6 +301,7 @@ class PluginTranslatorRegistry {
             LevelUpMessagePlusTranslator,
             DarkPlasmaChoiceExtensionTranslator,
             TrpParticleOptionTranslator,
+            KekeChangeLayoutLightTranslator,
             CultivatorUiTranslator,
             YknrMessageKeyWordTranslator,
             SttlaSynthesisTranslator,
@@ -291,10 +324,19 @@ class PluginTranslatorRegistry {
             HendrixHotbarTranslator,
             NyaWarehouseTranslator,
             SupponShopStockTranslator,
+            ShirokuronecoUiTranslator,
+            WafuFormationScreenTranslator,
+            LlVariableWindowTranslator,
+            NozomiUiTranslator,
+            MnkrKmsSaveWithSnapTranslator,
+            FesStyleConfirmTranslator,
+            DbMenuStatusTranslator,
+            KmsShopInventoryTranslator,
             NyaLuggageCapacityTranslator,
             CeliaDungeonUiTranslator,
             RirikaManagementUiTranslator,
             PretierePresentationTranslator,
+            LlMenuScreenStatusMvTranslator,
             HypnozmStatusTranslator,
             HiromonTransferTranslator,
             ArigachiImgFusionTranslator,
@@ -318,6 +360,27 @@ class PluginTranslatorRegistry {
             CbrEroStatusMvTranslator,
             DarkPlasmaCharacterTextTranslator,
             DescriptionExtendTranslator,
+            SrpgCoreTranslator,
+            SrpgBattlePrepareTranslator,
+            SimpleEquipUpgradeTranslator,
+            EventFastForwardTranslator,
+            BattleWindowHideTranslator,
+            BattleFaceToggleTranslator,
+            RebirthPowerCommandTranslator,
+            InfoEventTextTranslator,
+            ActorTextTranslator,
+            RadarChartTranslator,
+            EnemyPictureBookTranslator,
+            MapTalkBalloonTranslator,
+            MapNameExtendTranslator,
+            ManonMenuVariableTranslator,
+            YepCommonEventMenuTranslator,
+            TextResourceTranslator,
+            AdvExtentionTranslator,
+            SakuraShowChapterTitleTranslator,
+            StandPictureECTranslator,
+            SrdShakingTextTranslator,
+            BbTextExTranslator,
             DTextPictureTranslator,
             DynamicDatabaseTranslator,
             EquipInfoAllViewTranslator,
@@ -423,6 +486,7 @@ class PluginTranslatorRegistry {
             SkillEffectScriptTranslator,
             FtkrSkillCounterTranslator,
             SceneGlossaryTranslator,
+            StvBeastBookTranslator,
             SetMessageFontSizeTranslator,
             SHMessageWindowBgTranslator,
             SItemsceneKzTranslator,

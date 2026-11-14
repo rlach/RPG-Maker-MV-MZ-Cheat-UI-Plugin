@@ -187,6 +187,7 @@ export class YepSaveCoreTranslator extends BasePluginTranslator {
             const pattern = escapeRegExp(text).replace(/%\d+/g, '(.+?)');
             templates.push({
                 template: text,
+                placeholders: text.match(/%\d+/g),
                 regex: new RegExp(`^${pattern}$`),
             });
         }
@@ -229,7 +230,7 @@ export class YepSaveCoreTranslator extends BasePluginTranslator {
             }
 
             return translatedTemplate.replace(/%([1-9]\d*)/g, (placeholder, indexText) => {
-                const captureIndex = Number(indexText);
+                const captureIndex = templateEntry.placeholders.indexOf(`%${indexText}`) + 1;
                 return match[captureIndex] ?? placeholder;
             });
         }

@@ -83,3 +83,28 @@ it('uses authored keys for YEP-injected word wrap while preserving both wrapping
     message.addText(source);
     expect(translator.resolveMessageCacheSourceText({ text: source })).toBeNull();
 });
+
+it('initializes the header-only MV stub without requiring YEP runtime methods', () => {
+    class Message {
+        clear() {}
+    }
+    class MessageWindow {
+        convertEscapeCharacters(text) {
+            return text;
+        }
+    }
+    vi.stubGlobal('window', globalThis);
+    vi.stubGlobal('Game_Message', Message);
+    vi.stubGlobal('Window_Message', MessageWindow);
+    vi.stubGlobal('$gameSystem', {});
+    const translator = new YepMessageCoreTranslator();
+    vi.spyOn(translator, 'getRuntime').mockReturnValue({ isTranslationEnabled: () => true });
+    const register = vi.spyOn(translator, 'registerPluginCustomTags').mockImplementation(() => {});
+    expect(translator.enablePluginTranslation()).toBe(true);
+    expect(register).toHaveBeenCalledOnce();
+    expect(Message.prototype.addText).toBeUndefined();
+    const display = new MessageWindow();
+    expect(display.convertEscapeCharacters('Original message')).toBe('Original message');
+    expect(translator.resolveMessageCacheSourceText({ text: 'Original message' })).toBeNull();
+    new Message().clear();
+});

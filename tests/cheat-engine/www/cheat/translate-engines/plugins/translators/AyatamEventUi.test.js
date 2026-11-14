@@ -1,6 +1,22 @@
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { AyatamQuestTranslator } from '../../../../../../../cheat-engine/www/cheat/translate-engines/plugins/translators/AyatamQuestTranslator.js';
 import { EventUiTextTranslator } from '../../../../../../../cheat-engine/www/cheat/translate-engines/plugins/translators/EventUiTextTranslator.js';
+
+it('keeps translated map database values out of the event UI catalog and reuses map_name', () => {
+    const translator = new EventUiTextTranslator();
+    translator.collectMapTexts({ name: 'Silent Lakeside' }, { displayName: 'Silent Lakeside, Depths' });
+    expect(translator.entries.size).toBe(0);
+    const runtime = {
+        isTranslationEnabled: () => true,
+        getCacheKey: (text, type) => `${type}:${text}`,
+        trackCacheKeyUsage: vi.fn(),
+        translationCache: new Map([['map_name:静寂の湖畔', 'Silent Lakeside']]),
+        hasUsableCacheValue(key) { return this.translationCache.has(key); },
+    };
+    expect(translator.resolveText('静寂の湖畔', runtime)).toBe('Silent Lakeside');
+    expect(translator.resolveText('Silent Lakeside', runtime)).toBe('Silent Lakeside');
+    expect(runtime.trackCacheKeyUsage.mock.calls.map(([key]) => key)).toEqual(['map_name:静寂の湖畔']);
+});
 vi.mock(
     '../../../../../../../cheat-engine/www/cheat/js/translation-runtime/ObjectTranslationModalMethods.js',
     () => ({ loadMapDataById: vi.fn() })

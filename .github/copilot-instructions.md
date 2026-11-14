@@ -53,3 +53,16 @@ When adding a new runtime/store:
 - If code is hard to test without DOM, refactor logic into a pure helper/module first, then test that module.
 - Keep UI/window integration coverage minimal and separate from unit tests.
 
+
+## Translation Project Scope
+
+- Cheat Engine is an LLM-based automatic text translation system for RPG Maker MV and MZ.
+- Prefer reusable translators for individual plugins, using the shared translator interface and startup detection. Extend an existing translator before adding another one.
+- Game-specific translators are allowed only for author-written custom plugins or hardcoded game-specific behavior that cannot be covered by a reusable plugin translator.
+- Follow `.github/prompts/plugin-translation.prompt.md` for translator implementation.
+- Inspect game `data` JSON files and `js/plugins` sources; both directories may be inside `www`. Never modify the source game.
+- Translate text only. If requested labels are baked into images, report the exact image paths and leave replacement to the image translation workflow. Do not add text overlays.
+- Increment the root `package.json` patch version by exactly one per requested change, including tasks touching several translators.
+- Write all repository documentation and code comments in English.
+
+- Add cache or data migrations only when the user explicitly requests them. Pre-release translation changes may be tested by re-translating on the test device.

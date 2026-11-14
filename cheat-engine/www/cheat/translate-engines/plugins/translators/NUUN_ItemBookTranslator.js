@@ -6,6 +6,7 @@ import { walkNestedJsonLike } from './TranslatorHelpers.js';
  *
  * Supported plugin versions:
  * - NUUN_ItemBook.js v1.6.4 (MZ)
+ * - NUUN_ItemBook.js v1.6.5 (MZ): built-in detail labels and occasion/consume values.
  *
  * Translation notes:
  * - Translatable strings are sourced from plugin parameters, including nested
@@ -44,6 +45,74 @@ const NESTED_PARAMETER_KEYS = [
 const COMMAND_WINDOW_CTORS = new Set(['Window_ItemBook_Category', 'Window_ItemBookPageCategory']);
 const PERCENT_WINDOW_CTOR = 'Window_ItemBook_Percent';
 const PAGE_WINDOW_CTOR = 'Window_ItemBookPageCategory';
+
+// Built-in display defaults used when page definitions omit paramName.
+// Keep these in the catalog even when the current inventory cannot show them yet.
+const DETAIL_TEXTS = [
+    '所持数',
+    '最大所持数',
+    '価格',
+    '使用可能時',
+    '消耗',
+    '速度補正',
+    '成功率',
+    '得TP',
+    '武器タイプ',
+    '防具タイプ',
+    '装備タイプ',
+    '会心率',
+    '会心回避率',
+    '魔法回避率',
+    '魔法反射率',
+    '反撃率',
+    'HP再生率',
+    'MP再生率',
+    'TP再生率',
+    '狙われ率',
+    '防御効果率',
+    '回復効果率',
+    '薬の知識',
+    'MP消費率',
+    'TPチャージ率',
+    '物理ダメージ率',
+    '魔法ダメージ率',
+    '床ダメージ率',
+    '獲得経験率',
+    'Max possession',
+    'Price',
+    'Occasion',
+    'Consume',
+    'Speed',
+    'Success',
+    'TP Gain',
+    'Weapon type',
+    'Armmor type',
+    'Equipment type',
+    'Critcal Rate',
+    'Critical Evade',
+    'Magic Evade',
+    'Magic Reflect',
+    'Counter',
+    'HP Regen',
+    'MP Regen',
+    'TP Regen',
+    'Aggro',
+    'Guard',
+    'Recovery',
+    'Item Effect',
+    'MP Cost',
+    'TP Charge',
+    'Physical Damage',
+    'Magical Damage',
+    'Floor Damage',
+    'EXP Gain',
+    '常時',
+    '戦闘時',
+    '移動時',
+    '使用不可',
+    '消耗する',
+    '消耗しない',
+];
 
 export class NuunItemBookTranslator extends BasePluginTranslator {
     constructor() {
@@ -112,6 +181,9 @@ export class NuunItemBookTranslator extends BasePluginTranslator {
 
     buildScanEntries() {
         const entries = [];
+        for (const text of DETAIL_TEXTS) {
+            this._appendEntry(entries, text, { scope: 'builtInDetail' });
+        }
 
         const pluginEntry = this.findPluginEntry(this.getPluginName());
         if (pluginEntry?.parameters) {
@@ -226,6 +298,7 @@ export class NuunItemBookTranslator extends BasePluginTranslator {
         const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
         const resolveRuntimeTranslation = this.resolveRuntimeTranslation.bind(this);
         const cacheType = this.getCacheType();
+        const detailTexts = new Set(this.buildScanEntries().map((entry) => entry.text));
 
         if (!menuProto[MENU_HOOK_FLAG]) {
             const originalAddOriginalCommands = menuProto.addOriginalCommands;
@@ -356,7 +429,10 @@ export class NuunItemBookTranslator extends BasePluginTranslator {
                                 nextText = `${translatedLabel}${tail}`;
                             }
                         }
-                    } else if (ctorName === PAGE_WINDOW_CTOR) {
+                    } else if (
+                        ctorName === PAGE_WINDOW_CTOR ||
+                        (ctorName === 'Window_ItemBook' && detailTexts.has(text))
+                    ) {
                         const sourceText = String(text);
                         const cacheKey = runtime.getCacheKey(sourceText, cacheType);
                         runtime.trackCacheKeyUsage(cacheKey);

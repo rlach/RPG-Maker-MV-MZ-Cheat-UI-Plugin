@@ -10,6 +10,8 @@ import { parseJsonSafely } from './TranslatorHelpers.js';
  * This translator augments collection-time message keys with the same
  * AutoNamePopup-composed prefixes (name template + optionString) so translated
  * results preserve who is speaking.
+ * v5.1.2 (MZ): resolve face-mapped popup names through actor_name before the
+ * plugin applies its formatting template. Inline message prefixes stay original.
  */
 export class AutoNamePopupTranslator extends BasePluginTranslator {
     getPluginName() {
@@ -22,6 +24,22 @@ export class AutoNamePopupTranslator extends BasePluginTranslator {
 
     getCacheType() {
         return 'plugin_auto_name_popup';
+    }
+
+    enablePluginTranslation() {
+        const prototype = window.Game_System?.prototype;
+        if (typeof prototype?.getNameKeyParam !== 'function') return false;
+        const original = prototype.getNameKeyParam;
+        const translator = this;
+        const config = this._resolveRuntimeConfig();
+        prototype.getNameKeyParam = function (key, prop) {
+            const source = original.apply(this, arguments);
+            if (prop !== 'name' || config.inTheWindow) return source;
+            const runtime = translator.getRuntime();
+            if (!translator.isRuntimeTranslationActive(runtime)) return source;
+            return translator.resolveRuntimeTranslation(source, runtime, 'actor_name');
+        };
+        return true;
     }
 
     _resolveRuntimeConfig() {

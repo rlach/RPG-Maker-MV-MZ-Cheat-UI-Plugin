@@ -237,3 +237,25 @@ declare interface Window {
 }
 
 declare const CBR: any;
+
+declare const Window_SceneExtra: any;
+
+declare const TextResource: any;
+
+declare const Window_MenuStatus: any;
+
+declare const Window_Confirm: any;
+declare const Window_keikenReki: any;
+declare const CBR_evRecos: any;
+declare const CBR_hSceneList: any;
+
+declare const Window_Info: any;
+declare const Window_evList: any;
+declare const Window_EvText: any;
+declare const Window_evCategory: any;
+
+declare const Window_CommonEventMenu: any;
+
+declare const RadarChart: any;
+declare const getActorDescription: any;
+declare const Window_EnemyBookStatus: any;

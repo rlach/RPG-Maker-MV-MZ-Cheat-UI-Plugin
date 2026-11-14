@@ -290,7 +290,7 @@ function appendEntriesFromGlossaryDatabaseNoteRecord(
     allowedTags,
     output
 ) {
-    const note = typeof record?.note === 'string' ? record.note : '';
+    const note = getOriginalItemNote(record);
     if (!note.trim()) {
         return;
     }
@@ -316,6 +316,7 @@ function appendEntriesFromGlossaryDatabaseNoteRecord(
                 dataset: sourceScope,
                 dataId,
                 tag: tagName,
+                originalNote: note,
             },
             'plugin_scene_glossary'
         );
@@ -621,6 +622,9 @@ function appendEntriesFromParameters(parameters, scope, output) {
         return;
     }
 
+    for (const field of ['HelpText', 'HelpText2', 'ヘルプテキスト', 'ヘルプテキスト2']) {
+        pushScanEntry(output, parameters[field], { scope, field }, 'plugin_scene_glossary');
+    }
     const glossaryInfoList = parseStructArray(parameters.GlossaryInfo);
     appendEntriesFromGlossaryInfo(glossaryInfoList, scope, output);
 
@@ -974,6 +978,17 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
         if (!patchGlossaryDescription(this)) {
             return false;
         }
+        const scene = window.Scene_Glossary?.prototype;
+        if (typeof scene?.updateHelp === 'function') {
+            const original = scene.updateHelp;
+            const translator = this;
+            scene.updateHelp = function (text) {
+                return original.call(
+                    this,
+                    resolveRuntimeTranslation(translator, text, ['plugin_scene_glossary'])
+                );
+            };
+        }
         patchGlossaryCategoryWindow(this);
         patchGlossaryPartyMessages(this);
         patchGlossaryMenuCommand(this);
@@ -1053,6 +1068,26 @@ export class SceneGlossaryTranslator extends BasePluginTranslator {
         const byCacheKey = new Map();
 
         for (const entry of this._scanEntries) {
+            // A translated database note already supplies these tag values at runtime.
+            // Do not translate its extracted values a second time in a plugin cache.
+            if (entry.source?.originalNote) {
+                const dataset = entry.source.dataset;
+                const noteType = `${dataset === 'enemies' ? 'enemy' : dataset.replace(/s$/, '')}_note`;
+                const noteKey = runtime.getCacheKey(entry.source.originalNote, noteType);
+                if (runtime.hasUsableCacheValue(noteKey)) {
+                    const translatedTags = parseNoteTagEntries(
+                        runtime.translationCache.get(noteKey)
+                    );
+                    const translatedTag = translatedTags.find(
+                        (tag) => tag.tag === entry.source.tag
+                    );
+                    if (
+                        translatedTag?.value?.trim() &&
+                        translatedTag.value.trim() !== entry.text.trim()
+                    )
+                        continue;
+                }
+            }
             const text = typeof entry.text === 'string' ? entry.text : '';
             if (!this.isUsableText(text)) {
                 continue;

@@ -6,7 +6,7 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-it('translates saved map names using the map cache without changing saves or unrelated fields', () => {
+it('translates saved map names using the map cache without changing saves or unrelated fields', async () => {
     vi.stubGlobal('window', globalThis);
     vi.stubGlobal('$plugins', [
         { name: 'BB_CustomSaveWindow', status: true, parameters: { Item1title: '現在地' } },
@@ -39,7 +39,13 @@ it('translates saved map names using the map cache without changing saves or unr
         },
         trackCacheKeyUsage: vi.fn(),
     };
+    vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => ({ ok: true, text: async () => '' }))
+    );
     const translator = new BBCustomSaveWindowTranslator();
+    vi.spyOn(translator, '_scheduleEnablePluginTranslation').mockImplementation(() => {});
+    await translator.precomputeCounts();
     vi.spyOn(translator, 'getRuntime').mockReturnValue(runtime);
     expect(translator.enablePluginTranslation()).toBe(true);
     const saved = Object.freeze({ mapname: 'ひわい町', playtime: '00:04:24' });

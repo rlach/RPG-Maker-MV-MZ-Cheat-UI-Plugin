@@ -8,7 +8,7 @@ import { parseJsonSafely } from './TranslatorHelpers.js';
  * Supported plugin versions:
  * - LL_GalgeChoiceWindow.js v1.0.5 (MZ)
  * - LL_GalgeChoiceWindow.js v2.0.1 (MZ)
- * - LL_GalgeChoiceWindowMV.js v1.0.3 (MV)
+ * - LL_GalgeChoiceWindowMV.js v1.0.3 (MV), including RJ01547841 addMessageText fork
  *
  * Notes:
  * - MZ: Extracts text from plugin command "showChoice" args:
@@ -29,18 +29,9 @@ const LL_GALGE_SHOW_CHOICE_COMMAND = 'showChoice';
 const LL_GALGE_SET_MESSAGE_COMMAND = 'setMessageText';
 const LL_GALGE_SET_CHOICES_COMMAND = 'setChoices';
 
-function splitMvPluginCommandLine(commandLine) {
-    const normalized = String(commandLine || '').trim();
-    if (!normalized) {
-        return { pluginName: '', subCommand: '', tail: '' };
-    }
-
-    const [pluginName = '', subCommand = '', ...tailParts] = normalized.split(/\s+/);
-    return {
-        pluginName,
-        subCommand,
-        tail: tailParts.join(' '),
-    };
+function splitMvPluginCommandLine(line) {
+    const [pluginName = '', subCommand = '', ...tailParts] = String(line || '').split(' ');
+    return { pluginName, subCommand, tail: tailParts.join(' ') };
 }
 
 function toLowerSafe(value) {
@@ -50,7 +41,7 @@ function toLowerSafe(value) {
 }
 
 function splitMessageTextLines(rawText) {
-    return String(rawText || '').split('\n');
+    return String(rawText || '').split(/\n|\\n|\|/);
 }
 
 export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
@@ -308,27 +299,25 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
                     return originalSetQuestionText.apply(this, arguments);
                 }
 
-                const originalDrawText = this.drawText;
-                this.drawText = function (text, x, y, maxWidth, align) {
-                    const translatedText = resolveRuntimeTranslation(
+                const originalConvert = this.convertEscapeCharacters;
+                const ownConvert = Object.prototype.hasOwnProperty.call(
+                    this,
+                    'convertEscapeCharacters'
+                );
+                this.convertEscapeCharacters = function (text) {
+                    const translated = resolveRuntimeTranslation(
                         text,
                         runtime,
                         'plugin_ll_galge_choice_window',
                         { requireRuntimeTranslationActive: true }
                     );
-                    return Reflect.apply(originalDrawText, this, [
-                        translatedText,
-                        x,
-                        y,
-                        maxWidth,
-                        align,
-                    ]);
+                    return originalConvert.call(this, translated);
                 };
-
                 try {
                     return originalSetQuestionText.apply(this, arguments);
                 } finally {
-                    this.drawText = originalDrawText;
+                    if (ownConvert) this.convertEscapeCharacters = originalConvert;
+                    else delete this.convertEscapeCharacters;
                 }
             };
         }
@@ -393,6 +382,10 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
             return false;
         }
 
+        if (parsedCommand.subCommand === 'addMessageText') {
+            state.messageText += (state.messageText ? '\n' : '') + parsedCommand.tail;
+            return false;
+        }
         if (parsedCommand.subCommand === LL_GALGE_SET_CHOICES_COMMAND) {
             state.choices = parsedCommand.tail
                 .split(',')
@@ -699,6 +692,26 @@ export class LLGalgeChoiceWindowTranslator extends BasePluginTranslator {
                 continue;
             }
 
+            if (Number(cmd.code) === 356) {
+                const parsed = splitMvPluginCommandLine(cmd.parameters?.[0]);
+                if (
+                    this.isMvGalgePluginCommand(parsed.pluginName) &&
+                    [
+                        LL_GALGE_SET_MESSAGE_COMMAND,
+                        'addMessageText',
+                        LL_GALGE_SET_CHOICES_COMMAND,
+                    ].includes(parsed.subCommand)
+                ) {
+                    const texts =
+                        parsed.subCommand === LL_GALGE_SET_CHOICES_COMMAND
+                            ? parsed.tail.split(',')
+                            : splitMessageTextLines(parsed.tail);
+                    for (const text of texts) {
+                        if (this.isUsableText(text))
+                            output.push({ text, source: { ...baseMeta, cmdIdx } });
+                    }
+                }
+            }
             const entry =
                 this.extractShowChoiceEntry(cmd) ||
                 this.extractShowChoiceEntryFromMvList(list, cmdIdx);

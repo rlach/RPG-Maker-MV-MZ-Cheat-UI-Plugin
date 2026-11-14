@@ -108,7 +108,13 @@ export class DestinationWindowTranslator extends BasePluginTranslator {
     }
 
     isDestinationWindowPlugin(pluginName) {
-        return toLowerSafe(pluginName) === DESTINATION_WINDOW_PLUGIN_NAME;
+        return (
+            toLowerSafe(
+                String(pluginName || '')
+                    .split('/')
+                    .pop()
+            ) === DESTINATION_WINDOW_PLUGIN_NAME
+        );
     }
 
     isSetDestinationMZCommand(commandName) {

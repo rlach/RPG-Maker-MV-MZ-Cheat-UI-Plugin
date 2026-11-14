@@ -13,6 +13,27 @@ vi.mock('../../../../../../../cheat-engine/www/cheat/js/HookGuardHelper.js', () 
 import { SceneGlossaryTranslator } from '../../../../../../../cheat-engine/www/cheat/translate-engines/plugins/translators/SceneGlossaryTranslator.js';
 import { mergeKnowledgeEntries } from '../../../../../../../cheat-engine/www/cheat/js/KnowledgeBaseRuntime.js';
 
+it('scans original notes and skips only tag values already translated by the note cache', () => {
+    const translator = new SceneGlossaryTranslator();
+    const originalNote = '<SGカテゴリ:宝石><SG説明:ゆきなとオロチがお茶している。>';
+    const translatedNote = '<SGカテゴリ:宝石><SG説明:Yukina and Orochi are drinking tea.>';
+    const previousWindow = globalThis.window;
+    globalThis.window = { $dataItems: [null, { note: translatedNote, _translateOriginal: { note: originalNote } }] };
+    translator.findPluginEntry = () => null;
+    const runtime = {
+        getCacheKey: (text, type) => `${type}:${text}`,
+        translationCache: new Map([[`item_note:${originalNote}`, translatedNote]]),
+        hasUsableCacheValue(key) { return this.translationCache.has(key); },
+    };
+    try {
+        translator._scanEntries = translator.buildScanEntries();
+        expect(translator._scanEntries.map((entry) => entry.text)).not.toContain('Yukina and Orochi are drinking tea.');
+        expect(translator.buildUniquePendingItems(runtime).map((entry) => entry.value)).toEqual(['宝石']);
+        runtime.translationCache.clear();
+        expect(translator.buildUniquePendingItems(runtime).map((entry) => entry.value)).toContain('ゆきなとオロチがお茶している。');
+    } finally { globalThis.window = previousWindow; }
+});
+
 describe('SceneGlossaryTranslator.manageKnowledgeBase', () => {
     let translator;
 
