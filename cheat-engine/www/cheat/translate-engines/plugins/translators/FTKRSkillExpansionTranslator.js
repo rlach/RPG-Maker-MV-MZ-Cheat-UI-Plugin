@@ -170,7 +170,49 @@ export class FtkrSkillExpansionTranslator extends BasePluginTranslator {
         return skills;
     }
 
+    installEquipmentHelpHook() {
+        const prototype = window.Window_Help?.prototype;
+        if (this._equipmentHelpHooked || typeof prototype?.setItem !== 'function') return;
+        const original = prototype.setItem;
+        const translator = this;
+        prototype.setItem = function (item) {
+            const cacheType =
+                item?.wtypeId !== undefined
+                    ? 'weapon_description'
+                    : item?.atypeId !== undefined
+                      ? 'armor_description'
+                      : null;
+            if (!cacheType) return original.call(this, item);
+            const setText = this.setText;
+            const own = Object.getOwnPropertyDescriptor(this, 'setText');
+            this.setText = function (text) {
+                return setText.call(
+                    this,
+                    translator.resolveRuntimeTranslation(
+                        item.actorId && Array.isArray(item.descs)
+                            ? text
+                            : item._translateOriginal?.description || text,
+                        translator.getRuntime(),
+                        cacheType,
+                        {
+                            requireRuntimeTranslationActive: true,
+                            harvestMissing: false,
+                        }
+                    )
+                );
+            };
+            try {
+                return original.call(this, item);
+            } finally {
+                if (own) Object.defineProperty(this, 'setText', own);
+                else delete this.setText;
+            }
+        };
+        this._equipmentHelpHooked = true;
+    }
+
     enablePluginTranslation() {
+        this.installEquipmentHelpHook();
         const gameActorPrototype = globalThis.Game_Actor?.prototype;
         if (
             !gameActorPrototype ||

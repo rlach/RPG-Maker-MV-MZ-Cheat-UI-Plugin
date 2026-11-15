@@ -13,8 +13,8 @@ import { normalizeText, parseJsonSafely } from './TranslatorHelpers.js';
  * - Translatable text is stored in plugin parameter `statusList` (struct array).
  * - Command tokens (for example `name`, `param(%1)`, `custom(%1)`) are never
  *   translated because they are parser/control syntax, not display payload.
- * - Runtime integration patches `Window_Status.prototype.refresh` and temporarily
- *   swaps in a translated clone of `FTKR.CSS.DS.detailedStatus` for that draw pass.
+ * - Runtime translation occurs only at drawing, with a shared FTKR render guard.
+ *   Runtime status definitions remain original and safe for subsequent MT scans.
  */
 
 const CACHE_TYPE = 'plugin_ftkr_css_detailed_status';
@@ -193,35 +193,6 @@ export class FtkrCssDetailedStatusTranslator extends BasePluginTranslator {
         }
     }
 
-    translateStatusEntry(entry, runtime) {
-        if (!entry || typeof entry !== 'object') {
-            return entry;
-        }
-
-        const sourceTextToken = normalizeText(entry.text);
-        const sourceValue = normalizeText(entry.value);
-
-        let nextTextToken = entry.text;
-        if (this.isUsableText(sourceTextToken) && !isStatusControlToken(sourceTextToken)) {
-            nextTextToken = this.resolveCombinedRuntimeTranslation(sourceTextToken, runtime);
-        }
-
-        let nextValue = entry.value;
-        if (this.isUsableText(sourceValue) && shouldTranslateStatusValue(sourceTextToken)) {
-            nextValue = this.resolveCombinedRuntimeTranslation(sourceValue, runtime);
-        }
-
-        if (nextTextToken === entry.text && nextValue === entry.value) {
-            return entry;
-        }
-
-        return {
-            ...entry,
-            text: nextTextToken,
-            value: nextValue,
-        };
-    }
-
     resolveCombinedRuntimeTranslation(text, runtime) {
         return this.resolveRuntimeTranslation(
             text,
@@ -231,33 +202,6 @@ export class FtkrCssDetailedStatusTranslator extends BasePluginTranslator {
                 requireRuntimeTranslationActive: true,
             }
         );
-    }
-
-    buildTranslatedDetailedStatus(detailedStatus, runtime) {
-        const statusList = Array.isArray(detailedStatus?.statusList)
-            ? detailedStatus.statusList
-            : null;
-        if (!statusList) {
-            return detailedStatus;
-        }
-
-        let changed = false;
-        const nextStatusList = statusList.map((entry) => {
-            const nextEntry = this.translateStatusEntry(entry, runtime);
-            if (nextEntry !== entry) {
-                changed = true;
-            }
-            return nextEntry;
-        });
-
-        if (!changed) {
-            return detailedStatus;
-        }
-
-        return {
-            ...detailedStatus,
-            statusList: nextStatusList,
-        };
     }
 
     enablePluginTranslation() {
@@ -277,8 +221,6 @@ export class FtkrCssDetailedStatusTranslator extends BasePluginTranslator {
         }
 
         const getRuntime = this.getRuntime.bind(this);
-        const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
-        const buildTranslatedDetailedStatus = this.buildTranslatedDetailedStatus.bind(this);
         const resolveCombinedRuntimeTranslation = this.resolveCombinedRuntimeTranslation.bind(this);
 
         const originalDrawCssActorStatusBase = windowBasePrototype.drawCssActorStatusBase;
@@ -295,72 +237,24 @@ export class FtkrCssDetailedStatusTranslator extends BasePluginTranslator {
             }
         };
 
-        const originalDrawText = windowBasePrototype.drawText;
-        windowBasePrototype.drawText = function () {
-            try {
-                const runtime = getRuntime();
+        for (const method of ['drawText', 'drawTextEx']) {
+            const original = windowBasePrototype[method];
+            windowBasePrototype[method] = function (text, ...args) {
                 if (
-                    isRuntimeTranslationActive(runtime) &&
-                    (Number(this.__ftkrCssDetailedTranslationDepth) || 0) > 0 &&
-                    arguments.length > 0
-                ) {
-                    arguments[0] = resolveCombinedRuntimeTranslation(arguments[0], runtime);
+                    this.__ftkrCssTranslatedRender ||
+                    !(Number(this.__ftkrCssDetailedTranslationDepth) > 0)
+                )
+                    return original.call(this, text, ...args);
+                const translated = resolveCombinedRuntimeTranslation(text, getRuntime());
+                if (translated === text) return original.call(this, text, ...args);
+                this.__ftkrCssTranslatedRender = true;
+                try {
+                    return original.call(this, translated, ...args);
+                } finally {
+                    this.__ftkrCssTranslatedRender = false;
                 }
-            } catch (error) {
-                console.warn(
-                    '[FtkrCssDetailedStatusTranslator] Failed to translate drawText in FTKR CSS detailed scope',
-                    error
-                );
-            }
-
-            return originalDrawText.apply(this, arguments);
-        };
-
-        const originalDrawTextEx = windowBasePrototype.drawTextEx;
-        windowBasePrototype.drawTextEx = function () {
-            try {
-                const runtime = getRuntime();
-                if (
-                    isRuntimeTranslationActive(runtime) &&
-                    (Number(this.__ftkrCssDetailedTranslationDepth) || 0) > 0 &&
-                    arguments.length > 0
-                ) {
-                    arguments[0] = resolveCombinedRuntimeTranslation(arguments[0], runtime);
-                }
-            } catch (error) {
-                console.warn(
-                    '[FtkrCssDetailedStatusTranslator] Failed to translate drawTextEx in FTKR CSS detailed scope',
-                    error
-                );
-            }
-
-            return originalDrawTextEx.apply(this, arguments);
-        };
-
-        const originalRefresh = windowStatusPrototype.refresh;
-        windowStatusPrototype.refresh = function () {
-            const runtime = getRuntime();
-            if (!isRuntimeTranslationActive(runtime)) {
-                return originalRefresh.apply(this, arguments);
-            }
-
-            const detailedStatus = globalThis.FTKR?.CSS?.DS?.detailedStatus;
-            if (!detailedStatus) {
-                return originalRefresh.apply(this, arguments);
-            }
-
-            const translatedStatus = buildTranslatedDetailedStatus(detailedStatus, runtime);
-            if (translatedStatus === detailedStatus) {
-                return originalRefresh.apply(this, arguments);
-            }
-
-            globalThis.FTKR.CSS.DS.detailedStatus = translatedStatus;
-            try {
-                return originalRefresh.apply(this, arguments);
-            } finally {
-                globalThis.FTKR.CSS.DS.detailedStatus = detailedStatus;
-            }
-        };
+            };
+        }
 
         return true;
     }
@@ -396,7 +290,7 @@ export class FtkrCssDetailedStatusTranslator extends BasePluginTranslator {
     async buildScanEntries() {
         const entries = [];
 
-        const pluginEntry = this.findPluginEntry();
+        const pluginEntry = this.findPluginEntry(this.getPluginName());
         if (pluginEntry?.parameters) {
             this.collectParameterEntries(pluginEntry.parameters, 'pluginEntryParameter', entries);
         }

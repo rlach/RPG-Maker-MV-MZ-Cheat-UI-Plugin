@@ -52,3 +52,53 @@ it('translates profile variable text in the menu without modifying variables or 
     runtime.enabled = false;
     expect(status.drawSoloParameter(null, 'TEXT', parameter)).toBe(parameter.name);
 });
+
+it('catalogs modified plugin drawing literals and translates extra gauges at first refresh', async () => {
+    vi.stubGlobal('window', { $plugins: [{ name: 'TMSoloMenu', status: true, parameters: {} }] });
+    vi.stubGlobal('fetch', async () => ({
+        ok: true,
+        text: async () => `const unused = "使わない見出し";
+        function refresh() { this.drawText("名声",1,540,250);this.drawText("淫気",1,670,250);this.drawText("尿意",1,770,250);this.drawText("ランク冒険者",1,470,240); }`,
+    }));
+    const translator = new TMSoloMenuTranslator();
+    const entries = [];
+    await translator.collectSourceDrawingTexts(entries);
+    expect(entries.map((entry) => entry.text)).toEqual(['名声', '淫気', '尿意', 'ランク冒険者']);
+    translator._scanPrepared = true;
+    translator._scanEntries = entries;
+    const runtime = {
+        isTranslationEnabled: () => true,
+        getCacheKey: (text, type) => type + ':' + text,
+        translationCache: new Map([
+            ['plugin_tm_solo_menu:名声', 'Fame'],
+            ['plugin_tm_solo_menu:淫気', 'Arousal'],
+            ['plugin_tm_solo_menu:尿意', 'Bladder'],
+        ]),
+        hasUsableCacheValue(key) {
+            return this.translationCache.has(key);
+        },
+        trackCacheKeyUsage: vi.fn(),
+    };
+    vi.spyOn(translator, 'getRuntime').mockReturnValue(runtime);
+    const output = [];
+    const status = {
+        drawSoloParameter() {},
+        drawBattleParameter() {},
+        drawActorLevelAndExp() {},
+        drawText(text) {
+            output.push(text);
+        },
+        refresh() {
+            this.drawText('名声');
+            this.drawText('淫気');
+            this.drawText('尿意');
+            this.drawText('104');
+        },
+    };
+    translator.patchSoloStatusWindowInstance(status);
+    expect(output).toEqual(['Fame', 'Arousal', 'Bladder', '104']);
+    expect(runtime.trackCacheKeyUsage).toHaveBeenCalledWith(
+        'plugin_tm_solo_menu:名声',
+        expect.anything()
+    );
+});

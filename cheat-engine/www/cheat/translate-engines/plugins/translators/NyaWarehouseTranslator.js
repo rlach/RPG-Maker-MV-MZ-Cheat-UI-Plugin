@@ -17,9 +17,17 @@ export class NyaWarehouseTranslator extends ParameterSourceCatalogTranslator {
     shouldScanEventData() {
         return true;
     }
+    collectMapTexts() {}
     collectCommandTexts(list = []) {
-        super.collectCommandTexts(list);
         for (const command of list || []) {
+            if (command.code === 356) {
+                const match = /^PHWarehouse\s+(?:create|show)\s+<([^>:]+)(?::[^>]*)?>$/.exec(
+                    String(command.parameters[0])
+                );
+                if (match && this.isUsableText(match[1]))
+                    this.entries.set(match[1], { text: match[1] });
+                continue;
+            }
             if (command.code !== 357 || command.parameters[0] !== this.getPluginName()) continue;
             for (const field of ['create_title', 'show_title']) {
                 const text = command.parameters[3]?.[field];

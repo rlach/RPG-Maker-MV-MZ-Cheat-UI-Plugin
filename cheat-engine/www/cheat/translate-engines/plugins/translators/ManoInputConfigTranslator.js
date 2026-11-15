@@ -210,8 +210,8 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
             if (!this._hookKeyConfigDrawCommand() && !this._hookKeyConfigScene()) {
                 return false;
             }
-            this._hookGamepadConfigScene();
         }
+        this._hookGamepadConfigScene();
 
         window[RUNTIME_HOOK_GUARD] = true;
         return true;
@@ -547,6 +547,12 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
                 continue;
             }
 
+            if (typeof windowInstance.setText === 'function') {
+                const originalSetText = windowInstance.setText;
+                windowInstance.setText = function (text, ...args) {
+                    return originalSetText.call(this, resolveFromTranslatorCache(text), ...args);
+                };
+            }
             const originalDrawText = windowInstance.drawText;
             windowInstance.drawText = function (text, ...rest) {
                 let translated = text;
@@ -627,6 +633,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
             original.call(this);
 
             try {
+                translator._patchSceneWindowDrawText(this);
                 translator._patchGamepadWindow(this._gamepadWindow);
             } catch (error) {
                 console.warn(
@@ -648,6 +655,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
             // On first scene open, the original draw happened before patching.
             // Refresh once so translated draw methods take effect immediately.
             try {
+                this._helpWindow?.setText?.(this._helpWindow._text);
                 this._gamepadWindow?.refresh?.();
                 this._gamepadWindow?.updateHelp?.();
 
@@ -932,8 +940,15 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
         }
 
         // ── struct<MultiLangNote> parameters ─────────────────────────────────
-        for (const field of ['GamepadIsNotConnectedText', 'needButtonDetouchText']) {
-            const text = extractMultiLangNote(params[field]);
+        for (const field of [
+            'GamepadIsNotConnectedText',
+            'needButtonDetouchText',
+            'GamepadIsNotConnected',
+            'needButtonDetouch',
+        ]) {
+            const text =
+                extractMultiLangNote(params[field]) ||
+                (typeof params[field] === 'string' ? noteOrString(params[field]) : '');
             if (this.isUsableText(text)) {
                 output.push({ text, source: { scope, field } });
             }
@@ -1032,7 +1047,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
         const entries = [];
 
         // Collect from $plugins entry (persisted parameters in plugins.js)
-        const pluginEntry = this.findPluginEntry();
+        const pluginEntry = this.findPluginEntry(this.getPluginName());
         if (pluginEntry?.parameters) {
             this.appendEntriesFromParameters(
                 pluginEntry.parameters,

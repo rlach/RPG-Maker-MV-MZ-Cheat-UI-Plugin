@@ -4,7 +4,10 @@ import {
     isTranslationActive,
 } from '../CommandTranslationManager.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../../translate-engines/plugins/PluginTranslatorRegistry.js';
-import { createEncryptedImageLoader, findTranslatedImagePath } from './TranslatedImageResource.js';
+import {
+    createEncryptedImageLoader,
+    createTranslatedImagePathResolver,
+} from './TranslatedImageResource.js';
 
 export const translateOnTheFlyRuntimeMethods = {
     setupTranslationHook() {
@@ -340,6 +343,7 @@ export const translateOnTheFlyRuntimeMethods = {
             );
         };
 
+        const findImagePath = createTranslatedImagePathResolver();
         const resolveTranslatedImagePath = (folder, filename) => {
             if (!shouldUseImageCacheTranslation()) {
                 return null;
@@ -355,9 +359,6 @@ export const translateOnTheFlyRuntimeMethods = {
             if (!safeFolder || !safeFilename) {
                 return null;
             }
-
-            const fs = nodeRequire('fs');
-            const path = nodeRequire('path');
 
             const normalizedFolder = safeFolder.replaceAll('\\', '/');
             if (!normalizedFolder.startsWith('img/')) {
@@ -383,14 +384,8 @@ export const translateOnTheFlyRuntimeMethods = {
                 return null;
             }
 
-            const translatedImageDirectory = path.resolve(
-                splitCacheDirectory,
-                'img',
-                self.targetLang,
-                relativeImageFolder
-            );
-
-            return findTranslatedImagePath(fs, path, translatedImageDirectory, baseFileName);
+            const translatedImageDirectory = `${splitCacheDirectory}/img/${self.targetLang}/${relativeImageFolder}`;
+            return findImagePath(translatedImageDirectory, baseFileName);
         };
 
         const loadEncryptedImage = createEncryptedImageLoader();

@@ -28,13 +28,16 @@ export class AutoNamePopupTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         const prototype = window.Game_System?.prototype;
-        if (typeof prototype?.getNameKeyParam !== 'function') return false;
-        const original = prototype.getNameKeyParam;
+        const method =
+            typeof prototype?.getNameKeyParam === 'function' ? 'getNameKeyParam' : 'getNamePopup';
+        if (typeof prototype?.[method] !== 'function') return false;
+        const original = prototype[method];
         const translator = this;
         const config = this._resolveRuntimeConfig();
-        prototype.getNameKeyParam = function (key, prop) {
+        prototype[method] = function (key, prop) {
             const source = original.apply(this, arguments);
-            if (prop !== 'name' || config.inTheWindow) return source;
+            if ((method === 'getNameKeyParam' && prop !== 'name') || config.inTheWindow)
+                return source;
             const runtime = translator.getRuntime();
             if (!translator.isRuntimeTranslationActive(runtime)) return source;
             return translator.resolveRuntimeTranslation(source, runtime, 'actor_name');

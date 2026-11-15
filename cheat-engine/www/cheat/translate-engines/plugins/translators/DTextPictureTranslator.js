@@ -129,6 +129,7 @@ export class DTextPictureTranslator extends BasePluginTranslator {
             if (hasModifiedHookPoint) this.installModifiedInterpreterHook();
             this.installDTextRealTimeRefreshHook();
             this.installMZRefreshHook();
+            this.installMZPictureReuseHook();
             return true;
         }
 
@@ -140,6 +141,40 @@ export class DTextPictureTranslator extends BasePluginTranslator {
         return false;
     }
 
+    installMZPictureReuseHook() {
+        const prototype = window.Game_Picture?.prototype;
+        if (typeof prototype?.updateDText !== 'function' || typeof prototype?.show !== 'function')
+            return;
+        const parameters = this.findPluginEntry(this.getPluginName())?.parameters || {};
+        if (Number(parameters.widthVariable) || Number(parameters.heightVariable)) return;
+        const original = prototype.show;
+        prototype.show = function (...args) {
+            const previousInfo = this.dTextInfo;
+            const previousText = this._dTextValue;
+            const previousName = this._name;
+            const previousScaleX = this._scaleX;
+            const previousScaleY = this._scaleY;
+            const result = original.apply(this, args);
+            const info = this.dTextInfo;
+            if (
+                previousName &&
+                previousInfo &&
+                info &&
+                previousText === this._dTextValue &&
+                this._scaleX === previousScaleX &&
+                this._scaleY === previousScaleY
+            ) {
+                const keys = Object.keys(info);
+                if (
+                    keys.length === Object.keys(previousInfo).length &&
+                    keys.every((key) => info[key] === previousInfo[key])
+                )
+                    this._name = previousName;
+            }
+            return result;
+        };
+    }
+
     installMZRefreshHook() {
         const prototype = window.Game_Picture?.prototype;
         if (typeof prototype?.updateDText !== 'function' || prototype.__cheatDTextMZRefreshHook)
@@ -149,20 +184,23 @@ export class DTextPictureTranslator extends BasePluginTranslator {
         prototype.updateDText = function (...args) {
             const info = this.dTextInfo;
             if (!info || typeof info.value !== 'string') return original.apply(this, args);
-            const source = info.value;
-            info.value = translator.resolveRuntimeTranslation(
-                source,
-                translator.getRuntime(),
-                translator.getCacheType(),
-                {
-                    requireRuntimeTranslationActive: true,
-                    missValue: source,
-                }
-            );
+            const storedValue = info.value;
+            const source = info.__cheatDTextSource ?? storedValue;
+            info.value =
+                (info.__cheatDTextPrefix || '') +
+                translator.resolveRuntimeTranslation(
+                    source,
+                    translator.getRuntime(),
+                    translator.getCacheType(),
+                    {
+                        requireRuntimeTranslationActive: true,
+                        missValue: source,
+                    }
+                );
             try {
                 return original.apply(this, args);
             } finally {
-                info.value = source;
+                info.value = storedValue;
             }
         };
         Object.defineProperty(prototype, '__cheatDTextMZRefreshHook', { value: true });
@@ -186,6 +224,7 @@ export class DTextPictureTranslator extends BasePluginTranslator {
 
         Game_Picture.prototype.updateDTextVariable = function () {
             const info = this.dTextInfo;
+            const sourceValue = info?.originalValue;
 
             if (info && typeof info.originalValue === 'string' && info.originalValue) {
                 const runtime = getRuntime();
@@ -209,7 +248,11 @@ export class DTextPictureTranslator extends BasePluginTranslator {
                 }
             }
 
-            return original.apply(this, arguments);
+            try {
+                return original.apply(this, arguments);
+            } finally {
+                if (info && typeof sourceValue === 'string') info.originalValue = sourceValue;
+            }
         };
 
         Object.defineProperty(
@@ -232,34 +275,24 @@ export class DTextPictureTranslator extends BasePluginTranslator {
             manager.__cheatDTextRawCommandHook
         )
             return;
-        const translator = this;
         const original = manager.callCommand;
         manager.callCommand = function (self, pluginName, commandName, args) {
-            const runtime = translator.getRuntime();
             if (
                 String(pluginName).split('/').pop().toLowerCase() !== 'dtextpicture' ||
                 commandName !== 'dText' ||
-                typeof args?.text !== 'string' ||
-                !runtime ||
-                !translator.isRuntimeTranslationActive(runtime)
+                typeof args?.text !== 'string'
             ) {
                 return original.apply(this, arguments);
             }
-            const text = translator.resolveRuntimeTranslation(
-                args.text,
-                runtime,
-                translator.getCacheType(),
-                { missValue: args.text, requireRuntimeTranslationActive: true }
-            );
             const screen = window.$gameScreen;
-            const previous = screen?.__cheatDTextSourceTranslated;
-            if (screen) screen.__cheatDTextSourceTranslated = true;
+            const previous = screen?.__cheatDTextRawSource;
+            if (screen) screen.__cheatDTextRawSource = args.text;
             try {
-                return original.call(this, self, pluginName, commandName, { ...args, text });
+                return original.call(this, self, pluginName, commandName, args);
             } finally {
                 if (screen) {
-                    if (previous === undefined) delete screen.__cheatDTextSourceTranslated;
-                    else screen.__cheatDTextSourceTranslated = previous;
+                    if (previous === undefined) delete screen.__cheatDTextRawSource;
+                    else screen.__cheatDTextRawSource = previous;
                 }
             }
         };
@@ -267,6 +300,25 @@ export class DTextPictureTranslator extends BasePluginTranslator {
     }
 
     installLegacySetDTextPictureHook() {
+        const modern =
+            typeof window.Game_Picture?.prototype.updateDText === 'function' &&
+            typeof Game_Screen.prototype.getDTextPictureInfo === 'function';
+        if (modern) {
+            const getInfo = Game_Screen.prototype.getDTextPictureInfo;
+            Game_Screen.prototype.getDTextPictureInfo = function (...args) {
+                const info = getInfo.apply(this, args);
+                const source = this.__cheatDTextPreparedSource;
+                if (typeof source === 'string') {
+                    const prefix =
+                        info.value.slice(0, info.value.length - this.dTextValue.length) +
+                        (this.dTextSize > 0 ? `\\fs[${this.dTextSize}]` : '');
+                    info.__cheatDTextSource = source;
+                    info.__cheatDTextPrefix = prefix;
+                    info.value = prefix + source;
+                }
+                return info;
+            };
+        }
         const original = Game_Screen.prototype.setDTextPicture;
         const getRuntime = this.getRuntime.bind(this);
         const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
@@ -275,6 +327,10 @@ export class DTextPictureTranslator extends BasePluginTranslator {
 
         Game_Screen.prototype.setDTextPicture = function (value, size) {
             const runtime = getRuntime();
+            if (modern) {
+                this.__cheatDTextPreparedSource = this.__cheatDTextRawSource ?? value;
+                return original.apply(this, arguments);
+            }
             if (
                 !this.__cheatDTextSourceTranslated &&
                 runtime &&

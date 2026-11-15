@@ -442,6 +442,9 @@ export class SceneCustomMenuTranslator extends SourceTextCatalogTranslator {
                         for (const match of script.matchAll(/item\.meta\[['"]([^'"]+)['"]\]/g)) {
                             fields.add(match[1]);
                         }
+                        for (const match of script.matchAll(/\bdrawNoteText\(['"]([^'"]+)['"]/g)) {
+                            fields.add(match[1]);
+                        }
                     }
                 }
             }

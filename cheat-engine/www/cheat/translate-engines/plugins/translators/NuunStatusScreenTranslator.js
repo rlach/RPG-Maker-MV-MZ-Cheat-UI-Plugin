@@ -18,54 +18,29 @@ import { parseJsonSafely } from './TranslatorHelpers.js';
 const PLUGIN_NAME = 'NUUN_StatusScreen';
 const CACHE_TYPE = 'plugin_nuun_status_screen';
 
-const DIRECT_TEXT_PARAMETER_KEYS = Object.freeze(['PageNextSymbol', 'PagePreviousSymbol']);
+const DIRECT_TEXT_PARAMETER_KEYS = Object.freeze([
+    'PageNextSymbol',
+    'PagePreviousSymbol',
+    'ParamName',
+    'EquipsName',
+    'XParamName',
+    'SParamName',
+    'ElementName',
+    'StateName',
+    'OriginalParam1Name',
+    'OriginalParam2Name',
+]);
 
 const STRUCT_TEXT_FIELDS = Object.freeze([
     'ParamName',
     'paramName',
+    'XparamName',
+    'SparamName',
+    'XparamUnit',
+    'SparamUnit',
     'paramUnit',
     'UnitText',
     'RadarChartParamName',
-]);
-
-const FALLBACK_STATUS_LABELS = Object.freeze([
-    '命中率',
-    '回避率',
-    '会心率',
-    '会心回避',
-    '魔法回避',
-    '魔法反射率',
-    '反撃率',
-    '再生率',
-    '再生率',
-    '再生率',
-    '狙われ率',
-    '防御効果率',
-    '回復効果率',
-    '薬の知識',
-    '消費率',
-    'チャージ率',
-    '物理ダメージ率',
-    '魔法ダメージ率',
-    '床ダメージ率',
-    '経験値獲得率',
-    '会心回避率',
-    '魔法回避率',
-    '魔法反射率',
-    '反撃率',
-    'HP再生率',
-    'MP再生率',
-    'TP再生率',
-    '狙われ率',
-    '防御効果率',
-    '回復効果率',
-    '薬の知識',
-    'MP消費率',
-    'TPチャージ率',
-    '物理ダメージ率',
-    '魔法ダメージ率',
-    '床ダメージ率',
-    '獲得経験率',
 ]);
 
 function shouldSkipLiteralText(value) {
@@ -189,14 +164,6 @@ export class NuunStatusScreenTranslator extends BasePluginTranslator {
                 param: key,
             });
         }
-
-        for (let index = 0; index < FALLBACK_STATUS_LABELS.length; index++) {
-            this.appendEntry(output, FALLBACK_STATUS_LABELS[index], {
-                scope,
-                field: 'fallbackStatusLabel',
-                index,
-            });
-        }
     }
 
     buildScanEntries() {
@@ -217,7 +184,47 @@ export class NuunStatusScreenTranslator extends BasePluginTranslator {
             );
         }
 
+        this.collectRuntimeParameterNames(entries, pluginEntry?.parameters || {});
         return entries;
+    }
+
+    collectRuntimeParameterNames(output, parameters) {
+        let scene;
+        let content = this._contentPrototype ? Object.create(this._contentPrototype) : null;
+        try {
+            if (
+                !content &&
+                typeof window.Scene_Status?.prototype.createStatusContentWindow === 'function'
+            ) {
+                scene = Object.create(window.Scene_Status.prototype);
+                scene.addChild = () => {};
+                scene.createStatusContentWindow();
+                content = scene._leftContentWindow || scene._rightContentWindow;
+            }
+            if (!content) return;
+            for (const [field, method, nameField] of [
+                ['Xparam', 'XparamName', 'XparamName'],
+                ['Sparam', 'SparamName', 'SparamName'],
+            ]) {
+                if (typeof content[method] !== 'function') continue;
+                const settings = parseJsonSafely(parameters[field], []);
+                for (let index = 0; index < settings.length; index++) {
+                    const setting = parseJsonSafely(settings[index], settings[index]);
+                    if (field === 'Xparam' && !setting[nameField] && Number(setting.XparamId) < 2)
+                        continue;
+                    this.appendEntry(output, content[method](index), {
+                        scope: 'runtimeParameterName',
+                        field,
+                        index,
+                    });
+                }
+            }
+        } finally {
+            if (scene) {
+                for (const field of ['_leftContentWindow', '_rightContentWindow'])
+                    scene[field]?.destroy();
+            }
+        }
     }
 
     async precomputeCounts() {
@@ -303,8 +310,7 @@ export class NuunStatusScreenTranslator extends BasePluginTranslator {
         return true;
     }
 
-    installDrawTextHooks() {
-        const windowStatusPrototype = window.Window_Status?.prototype;
+    installDrawTextHooks(windowStatusPrototype = window.Window_Status?.prototype) {
         if (!windowStatusPrototype) {
             return false;
         }
@@ -350,6 +356,16 @@ export class NuunStatusScreenTranslator extends BasePluginTranslator {
         return installed;
     }
 
+    hookContentWindows(scene) {
+        for (const field of ['_leftContentWindow', '_rightContentWindow']) {
+            const instance = scene?.[field];
+            if (instance) {
+                this._contentPrototype = Object.getPrototypeOf(instance);
+                this.installDrawTextHooks(Object.getPrototypeOf(instance));
+            }
+        }
+    }
+
     enablePluginTranslation() {
         const hasWindowStatus = !!window.Window_Status?.prototype;
         const hasParamNameHook =
@@ -365,6 +381,21 @@ export class NuunStatusScreenTranslator extends BasePluginTranslator {
 
         const paramNameHookInstalled = this.installParamNameHook();
         const drawTextHooksInstalled = this.installDrawTextHooks();
+        const translator = this;
+        const scenePrototype = window.Scene_Status?.prototype;
+        if (
+            typeof scenePrototype?.createStatusContentWindow === 'function' &&
+            !scenePrototype.__cheatNuunContentHook
+        ) {
+            const original = scenePrototype.createStatusContentWindow;
+            scenePrototype.createStatusContentWindow = function (...args) {
+                const result = original.apply(this, args);
+                translator.hookContentWindows(this);
+                return result;
+            };
+            Object.defineProperty(scenePrototype, '__cheatNuunContentHook', { value: true });
+        }
+        this.hookContentWindows(window.SceneManager?._scene);
 
         return paramNameHookInstalled || drawTextHooksInstalled;
     }

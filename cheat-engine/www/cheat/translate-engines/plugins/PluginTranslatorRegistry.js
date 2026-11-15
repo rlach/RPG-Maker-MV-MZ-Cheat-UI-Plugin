@@ -1,7 +1,26 @@
+import { TaSceneStatusExtendTranslator } from './translators/TaSceneStatusExtendTranslator.js';
+import { CbrEroStatusMzPortTranslator } from './translators/CbrEroStatusMzPortTranslator.js';
+import { HbNotificationTranslator } from './translators/HbNotificationTranslator.js';
+import { TorigoyaMZBookshelfTranslator } from './translators/TorigoyaMZBookshelfTranslator.js';
+import { ValkyrieArenaTranslator } from './translators/ValkyrieArenaTranslator.js';
+import { NoreFamilyTreeTranslator } from './translators/NoreFamilyTreeTranslator.js';
+import { SoRMapActionIndicatorTranslator } from './translators/SoRMapActionIndicatorTranslator.js';
+import { CustomMadeStatusSceneTranslator } from './translators/CustomMadeStatusSceneTranslator.js';
+import { HzChoiceEventTranslator } from './translators/HzChoiceEventTranslator.js';
+import { RtkCompositeTranslator } from './translators/RtkCompositeTranslator.js';
+import { Rj01310953MenuTranslator } from './translators/Rj01310953MenuTranslator.js';
+import { FadeTextTranslator } from './translators/FadeTextTranslator.js';
+import { MogMapNameHudTranslator } from './translators/MogMapNameHudTranslator.js';
+import { MppSmoothBattleLogTranslator } from './translators/MppSmoothBattleLogTranslator.js';
+import { AyatamSceneCustomTranslator } from './translators/AyatamSceneCustomTranslator.js';
+import { AutoSaveSlotTranslator } from './translators/AutoSaveSlotTranslator.js';
+import { YepItemSynthesisTranslator } from './translators/YepItemSynthesisTranslator.js';
+import { EnemyBookTranslator } from './translators/EnemyBookTranslator.js';
 import { MapTalkBalloonTranslator } from './translators/MapTalkBalloonTranslator.js';
 import { EnemyPictureBookTranslator } from './translators/EnemyPictureBookTranslator.js';
 import { RadarChartTranslator } from './translators/RadarChartTranslator.js';
 import { ActorTextTranslator } from './translators/ActorTextTranslator.js';
+import { Rj01477834Translator } from './translators/Rj01477834Translator.js';
 import { InfoEventTextTranslator } from './translators/InfoEventTextTranslator.js';
 import { RebirthPowerCommandTranslator } from './translators/RebirthPowerCommandTranslator.js';
 import { BattleFaceToggleTranslator } from './translators/BattleFaceToggleTranslator.js';
@@ -368,10 +387,29 @@ class PluginTranslatorRegistry {
             BattleFaceToggleTranslator,
             RebirthPowerCommandTranslator,
             InfoEventTextTranslator,
+            Rj01477834Translator,
+            Rj01310953MenuTranslator,
+            FadeTextTranslator,
+            RtkCompositeTranslator,
+            HzChoiceEventTranslator,
+            CustomMadeStatusSceneTranslator,
+            SoRMapActionIndicatorTranslator,
+            NoreFamilyTreeTranslator,
+            TorigoyaMZBookshelfTranslator,
+            ValkyrieArenaTranslator,
+            CbrEroStatusMzPortTranslator,
+            HbNotificationTranslator,
+            TaSceneStatusExtendTranslator,
             ActorTextTranslator,
             RadarChartTranslator,
             EnemyPictureBookTranslator,
             MapTalkBalloonTranslator,
+            EnemyBookTranslator,
+            YepItemSynthesisTranslator,
+            AutoSaveSlotTranslator,
+            AyatamSceneCustomTranslator,
+            MppSmoothBattleLogTranslator,
+            MogMapNameHudTranslator,
             MapNameExtendTranslator,
             ManonMenuVariableTranslator,
             YepCommonEventMenuTranslator,

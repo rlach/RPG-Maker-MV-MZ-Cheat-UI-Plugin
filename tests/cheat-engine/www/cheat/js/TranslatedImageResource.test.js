@@ -3,12 +3,37 @@ import path from 'node:path';
 import { Buffer } from 'node:buffer';
 import {
     createEncryptedImageLoader,
+    createTranslatedImagePathResolver,
     findTranslatedImagePath,
 } from '../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslatedImageResource.js';
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe('translated encrypted images', () => {
+    it('reuses positive and negative lookups, separates languages and refreshes changed files', () => {
+        let now = 0;
+        vi.spyOn(Date, 'now').mockImplementation(() => now);
+        const files = new Set();
+        const existsSync = vi.fn((file) => files.has(file));
+        const require = vi.fn((name) => (name === 'fs' ? { existsSync } : path));
+        vi.stubGlobal('require', require);
+        const resolve = createTranslatedImagePathResolver();
+        expect(resolve('cache/img/en/pictures', 'hud')).toBeNull();
+        for (let i = 0; i < 1000; i++) resolve('cache/img/en/pictures', 'hud');
+        expect(existsSync).toHaveBeenCalledTimes(2);
+        expect(require).toHaveBeenCalledTimes(2);
+        const png = path.resolve('cache/img/en/pictures/hud.png');
+        files.add(png);
+        now = 1001;
+        expect(resolve('cache/img/en/pictures', 'hud')).toBe(png);
+        resolve('cache/img/en/pictures', 'hud');
+        expect(existsSync).toHaveBeenCalledTimes(3);
+        expect(resolve('cache/img/pl/pictures', 'hud')).toBeNull();
+        files.delete(png);
+        now = 2002;
+        expect(resolve('cache/img/en/pictures', 'hud')).toBeNull();
+        vi.restoreAllMocks();
+    });
     it('prefers PNG, falls back to RPGMVP, and leaves missing files alone', () => {
         const directory = path.resolve('cache/img/en/titles1');
         const png = path.join(directory, 'foo.png');

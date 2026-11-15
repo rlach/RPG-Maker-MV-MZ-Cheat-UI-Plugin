@@ -114,7 +114,7 @@ export class SystemCommands extends BasePhase {
         }
     }
 
-    getSourceCommands() {
+    getSourceCommands(runtime) {
         const terms = $dataSystem.terms;
         const currentCommands = this.normalizeCommandList(terms.commands);
         const originalCommands = Array.isArray(terms.commandsOriginal)
@@ -122,7 +122,9 @@ export class SystemCommands extends BasePhase {
             : null;
         const defaultSource = originalCommands || currentCommands;
 
-        const menuCommandNames = this.collectCommandWindowNames();
+        const menuCommandNames = this.collectCommandWindowNames().filter(
+            (name) => !runtime?.getKnownCommandDisplayCacheKey?.(name)
+        );
         if (!menuCommandNames.length) {
             return defaultSource;
         }
@@ -134,7 +136,7 @@ export class SystemCommands extends BasePhase {
     }
 
     countAmountSync({ runtime }) {
-        const source = this.getSourceCommands();
+        const source = this.getSourceCommands(runtime);
         if (!source.length) {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
@@ -153,7 +155,7 @@ export class SystemCommands extends BasePhase {
     }
 
     collectUntranslated({ runtime }) {
-        const sourceCommands = this.getSourceCommands();
+        const sourceCommands = this.getSourceCommands(runtime);
         if (!sourceCommands.length) {
             return [];
         }

@@ -117,12 +117,26 @@ it('keeps raw database identity authoritative over translated saved snapshots', 
     );
 });
 
-it('does not harvest generated save timestamps while still observing help text', () => {
+it('does not harvest generated save timestamps while still observing help text', async () => {
     class CommandWindow {
         drawItemSub() {}
         drawText(text) { return text; }
     }
     const translator = new SceneCustomMenuTranslator();
+    const helpText = 'どのファイルにセーブしますか？';
+    vi.stubGlobal('$plugins', [{
+        name: 'SceneCustomMenu',
+        parameters: {
+            Scene1: JSON.stringify({
+                Id: 'save',
+                WindowList: JSON.stringify([{ CommonHelpText: helpText }]),
+            }),
+        },
+    }]);
+    translator._loadActorSourceNames = vi.fn().mockResolvedValue();
+    for (const entry of await translator.buildScanEntries()) {
+        translator.entries.set(entry.text, entry);
+    }
     const runtime = {
         getCacheKey: (text) => text,
         trackCacheKeyUsage: vi.fn(),
@@ -134,6 +148,7 @@ it('does not harvest generated save timestamps while still observing help text',
     const instance = new CommandWindow();
     expect(instance.drawText('2026/11/12 01:15:59')).toBe('2026/11/12 01:15:59');
     expect(runtime.trackCacheKeyUsage).not.toHaveBeenCalled();
-    instance.drawText('どのファイルにセーブしますか？');
+    instance.drawText(helpText);
     expect(runtime.trackCacheKeyUsage).toHaveBeenCalledTimes(1);
+    expect(runtime.trackCacheKeyUsage).toHaveBeenCalledWith(helpText, { harvestMissing: true });
 });

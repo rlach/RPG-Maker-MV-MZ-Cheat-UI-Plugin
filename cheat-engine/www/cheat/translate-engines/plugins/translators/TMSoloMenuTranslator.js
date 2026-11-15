@@ -218,6 +218,31 @@ export class TMSoloMenuTranslator extends BasePluginTranslator {
         }
     }
 
+    async collectSourceDrawingTexts(output) {
+        const plugin = this.findPluginEntry(this.getPluginName());
+        if (!plugin) return;
+        const response = await fetch(`js/plugins/${plugin.name}.js`);
+        if (!response.ok) throw new Error(`Cannot read ${plugin.name}: ${response.status}`);
+        const syntax = parse(await response.text(), { ecmaVersion: 'latest' });
+        const visit = (node) => {
+            if (!node || typeof node !== 'object') return;
+            if (node.type === 'CallExpression' && node.callee?.property?.name === 'drawText') {
+                const argument = node.arguments[0];
+                if (
+                    argument?.type === 'Literal' &&
+                    typeof argument.value === 'string' &&
+                    /[\u3040-\u30ff\u3400-\u9fff]/.test(argument.value)
+                )
+                    this.appendEntry(output, argument.value, { scope: 'pluginDrawingLiteral' });
+            }
+            for (const child of Object.values(node)) {
+                if (Array.isArray(child)) child.forEach(visit);
+                else if (child && typeof child === 'object') visit(child);
+            }
+        };
+        visit(syntax);
+    }
+
     async precomputeCounts() {
         if (this._scanPrepared) {
             return;
@@ -230,6 +255,7 @@ export class TMSoloMenuTranslator extends BasePluginTranslator {
         this._scanPromise = Promise.resolve(this.buildScanEntries())
             .then(async (entries) => {
                 await this.collectDisplayVariableTexts(entries);
+                await this.collectSourceDrawingTexts(entries);
                 this._scanEntries = Array.isArray(entries) ? entries : [];
                 this._scanPrepared = true;
                 this._knownTexts = null;
@@ -429,6 +455,15 @@ export class TMSoloMenuTranslator extends BasePluginTranslator {
         const resolveRuntimeTranslation = this.resolveRuntimeTranslation.bind(this);
         const resolveExpRuntimeText = this.resolveExpRuntimeText.bind(this);
 
+        const originalDrawText = statusWindow.drawText;
+        statusWindow.drawText = function (text, ...args) {
+            return originalDrawText.call(
+                this,
+                resolveKnownRuntimeText(text, getRuntime()),
+                ...args
+            );
+        };
+
         const originalDrawSoloParameter = statusWindow.drawSoloParameter;
         statusWindow.drawSoloParameter = function (actor, code, parameter) {
             try {
@@ -527,9 +562,16 @@ export class TMSoloMenuTranslator extends BasePluginTranslator {
             enumerable: false,
             writable: false,
         });
+        statusWindow.refresh?.();
     }
 
     enablePluginTranslation() {
+        this.precomputeCounts()
+            .then(() => {
+                const scene = window.SceneManager?._scene;
+                if (scene instanceof window.Scene_Menu) scene._statusWindow?.refresh?.();
+            })
+            .catch((error) => console.warn('[TMSoloMenuTranslator] Startup scan failed', error));
         const sceneMenuPrototype = window.Scene_Menu?.prototype;
         if (!sceneMenuPrototype || typeof sceneMenuPrototype.createStatusWindow !== 'function') {
             return false;

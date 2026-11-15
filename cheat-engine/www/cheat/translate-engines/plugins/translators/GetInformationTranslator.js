@@ -5,7 +5,11 @@ const RUNTIME_HOOK_GUARD = '__CHEAT_GET_INFORMATION_TRANSLATOR_HOOKED__';
 const CACHE_TYPE = 'plugin_get_information';
 const COMMAND_CACHE_TYPE = 'plugin_get_information_command';
 const DIRECT_TEMPLATE_TYPE = '__CHEAT_GET_INFORMATION_DIRECT_TEMPLATE__';
-const COMMON_POPUP_PLUGIN_NAMES = new Set(['commonpopupcore', 'skm_commonpopupcoremz']);
+const COMMON_POPUP_PLUGIN_NAMES = new Set([
+    'commonpopupcore',
+    'skm_commonpopupcoremz',
+    'commonpopupcoremz',
+]);
 
 const PARAM_TEXT_FIELDS = [
     'Get Gold Text',
@@ -111,7 +115,7 @@ export class GetInformationTranslator extends BasePluginTranslator {
     }
 
     getPluginAliases() {
-        return ['GetInformation', 'SKM_GetInformationMZ'];
+        return ['GetInformation', 'SKM_GetInformationMZ', 'GetInformationMZ'];
     }
 
     getCacheType() {
@@ -219,6 +223,19 @@ export class GetInformationTranslator extends BasePluginTranslator {
 
         for (let cmdIdx = 0; cmdIdx < list.length; cmdIdx++) {
             const cmd = list[cmdIdx];
+            if (
+                cmd?.code === 357 &&
+                this.getPluginAliases().includes(cmd.parameters[0]) &&
+                cmd.parameters[1] === 'showInfo' &&
+                this.isUsableText(cmd.parameters[3]?.text)
+            ) {
+                output.push({
+                    text: cmd.parameters[3].text,
+                    cacheType: COMMAND_CACHE_TYPE,
+                    source: { ...baseMeta, cmdIdx },
+                });
+                continue;
+            }
             if (!cmd || Number(cmd.code) !== 356) {
                 continue;
             }

@@ -259,182 +259,18 @@ export class FtkrCustomSimpleActorStatusTranslator extends BasePluginTranslator 
             }
         };
 
-        const originalDrawText = windowBasePrototype.drawText;
-        windowBasePrototype.drawText = function () {
-            try {
-                const runtime = getRuntime();
-                if (
-                    isRuntimeTranslationActive(runtime) &&
-                    (Number(this.__ftkrCssTranslationDepth) || 0) > 0 &&
-                    arguments.length > 0
-                ) {
-                    arguments[0] = translateCssText(arguments[0], runtime);
-                }
-            } catch (error) {
-                console.warn(
-                    '[FtkrCustomSimpleActorStatusTranslator] Failed to translate drawText in FTKR CSS scope',
-                    error
-                );
-            }
-
-            return originalDrawText.apply(this, arguments);
-        };
-
-        const originalDrawTextEx = windowBasePrototype.drawTextEx;
-        windowBasePrototype.drawTextEx = function () {
-            try {
-                const runtime = getRuntime();
-                if (
-                    isRuntimeTranslationActive(runtime) &&
-                    (Number(this.__ftkrCssTranslationDepth) || 0) > 0 &&
-                    arguments.length > 0
-                ) {
-                    arguments[0] = translateCssText(arguments[0], runtime);
-                }
-            } catch (error) {
-                console.warn(
-                    '[FtkrCustomSimpleActorStatusTranslator] Failed to translate drawTextEx in FTKR CSS scope',
-                    error
-                );
-            }
-
-            return originalDrawTextEx.apply(this, arguments);
-        };
-
-        const originalDrawCssActorCustom = windowBasePrototype.drawCssActorCustom;
-        windowBasePrototype.drawCssActorCustom = function () {
-            try {
-                const runtime = getRuntime();
-                const custom = arguments[4];
-                if (isRuntimeTranslationActive(runtime) && custom) {
-                    const nextName = translateCssText(custom.name, runtime);
-                    const nextUnit = translateCssText(custom.unit, runtime);
-                    if (nextName !== custom.name || nextUnit !== custom.unit) {
-                        arguments[4] = {
-                            ...custom,
-                            name: nextName,
-                            unit: nextUnit,
-                        };
-                    }
-                }
-            } catch (error) {
-                console.warn(
-                    '[FtkrCustomSimpleActorStatusTranslator] Failed to translate custom parameter label',
-                    error
-                );
-            }
-
-            return originalDrawCssActorCustom.apply(this, arguments);
-        };
-
-        const originalDrawCssActorGauge = windowBasePrototype.drawCssActorGauge;
-        windowBasePrototype.drawCssActorGauge = function () {
-            try {
-                const runtime = getRuntime();
-                const gauge = arguments[4];
-                if (isRuntimeTranslationActive(runtime) && gauge) {
-                    const nextName = translateCssText(gauge.name, runtime);
-                    if (nextName !== gauge.name) {
-                        arguments[4] = {
-                            ...gauge,
-                            name: nextName,
-                        };
-                    }
-                }
-            } catch (error) {
-                console.warn(
-                    '[FtkrCustomSimpleActorStatusTranslator] Failed to translate gauge label',
-                    error
-                );
-            }
-
-            return originalDrawCssActorGauge.apply(this, arguments);
-        };
-
-        const originalDrawCssActorXParam = windowBasePrototype.drawCssActorXParam;
-        if (originalDrawCssActorXParam) {
-            // doesn't exist in older versions, so only patch if present
-            windowBasePrototype.drawCssActorXParam = function () {
-                const cssStatus = globalThis.FTKR?.CSS?.cssStatus;
-                const paramLabels = Array.isArray(cssStatus?.xparam) ? cssStatus.xparam : null;
-
-                if (!paramLabels) {
-                    return originalDrawCssActorXParam.apply(this, arguments);
-                }
-
-                const paramId = Number(arguments[4]);
-                if (!Number.isFinite(paramId) || paramId < 0 || paramId >= paramLabels.length) {
-                    return originalDrawCssActorXParam.apply(this, arguments);
-                }
-
-                const sourceLabel = paramLabels[paramId];
-                let translatedLabel = sourceLabel;
-
+        for (const method of ['drawText', 'drawTextEx']) {
+            const original = windowBasePrototype[method];
+            windowBasePrototype[method] = function (text, ...args) {
+                if (this.__ftkrCssTranslatedRender || !(Number(this.__ftkrCssTranslationDepth) > 0))
+                    return original.call(this, text, ...args);
+                const translated = translateCssText(text, getRuntime());
+                if (translated === text) return original.call(this, text, ...args);
+                this.__ftkrCssTranslatedRender = true;
                 try {
-                    const runtime = getRuntime();
-                    if (isRuntimeTranslationActive(runtime)) {
-                        translatedLabel = translateCssText(sourceLabel, runtime);
-                    }
-                } catch (error) {
-                    console.warn(
-                        '[FtkrCustomSimpleActorStatusTranslator] Failed to translate xparam label',
-                        error
-                    );
-                }
-
-                if (translatedLabel === sourceLabel) {
-                    return originalDrawCssActorXParam.apply(this, arguments);
-                }
-
-                paramLabels[paramId] = translatedLabel;
-                try {
-                    return originalDrawCssActorXParam.apply(this, arguments);
+                    return original.call(this, translated, ...args);
                 } finally {
-                    paramLabels[paramId] = sourceLabel;
-                }
-            };
-        }
-
-        const originalDrawCssActorSParam = windowBasePrototype.drawCssActorSParam;
-        if (originalDrawCssActorSParam) {
-            // doesn't exist in older versions, so only patch if present
-            windowBasePrototype.drawCssActorSParam = function () {
-                const cssStatus = globalThis.FTKR?.CSS?.cssStatus;
-                const paramLabels = Array.isArray(cssStatus?.sparam) ? cssStatus.sparam : null;
-
-                if (!paramLabels) {
-                    return originalDrawCssActorSParam.apply(this, arguments);
-                }
-
-                const paramId = Number(arguments[4]);
-                if (!Number.isFinite(paramId) || paramId < 0 || paramId >= paramLabels.length) {
-                    return originalDrawCssActorSParam.apply(this, arguments);
-                }
-
-                const sourceLabel = paramLabels[paramId];
-                let translatedLabel = sourceLabel;
-
-                try {
-                    const runtime = getRuntime();
-                    if (isRuntimeTranslationActive(runtime)) {
-                        translatedLabel = translateCssText(sourceLabel, runtime);
-                    }
-                } catch (error) {
-                    console.warn(
-                        '[FtkrCustomSimpleActorStatusTranslator] Failed to translate sparam label',
-                        error
-                    );
-                }
-
-                if (translatedLabel === sourceLabel) {
-                    return originalDrawCssActorSParam.apply(this, arguments);
-                }
-
-                paramLabels[paramId] = translatedLabel;
-                try {
-                    return originalDrawCssActorSParam.apply(this, arguments);
-                } finally {
-                    paramLabels[paramId] = sourceLabel;
+                    this.__ftkrCssTranslatedRender = false;
                 }
             };
         }
@@ -467,10 +303,13 @@ export class FtkrCustomSimpleActorStatusTranslator extends BasePluginTranslator 
             }
 
             messageSettings.levelUp = translatedTemplate;
+            const previousRender = this.__ftkrCssTranslatedRender;
+            this.__ftkrCssTranslatedRender = true;
             try {
                 return originalDrawCssActorMessage.apply(this, arguments);
             } finally {
                 messageSettings.levelUp = sourceTemplate;
+                this.__ftkrCssTranslatedRender = previousRender;
             }
         };
 
@@ -509,7 +348,7 @@ export class FtkrCustomSimpleActorStatusTranslator extends BasePluginTranslator 
         const entries = [];
         const globals = /** @type {any} */ (globalThis);
 
-        const pluginEntry = this.findPluginEntry();
+        const pluginEntry = this.findPluginEntry(this.getPluginName());
         if (pluginEntry?.parameters) {
             this.collectParameterEntries(pluginEntry.parameters, 'pluginEntryParameter', entries);
         }

@@ -17,12 +17,10 @@ class CheatWindowManager {
 
         const main = nw.Window.get();
 
-        main.on('close', () => {
+        main.on('closed', () => {
             if (this.externalWindow && !this.externalWindow.closed) {
                 this.externalWindow.close(true);
             }
-
-            main.close(true);
         });
     }
 

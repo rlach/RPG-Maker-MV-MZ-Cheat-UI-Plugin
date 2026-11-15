@@ -85,6 +85,35 @@ function installGlobalsWithHandlerInMenuList({
 }
 
 describe('SystemCommands', () => {
+    it('excludes already translated plugin commands from both pending payload and remaining counts', () => {
+        const translated = [
+            'Recollection Mode',
+            'View Recollections',
+            'View CGs',
+            'Return to Title',
+        ];
+        installGlobals({
+            commands: ['アイテム'],
+            commandsOriginal: ['アイテム'],
+            menuEntries: [...translated, '未翻訳'],
+        });
+        const strategy = new SystemCommands();
+        const runtime = createRuntimeStub();
+        runtime.getKnownCommandDisplayCacheKey = (value) =>
+            translated.includes(value) ? 'command:回想モード' : null;
+        runtime.hasUsableCacheValue = (key) => key === 'command:アイテム';
+        expect(strategy.collectUntranslated({ runtime }).map((item) => item.value)).toEqual([
+            '未翻訳',
+        ]);
+        expect(strategy.countAmountSync({ runtime })).toEqual({
+            total: 2,
+            left: 1,
+            totalStrings: 2,
+            leftStrings: 1,
+        });
+        expect(globalThis.$dataSystem.terms.commands).toEqual(['アイテム']);
+    });
+
     afterEach(() => {
         delete globalThis.window;
         delete globalThis.$dataSystem;

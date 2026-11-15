@@ -1,3 +1,4 @@
+import { extractJavaScriptTextCatalog } from './JavaScriptTextCatalog.js';
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { parseJsonSafely, walkNestedJsonLike } from './TranslatorHelpers.js';
 
@@ -175,7 +176,16 @@ export class NUUN_EnemyBookTranslator extends BasePluginTranslator {
                     if (!response.ok) throw new Error('Cannot read enemy book descriptions');
                     enemies = parseJsonSafely(await response.text(), []);
                 }
-                return this.buildScanEntries(enemies);
+                const entries = this.buildScanEntries(enemies);
+                const plugin = this.findPluginEntry(this.getPluginName());
+                const response = await fetch(`js/plugins/${plugin.name}.js`);
+                if (!response.ok) throw new Error(`Cannot read ${plugin.name}`);
+                entries.push(
+                    ...extractJavaScriptTextCatalog(await response.text()).entries.filter(
+                        (entry) => !entry.parts
+                    )
+                );
+                return entries;
             })
             .then((entries) => {
                 this._scanEntries = Array.isArray(entries) ? entries : [];

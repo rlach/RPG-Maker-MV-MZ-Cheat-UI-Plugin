@@ -149,3 +149,14 @@ Output requirements in final response:
 9. Image handling
 
 If user complains some of the text is not translated and code analysis shows the text is part of an image/texture do not make random solutions like overlaying text over the image. Inform user about the situation and ask for clarification on how they want to proceed. Remind user there's image extractor tools available in cheat engine that can be used to extract the text from the image, which can then be translated and re-inserted as a new image. Do not automate this process beyond existing tools.
+
+## Preserve translation source identity
+
+- Treat runtime database objects, map names, plugin parameters, command lists and window fields as potentially translated. Never use their current display values as new source keys without proving their provenance.
+- Scan original plugin/data files or existing canonical source snapshots. Collect only fields owned by the target plugin; disable inherited map-name and unrelated event-script scanning when those are not plugin text sources.
+- Preserve original identifiers and source objects. Translate at presentation, without writing translated titles into warehouse IDs, save data, plugin configuration or shared database fields.
+- Prevent nested drawText/drawTextEx/Bitmap hooks from harvesting translated output. Reuse shared drawing guards and source catalogs. Do not filter by Japanese characters: legitimate original keys may be English.
+- Do not infer game language, locale or logic from translated display labels. If a plugin does so, use its original source configuration/data at that boundary rather than allowing translations to select placeholder language branches.
+- Trace actual event dispatch before choosing a hook: replacing a method does not replace callbacks already captured with bind(), closures or registration tables. Test the registered callback route, not just direct method calls.
+- Add a regression covering original text -> translated display -> repeated redraw/rescan. Assert only original keys reach collection/seen tracking, cache hits leave no pending duplicate, and disabling translation preserves original behavior.
+- Do not migrate or delete existing cache entries unless the user explicitly requests it.

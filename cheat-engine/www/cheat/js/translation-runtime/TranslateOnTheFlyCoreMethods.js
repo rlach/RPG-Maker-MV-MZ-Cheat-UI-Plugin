@@ -9,6 +9,12 @@ import { createTranslationBatchManager } from '../../translate-engines/batch-man
 import { DATA_CONTAINER_TRANSLATION_DEFINITIONS } from '../../translate-engines/translation-phases/DataContainerDefinitions.js';
 import { runCacheMigrationsIfNeeded } from './TranslateCacheMigrations.js';
 
+const normalizeCommandDisplayText = (text) =>
+    String(text || '')
+        .trim()
+        .replaceAll('\x1b', '\\')
+        .replace(/^(?:\\+i\[\d+\]\s*|[»●]\s*)+/gi, '');
+
 export const translateOnTheFlyCoreMethods = {
     isBatchQueueAbortRequested() {
         return !!this._batchQueueAbortRequested;
@@ -288,21 +294,17 @@ export const translateOnTheFlyCoreMethods = {
                 continue;
             }
 
-            this.reverseCommandLookup.set(normalizedTranslatedValue, cacheKey);
-            this.reverseCommandValues.set(cacheKey, normalizedTranslatedValue);
+            const display = normalizeCommandDisplayText(normalizedTranslatedValue);
+            this.reverseCommandLookup.set(display, cacheKey);
+            this.reverseCommandValues.set(cacheKey, display);
         }
         this._commandDisplayLookupPrepared = true;
     },
 
     getKnownCommandDisplayCacheKey(text) {
         if (!this._commandDisplayLookupPrepared) this.buildReverseCommandLookupFromCache();
-        // Some custom menus decorate already translated item/choice labels.
-        const display = String(text || '').trim();
-        const undecorated = display.replace(/^»\s*/, '').replace(/^\\i\[\d+\]\s*/i, '');
-        for (const candidate of [display, undecorated]) {
-            const key = this.reverseCommandLookup.get(candidate);
-            if (key && this.hasUsableCacheValue(key)) return key;
-        }
+        const key = this.reverseCommandLookup.get(normalizeCommandDisplayText(text));
+        if (key && this.hasUsableCacheValue(key)) return key;
         return null;
     },
 
@@ -335,7 +337,9 @@ export const translateOnTheFlyCoreMethods = {
             this.buildReverseCommandLookupFromCache();
         }
 
-        const commandCacheKey = this.reverseCommandLookup.get(normalizedName);
+        const commandCacheKey = this.reverseCommandLookup.get(
+            normalizeCommandDisplayText(normalizedName)
+        );
         return this.resolveCanonicalCommandNameFromCacheKey(commandCacheKey, normalizedName);
     },
 
@@ -369,7 +373,7 @@ export const translateOnTheFlyCoreMethods = {
 
         this.removeReverseCommandLookupByCacheKey(cacheKey);
 
-        const normalizedLookupKey = typeof normalizedValue === 'string' ? normalizedValue : '';
+        const normalizedLookupKey = normalizeCommandDisplayText(normalizedValue);
         if (!normalizedLookupKey) {
             return;
         }

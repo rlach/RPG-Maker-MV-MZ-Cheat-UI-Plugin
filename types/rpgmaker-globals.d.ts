@@ -259,3 +259,12 @@ declare const Window_CommonEventMenu: any;
 declare const RadarChart: any;
 declare const getActorDescription: any;
 declare const Window_EnemyBookStatus: any;
+
+declare const Map_Name_Hud: any;
+
+declare const _PD_EventInfomation: any;
+
+declare const RTK: any;
+
+declare function getTaneoyaName(id: number): string;
+declare function getBabyName(id: number): string;
