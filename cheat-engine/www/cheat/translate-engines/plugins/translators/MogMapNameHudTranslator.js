@@ -7,10 +7,11 @@ export class MogMapNameHudTranslator extends BasePluginTranslator {
     }
     enablePluginTranslation() {
         const prototype = window.Map_Name_Hud?.prototype;
-        if (typeof prototype?.mapName !== 'function') return false;
-        const original = prototype.mapName;
+        const method = typeof prototype?.mapName === 'function' ? 'mapName' : 'name';
+        if (typeof prototype?.[method] !== 'function') return false;
+        const original = prototype[method];
         const translator = this;
-        prototype.mapName = function (...args) {
+        prototype[method] = function (...args) {
             return translator.resolveRuntimeTranslation(
                 original.apply(this, args),
                 translator.getRuntime(),

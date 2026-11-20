@@ -124,8 +124,30 @@ export class NuunResultTranslator extends BasePluginTranslator {
 
         hooksApplied = this.patchResultWindowPrototypes() || hooksApplied;
         hooksApplied = this.patchResultWindowTextDrawing() || hooksApplied;
+        hooksApplied = this.patchBitmapLabels() || hooksApplied;
 
         return hooksApplied;
+    }
+
+    patchBitmapLabels() {
+        const prototype = window.Bitmap?.prototype;
+        const flag = '__CHEAT_NUUN_RESULT_BITMAP_LABELS__';
+        if (typeof prototype?.drawText !== 'function') return false;
+        if (prototype[flag]) return true;
+        // Some versions keep Sprite_ResultExpValue private to the plugin IIFE.
+        // Its label still reaches Bitmap intact; numeric reward values do not
+        // belong to this exact source-label set.
+        const labels = new Set(this.buildScanEntries().map((entry) => entry.text));
+        const drawText = prototype.drawText;
+        const translator = this;
+        prototype.drawText = function (text, ...args) {
+            const next = labels.has(text)
+                ? translator._translateRuntimeText(translator.getRuntime(), text)
+                : text;
+            return drawText.call(this, next, ...args);
+        };
+        Object.defineProperty(prototype, flag, { value: true, configurable: true });
+        return true;
     }
 
     _patchSceneBattlePrototype(sceneBattleProto) {

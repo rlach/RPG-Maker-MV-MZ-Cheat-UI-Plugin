@@ -44,6 +44,26 @@ export class NuunSaveScreen3Translator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
+        const prototype = window.Window_Base?.prototype;
+        const original = prototype?.nuun_DrawSaveContentsLcation;
+        if (typeof original === 'function') {
+            const translator = this;
+            prototype.nuun_DrawSaveContentsLcation = function (info, ...args) {
+                const runtime = translator.getRuntime();
+                const translated =
+                    translator.isRuntimeTranslationActive(runtime) &&
+                    typeof info?.mapname === 'string'
+                        ? translator.resolveRuntimeTranslation(info.mapname, runtime, 'map_name', {
+                              harvestMissing: false,
+                          })
+                        : info?.mapname;
+                return original.call(
+                    this,
+                    translated !== info?.mapname ? { ...info, mapname: translated } : info,
+                    ...args
+                );
+            };
+        }
         return this._hookDrawSystemText();
     }
 

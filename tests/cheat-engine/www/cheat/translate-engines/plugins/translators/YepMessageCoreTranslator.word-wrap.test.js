@@ -108,3 +108,39 @@ it('initializes the header-only MV stub without requiring YEP runtime methods', 
     expect(translator.resolveMessageCacheSourceText({ text: 'Original message' })).toBeNull();
     new Message().clear();
 });
+it('does not restart word wrapping during YEP drawTextEx word-width measurement', () => {
+    vi.stubGlobal('window', globalThis);
+    vi.stubGlobal('$gameSystem', { wordWrap: () => true });
+    class Message { clear() {} addText() {} }
+    class Display {
+        convertEscapeCharacters(text) {
+            this._wordWrap = /<WordWrap>/i.test(text);
+            return text.replace(/<WordWrap>/gi, '');
+        }
+        drawTextEx(text) {
+            const converted = this.convertEscapeCharacters(text);
+            if (this._wordWrap) this.checkWordWrap(converted);
+            return converted.length;
+        }
+        checkWordWrap(text) {
+            this.measurements = (this.measurements || 0) + 1;
+            if (this.measurements > 10) throw new Error('recursive wrapping');
+            const saved = this._wordWrap;
+            this._wordWrap = false; this._checkWordWrapMode = true;
+            try { return this.drawTextEx(text); }
+            finally { this._checkWordWrapMode = false; this._wordWrap = saved; }
+        }
+    }
+    vi.stubGlobal('Game_Message', Message); vi.stubGlobal('Window_Message', Display);
+    const translator = new YepMessageCoreTranslator();
+    translator.getRuntime = () => ({ isTranslationEnabled: () => true });
+    translator.registerPluginCustomTags = () => {};
+    translator.enablePluginTranslation();
+    const message = new Message(); vi.stubGlobal('$gameMessage', message);
+    message.addText('Hello world');
+    const display = new Display();
+    expect(display.drawTextEx('Hello world')).toBe(11);
+    expect(display.measurements).toBe(1);
+    expect(display._wordWrap).toBe(true);
+    expect(display._checkWordWrapMode).toBe(false);
+});

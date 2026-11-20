@@ -5,7 +5,11 @@ import { ConfirmDialog } from '../js/DialogHelper.js';
 import { ensureTranslateCacheRuntime, isMapLike } from '../js/TranslateCacheRuntime.js';
 import { nameIsTag } from '../js/EventCommandTraversal.js';
 import { Alert } from '../js/AlertHelper.js';
-import { previewNamePatternRepair, applyNamePatternRepair } from '../js/NamePatternCacheRepair.js';
+import {
+    previewNamePatternRepair,
+    applyNamePatternRepair,
+    getNameRepairExample,
+} from '../js/NamePatternCacheRepair.js';
 import { PLUGIN_TRANSLATOR_REGISTRY } from '../translate-engines/plugins/PluginTranslatorRegistry.js';
 
 export default {
@@ -151,6 +155,10 @@ export default {
             </v-card-text>
             <v-card-actions>
                 <v-spacer></v-spacer>
+                <v-btn variant="text" :disabled="!nameRepairPreview || nameRepairPreview.count < 2" @click="recycleNameRepairExample">
+                    <v-icon start>mdi-recycle</v-icon>Another example
+                </v-btn>
+                <span v-if="nameRepairPreview?.count" class="text-caption">{{ nameRepairExampleIndex + 1 }} / {{ nameRepairPreview.count }}</span>
                 <v-btn variant="text" @click="nameRepairOpen = false">Cancel</v-btn>
                 <v-btn color="primary" :disabled="!nameRepairPreview || !nameRepairPreview.count || !!nameRepairError" @click="applyPatternNameRepair">Apply</v-btn>
             </v-card-actions>
@@ -297,6 +305,7 @@ export default {
             patternPickerOpen: false,
             nameRepairOpen: false,
             nameRepairPreview: null,
+            nameRepairExampleIndex: -1,
             nameRepairError: '',
             officialNameEnforcementOptions: [
                 {
@@ -727,6 +736,7 @@ export default {
         previewPatternNameRepair() {
             this._namePatternRepairPlan = null;
             this.nameRepairPreview = null;
+            this.nameRepairExampleIndex = -1;
             this.nameRepairError = '';
             this.nameRepairOpen = true;
             try {
@@ -736,6 +746,7 @@ export default {
                     return;
                 }
                 this._namePatternRepairPlan = plan;
+                this.nameRepairExampleIndex = 0;
                 const example = plan.changes[0];
                 this.nameRepairPreview = {
                     count: plan.changes.length,
@@ -748,6 +759,22 @@ export default {
                 this.nameRepairError = `Cannot preview name replacements: ${error.message}`;
                 console.warn('[TranslateNamesPanel] Name replacement preview failed', error);
             }
+        },
+
+        recycleNameRepairExample() {
+            const plan = this._namePatternRepairPlan;
+            const count = plan?.changes.length || 0;
+            if (count < 2) return;
+            let index = Math.floor(Math.random() * (count - 1));
+            if (index >= this.nameRepairExampleIndex) index++;
+            this.nameRepairExampleIndex = index;
+            const change = plan.changes[index];
+            this.nameRepairPreview = {
+                count,
+                before: change.before,
+                after: change.after,
+                ...getNameRepairExample(change),
+            };
         },
 
         applyPatternNameRepair() {

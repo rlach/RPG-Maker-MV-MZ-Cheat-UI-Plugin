@@ -1,5 +1,6 @@
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { wrapTextByVisibleWidth } from './TextWrap.js';
+import { recordDisplayedMessage } from '../DisplayedMessageText.js';
 
 export const translateOnTheFlyMessageMethods = {
     replaceMessageText(translatedText) {
@@ -83,6 +84,12 @@ export const translateOnTheFlyMessageMethods = {
             msgWindow._showFast = true;
             msgWindow.pause = false;
             msgWindow._waitCount = 0;
+        }
+        const messageLog = window.__MESSAGE_LOG__;
+        if (messageLog && $gameMessage.__cheatMessageLogId && msgWindow._textState) {
+            recordDisplayedMessage($gameMessage, msgWindow, null, messageLog, {
+                translated: true,
+            });
         }
     },
 

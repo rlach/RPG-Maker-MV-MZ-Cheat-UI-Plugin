@@ -23,6 +23,43 @@ function runtimeFor(translator, entries) {
     vi.spyOn(translator, 'getRuntime').mockReturnValue(runtime);
     return runtime;
 }
+
+it('preserves getter-only DynamicDatabase names and original snapshots during refresh', () => {
+    vi.stubGlobal('window', globalThis);
+    vi.stubGlobal('DataManager', {
+        convertName(data) {
+            if (data.preName != null) data.name = data.preName.replace(/\\V\[1\]/g, '5');
+            if (data.preDescription != null)
+                data.description = data.preDescription.replace(/\\V\[1\]/g, '5');
+        },
+    });
+    const translator = new ItemNameEscapeTranslator();
+    const runtime = runtimeFor(translator, [
+        ['item_name:原文\\V[1]', 'Name \\V[1]'],
+        ['item_description:説明\\V[1]', 'Description \\V[1]'],
+    ]);
+    translator.enablePluginTranslation();
+    const snapshot = {};
+    Object.defineProperty(snapshot, 'name', { enumerable: true, get: () => '原文5' });
+    const item = {
+        preName: '原文\\V[1]',
+        preDescription: '説明\\V[1]',
+        description: '説明5',
+        _translateOriginal: snapshot,
+    };
+    const getter = () => 'Dynamic name';
+    Object.defineProperty(item, 'name', { enumerable: true, get: getter });
+    expect(() => DataManager.convertName(item)).not.toThrow();
+    expect(item.name).toBe('Dynamic name');
+    expect(Object.getOwnPropertyDescriptor(item, 'name').get).toBe(getter);
+    expect(snapshot.name).toBe('原文5');
+    expect(item._translateOriginal.name).toBe('原文\\V[1]');
+    expect(item.description).toBe('Description 5');
+    expect(item.preName).toBe('原文\\V[1]');
+    runtime.enabled = false;
+    expect(() => DataManager.convertName(item)).not.toThrow();
+    expect(item.description).toBe('説明5');
+});
 it('reapplies plain string escape sources without consuming variable codes or changing canonical data', () => {
     vi.stubGlobal('window', globalThis);
     let value = 5;

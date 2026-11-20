@@ -682,16 +682,19 @@ export const translateOnTheFlyFlowMethods = {
             this.objectTranslationJob.runErrors = translated.failures.length;
             mergeStats(translated.stats);
 
-            const summary = BatchSummaryReporter.buildSummary({
-                batchLabel: 'object translation',
-                totalItems: this.objectTranslationJob.totalTarget,
-                successes: this.objectTranslationJob.totalDone,
-                failures: this.objectTranslationJob.runErrors,
-                errorStats: aggregatedErrorStats,
-                durationMs: Date.now() - startedAt,
-                currentPhaseErrors: 0,
-                totalCumulativeErrors: this.objectTranslationJob.runErrors,
-            });
+            const summary = dryRun
+                ? translated.summary
+                : BatchSummaryReporter.buildSummary({
+                      dryRun,
+                      batchLabel: 'object translation',
+                      totalItems: this.objectTranslationJob.totalTarget,
+                      successes: this.objectTranslationJob.totalDone,
+                      failures: this.objectTranslationJob.runErrors,
+                      errorStats: aggregatedErrorStats,
+                      durationMs: Date.now() - startedAt,
+                      currentPhaseErrors: 0,
+                      totalCumulativeErrors: this.objectTranslationJob.runErrors,
+                  });
             BatchSummaryReporter.showAlert(summary);
             BatchSummaryReporter.logSummary(summary);
 

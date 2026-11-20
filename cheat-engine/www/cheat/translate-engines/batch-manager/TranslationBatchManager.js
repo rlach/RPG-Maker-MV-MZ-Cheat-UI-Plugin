@@ -285,7 +285,15 @@ export class TranslationBatchManager {
             }
 
             const hasUsable = this.runtime.hasUsableCacheValue(failure.cacheKey);
-            if (!hasUsable) {
+            // A phase may explicitly rediscover an identity-valued entry as
+            // untranslated (for example a Japanese HA gallery caption). Dry
+            // run must materialize that pending key as empty, not preserve the
+            // source copy merely because the cache value is nonempty.
+            const harvestedIdentity =
+                failure.rejectReason === 'dry_run' &&
+                typeof failure.value === 'string' &&
+                this.runtime.translationCache.get(failure.cacheKey) === failure.value;
+            if (!hasUsable || harvestedIdentity) {
                 this.runtime.setCacheValue(failure.cacheKey, '', { persist: false });
                 changedKeys.push(failure.cacheKey);
             }
@@ -351,7 +359,7 @@ export class TranslationBatchManager {
             ? translationTaskbarFor(this.runtime).begin(this.progressChannel, dryRun)
             : () => {};
         try {
-            return await this._runBatchedTranslation(items, options);
+            return await this._runBatchedTranslation(items, { ...options, dryRun });
         } finally {
             finish();
         }
@@ -519,6 +527,7 @@ export class TranslationBatchManager {
 
             if (safeItems.length === 0) {
                 const emptySummary = BatchSummaryReporter.buildSummary({
+                    dryRun,
                     batchLabel: translationPhaseLabel,
                     totalItems: 0,
                     successes: 0,
@@ -757,6 +766,7 @@ export class TranslationBatchManager {
             }
 
             const summary = BatchSummaryReporter.buildSummary({
+                dryRun,
                 batchLabel: translationPhaseLabel,
                 totalItems: safeItems.length,
                 successes: allSuccesses.length,
@@ -791,6 +801,7 @@ export class TranslationBatchManager {
 
         if (safeQueueEntries.length === 0) {
             const emptySummary = BatchSummaryReporter.buildSummary({
+                dryRun,
                 batchLabel: options.translationPhaseLabel || 'translation',
                 totalItems: 0,
                 successes: 0,
@@ -939,11 +950,38 @@ export class TranslationBatchManager {
             }
         }
 
+        // Earlier failed attempts may have succeeded in a later cleanup phase.
+        // Keep their diagnostics, but report each key's final outcome only once.
+        const successfulKeys = new Set(
+            aggregatedSuccesses.map((item) => item.cacheKey).filter(Boolean)
+        );
+        const failedKeys = new Set();
+        const finalFailures = aggregatedFailures.filter((item) => {
+            if (!item.cacheKey) return true;
+            if (
+                successfulKeys.has(item.cacheKey) ||
+                failedKeys.has(item.cacheKey) ||
+                this.runtime.hasUsableCacheValue(item.cacheKey)
+            )
+                return false;
+            failedKeys.add(item.cacheKey);
+            return true;
+        });
+        const seenSuccesses = new Set();
+        const finalSuccesses = aggregatedSuccesses.filter((item) => {
+            if (!item.cacheKey) return true;
+            if (seenSuccesses.has(item.cacheKey)) return false;
+            seenSuccesses.add(item.cacheKey);
+            return true;
+        });
         const summary = BatchSummaryReporter.buildSummary({
+            dryRun,
             batchLabel: options.translationPhaseLabel || 'translation',
-            totalItems: aggregatedSuccesses.length + aggregatedFailures.length,
-            successes: aggregatedSuccesses.length,
-            failures: aggregatedFailures.length,
+            dryRunItems: [...aggregatedSuccesses, ...aggregatedFailures],
+            runtime: this.runtime,
+            totalItems: finalSuccesses.length + finalFailures.length,
+            successes: finalSuccesses.length,
+            failures: finalFailures.length,
             errorStats: aggregatedErrorStats,
             durationMs: Date.now() - startedAt,
             currentPhaseErrors: 0,
@@ -966,8 +1004,8 @@ export class TranslationBatchManager {
         }
 
         return {
-            successes: aggregatedSuccesses,
-            failures: aggregatedFailures,
+            successes: finalSuccesses,
+            failures: finalFailures,
             summary,
             stats: aggregatedErrorStats,
             cancelReason: connectionFailed ? LLM_CONNECTION_ERROR : null,

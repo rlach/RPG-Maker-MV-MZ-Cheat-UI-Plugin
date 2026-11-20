@@ -1,6 +1,8 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
 import { TAG_TYPE } from '../../ai-engine/constants.js';
+import { DisplayVariableCatalogTranslator } from '../DisplayVariableCatalogTranslator.js';
+import { collectScriptVariableAssignments } from '../ScriptVariableAssignments.js';
 import {
     withTranslatedNotification,
     isNotificationTranslationHandled,
@@ -17,6 +19,28 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
         this._scanPrepared = false;
         this._scanEntries = [];
         this._scanPromise = null;
+        this.dynamicTexts = new DisplayVariableCatalogTranslator();
+        this.dynamicTexts.getPluginName = () => this.getPluginName();
+        this.dynamicTexts.getSourcePluginNames = () => [];
+        this.dynamicTexts.shouldScanEventData = () => false;
+        this.dynamicTexts.getCacheType = () => CACHE_TYPE;
+        this.dynamicTexts.collectAdditionalTexts = async () => {
+            await this.dynamicTexts.collectVariableTexts();
+            const normalize = (text) => text.split(String.fromCharCode(27)).join('\\');
+            this.dynamicTexts.entries = new Map(
+                [...this.dynamicTexts.entries.values()].map((entry) => {
+                    const text = normalize(entry.text);
+                    return [
+                        text,
+                        {
+                            ...entry,
+                            text,
+                            ...(entry.parts ? { parts: entry.parts.map(normalize) } : {}),
+                        },
+                    ];
+                })
+            );
+        };
     }
 
     getPluginName() {
@@ -47,7 +71,12 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
             isKnownDisplayTranslation(runtime, text)
         )
             return text;
-        const translated = this.resolveRuntimeTranslation(text, runtime);
+        let translated = this.resolveRuntimeTranslation(text, runtime);
+        if (translated === text && this.dynamicTexts.entries.size) {
+            const source = text.split(String.fromCharCode(27)).join('\\');
+            const dynamic = this.dynamicTexts.resolveText(source, runtime);
+            if (dynamic !== source) translated = dynamic;
+        }
         if (translated !== text) rememberDisplayTranslation(runtime, translated);
         return translated;
     }
@@ -190,6 +219,8 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
         this.collectCommonEventEntries(entries);
         this.collectTroopEntries(entries);
         await this.collectMapEntries(entries);
+        await this.dynamicTexts.buildCatalog();
+        for (const entry of this.dynamicTexts.entries.values()) entries.push(entry);
         return entries;
     }
 
@@ -296,6 +327,9 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
         if (!Array.isArray(list) || !Array.isArray(output)) {
             return;
         }
+        this.dynamicTexts.assignments.push(...collectScriptVariableAssignments(list));
+        for (const command of list)
+            if (command?.code === 122) this.dynamicTexts.assignments.push(command.parameters);
 
         for (let cmdIdx = 0; cmdIdx < list.length; cmdIdx++) {
             const cmd = list[cmdIdx];
@@ -307,6 +341,7 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
             if (!entry?.text?.trim()) {
                 continue;
             }
+            this.dynamicTexts.collectDisplayReferences(entry.text);
 
             output.push({
                 text: entry.text,
@@ -331,12 +366,20 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
 
         if (
             pluginName?.toLowerCase() !== 'torigoyamz_notifymessage' &&
-            pluginName?.toLowerCase() !== 'torigoyamz_notifymessagez'
+            pluginName?.toLowerCase() !== 'torigoyamz_notifymessagez' &&
+            pluginName?.toLowerCase() !== 'torigoyamz_notifymessage_commandmessage'
         ) {
             return null;
         }
 
-        if (commandName && commandName !== 'notify') {
+        if (
+            commandName &&
+            commandName !== 'notify' &&
+            !(
+                pluginName?.toLowerCase() === 'torigoyamz_notifymessage_commandmessage' &&
+                commandName === 'Show'
+            )
+        ) {
             return null;
         }
 
@@ -351,6 +394,7 @@ export class TorigoyaNotifyMessageTranslator extends BasePluginTranslator {
     }
 
     buildUniquePendingItems(runtime) {
+        if (this.dynamicTexts.entries.size) this.dynamicTexts.prepareDynamicValueTag(runtime);
         const byCacheKey = new Map();
 
         for (const entry of this._scanEntries) {

@@ -111,7 +111,7 @@ export function guessConfigFromPattern(pattern) {
     };
 }
 
-export function findTagExamples(cache, pattern) {
+export function findTagExamples(cache, pattern, exampleKeys = null) {
     const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     let source = escaped
         .replace(/…/g, '[^\\n]*?')
@@ -119,10 +119,15 @@ export function findTagExamples(cache, pattern) {
         .replace(/:N>$/, ':\\d+>');
     if (pattern.startsWith('\\')) source = '(?:\\\\|\\x1b)' + source.slice(2);
     const hasParameter = /[>\])}]$/.test(pattern);
-    const regex = new RegExp(source + (hasParameter ? '' : '(?![A-Za-z0-9\\[<({])'), 'gi');
+    // A bare detection can be an unclosed parameter, not just a parameterless
+    // command. Exclude complete parameters but retain malformed opening brackets.
+    const bareSuffix = String.raw`(?![A-Za-z0-9]|\[[^\]\n]*\]|<[^>\n]*>|\([^\)\n]*\)|\{[^}\n]*\})`;
+    const regex = new RegExp(source + (hasParameter ? '' : bareSuffix), 'gi');
     const examples = [];
+    const candidates = Array.isArray(exampleKeys) ? new Set(exampleKeys) : null;
     for (const key of cache?.keys() || []) {
         if (typeof key !== 'string') continue;
+        if (candidates && !candidates.has(key)) continue;
         const text = key.replace(/^[^:]+:[^-]+-[^-]+-/, '');
         const parts = [];
         let end = 0;
@@ -258,7 +263,11 @@ export default {
 
         showExamples(item) {
             this.examplePattern = item.pattern;
-            this.examples = findTagExamples(this.runtime?.translationCache, item.pattern);
+            this.examples = findTagExamples(
+                this.runtime?.translationCache,
+                item.pattern,
+                item.exampleKeys
+            );
             this.exampleIndex = -1;
             this.recycleExample();
             this.$emit('update:visible', false);

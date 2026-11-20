@@ -11,6 +11,9 @@ import { ConfirmDialog } from '../js/DialogHelper.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
 import { BOXING_SERVICE } from '../components/BoxingModal.js';
 
+let cacheManagerSnapshot = null;
+const tableCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
 const cacheManagerTableStateMemory = {
     sortBy: 'seenSort',
     sortDesc: true,
@@ -61,10 +64,10 @@ export default {
         </div>
     </v-card-text>
 
-    <v-data-table return-object
+    <v-data-table-server return-object item-value="key" :items-length="sortedEntries.length" :loading="isLoadingEntries" loading-text="Preparing translation cache…"
       class="mt-1 table-with-sticky-footer"
         :headers="uiTableHeaders(tableHeaders)"
-        :items="filteredEntries"
+        :items="pageEntries"
         v-model:page="page"
         :sort-by="uiTableSort(sortBy, sortDesc)" @update:sort-by="updateUiTableSort($event, 'sortBy', 'sortDesc')"
 
@@ -248,7 +251,7 @@ export default {
                 </template>
             </div>
         </template>
-    </v-data-table>
+    </v-data-table-server>
 </v-card>
     `,
 
@@ -269,7 +272,8 @@ export default {
             editingKey: null,
             sourceLang: 'ja',
             targetLang: 'en',
-            entries: [],
+            entries: Object.freeze([]),
+            isLoadingEntries: false,
             draftByKey: {},
             refreshTimer: null,
             searchDebounceTimer: null,
@@ -305,6 +309,7 @@ export default {
     },
 
     created() {
+        this._cacheManagerActive = true;
         this.settingsStorage = new KeyValueStorage(
             './www/cheat-settings/translate-on-the-fly.json'
         );
@@ -315,11 +320,14 @@ export default {
         this.lastSeenByCacheKey = runtime.lastSeenByCacheKey;
 
         this.unsubscribeRuntime = onTranslateCacheRuntimeChanged((detail) => {
+            if (!this._cacheManagerActive) return;
             if (detail?.reason === 'suspicions-updated') {
                 const keys = new Set(detail.keys || []);
                 for (const entry of this.entries) {
                     if (keys.has(entry.key)) entry.suspicions = [];
                 }
+                this.entries = Object.freeze([...this.entries]);
+                cacheManagerSnapshot = null;
                 return;
             }
             if (detail?.reason === 'cache-manager-remove-translation' && detail.key) {
@@ -334,15 +342,22 @@ export default {
     },
 
     activated() {
+        this._cacheManagerActive = true;
         this.refreshEntries();
     },
 
     deactivated() {
+        this._cacheManagerActive = false;
+        this._refreshGeneration = (this._refreshGeneration || 0) + 1;
+        this._refreshJob = null;
+        this.isLoadingEntries = false;
+        if (this.refreshTimer) clearTimeout(this.refreshTimer);
         this.flushPendingCacheEdits('panel-deactivated');
     },
 
     beforeUnmount() {
         this.flushPendingCacheEdits('panel-before-destroy');
+        this._refreshGeneration = (this._refreshGeneration || 0) + 1;
 
         if (this.unsubscribeRuntime) {
             this.unsubscribeRuntime();
@@ -397,18 +412,22 @@ export default {
         },
 
         search() {
+            this.page = 1;
             this.saveTableState();
         },
 
         selectedTypeFilter() {
+            this.page = 1;
             this.saveTableState();
         },
 
         searchIn() {
+            this.page = 1;
             this.saveTableState();
         },
 
         suspicionFilter() {
+            this.page = 1;
             this.saveTableState();
         },
         suspicionFilterOptions(options) {
@@ -418,6 +437,7 @@ export default {
         },
 
         onlyEmpty() {
+            this.page = 1;
             this.saveTableState();
         },
     },
@@ -436,22 +456,22 @@ export default {
                 ),
             ];
         },
-        activeLanguagePairLabel() {
-            const completion = computeLangPairCompletionByKeyLength({
+        completionStats() {
+            void this.entries;
+            return computeLangPairCompletionByKeyLength({
                 translationCache: this.translationCache,
                 sourceLang: this.sourceLang,
                 targetLang: this.targetLang,
-            }).completionPercent.toFixed(1);
+            });
+        },
+        activeLanguagePairLabel() {
+            const completion = this.completionStats.completionPercent.toFixed(1);
 
             return `Active language pair: ${this.sourceLang} -> ${this.targetLang} (${completion}% complete)`;
         },
 
         activeLanguagePairTooltip() {
-            const { translatedKeyLength, totalKeyLength } = computeLangPairCompletionByKeyLength({
-                translationCache: this.translationCache,
-                sourceLang: this.sourceLang,
-                targetLang: this.targetLang,
-            });
+            const { translatedKeyLength, totalKeyLength } = this.completionStats;
             const translated = translatedKeyLength;
             const total = totalKeyLength;
             return `${translated} out of ${total} characters`;
@@ -465,6 +485,27 @@ export default {
             return this.getEntriesMatchingFilter(this.search, this.selectedTypeFilter);
         },
 
+        sortedEntries() {
+            const key = this.sortBy;
+            const direction = this.sortDesc ? -1 : 1;
+            return Object.freeze(
+                [...this.filteredEntries].sort((a, b) => {
+                    const left = a[key] ?? '',
+                        right = b[key] ?? '';
+                    const comparison =
+                        typeof left === 'number' && typeof right === 'number'
+                            ? left - right
+                            : tableCollator.compare(String(left), String(right));
+                    return comparison * direction;
+                })
+            );
+        },
+        pageEntries() {
+            const pageSize = Math.max(1, this.rowsPerPage);
+            const lastPage = Math.max(1, Math.ceil(this.sortedEntries.length / pageSize));
+            const start = (Math.min(Math.max(1, this.page), lastPage) - 1) * pageSize;
+            return this.sortedEntries.slice(start, start + pageSize);
+        },
         typeFilterOptions() {
             const typeSet = new Set();
             for (const entry of this.entries || []) {
@@ -499,7 +540,7 @@ export default {
         },
 
         replaceButtonDisabled() {
-            return !this.searchInput.trim() || this.searchIn === 'translation';
+            return !this.searchInput.trim();
         },
 
         searchHighlightTerm() {
@@ -514,6 +555,8 @@ export default {
             for (const entry of this.entries) {
                 if (accepted.has(entry.key)) entry.suspicions = [];
             }
+            this.entries = Object.freeze([...this.entries]);
+            cacheManagerSnapshot = null;
         },
 
         reviewSuspicion(item) {
@@ -790,37 +833,75 @@ export default {
             this.refreshEntries();
         },
 
-        refreshEntries() {
+        async refreshEntries() {
             const pair = this.getActiveLanguagePair();
             this.sourceLang = pair.sourceLang;
             this.targetLang = pair.targetLang;
 
-            const runtime = ensureTranslationRuntime();
-            const items = [];
-            for (const [cacheKey, value] of this.translationCache.entries()) {
-                const parsed = parseCacheKeyForLangPair(cacheKey, this.sourceLang, this.targetLang);
-                if (!parsed) {
-                    continue;
-                }
-
-                const seenTs = this.lastSeenByCacheKey.get(cacheKey) || null;
-
-                const translation = this.normalizeCacheValue(value);
-
-                items.push({
-                    key: cacheKey,
-                    seenSort: Number.isFinite(seenTs) ? seenTs : 0,
-                    seenDisplay: this.formatSeenTimestamp(seenTs),
-                    type: parsed.type,
-                    original: parsed.original,
-                    translation,
-                    actionsSort: parsed.original,
-                    suspicions: runtime.getTranslationSuspicions(cacheKey),
-                });
+            const state = ensureTranslateCacheRuntime();
+            if (this._refreshJob && this._refreshVersion === state.version) return this._refreshJob;
+            if (
+                cacheManagerSnapshot?.cache === state.cache &&
+                cacheManagerSnapshot.version === state.version &&
+                cacheManagerSnapshot.sourceLang === this.sourceLang &&
+                cacheManagerSnapshot.targetLang === this.targetLang
+            ) {
+                this.entries = cacheManagerSnapshot.items;
+                return;
             }
-
-            this.entries = items;
-            this.ensureSelectedTypeFilterIsValid();
+            const generation = (this._refreshGeneration = (this._refreshGeneration || 0) + 1);
+            this._refreshVersion = state.version;
+            this.isLoadingEntries = true;
+            const runtime = ensureTranslationRuntime();
+            const sourceLang = this.sourceLang,
+                targetLang = this.targetLang;
+            const job = (async () => {
+                // Let the loader paint, then yield between bounded chunks.
+                await new Promise((resolve) => setTimeout(resolve, 0));
+                const items = [];
+                let chunkStart = performance.now();
+                for (const [cacheKey, value] of this.translationCache.entries()) {
+                    if (generation !== this._refreshGeneration) return;
+                    const parsed = parseCacheKeyForLangPair(cacheKey, sourceLang, targetLang);
+                    if (parsed) {
+                        const seenTs = this.lastSeenByCacheKey.get(cacheKey) || null;
+                        items.push({
+                            key: cacheKey,
+                            seenSort: Number.isFinite(seenTs) ? seenTs : 0,
+                            seenDisplay: this.formatSeenTimestamp(seenTs),
+                            type: parsed.type,
+                            original: parsed.original,
+                            translation: this.normalizeCacheValue(value),
+                            actionsSort: parsed.original,
+                            suspicions: runtime.getTranslationSuspicions(cacheKey),
+                        });
+                    }
+                    if (performance.now() - chunkStart >= 8) {
+                        await new Promise((resolve) => setTimeout(resolve, 0));
+                        chunkStart = performance.now();
+                    }
+                }
+                if (generation !== this._refreshGeneration) return;
+                this.entries = Object.freeze(items);
+                cacheManagerSnapshot = {
+                    cache: state.cache,
+                    version: state.version,
+                    sourceLang,
+                    targetLang,
+                    items: this.entries,
+                };
+                this.ensureSelectedTypeFilterIsValid();
+            })();
+            this._refreshJob = job;
+            try {
+                await job;
+            } finally {
+                if (generation === this._refreshGeneration) {
+                    this.isLoadingEntries = false;
+                    this._refreshJob = null;
+                }
+            }
+            return;
         },
 
         matchesTypeFilter(item, selectedType = '') {
@@ -861,7 +942,10 @@ export default {
             if (index < 0) return;
             const translation = this.normalizeCacheValue(this.translationCache.get(cacheKey));
             if (this.entries[index].translation === translation) return;
-            this.entries.splice(index, 1, { ...this.entries[index], translation });
+            const items = [...this.entries];
+            items[index] = { ...items[index], translation };
+            this.entries = Object.freeze(items);
+            cacheManagerSnapshot = null;
         },
 
         isEmptyTranslationEntry(entry) {

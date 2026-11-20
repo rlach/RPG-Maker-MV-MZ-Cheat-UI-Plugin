@@ -1,3 +1,4 @@
+import { recordDisplayedMessage } from './DisplayedMessageText.js';
 import { Alert } from './AlertHelper.js';
 import { KeyValueStorage } from './KeyValueStorage.js';
 import { TranslateOnTheFlyState } from './TranslateOnTheFlyState.js';
@@ -749,24 +750,28 @@ export class MessageCheat {
         const _Window_Message_startMessage = Window_Message.prototype.startMessage;
         Window_Message.prototype.startMessage = function () {
             _Window_Message_startMessage.call(this);
-            MessageCheat.logCurrentMessage();
+            MessageCheat.logCurrentMessage(this);
         };
 
-        // MV can apply choices later without re-entering startMessage.
-        // Log again when choices are set so they are visible in Text Log.
-        if (!Game_Message.prototype._messageLogOriginalSetChoices) {
-            Game_Message.prototype._messageLogOriginalSetChoices =
-                Game_Message.prototype.setChoices;
-        }
-
-        Game_Message.prototype.setChoices = function (choices, defaultType, cancelType) {
-            Game_Message.prototype._messageLogOriginalSetChoices.call(
-                this,
-                choices,
-                defaultType,
-                cancelType
-            );
-            MessageCheat.logCurrentMessage();
+        // Choices are logged when their window actually opens, after translation.
+        const startChoices = Window_ChoiceList.prototype.start;
+        Window_ChoiceList.prototype.start = function (...args) {
+            const result = startChoices.apply(this, args);
+            MessageCheat.logCurrentMessage(this._messageWindow, this);
+            return result;
+        };
+        const choose = Game_Message.prototype.onChoice;
+        Game_Message.prototype.onChoice = function (index, ...args) {
+            if (this.__cheatMessageLogId)
+                MESSAGE_LOG.updateEntry(this.__cheatMessageLogId, { selectedChoice: index });
+            return choose.call(this, index, ...args);
+        };
+        const clear = Game_Message.prototype.clear;
+        Game_Message.prototype.clear = function (...args) {
+            const result = clear.apply(this, args);
+            this.__cheatMessageLogId = null;
+            this.__cheatDisplayedLogBody = null;
+            return result;
         };
 
         // --------------------------- 배틀 로그 관련
@@ -969,30 +974,12 @@ export class MessageCheat {
         }
     }
 
-    static logCurrentMessage() {
+    static logCurrentMessage(messageWindow = null, choiceWindow = null) {
         try {
-            if (!$gameMessage || typeof $gameMessage.allText !== 'function') {
-                return;
-            }
-
-            const text = $gameMessage.allText() || '';
-            const choices = $gameMessage.choices ? $gameMessage.choices() : [];
-            const speakerName = ($gameMessage._speakerName || '').trim();
-            let combined = text;
-
-            if (Array.isArray(choices) && choices.length > 0) {
-                const lines = choices.map((choice, index) => `[${index + 1}] ${choice}`);
-                combined = combined ? `${combined}\n${lines.join('\n')}` : lines.join('\n');
-            }
-
-            if (!combined || combined.trim().length === 0) {
-                return;
-            }
-
-            MESSAGE_LOG.addEntry(combined, {
+            if (!$gameMessage || typeof $gameMessage.allText !== 'function') return;
+            recordDisplayedMessage($gameMessage, messageWindow, choiceWindow, MESSAGE_LOG, {
                 translated: !!TranslateOnTheFlyState.isEnabled() && !MessageCheat.skip,
                 skipped: !!MessageCheat.skip,
-                speakerName: speakerName || null,
             });
         } catch (err) {
             console.warn('[MessageCheat] Failed to log message', err);

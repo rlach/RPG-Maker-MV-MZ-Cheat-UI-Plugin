@@ -317,6 +317,9 @@ export class YepMessageCoreTranslator extends BasePluginTranslator {
         };
         const convert = messageWindow.convertEscapeCharacters;
         messageWindow.convertEscapeCharacters = function (text) {
+            // YEP measures the next word via drawTextEx while wrapping is off.
+            // Re-injecting WordWrap there recursively starts another measurement.
+            if (this._checkWordWrapMode) return convert.call(this, text);
             // Boxed translations already contain deliberate line breaks. Both YEP
             // and YED would otherwise discard them or wrap the text a second time.
             if (

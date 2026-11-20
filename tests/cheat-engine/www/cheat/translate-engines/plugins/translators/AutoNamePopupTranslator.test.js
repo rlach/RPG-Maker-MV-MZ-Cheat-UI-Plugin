@@ -1,9 +1,62 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { AutoNamePopupTranslator } from '../../../../../../../cheat-engine/www/cheat/translate-engines/plugins/translators/AutoNamePopupTranslator.js';
+import { collectEventCommandEntries } from '../../../../../../../cheat-engine/www/cheat/js/EventCommandTraversal.js';
+
+it('harvests both switch-controlled popup and inline message keys without changing events', () => {
+    const { translator } = setup('1');
+    window.$plugins[0].parameters.switchId = '53';
+    window.$plugins[0].parameters.startNewLine = 'true';
+    const body = '\n\n\\ac\\C[6]からだがぁ…♡　あついぃ……♡♡';
+    const list = [
+        { code: 101, parameters: ['', 0, 2, 2, '\\C[6]\\N[2]'] },
+        ...body.split('\n').map((line) => ({ code: 401, parameters: [line] })),
+    ];
+    const before = JSON.stringify(list);
+    const entries = collectEventCommandEntries(list, {
+        traversalExtensions: [translator.getEventCommandTraversalExtension()],
+        transformEntry: (entry) => ({
+            ...entry,
+            value:
+                translator.resolveMessageCacheSourceText({
+                    text: entry.value,
+                    command: entry.command,
+                    entry,
+                    mode: entry.type === 'message' ? 'collection' : 'runtime',
+                }) ?? entry.value,
+        }),
+    });
+    expect(entries.filter((e) => e.type === 'message').map((e) => e.value)).toEqual([
+        body,
+        '\\>\\c[14]\\C[6]\\N[2]\\c[0]\n' + body,
+    ]);
+    expect(entries.find((e) => e.type === 'speaker').value).toBe('\\C[6]\\N[2]');
+    expect(JSON.stringify(list)).toBe(before);
+});
 
 afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+});
+
+it('deduplicates suppressed-name variants and keeps the native startup template', () => {
+    const { translator } = setup('0');
+    window.$plugins[0].parameters.switchId = '53';
+    window.$plugins[0].parameters.startNewLine = 'true';
+    expect(translator._buildCollectionPrefix({ parameters: ['', 0, 0, 0, 'Name'] }, 1)).toBe(
+        '\\>\\c[14]Name\\c[0]'
+    );
+    const list = [
+        { code: 101, parameters: ['', 0, 0, 0, 'Name'] },
+        { code: 401, parameters: ['_Hidden speaker'] },
+    ];
+    const entries = collectEventCommandEntries(list, {
+        traversalExtensions: [translator.getEventCommandTraversalExtension()],
+    });
+    expect(entries.map((entry) => [entry.type, entry.value])).toEqual([
+        ['message', 'Hidden speaker'],
+    ]);
+    delete window.$plugins[0].parameters.switchId;
+    expect(translator.getEventCommandTraversalExtension()).toBeNull();
 });
 
 function setup(mode = '0') {

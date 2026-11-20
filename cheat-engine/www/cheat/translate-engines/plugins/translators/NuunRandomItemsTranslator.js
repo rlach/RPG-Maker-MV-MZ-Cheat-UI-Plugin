@@ -11,6 +11,13 @@ export class NuunRandomItemsTranslator extends ParameterSourceCatalogTranslator 
     getCacheType() {
         return 'plugin_nuun_randomitems';
     }
+    shouldScanEventData() {
+        // ItemList event commands override the defaults with per-reward GetText.
+        return true;
+    }
+    collectMapTexts() {
+        // Map names retain their dedicated map_name cache keys.
+    }
     getParameterTextPattern() {
         return /(?:Text|Message)$/;
     }

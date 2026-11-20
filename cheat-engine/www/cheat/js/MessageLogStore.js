@@ -1,4 +1,4 @@
-class MessageLogStore {
+export class MessageLogStore {
     constructor(maxEntries = 500) {
         this.maxEntries = maxEntries;
         this.entries = [];
@@ -29,6 +29,15 @@ class MessageLogStore {
         }
 
         this.notify();
+        return entry.id;
+    }
+
+    updateEntry(id, patch) {
+        const entry = this.entries.find((item) => item.id === id);
+        if (!entry) return false;
+        Object.assign(entry, patch);
+        this.notify();
+        return true;
     }
 
     clear() {

@@ -22,6 +22,7 @@ export function normalizeMessageEntryForPlugins(runtime, entry) {
         mode: 'collection',
         command: entry.command || null,
         cmdIndex: entry.cmdIndex,
+        entry,
     });
 
     if (typeof normalized !== 'string' || !normalized.trim() || normalized === entry.value) {

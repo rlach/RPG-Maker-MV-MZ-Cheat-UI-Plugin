@@ -159,3 +159,17 @@ it('collects the inherited first page returned as bare text commands by 1.3', ()
     ]);
     expect($externMessage._map.ROOT).toEqual(['【カナデ】\nFirst\nsecond']);
 });
+it('keeps the native ExternMessage identity check valid for a transparent command wrapper', () => {
+    const native = Game_Interpreter.prototype.command101;
+    window.$externMessage.replaceCommand101 = native;
+    const translator = new ExternMessageTranslator();
+    expect(translator.enablePluginTranslation()).toBe(true);
+    expect(window.$externMessage.replaceCommand101).toBe(Game_Interpreter.prototype.command101);
+    expect(new Game_Interpreter().command101()).toBe(12);
+});
+it('preserves the native warning when an unrelated plugin has already replaced command101', () => {
+    const different = () => false;
+    window.$externMessage.replaceCommand101 = different;
+    new ExternMessageTranslator().enablePluginTranslation();
+    expect(window.$externMessage.replaceCommand101).toBe(different);
+});

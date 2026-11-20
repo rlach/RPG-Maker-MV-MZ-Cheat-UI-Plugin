@@ -207,7 +207,9 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
                 return false;
             }
         } else {
-            if (!this._hookKeyConfigDrawCommand() && !this._hookKeyConfigScene()) {
+            const commandHook = this._hookKeyConfigDrawCommand();
+            const sceneHook = this._hookKeyConfigScene();
+            if (!commandHook && !sceneHook) {
                 return false;
             }
         }
@@ -572,6 +574,13 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
                 enumerable: false,
                 writable: false,
             });
+            if (typeof windowInstance.drawTextEx === 'function') {
+                const drawTextEx = windowInstance.drawTextEx;
+                windowInstance.drawTextEx = function (text, ...args) {
+                    return drawTextEx.call(this, resolveFromTranslatorCache(text), ...args);
+                };
+            }
+            windowInstance.refresh?.();
         }
     }
 
@@ -924,6 +933,24 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
     appendEntriesFromParameters(params, scope, output) {
         if (!params || typeof params !== 'object' || !Array.isArray(output)) {
             return;
+        }
+
+        // Earlier MZ layouts coexist with newer structs in shipped parameters.
+        for (const [field, raw] of Object.entries(params)) {
+            if (
+                /^(?:basic(?:Ok|Cancel|Shift|Menu|Escape|Pageup|Pagedown)Key|mapperDeleteKey|\w+Command(?:Help)?Name|GamePadConfigName|KeyConfigName)$/.test(
+                    field
+                )
+            ) {
+                if (this.isUsableText(raw)) output.push({ text: raw, source: { scope, field } });
+            } else if (
+                /^(?:saveCommand|resetCommand|WASDCommand|WASDhelp|changeKeyLayoutCommand|exitCommand|exitHelp|saveDescription|resetDescription)$/.test(
+                    field
+                )
+            ) {
+                const text = extractMultiLangString(raw) || extractMultiLangNote(raw);
+                if (this.isUsableText(text)) output.push({ text, source: { scope, field } });
+            }
         }
 
         if (this._isMvStyleParams(params)) {

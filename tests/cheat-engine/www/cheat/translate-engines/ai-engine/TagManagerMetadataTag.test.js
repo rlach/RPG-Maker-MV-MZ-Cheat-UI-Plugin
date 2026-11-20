@@ -37,3 +37,17 @@ it.each(['TAG:sn', 'prefix TAG:missing', '<name:TAG:broken>', '⟪broken', 'brok
         }
     }
 );
+it('accepts the reported native tag metadata after decoding newline transport tokens', () => {
+    const manager = new TagManager(null);
+    const source = '<tag: buji,lianjin>\n<icon:icon-item-x-myl>\n<pic:icon-item-d-myl>\n<BD_gold: 50>\n<sell: 16>';
+    const { preprocessedText, tagCounts, caseMap } = manager.preprocessTags(source);
+    const output = preprocessedText.replace('buji,lianjin', 'Broken,Gold Inlay');
+    const result = manager.postprocessTags(output, tagCounts, caseMap);
+    expect(result.valid).toBe(true);
+    expect(result.text).toBe(source.replace('buji,lianjin', 'Broken,Gold Inlay'));
+    expect(result.text).not.toContain('⟪TAG:sn⟫');
+});
+it.each(['<tag: Broken> TAG:sn', '<tag: ⟪TAG:broken⟫>', '<<TAG:sn>', '<tag: unclosed'])('does not hide broken transport tokens near native tags: %s', text => {
+    const result = new TagManager(null).postprocessTags(text, {}, {});
+    expect(result.valid).toBe(false);
+});

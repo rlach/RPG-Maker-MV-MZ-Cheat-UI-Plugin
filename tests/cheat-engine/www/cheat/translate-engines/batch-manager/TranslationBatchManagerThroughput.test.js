@@ -125,13 +125,18 @@ describe('TranslationBatchManager throughput sampling', () => {
         const manager = new TranslationBatchManager(runtime);
         manager.register({ getKind: () => 'ordinary', createEntries: async () => [{ items }] });
         manager.register(new CacheEmptyStrings());
-        await manager.runBatchedTranslation(
+        const result = await manager.runBatchedTranslation(
             [
                 { kind: 'ordinary', backgroundJob: false, itemLimit: 100, charLimit: 10000 },
                 { kind: 'cacheEmptyStrings', backgroundJob: false, repeatUntilSuccess: true },
             ],
             { showSummary: false }
         );
+        expect(result.failures).toHaveLength(0);
+        expect(result.successes).toHaveLength(100);
+        expect(result.summary.hasErrors).toBe(false);
+        expect(result.summary.successRate).toBe(100);
+        expect(result.summary.message).toContain('total errors:');
         expect(calls).toBe(2);
         expect(observed[0].stats.totalChars).toBe(400); // Not 800 after dry run.
         expect(observed[1].size).toBe(10);
@@ -530,4 +535,75 @@ describe('TranslationBatchManager throughput sampling', () => {
         expect(afterLine).toContain('total 20.0% complete');
         expect(runtime.getBatchThroughputSamples('main').length).toBeGreaterThanOrEqual(2);
     });
+});
+
+it.each([true, false])(
+    'keeps simulated failures without error severity for dry run (options flag: %s)',
+    async (optionsFlag) => {
+        const runtime = createRuntimeStub();
+        const manager = new TranslationBatchManager(runtime);
+        runtime.saveSettings = () => {};
+        const item = {
+            type: 'message',
+            value: 'Dry run source',
+            cacheKey: 'message:ja-en-Dry run source',
+            dryRun: !optionsFlag,
+        };
+        manager.register({
+            getKind: () => 'dryRunProbe',
+            createEntries: async () => [{ items: [item] }],
+        });
+        const result = await manager.runBatchedTranslation(
+            [
+                { kind: 'dryRunProbe', ...(optionsFlag ? {} : { dryRun: true }) },
+                { kind: 'dryRunProbe', ...(optionsFlag ? {} : { dryRun: true }) },
+            ],
+            {
+                showSummary: false,
+                dryRun: optionsFlag,
+            }
+        );
+        expect(result.failures).toHaveLength(1);
+        expect(result.failures[0].rejectReason).toBe('dry_run');
+        expect(result.summary.hasErrors).toBe(false);
+        expect(result.summary.message).toContain('Dry run completed');
+        expect(result.summary.uniquePendingKeys).toBe(1);
+    }
+);
+
+it('materializes rediscovered identity entries during dry run so empty-string MT can translate them', async () => {
+    const runtime = createRuntimeStub();
+    runtime.saveSettings = () => {};
+    const original = '拓真が遥に絡む';
+    const key = `plugin_ha_adventure_ui:ja-en-${original}`;
+    const goodKey = 'plugin_ha_adventure_ui:ja-en-キスをする';
+    runtime.translationCache.set(key, original);
+    runtime.translationCache.set(goodKey, 'Kiss');
+    const manager = new TranslationBatchManager(runtime);
+    manager.register({
+        getKind: () => 'pendingCaption',
+        createEntries: async () => [
+            { items: [{ type: 'plugin_ha_adventure_ui', value: original, cacheKey: key }] },
+        ],
+    });
+    manager.register(new CacheEmptyStrings());
+    const result = await manager.runBatchedTranslation([{ kind: 'pendingCaption' }], {
+        dryRun: true,
+        showSummary: false,
+    });
+    expect(runtime.translationCache.get(key)).toBe('');
+    expect(runtime.translationCache.get(goodKey)).toBe('Kiss');
+    expect(result.summary.uniquePendingKeys).toBe(1);
+    expect(
+        new CacheEmptyStrings().collectUntranslated({ runtime }).map((item) => item.cacheKey)
+    ).toEqual([key]);
+    runtime.engine.batchTranslate = async (batch) => ({
+        successes: batch.map((item) => ({ ...item, translated: 'Takuma bothers Haruka' })),
+        failures: [],
+    });
+    await manager.runBatchedTranslation([{ kind: 'cacheEmptyStrings', backgroundJob: false }], {
+        showSummary: false,
+    });
+    expect(runtime.translationCache.get(key)).toBe('Takuma bothers Haruka');
+    expect(new CacheEmptyStrings().collectUntranslated({ runtime })).toHaveLength(0);
 });

@@ -1,4 +1,5 @@
-import { SourceTextCatalogTranslator } from '../SourceTextCatalogTranslator.js';
+import { DisplayVariableCatalogTranslator } from '../DisplayVariableCatalogTranslator.js';
+import { collectScriptVariableAssignments } from '../ScriptVariableAssignments.js';
 import { extractJavaScriptTextCatalog } from './JavaScriptTextCatalog.js';
 import { parseJsonSafely } from './TranslatorHelpers.js';
 
@@ -91,7 +92,7 @@ function extractSceneEntries(scene) {
  * Preserve original actor-name metadata keys in data-list filters, while keeping
  * localized display names and authored gallery unlock conditions unchanged.
  */
-export class SceneCustomMenuTranslator extends SourceTextCatalogTranslator {
+export class SceneCustomMenuTranslator extends DisplayVariableCatalogTranslator {
     constructor() {
         super();
         this._scanPrepared = false;
@@ -104,7 +105,20 @@ export class SceneCustomMenuTranslator extends SourceTextCatalogTranslator {
         return [];
     }
     shouldScanEventData() {
-        return false;
+        return this.displayVariables.size > 0;
+    }
+
+    collectMapTexts() {}
+
+    collectCommandTexts(list = []) {
+        this.assignments.push(...collectScriptVariableAssignments(list));
+        for (const command of list || []) {
+            if (command.code === 122) this.assignments.push(command.parameters);
+        }
+    }
+
+    async collectAdditionalTexts() {
+        await this.collectVariableTexts();
     }
 
     getPluginName() {
@@ -219,6 +233,15 @@ export class SceneCustomMenuTranslator extends SourceTextCatalogTranslator {
         this._drawTargets ??= new WeakSet();
         if (this._drawTargets.has(target)) return true;
         this._drawTargets.add(target);
+        if (typeof target.convertEscapeCharacters === 'function') {
+            const original = target.convertEscapeCharacters;
+            const translator = this;
+            target.convertEscapeCharacters = function (...args) {
+                // Resolve display variables only after the engine expands them.
+                // Stored values remain available to event conditions unchanged.
+                return translator.resolveText(original.apply(this, args), translator.getRuntime());
+            };
+        }
         for (const method of ['drawText', 'drawTextEx', 'textWidth', 'textSizeEx']) {
             if (typeof target[method] === 'function') this.hookDrawing(target, method);
         }
@@ -399,7 +422,10 @@ export class SceneCustomMenuTranslator extends SourceTextCatalogTranslator {
         this._scanPromise = this.buildScanEntries()
             .then(async (entries) => {
                 this._scanEntries = Array.isArray(entries) ? entries : [];
-                for (const entry of this._scanEntries) this.entries.set(entry.text, entry);
+                for (const entry of this._scanEntries) {
+                    this.entries.set(entry.text, entry);
+                    this.collectDisplayReferences(entry.text);
+                }
                 await super.buildCatalog();
                 this._scanPrepared = true;
             })

@@ -7,6 +7,44 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
+it('supports Awaya FadeText 2.0 without addFadeText and preserves ordinary messages and fade state', () => {
+    class Message {
+        constructor() {
+            this._texts = ['第一行', '第二行'];
+            this.fading = true;
+        }
+        fadeMode() {
+            return this.fading;
+        }
+        allText() {
+            return this._texts.join('\n');
+        }
+    }
+    vi.stubGlobal('window', { Game_Message: Message });
+    const translator = new FadeTextTranslator();
+    translator.collectCommandTexts([
+        { code: 357, parameters: ['FadeText', 'showFadingText', '', { fadeDuration: '30' }] },
+        { code: 105, parameters: [2, false] },
+        { code: 405, parameters: ['第一行'] },
+        { code: 405, parameters: ['第二行'] },
+    ]);
+    expect([...translator.entries.keys()]).toEqual(['第一行\n第二行']);
+    let enabled = true;
+    vi.spyOn(translator, 'getRuntime').mockReturnValue({
+        isTranslationEnabled: () => enabled,
+        getPreferredMessageCacheEntry: () => ({ value: 'First line\nSecond line' }),
+    });
+    expect(translator.enablePluginTranslation()).toBe(true);
+    const message = new Message();
+    expect(message.allText()).toBe('First line\nSecond line');
+    expect(message._texts).toEqual(['第一行', '第二行']);
+    enabled = false;
+    expect(message.allText()).toBe('第一行\n第二行');
+    enabled = true;
+    message.fading = false;
+    expect(message.allText()).toBe('第一行\n第二行');
+});
+
 it('scans menu source and resolves changing volume values through one template', async () => {
     const source = `this.addCommand('BGM 音量: ' + ConfigManager.bgmVolume, 'bgmVolume');
         this.addCommand('ロード', 'load');

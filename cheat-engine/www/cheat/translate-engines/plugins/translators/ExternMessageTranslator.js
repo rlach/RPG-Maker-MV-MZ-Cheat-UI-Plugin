@@ -93,6 +93,8 @@ export class ExternMessageTranslator extends ExternBaseTranslator {
             }
             return command101.apply(this, args);
         };
+        if (window.$externMessage?.replaceCommand101 === command101)
+            window.$externMessage.replaceCommand101 = Game_Interpreter.prototype.command101;
         return true;
     }
 

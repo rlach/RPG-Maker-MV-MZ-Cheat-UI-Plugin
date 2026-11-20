@@ -296,7 +296,9 @@ function createRuntime({
             return getCanonicalSystemCommandName.call(this, commandName);
         },
         hasUsableCacheValue(cacheKey) {
-            return this.translationCache.has(cacheKey) && this.translationCache.get(cacheKey) !== '';
+            return (
+                this.translationCache.has(cacheKey) && this.translationCache.get(cacheKey) !== ''
+            );
         },
         setCacheValue(cacheKey, value) {
             const normalizedValue =
@@ -402,6 +404,57 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         delete globalThis.Scene_Map;
     });
 
+    it('keeps safe time and outfit variables raw for game logic while translating text expansion', () => {
+        installRpgMakerGlobals();
+        const values = { 1: '朝', 2: '月曜日', 3: 'お嬢様スタイル', 4: 10 };
+        Game_Variables.prototype.value = (id) => values[id];
+        const variables = new Game_Variables();
+        class Base {
+            convertEscapeCharacters(text) {
+                if (text === 'throw') throw new Error('conversion failure');
+                return text.replace(/\\V\[(\d+)\]/gi, (_, id) => variables.value(Number(id)));
+            }
+        }
+        class Picture {
+            updateDText() {
+                return variables.value(3);
+            }
+        }
+        class Extra {
+            drawAllText() {
+                return variables.value(1) + ' ' + variables.value(2);
+            }
+        }
+        globalThis.Window_Base = Base;
+        globalThis.Game_Picture = Picture;
+        globalThis.Window_SceneExtra = Extra;
+        try {
+            const runtime = createRuntime({ translationEnabled: true });
+            runtime.isVariableSafeForTranslation = (id) => id <= 4;
+            for (const [source, target] of [
+                ['朝', 'Morning'],
+                ['月曜日', 'Monday'],
+                ['お嬢様スタイル', 'Lady Style'],
+            ])
+                runtime.translationCache.set(runtime.getCacheKey(source, 'variable_value'), target);
+            translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
+            expect(variables.value(1) === '朝' && variables.value(2) !== '土曜日').toBe(true);
+            expect({ お嬢様スタイル: 'outfit_lady' }[variables.value(3)]).toBe('outfit_lady');
+            expect(new Base().convertEscapeCharacters('\\V[1] \\V[2] \\V[3] \\V[4]')).toBe(
+                'Morning Monday Lady Style 10'
+            );
+            expect(new Picture().updateDText()).toBe('Lady Style');
+            expect(new Extra().drawAllText()).toBe('Morning Monday');
+            expect(() => new Base().convertEscapeCharacters('throw')).toThrow('conversion failure');
+            expect(variables.value(3)).toBe('お嬢様スタイル');
+            expect(values).toEqual({ 1: '朝', 2: '月曜日', 3: 'お嬢様スタイル', 4: 10 });
+        } finally {
+            delete globalThis.Window_Base;
+            delete globalThis.Game_Picture;
+            delete globalThis.Window_SceneExtra;
+        }
+    });
+
     it('injects cached command translations during menu refresh when cache-mode is enabled', () => {
         installRpgMakerGlobals();
         const runtime = createRuntime({
@@ -420,7 +473,9 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
         expect(commandWindow._list).toEqual([
             { name: 'Gallery', symbol: 'gallery', enabled: true, ext: null },
         ]);
-        expect(runtime.translationCache).toEqual(new Map([[commandKey(runtime, 'Galeria'), 'Gallery']]));
+        expect(runtime.translationCache).toEqual(
+            new Map([[commandKey(runtime, 'Galeria'), 'Gallery']])
+        );
         expect(runtime.lastSeenByCacheKey.has(commandKey(runtime, 'Galeria'))).toBe(true);
     });
 
@@ -497,9 +552,7 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
 
         translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
 
-        const commandWindow = new globalThis.Window_Command([
-            { name: 'Tak', symbol: 'choice' },
-        ]);
+        const commandWindow = new globalThis.Window_Command([{ name: 'Tak', symbol: 'choice' }]);
         commandWindow.refresh();
 
         expect(commandWindow._list).toEqual([
@@ -594,22 +647,20 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
             translationEnabled: true,
         });
 
-        runtime.batchManager.runBatchedTranslation = vi
-            .fn()
-            .mockImplementation(async (entries) => {
-                const item = entries?.[0]?.items?.[0];
-                runtime.translationCache.set(item.cacheKey, 'Scroll translated now');
-                return {
-                    successes: [
-                        {
-                            cacheKey: item.cacheKey,
-                            translated: 'Scroll translated now',
-                            type: 'scroll_text',
-                        },
-                    ],
-                    failures: [],
-                };
-            });
+        runtime.batchManager.runBatchedTranslation = vi.fn().mockImplementation(async (entries) => {
+            const item = entries?.[0]?.items?.[0];
+            runtime.translationCache.set(item.cacheKey, 'Scroll translated now');
+            return {
+                successes: [
+                    {
+                        cacheKey: item.cacheKey,
+                        translated: 'Scroll translated now',
+                        type: 'scroll_text',
+                    },
+                ],
+                failures: [],
+            };
+        });
 
         translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
 
@@ -625,9 +676,9 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
 
         expect(runtime.batchManager.runBatchedTranslation).toHaveBeenCalledTimes(1);
         expect(scrollWindow._text).toBe('Scroll translated now');
-        expect(runtime.pendingTranslations.has(scrollTextKey(runtime, 'Uncached scroll line'))).toBe(
-            false
-        );
+        expect(
+            runtime.pendingTranslations.has(scrollTextKey(runtime, 'Uncached scroll line'))
+        ).toBe(false);
     });
 
     it('keeps Scene_Title lifecycle hook working when another plugin reassigns Scene_Title class', () => {
@@ -658,4 +709,21 @@ describe('TranslateOnTheFlyRuntimeMethods command handling', () => {
             trigger: 'sceneTitleCreateCommandWindow',
         });
     });
+    it.each([true, false])(
+        'preserves ExternMessage override detection when its native handler matches: %s',
+        (matches) => {
+            installRpgMakerGlobals();
+            const native = Game_Interpreter.prototype.command101;
+            const expected = matches ? native : () => 'unrelated plugin';
+            window.$externMessage = { replaceCommand101: expected };
+            try {
+                translateOnTheFlyRuntimeMethods.setupTranslationHook.call(createRuntime());
+                expect(window.$externMessage.replaceCommand101).toBe(
+                    matches ? Game_Interpreter.prototype.command101 : expected
+                );
+            } finally {
+                delete window.$externMessage;
+            }
+        }
+    );
 });

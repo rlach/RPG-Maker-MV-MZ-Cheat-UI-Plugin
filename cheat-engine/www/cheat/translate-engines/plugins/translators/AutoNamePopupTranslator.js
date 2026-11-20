@@ -45,17 +45,19 @@ export class AutoNamePopupTranslator extends BasePluginTranslator {
         return true;
     }
 
-    _resolveRuntimeConfig() {
+    _resolveRuntimeConfig(modeOverride) {
         const pluginEntry = this.findPluginEntry(this.getPluginName());
         const parameters = pluginEntry?.parameters || {};
 
-        const mode = Number(parameters.mode || 0);
+        const configuredMode = Number(parameters.mode || 0);
+        const mode = modeOverride ?? configuredMode;
         const useMZ = Utils?.RPGMAKER_NAME === 'MZ';
         const inTheWindow = mode > 0 || !useMZ;
 
         let template = String(parameters.template || '%1');
         const startNewLine = String(parameters.startNewLine || 'true') === 'true';
-        if ((useMZ ? mode === 1 : mode < 2) && startNewLine) {
+        // The native changeMode command changes placement, not the startup template.
+        if ((useMZ ? configuredMode === 1 : configuredMode < 2) && startNewLine) {
             template += '\n';
         }
 
@@ -123,13 +125,13 @@ export class AutoNamePopupTranslator extends BasePluginTranslator {
         return this._resolveOptionStringFromKey(faceInfo.faceName, faceInfo.faceIndex);
     }
 
-    _buildCollectionPrefix(command) {
+    _buildCollectionPrefix(command, modeOverride) {
         const characterName = this._resolveCharacterNameFromCommand(command);
         if (!this.isUsableText(characterName)) {
             return '';
         }
 
-        const config = this._resolveRuntimeConfig();
+        const config = this._resolveRuntimeConfig(modeOverride);
         const optionString = this._resolveOptionStringFromCommand(command);
         const namePrefix = config.inTheWindow
             ? this._formatTemplate(config.template, characterName)
@@ -210,6 +212,7 @@ export class AutoNamePopupTranslator extends BasePluginTranslator {
     }
 
     resolveMessageCacheSourceText(context = {}) {
+        if (context.entry?.autoNamePopupComposed) return null;
         const sourceText = typeof context.text === 'string' ? context.text : '';
         if (!sourceText) {
             return null;
@@ -221,6 +224,43 @@ export class AutoNamePopupTranslator extends BasePluginTranslator {
         }
 
         return null;
+    }
+
+    getEventCommandTraversalExtension() {
+        // Some shipped builds switch between popup and inline names every frame.
+        // Harvest both possible bodies, rather than depending on the current save.
+        const parameters = this.findPluginEntry(this.getPluginName())?.parameters || {};
+        if (!(Number(parameters.switchId) > 0)) return null;
+        return {
+            collectEntriesAt: ({ list, index, command, pushEntry, helpers }) => {
+                const message = helpers.extractMessageEntryAt(list, index);
+                if (!message) return null;
+                const noName = message.speaker === '_' || message.text.startsWith('_');
+                const body = message.text.startsWith('_') ? message.text.slice(1) : message.text;
+                const values = new Set(
+                    [0, 1].map(
+                        (mode) => (noName ? '' : this._buildCollectionPrefix(command, mode)) + body
+                    )
+                );
+                if (!noName && this.isUsableText(message.speaker))
+                    pushEntry({
+                        type: 'speaker',
+                        value: message.speaker,
+                        command,
+                        cmdIndex: index,
+                    });
+                for (const value of values)
+                    pushEntry({
+                        type: message.hasPortrait ? 'message_portrait' : 'message',
+                        value,
+                        command,
+                        cmdIndex: index,
+                        nextIndex: message.nextIndex,
+                        autoNamePopupComposed: true,
+                    });
+                return { handled: true, nextIndex: message.nextIndex };
+            },
+        };
     }
 
     collectUntranslated() {

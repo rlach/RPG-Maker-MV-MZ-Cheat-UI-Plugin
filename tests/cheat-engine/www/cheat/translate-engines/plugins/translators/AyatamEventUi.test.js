@@ -4,18 +4,25 @@ import { EventUiTextTranslator } from '../../../../../../../cheat-engine/www/che
 
 it('keeps translated map database values out of the event UI catalog and reuses map_name', () => {
     const translator = new EventUiTextTranslator();
-    translator.collectMapTexts({ name: 'Silent Lakeside' }, { displayName: 'Silent Lakeside, Depths' });
+    translator.collectMapTexts(
+        { name: 'Silent Lakeside' },
+        { displayName: 'Silent Lakeside, Depths' }
+    );
     expect(translator.entries.size).toBe(0);
     const runtime = {
         isTranslationEnabled: () => true,
         getCacheKey: (text, type) => `${type}:${text}`,
         trackCacheKeyUsage: vi.fn(),
         translationCache: new Map([['map_name:静寂の湖畔', 'Silent Lakeside']]),
-        hasUsableCacheValue(key) { return this.translationCache.has(key); },
+        hasUsableCacheValue(key) {
+            return this.translationCache.has(key);
+        },
     };
     expect(translator.resolveText('静寂の湖畔', runtime)).toBe('Silent Lakeside');
     expect(translator.resolveText('Silent Lakeside', runtime)).toBe('Silent Lakeside');
-    expect(runtime.trackCacheKeyUsage.mock.calls.map(([key]) => key)).toEqual(['map_name:静寂の湖畔']);
+    expect(runtime.trackCacheKeyUsage.mock.calls.map(([key]) => key)).toEqual([
+        'map_name:静寂の湖畔',
+    ]);
 });
 vi.mock(
     '../../../../../../../cheat-engine/www/cheat/js/translation-runtime/ObjectTranslationModalMethods.js',
@@ -141,6 +148,119 @@ async function prepareUi() {
     await translator.precomputeCounts();
     return translator;
 }
+
+it('reuses skill descriptions and map keys for MZ text pictures and dungeon popups', () => {
+    const translator = instance(EventUiTextTranslator);
+    const values = {
+        202: '因果に宿る、宿命の淫性。\n魔力変換効率が10%上昇。',
+        41: 'プール',
+        703: 'プールの亜空間　第３層',
+    };
+    runtime.translationCache.set(
+        'skill_description:' + values[202],
+        'A fated trait.\nConversion efficiency +10%.'
+    );
+    runtime.translationCache.set('map_name:' + values[41], 'Pool');
+    runtime.translationCache.set('map_name:' + values[703], 'Pool Subspace, Floor 3');
+    class Base {
+        convertEscapeCharacters(text) {
+            return text.replace(/\\V\[(\d+)\]/gi, (_, id) => values[id]);
+        }
+    }
+    class Window_ExInfoWindow extends Base {}
+    class Picture {
+        getDText() {
+            return 'Current Location ' + values[41] + '\n' + values[202];
+        }
+    }
+    vi.stubGlobal('Window_Base', Base);
+    vi.stubGlobal('Game_Picture', Picture);
+    vi.stubGlobal('$gameVariables', { value: (id) => values[id] });
+    const parent = vi
+        .spyOn(Object.getPrototypeOf(EventUiTextTranslator.prototype), 'enablePluginTranslation')
+        .mockReturnValue(true);
+    try {
+        expect(translator.enablePluginTranslation()).toBe(true);
+        const picture = new Picture();
+        picture.dTextInfo = { value: 'Current Location \\V[41]\n\\V[202]' };
+        expect(picture.getDText()).toBe(
+            'Current Location Pool\nA fated trait.\nConversion efficiency +10%.'
+        );
+        expect(new Window_ExInfoWindow().convertEscapeCharacters('\\v[703]')).toBe(
+            'Pool Subspace, Floor 3'
+        );
+        expect(values[41]).toBe('プール');
+        expect(
+            runtime.trackCacheKeyUsage.mock.calls.some(([key]) =>
+                key.startsWith('plugin_event_ui_text:')
+            )
+        ).toBe(false);
+        runtime.enabled = false;
+        expect(picture.getDText()).toContain(values[202]);
+        expect(new Window_ExInfoWindow().convertEscapeCharacters('\\v[703]')).toBe(values[703]);
+    } finally {
+        parent.mockRestore();
+    }
+});
+
+it('harvests negotiation variables and expands translations in messages and choices only', async () => {
+    vi.stubGlobal('$plugins', [{ name: 'ResidentWindow', status: true, parameters: {} }]);
+    const values = {
+        86: '食いついている。このアイテムに関心が高いようだ。',
+        89: '魔法の話',
+        91: '品質のアピール',
+        92: 15,
+    };
+    const list = [
+        { code: 401, parameters: ['\\V[86]'] },
+        { code: 102, parameters: [['\\V[89](Time consumed \\V[92])', '\\V[91]']] },
+        ...[86, 89, 91, 92].map((id) => ({
+            code: 122,
+            parameters: [id, id, 0, 4, JSON.stringify(values[id])],
+        })),
+        { code: 122, parameters: [999, 999, 0, 4, '"Unrelated logic token"'] },
+    ];
+    vi.stubGlobal('$dataCommonEvents', [{ list }]);
+    const translator = instance(EventUiTextTranslator);
+    expect(translator.detectPlugin()).toBe(true);
+    await translator.precomputeCounts();
+    for (const id of [86, 89, 91]) expect(translator.entries.has(values[id])).toBe(true);
+    expect(translator.entries.has('15')).toBe(false);
+    expect(translator.entries.has('Unrelated logic token')).toBe(false);
+    cache(translator, values[86], 'They seem interested in this item.');
+    cache(translator, values[89], 'Talk about magic');
+    cache(translator, values[91], 'Emphasize quality');
+    class Base {
+        convertEscapeCharacters(text) {
+            return text.replace(/\\V\[(\d+)\]/gi, (_, id) => values[id]);
+        }
+    }
+    class Message extends Base {}
+    class Choice extends Base {}
+    vi.stubGlobal('Window_Base', Base);
+    vi.stubGlobal('Window_Message', Message);
+    vi.stubGlobal('Window_ChoiceList', Choice);
+    vi.stubGlobal('$gameVariables', { value: (id) => values[id] });
+    const parent = vi
+        .spyOn(Object.getPrototypeOf(EventUiTextTranslator.prototype), 'enablePluginTranslation')
+        .mockReturnValue(true);
+    try {
+        expect(translator.enablePluginTranslation()).toBe(true);
+        expect(new Message().convertEscapeCharacters('\\V[86]')).toBe(
+            'They seem interested in this item.'
+        );
+        expect(new Choice().convertEscapeCharacters('\\V[89](Time consumed \\V[92])')).toBe(
+            'Talk about magic(Time consumed 15)'
+        );
+        expect(new Choice().convertEscapeCharacters('\\V[91]')).toBe('Emphasize quality');
+        expect(new Base().convertEscapeCharacters('\\V[89]')).toBe('魔法の話');
+        expect(values[89]).toBe('魔法の話');
+        runtime.enabled = false;
+        expect(new Choice().convertEscapeCharacters('\\V[89]')).toBe('魔法の話');
+    } finally {
+        parent.mockRestore();
+    }
+});
 
 it('follows display-variable assignments and aliases without evaluating expressions or scanning unrelated variables', async () => {
     const translator = await prepareUi();

@@ -110,29 +110,35 @@ export function previewNamePatternRepair(runtime, pattern) {
             edits.push({ start: range[0], end: range[1], replacement });
         }
         let after = before;
-        if (!example && edits.length) {
-            const beforeParts = [];
-            const afterParts = [];
-            let end = 0;
-            for (const edit of edits) {
-                const unchanged = { text: before.slice(end, edit.start), changed: false };
-                beforeParts.push(unchanged, {
-                    text: before.slice(edit.start, edit.end),
-                    changed: true,
-                });
-                afterParts.push(unchanged, { text: edit.replacement, changed: true });
-                end = edit.end;
-            }
-            const suffix = { text: before.slice(end), changed: false };
-            beforeParts.push(suffix);
-            afterParts.push(suffix);
-            example = { beforeParts, afterParts };
-        }
-        for (const edit of edits.reverse())
+        for (const edit of [...edits].reverse())
             after = after.slice(0, edit.start) + edit.replacement + after.slice(edit.end);
-        if (after !== before) changes.push({ cacheKey, before, after });
+        if (after !== before) {
+            const change = { cacheKey, before, after, edits };
+            changes.push(change);
+            if (!example) example = getNameRepairExample(change);
+        }
     }
     return { sourceLang: runtime.sourceLang, targetLang: runtime.targetLang, changes, example };
+}
+
+/** Build highlighted preview parts for any change without altering the repair plan. */
+export function getNameRepairExample(change) {
+    const beforeParts = [],
+        afterParts = [];
+    let end = 0;
+    for (const edit of change.edits || []) {
+        const unchanged = { text: change.before.slice(end, edit.start), changed: false };
+        beforeParts.push(unchanged, {
+            text: change.before.slice(edit.start, edit.end),
+            changed: true,
+        });
+        afterParts.push(unchanged, { text: edit.replacement, changed: true });
+        end = edit.end;
+    }
+    const suffix = { text: change.before.slice(end), changed: false };
+    beforeParts.push(suffix);
+    afterParts.push(suffix);
+    return { beforeParts, afterParts };
 }
 
 export function applyNamePatternRepair(runtime, plan) {

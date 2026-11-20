@@ -114,18 +114,28 @@ export class LunatlazurActorNameWindowTranslator extends BasePluginTranslator {
                 names.push({ token, name });
                 return token;
             });
-            let converted = original.call(this, protectedText);
-            if (!names.length) return converted;
-            for (const { token, name } of names) {
-                // Preserve normal variable/actor escape expansion inside names,
-                // but never expose the surrounding <name> to color parsing.
-                const convertedName = window.Window_Base.prototype.convertEscapeCharacters.call(
-                    this,
-                    name
-                );
-                converted = converted.split(token).join('\x1bN<' + convertedName + '>');
+            if (!names.length) return original.call(this, protectedText);
+            const restoreNameTags = (value) => {
+                for (const { token, name } of names) {
+                    if (!value.includes(token)) continue;
+                    const convertedName = window.Window_Base.prototype.convertEscapeCharacters.call(
+                        this,
+                        name
+                    );
+                    value = value.split(token).join('\x1bN<' + convertedName + '>');
+                }
+                return value;
+            };
+            const nameWindow = this._nameWindow;
+            const processActorName = nameWindow.processActorName;
+            nameWindow.processActorName = function (value) {
+                return processActorName.call(this, restoreNameTags(value));
+            };
+            try {
+                return restoreNameTags(original.call(this, protectedText));
+            } finally {
+                nameWindow.processActorName = processActorName;
             }
-            return this._nameWindow.processActorName(converted);
         };
     }
 

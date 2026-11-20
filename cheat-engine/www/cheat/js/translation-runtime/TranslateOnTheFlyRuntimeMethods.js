@@ -1,4 +1,9 @@
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
+import { installActorNameConditionTranslation } from './ActorNameConditions.js';
+import {
+    isVariableDisplayContext,
+    installVariableDisplayContexts,
+} from './VariableDisplayContext.js';
 import {
     installCommandTranslationHook,
     isTranslationActive,
@@ -12,6 +17,8 @@ import {
 export const translateOnTheFlyRuntimeMethods = {
     setupTranslationHook() {
         const self = this;
+        installActorNameConditionTranslation(self);
+        installVariableDisplayContexts();
 
         let localeSetupAttempts = 0;
         const maxLocaleSetupAttempts = 20;
@@ -557,6 +564,7 @@ export const translateOnTheFlyRuntimeMethods = {
 
             if (
                 safeVariableId <= 0 ||
+                !isVariableDisplayContext() ||
                 !shouldReturnTranslatedVariableValue() ||
                 !self.isVariableSafeForTranslation(safeVariableId) ||
                 typeof originalValue !== 'string' ||
@@ -581,6 +589,7 @@ export const translateOnTheFlyRuntimeMethods = {
         };
 
         if (shouldHookInterpreterCommands) {
+            const previousCommand101 = Game_Interpreter.prototype.command101;
             if (!Game_Interpreter.prototype._translateOriginalCommand101) {
                 Game_Interpreter.prototype._translateOriginalCommand101 =
                     Game_Interpreter.prototype.command101;
@@ -591,6 +600,8 @@ export const translateOnTheFlyRuntimeMethods = {
                 }
                 return Game_Interpreter.prototype._translateOriginalCommand101.apply(this, args);
             };
+            if (window.$externMessage?.replaceCommand101 === previousCommand101)
+                window.$externMessage.replaceCommand101 = Game_Interpreter.prototype.command101;
             if (!Game_Interpreter.prototype._translateOriginalCommand102) {
                 Game_Interpreter.prototype._translateOriginalCommand102 =
                     Game_Interpreter.prototype.command102;

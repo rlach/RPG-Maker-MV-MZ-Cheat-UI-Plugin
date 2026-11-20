@@ -1,5 +1,6 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { parseJsonSafely } from './TranslatorHelpers.js';
+import { withVariableDisplayContext } from '../../../js/translation-runtime/VariableDisplayContext.js';
 
 const CACHE_TYPE = 'plugin_ll_menu_screen';
 const DEBUG_TAG = '[LLMenuScreenTranslator]';
@@ -100,6 +101,11 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
     }
 
     _appendEntriesFromParameters(parameters, output) {
+        // Older/index-based LL layouts use individual helpTextItem/Skill/etc.
+        for (const [field, text] of Object.entries(parameters || {})) {
+            if (/^helpText[A-Z]/.test(field) && typeof text === 'string' && text.trim())
+                output.push({ text: text.trim(), source: { field } });
+        }
         // Collect menuHelpTexts[].helpText values (the descriptions).
         // The symbol values are command display names handled by the command translation system.
         const menuHelpTexts = this._parseMenuHelpTexts(parameters);
@@ -412,13 +418,22 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
         // ---------------------------------------------------------------------------
         const originalCreate = sceneMenuPrototype.createMenuHelpWindow;
         sceneMenuPrototype.createMenuHelpWindow = function () {
-            originalCreate.call(this);
+            withVariableDisplayContext(() => originalCreate.call(this));
 
             try {
                 const win = this._menuHelpWindow;
                 if (!win) {
                     console.debug(`${DEBUG_TAG} createMenuHelpWindow: no _menuHelpWindow instance`);
                     return;
+                }
+
+                // LL evaluates variable expressions before calling drawText.
+                // Only this rendering scope may read localized safe variables.
+                const refresh = win.refresh;
+                if (typeof refresh === 'function') {
+                    win.refresh = function (...args) {
+                        return withVariableDisplayContext(() => refresh.apply(this, args));
+                    };
                 }
 
                 const protoDrawText = Object.getPrototypeOf(win).drawText;

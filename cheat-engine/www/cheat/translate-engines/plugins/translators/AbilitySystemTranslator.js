@@ -22,9 +22,18 @@ export class AbilitySystemTranslator extends SourceTextCatalogTranslator {
         walkNestedJsonLike(parameters, (value, { path }) => {
             if (
                 typeof value === 'string' &&
-                /^(?:CostText|EmptySlotText|MenuAbilitySystemText)$/.test(path[path.length - 1])
+                /^(?:CostText|EmptySlotText|MenuAbilitySystemText|HelpWindowName)$/.test(
+                    path[path.length - 1]
+                )
             )
                 this.entries.set(value, { text: value });
         });
+    }
+
+    enablePluginTranslation() {
+        if (!super.enablePluginTranslation()) return false;
+        if (typeof window.Window_Base?.prototype.textWidth === 'function')
+            this.hookDrawing(window.Window_Base.prototype, 'textWidth');
+        return true;
     }
 }

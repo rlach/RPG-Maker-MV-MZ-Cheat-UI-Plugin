@@ -508,6 +508,7 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
     }
 
     appendParameterEntries(output) {
+        for (const text of ['調理', '基準売価']) output.push({ text, cacheType: CACHE_TYPE });
         const sourceTextByField = this.getSourceTextByField();
 
         for (const fieldConfig of PARAM_FIELD_CONFIGS) {
@@ -807,6 +808,13 @@ export class CategorySynthesisTranslator extends BasePluginTranslator {
     }
 
     translateKnownPluginText(runtime, text) {
+        if (text === '調理' || text === '基準売価')
+            return this.resolveCachedText(runtime, text, CACHE_TYPE);
+        if (typeof text === 'string' && /^\(.+\)$/.test(text)) {
+            const source = text.slice(1, -1);
+            const translated = this.resolveCachedText(runtime, source, COMMAND_CACHE_TYPE);
+            if (translated !== source) return '(' + translated + ')';
+        }
         if (!this.isUsableText(text)) {
             return text;
         }

@@ -41,7 +41,7 @@ export class Alert {
         this.alertInternal('warn', msg, err, timeout);
     }
 
-    static error(msg, err = null, timeout = 1500) {
+    static error(msg, err = null, timeout = -1) {
         this.alertInternal('error', msg, err, timeout);
     }
 }

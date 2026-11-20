@@ -583,6 +583,14 @@ class AIEngine extends BaseTranslationEngine {
         const ESC_TAG_RE = new RegExp(ESC_TAG_SOURCE, 'g');
 
         const counts = new Map();
+        const exampleKeysByPattern = new Map();
+        let currentKey;
+        const record = (pattern) => {
+            counts.set(pattern, (counts.get(pattern) || 0) + 1);
+            let examples = exampleKeysByPattern.get(pattern);
+            if (!examples) exampleKeysByPattern.set(pattern, (examples = []));
+            if (examples.length < 20 && !examples.includes(currentKey)) examples.push(currentKey);
+        };
 
         const normalizeEscapePattern = (pattern) => {
             const match = /^\\([A-Za-z${}|.!><^][A-Za-z0-9]*)(.*)$/.exec(String(pattern || ''));
@@ -602,7 +610,7 @@ class AIEngine extends BaseTranslationEngine {
             } else {
                 pattern = `<${sym}:…>`;
             }
-            counts.set(pattern, (counts.get(pattern) || 0) + 1);
+            record(pattern);
         };
 
         const recordEsc = (sym, numVal, sqVal, angVal, roundVal, curlyVal) => {
@@ -621,12 +629,13 @@ class AIEngine extends BaseTranslationEngine {
             } else {
                 pattern = `\\${normalizedSym}`;
             }
-            counts.set(pattern, (counts.get(pattern) || 0) + 1);
+            record(pattern);
         };
 
         const keys = cacheKeys instanceof Map ? cacheKeys.keys() : cacheKeys;
         for (const key of keys) {
             if (typeof key !== 'string') continue;
+            currentKey = key;
 
             let text = key;
             try {
@@ -654,7 +663,11 @@ class AIEngine extends BaseTranslationEngine {
         }
 
         return Array.from(counts.entries())
-            .map(([pattern, count]) => ({ pattern, count }))
+            .map(([pattern, count]) => ({
+                pattern,
+                count,
+                exampleKeys: exampleKeysByPattern.get(pattern),
+            }))
             .sort((a, b) => b.count - a.count);
     }
 

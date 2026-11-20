@@ -35,6 +35,14 @@ const DESCRIPTION_CACHE_TYPES = Object.freeze([
     'state_description',
 ]);
 
+function isWritable(object, field) {
+    for (let owner = object; owner; owner = Object.getPrototypeOf(owner)) {
+        const descriptor = Object.getOwnPropertyDescriptor(owner, field);
+        if (descriptor) return 'value' in descriptor ? descriptor.writable : !!descriptor.set;
+    }
+    return Object.isExtensible(object);
+}
+
 export class ItemNameEscapeTranslator extends BasePluginTranslator {
     getPluginName() {
         return 'ItemNameEscape';
@@ -56,20 +64,40 @@ export class ItemNameEscapeTranslator extends BasePluginTranslator {
         const originalConvertName = DataManager.convertName;
         const translator = this;
         DataManager.convertName = function (data) {
+            const target = data;
+            if (
+                data &&
+                ['name', 'description', 'preName', 'preDescription', '_translateOriginal'].some(
+                    (field) => !isWritable(data, field)
+                )
+            ) {
+                // DynamicDatabase owns getter-only fields. Convert on a plain
+                // working copy without replacing its live property descriptors.
+                data = { ...data };
+            }
+            const convert = () => {
+                const result = originalConvertName.call(this, data);
+                if (data && data !== target) {
+                    for (const field of ['name', 'description', '_translateOriginal'])
+                        if (isWritable(target, field)) target[field] = data[field];
+                }
+                return result;
+            };
             if (data) {
                 for (const [field, sourceField] of [
                     ['name', 'preName'],
                     ['description', 'preDescription'],
                 ]) {
                     if (translator.isUsableText(data[sourceField])) {
-                        data._translateOriginal ??= {};
-                        data._translateOriginal[field] = data[sourceField];
+                        data._translateOriginal = {
+                            ...data._translateOriginal,
+                            [field]: data[sourceField],
+                        };
                     }
                 }
             }
             const runtime = translator.getRuntime();
-            if (!data || !translator.isRuntimeTranslationActive(runtime))
-                return originalConvertName.apply(this, arguments);
+            if (!data || !translator.isRuntimeTranslationActive(runtime)) return convert();
             const preName = data.preName;
             const preDescription = data.preDescription;
             try {
@@ -90,7 +118,7 @@ export class ItemNameEscapeTranslator extends BasePluginTranslator {
                     if (data[sourceField] != null) data[sourceField] = translated;
                     else data[field] = translated;
                 }
-                return originalConvertName.apply(this, arguments);
+                return convert();
             } finally {
                 // The native plugin re-evaluates these sources on scene changes.
                 // Keep their control codes available for future variable updates.

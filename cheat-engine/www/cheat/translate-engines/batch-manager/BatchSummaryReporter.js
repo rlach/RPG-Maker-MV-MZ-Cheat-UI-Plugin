@@ -123,9 +123,24 @@ export class BatchSummaryReporter {
         failures,
         errorStats,
         durationMs,
+        dryRun = false,
+        dryRunItems,
+        runtime,
         currentPhaseErrors = 0,
         totalCumulativeErrors = 0,
     }) {
+        if (dryRun) {
+            const keys = new Set((dryRunItems || []).map((item) => item?.cacheKey).filter(Boolean));
+            const count = Array.isArray(dryRunItems)
+                ? [...keys].filter((key) => !runtime?.hasUsableCacheValue(key)).length
+                : Math.max(0, this.toSafeNumber(totalItems, 0));
+            return {
+                title: '[DryRunSummary]',
+                message: `Dry run completed.\nUnique keys awaiting translation: ${count}`,
+                uniquePendingKeys: count,
+                hasErrors: false,
+            };
+        }
         const safeTotal = Math.max(0, this.toSafeNumber(totalItems, 0));
         const safeSuccess = Math.max(0, this.toSafeNumber(successes, 0));
         const safeFailures = Math.max(0, this.toSafeNumber(failures, 0));
@@ -181,6 +196,7 @@ export class BatchSummaryReporter {
             title: '[BatchSummary]',
             message: lines.join('\n'),
             successRate: percent,
+            hasErrors: !dryRun && (safeFailures > 0 || safeSuccess < safeTotal),
         };
     }
 
@@ -190,7 +206,8 @@ export class BatchSummaryReporter {
         }
 
         const fullMessage = `${summary.title}\n${summary.message}`;
-        Alert.success(fullMessage, null, 5000);
+        if (summary.hasErrors) Alert.error(fullMessage, null, -1);
+        else Alert.success(fullMessage, null, 5000);
     }
 
     static logSummary(summary) {

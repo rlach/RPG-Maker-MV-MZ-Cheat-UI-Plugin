@@ -222,6 +222,8 @@ declare interface Window {
     Window_ItemListM?: any;
     Window_TitleCommand?: any;
     Window_StatusBase?: any;
+    Window_StatusData?: any;
+    Window_StatusCategory?: any;
     Window_Gab?: any;
     Window_Prompt?: any;
     JavaHut?: any;

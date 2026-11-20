@@ -1,3 +1,7 @@
+import { TmGoldLevelUpTranslator } from './translators/TmGoldLevelUpTranslator.js';
+import { EncLive2dSaveTranslator } from './translators/EncLive2dSaveTranslator.js';
+import { VisuOptionsCoreTranslator } from './translators/VisuOptionsCoreTranslator.js';
+import { VisuElementStatusCoreTranslator } from './translators/VisuElementStatusCoreTranslator.js';
 import { TaSceneStatusExtendTranslator } from './translators/TaSceneStatusExtendTranslator.js';
 import { CbrEroStatusMzPortTranslator } from './translators/CbrEroStatusMzPortTranslator.js';
 import { HbNotificationTranslator } from './translators/HbNotificationTranslator.js';
@@ -94,6 +98,28 @@ import { InfoWindowTranslator } from './translators/InfoWindowTranslator.js';
 import { DKToolsLocalizationTranslator } from './translators/DKToolsLocalizationTranslator.js';
 import { HendrixLocalizationTranslator } from './translators/HendrixLocalizationTranslator.js';
 import { LanguageTranslationTranslator } from './translators/LanguageTranslationTranslator.js';
+import { MultiLanguageTranslationTranslator } from './translators/MultiLanguageTranslationTranslator.js';
+import { SrdTranslationEngineTranslator } from './translators/SrdTranslationEngineTranslator.js';
+import { MotMnkrEquipUiTranslator } from './translators/MotMnkrEquipUiTranslator.js';
+import { CharacterSelectionTranslator } from './translators/CharacterSelectionTranslator.js';
+import { ItemBookTranslator } from './translators/ItemBookTranslator.js';
+import { MitsugaseUiTranslator } from './translators/MitsugaseUiTranslator.js';
+import { HbCaseUiTranslator } from './translators/HbCaseUiTranslator.js';
+import { VisuCoreInterfaceTranslator } from './translators/VisuCoreInterfaceTranslator.js';
+import { PurefullBattleMenuTranslator } from './translators/PurefullBattleMenuTranslator.js';
+import { HaAdventureUiTranslator } from './translators/HaAdventureUiTranslator.js';
+import { KrdMultilingualTranslator } from './translators/KrdMultilingualTranslator.js';
+import { NoEquipmentTextTranslator } from './translators/NoEquipmentTextTranslator.js';
+import { BattleSystemSelectableTranslator } from './translators/BattleSystemSelectableTranslator.js';
+import { NuunSceneFormationTranslator } from './translators/NuunSceneFormationTranslator.js';
+
+import {
+    ItemSortTranslator,
+    EnemyAnalysisSkillTranslator,
+    ExtraGaugeTextTranslator,
+    TinyGetInfoTranslator,
+} from './translators/AdditionalDisplayUiTranslators.js';
+import { ManoQuestTranslator } from './translators/ManoQuestTranslator.js';
 import { MMChoiceButtonExTranslator } from './translators/MMChoiceButtonExTranslator.js';
 import { MMUltimateTextAnimationTranslator } from './translators/MMUltimateTextAnimationTranslator.js';
 import { EquipRemoveUiTranslator } from './translators/EquipRemoveUiTranslator.js';
@@ -311,6 +337,25 @@ class PluginTranslatorRegistry {
             DKToolsLocalizationTranslator,
             HendrixLocalizationTranslator,
             LanguageTranslationTranslator,
+            MultiLanguageTranslationTranslator,
+            SrdTranslationEngineTranslator,
+            MotMnkrEquipUiTranslator,
+            CharacterSelectionTranslator,
+            ItemBookTranslator,
+            MitsugaseUiTranslator,
+            KrdMultilingualTranslator,
+            HaAdventureUiTranslator,
+            PurefullBattleMenuTranslator,
+            VisuCoreInterfaceTranslator,
+            HbCaseUiTranslator,
+            NoEquipmentTextTranslator,
+            BattleSystemSelectableTranslator,
+            NuunSceneFormationTranslator,
+            ItemSortTranslator,
+            EnemyAnalysisSkillTranslator,
+            ExtraGaugeTextTranslator,
+            TinyGetInfoTranslator,
+            ManoQuestTranslator,
             MMChoiceButtonExTranslator,
             MMUltimateTextAnimationTranslator,
             EquipRemoveUiTranslator,
@@ -400,6 +445,10 @@ class PluginTranslatorRegistry {
             CbrEroStatusMzPortTranslator,
             HbNotificationTranslator,
             TaSceneStatusExtendTranslator,
+            TmGoldLevelUpTranslator,
+            EncLive2dSaveTranslator,
+            VisuOptionsCoreTranslator,
+            VisuElementStatusCoreTranslator,
             ActorTextTranslator,
             RadarChartTranslator,
             EnemyPictureBookTranslator,

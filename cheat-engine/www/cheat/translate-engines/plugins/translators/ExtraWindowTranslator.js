@@ -5,6 +5,7 @@
  */
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { parseStructArraySafely } from './TranslatorHelpers.js';
+import { withVariableDisplayContext } from '../../../js/translation-runtime/VariableDisplayContext.js';
 
 export class ExtraWindowTranslator extends BasePluginTranslator {
     constructor() {
@@ -59,16 +60,17 @@ export class ExtraWindowTranslator extends BasePluginTranslator {
         Window_SceneExtra.prototype.drawAllText = function () {
             const runtime = translator.getRuntime();
             if (!translator.isRuntimeTranslationActive(runtime)) {
-                return original.apply(this, arguments);
+                return withVariableDisplayContext(() => original.apply(this, arguments));
             }
 
             const sourceText = this._data.Text;
             const translated = translator.resolveRuntimeTranslation(sourceText, runtime);
-            if (translated === sourceText) return original.apply(this, arguments);
+            if (translated === sourceText)
+                return withVariableDisplayContext(() => original.apply(this, arguments));
 
             this._data.Text = translated;
             try {
-                return original.apply(this, arguments);
+                return withVariableDisplayContext(() => original.apply(this, arguments));
             } finally {
                 this._data.Text = sourceText;
             }

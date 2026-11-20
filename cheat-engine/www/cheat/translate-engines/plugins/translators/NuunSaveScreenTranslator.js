@@ -89,6 +89,7 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
         this._hookDrawContentsBase(savefileListProto);
         this._hookDrawAnyName(savefileListProto);
         this._hookMapNameValue(savefileListProto);
+        this._hookSavedVariableValue(savefileListProto);
         this._hookFirstDrawTextOfMethod(savefileListProto, 'drawPlaytime');
         this._hookFirstDrawTextOfMethod(savefileListProto, 'drawMapName');
         this._hookFirstDrawTextOfMethod(savefileListProto, 'drawGold');
@@ -97,6 +98,36 @@ export class NuunSaveScreenTranslator extends BasePluginTranslator {
 
         savefileListProto.__CHEAT_NUUN_SAVE_SCREEN_TRANSLATOR_HOOKED__ = true;
         return true;
+    }
+
+    _hookSavedVariableValue(prototype) {
+        const original = prototype.drawOriginal;
+        if (typeof original !== 'function') return;
+        const translator = this;
+        prototype.drawOriginal = function (info, x, y, width, data, index) {
+            const runtime = translator.getRuntime();
+            // Read the value recorded in this save, never the current session's
+            // variable. Restrict translation to a direct safe-variable expression.
+            const match =
+                /^\s*['"]?\s*\$gameVariables\.value\(\s*(\d+)\s*\)\s*(?:;?\s*\/\/[^\n]*|;?\s*['"]?\s*)$/.exec(
+                    data?.DetaEval || ''
+                );
+            let displayInfo = info;
+            if (
+                match &&
+                translator.isRuntimeTranslationActive(runtime) &&
+                runtime.isVariableSafeForTranslation?.(Number(match[1]))
+            ) {
+                const key = `orgParam_${index}`;
+                const translated = translator.resolveRuntimeTranslation(
+                    info?.[key],
+                    runtime,
+                    'variable_value'
+                );
+                displayInfo = { ...info, [key]: translated };
+            }
+            return original.call(this, displayInfo, x, y, width, data, index);
+        };
     }
 
     _hookDrawContentsBase(savefileListProto) {

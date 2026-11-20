@@ -157,6 +157,9 @@ describe('TranslationBatchManager cacheEmptyStrings repeat behavior', () => {
             'Description translated'
         );
 
-        expect(result.failures).toHaveLength(1);
+        expect(result.failures).toHaveLength(0);
+        expect(result.summary.hasErrors).toBe(false);
+        expect(result.summary.successRate).toBe(100);
+        expect(result.summary.message).toContain('Tag count mismatch: 1');
     });
 });

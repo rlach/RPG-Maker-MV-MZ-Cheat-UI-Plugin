@@ -19,7 +19,6 @@ export class LLInfoPopupWIndowTranslator extends SourceTextCatalogTranslator {
     getPluginName() {
         return 'LL_InfoPopupWIndow';
     }
-
     getPluginAliases() {
         return [this.getPluginName(), 'LL_InfoPopupWIndowMV'];
     }
@@ -65,6 +64,9 @@ export class LLInfoPopupWIndowTranslator extends SourceTextCatalogTranslator {
     }
 
     enablePluginTranslation() {
+        this.precomputeCounts().catch((error) =>
+            console.error('[LLInfoPopup] Catalog scan failed', error)
+        );
         if (this.findPluginEntry('LL_InfoPopupWIndowMV')?.status) {
             const prototype = window.Game_Interpreter?.prototype;
             if (typeof prototype?.pluginCommand !== 'function') return false;

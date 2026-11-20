@@ -66,8 +66,23 @@ it('reports CE when a registered C command shares its prefix', () => {
     ]);
     const source = String.raw`\CE[511]はぁあー！`;
     expect(engine.tagManager.preprocessTags(source).preprocessedText).toBe(source);
-    expect(engine.scanForUnknownTags([source])).toContainEqual({
+    expect(engine.scanForUnknownTags([source])).toContainEqual(expect.objectContaining({
         pattern: String.raw`\CE[N]`,
         count: 1,
-    });
+    }));
+});
+it('keeps incomplete name escapes visible and supplies only the source keys that produced the detection', async () => {
+    const { findTagExamples } = await import('../../../../../../cheat-engine/www/cheat/panels/translate-tag-manager/UnknownTagsModal.js');
+    const engine = createEngine();
+    engine.setCustomTags([{ description: 'Name box', type: 'withCustomParameter', tagSymbol: 'N', bracket: '<', maskValue: false }]);
+    const malformed = ['\\N[1', '\\N<\\N[2]「Text」', '\\N[1>「Yes」'];
+    const valid = ['\\N[1]', '\\N<\\N[2]>「Valid」', 'First\nSecond'];
+    const cache = new Map([...malformed, ...valid].map(text => ['message:ja-en-'+text, '']));
+    const row = engine.scanForUnknownTags(cache).find(row => row.pattern === '\\N');
+    expect(row.count).toBe(3);
+    expect(row.exampleKeys).toHaveLength(3);
+    const examples = findTagExamples(cache, row.pattern, row.exampleKeys);
+    expect(examples).toHaveLength(3);
+    expect(examples.map(parts => parts.map(part => part.text).join(''))).toEqual(malformed);
+    for (const parts of examples) expect(parts.filter(part => part.highlighted).map(part => part.text)).toEqual(['\\N']);
 });

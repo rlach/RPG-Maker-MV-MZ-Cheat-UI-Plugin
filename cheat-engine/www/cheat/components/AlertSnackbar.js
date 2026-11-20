@@ -69,7 +69,7 @@ export default {
             this.show({
                 text: msg,
                 color: color,
-                timeout: timeout,
+                timeout: level === 'error' ? -1 : timeout,
             });
         };
         Alert.alertInternal = this.alertHandler;

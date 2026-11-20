@@ -37,7 +37,7 @@ afterEach(() => {
 it('previews only real active-pair changes and replaces group 1 without touching dialogue or keys', () => {
     const before = new Map(runtime.translationCache);
     const plan = previewNamePatternRepair(runtime, pattern);
-    expect(plan.changes).toEqual([
+    expect(plan.changes.map(({ edits, ...change }) => change)).toEqual([
         {
             cacheKey: 'message:ja-en-one',
             before: '\\N<ユージン>Ugh...\\!Nggghhh...! ユージン',
@@ -133,4 +133,24 @@ it('supports NW.js without match indices while preserving capture offsets and ba
             change.after.startsWith('Eugene:')
         )
     ).toBe(true);
+});
+it('rerandomizes the highlighted name repair example without changing the plan or writing cache', async () => {
+    runtime.translationCache.set('message:ja-en-more', '\\N<ユージン>Another line');
+    const panel = (await import('../cheat-engine/www/cheat/panels/TranslateNamesPanel.js')).default;
+    const context = { namePattern: pattern, refresh: vi.fn() };
+    panel.methods.previewPatternNameRepair.call(context);
+    expect(context.nameRepairPreview.count).toBe(2);
+    const plan = context._namePatternRepairPlan;
+    const before = new Map(runtime.translationCache);
+    const initial = context.nameRepairPreview.before;
+    panel.methods.recycleNameRepairExample.call(context);
+    expect(context.nameRepairPreview.before).not.toBe(initial);
+    expect(context.nameRepairPreview.beforeParts.map(part => part.text).join('')).toBe(context.nameRepairPreview.before);
+    expect(context.nameRepairPreview.afterParts.map(part => part.text).join('')).toBe(context.nameRepairPreview.after);
+    expect(context.nameRepairPreview.beforeParts.filter(part => part.changed).map(part => part.text)).toEqual(['ユージン']);
+    expect(context._namePatternRepairPlan).toBe(plan);
+    expect(runtime.translationCache).toEqual(before);
+    expect(runtime.persistCache).not.toHaveBeenCalled();
+    panel.methods.recycleNameRepairExample.call(context);
+    expect(context.nameRepairPreview.before).toBe(initial);
 });

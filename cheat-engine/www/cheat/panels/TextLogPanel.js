@@ -74,7 +74,16 @@ export default {
             const minutes = String(date.getMinutes()).padStart(2, '0');
             const seconds = String(date.getSeconds()).padStart(2, '0');
             const speaker = entry.speakerName ? ` ${entry.speakerName}: ` : ' ';
-            return `[${hours}:${minutes}:${seconds}]${speaker}${entry.text}`;
+            const choices = (entry.choices || []).map(
+                (text, index) =>
+                    `${entry.selectedChoice === index ? '▶ ' : ''}[${index + 1}] ${text}`
+            );
+            const cancelled =
+                Number.isInteger(entry.selectedChoice) &&
+                (entry.selectedChoice < 0 || entry.selectedChoice >= choices.length)
+                    ? ['[Cancelled]']
+                    : [];
+            return `[${hours}:${minutes}:${seconds}]${speaker}${[entry.text, ...choices, ...cancelled].filter(Boolean).join('\n')}`;
         },
 
         scrollToBottom() {

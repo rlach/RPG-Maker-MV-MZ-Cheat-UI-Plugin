@@ -40,6 +40,29 @@ export class MessageAlignCenterTranslator extends BasePluginTranslator {
 
     enablePluginTranslation() {
         this.registerPluginCustomTags(PLUGIN_TAGS);
+        const prototype = window.Window_Base?.prototype;
+        if (typeof prototype?.convertEscapeCharacters === 'function') {
+            const original = prototype.convertEscapeCharacters;
+            const parameters = window.PluginManager?.parameters?.(this.getPluginName()) || {};
+            const symbols = [
+                parameters.escapeCharacterCenter || 'AC',
+                parameters.escapeCharacterRight || 'AR',
+            ];
+            const escaped = symbols.map((symbol) => symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+            // Name/variable expansion can put Latin letters immediately after AC/AR.
+            // An explicit zero shift terminates the native alphabetic escape-code scan.
+            const bareAlignment = new RegExp(
+                `((?:\\\\|\x1b)(?:${escaped.join('|')}))(?![A-Za-z0-9]|\\[)`,
+                'gi'
+            );
+            prototype.convertEscapeCharacters = function (text, ...args) {
+                return original.call(
+                    this,
+                    typeof text === 'string' ? text.replace(bareAlignment, '$1[0]') : text,
+                    ...args
+                );
+            };
+        }
         return true;
     }
 }

@@ -1,6 +1,7 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
 import { TAG_BRACKET, TAG_STYLE, TAG_TYPE } from '../../ai-engine/constants.js';
+import { withVariableDisplayContext } from '../../../js/translation-runtime/VariableDisplayContext.js';
 
 /**
  * DTextPicture translator.
@@ -198,7 +199,7 @@ export class DTextPictureTranslator extends BasePluginTranslator {
                     }
                 );
             try {
-                return original.apply(this, args);
+                return withVariableDisplayContext(() => original.apply(this, args));
             } finally {
                 info.value = storedValue;
             }

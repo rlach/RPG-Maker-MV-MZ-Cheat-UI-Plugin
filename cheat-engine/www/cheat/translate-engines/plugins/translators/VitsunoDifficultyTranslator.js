@@ -5,6 +5,9 @@ export class VitsunoDifficultyTranslator extends SourceTextCatalogTranslator {
     getPluginName() {
         return 'Vitsuno_Difficulty';
     }
+    getPluginAliases() {
+        return ['Vitsuno_Difficulty', 'MNKR_Vitsuno_DifficultyMZ'];
+    }
     getCacheType() {
         return 'plugin_vitsuno_difficulty';
     }

@@ -81,7 +81,7 @@ export default {
                     </template>
                 </cheat-tooltip>
                 <cheat-tooltip location="bottom">
-                    <span>Mark as safe for translate</span>
+                    <span>Translate this variable in text displays</span>
                     <template v-slot:activator="{ props: activatorProps }">
                         <v-btn variant="text"
                             icon size="x-small"

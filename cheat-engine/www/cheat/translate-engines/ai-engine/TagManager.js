@@ -916,12 +916,21 @@ export class TagManager {
 
         // Inspect before the advisory checks strip surrounding game tags.
         // A broken transport token can be nested inside a valid name command.
-        if (/⟪|\bTAG:|⟫/i.test(result)) {
+        const transportFragments = [...result.matchAll(/⟪[^\r\n]*|\bTAG:[^\s]*|⟫/gi)].filter(
+            (match) =>
+                !(
+                    /^tag:/i.test(match[0]) &&
+                    result[match.index - 1] === '<' &&
+                    result[match.index - 2] !== '<' &&
+                    /^tag:[^<>]*>/i.test(result.slice(match.index))
+                )
+        );
+        if (transportFragments.length) {
             return {
                 text: result,
                 valid: false,
                 errorReason: 'Unresolved encoded tags left in output',
-                unresolvedTags: [...result.matchAll(/⟪[^\r\n]*|\bTAG:[^\s]*|⟫/gi)].map((match) => ({
+                unresolvedTags: transportFragments.map((match) => ({
                     tag: match[0],
                     index: match.index,
                     context: result,
