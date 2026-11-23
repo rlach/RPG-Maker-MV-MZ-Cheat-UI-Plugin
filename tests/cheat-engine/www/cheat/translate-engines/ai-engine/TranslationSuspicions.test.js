@@ -5,7 +5,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TagManager } from '../../../../../../cheat-engine/www/cheat/translate-engines/ai-engine/TagManager.js';
 import AIEngine from '../../../../../../cheat-engine/www/cheat/translate-engines/ai-engine/AIEngine.js';
-import { detectTranslationSuspicions } from '../../../../../../cheat-engine/www/cheat/translate-engines/ai-engine/TranslationSuspicions.js';
+import {
+    detectTranslationSuspicions,
+    isCutOffTranslation,
+} from '../../../../../../cheat-engine/www/cheat/translate-engines/ai-engine/TranslationSuspicions.js';
 import { TranslationSuspicionStore } from '../../../../../../cheat-engine/www/cheat/js/TranslationSuspicionStore.js';
 import { ConfirmDialog } from '../../../../../../cheat-engine/www/cheat/js/DialogHelper.js';
 
@@ -98,13 +101,39 @@ it('excludes real formatting and name tags from bracket detection', () => {
 });
 
 it.each(['終わり。', '終わり！', '終わり？', '終わり……', '「終わり。」'])(
-    'flags a missing terminal punctuation mark for %s',
+    'treats a missing terminal punctuation mark for %s as a hard cut-off rejection instead of a suspicion',
     (source) => {
-        expect(
-            detectTranslationSuspicions(source, 'The end', manager()).map((r) => r.id)
-        ).toContain('cut-off-text');
+        expect(isCutOffTranslation(source, 'The end', manager())).toBe(true);
+        expect(detectTranslationSuspicions(source, 'The end', manager()).map((r) => r.id)).not.toContain(
+            'cut-off-text'
+        );
     }
 );
+
+it('rejects cut-off translations in AIEngine.batchTranslate instead of marking them suspicious', async () => {
+    vi.stubGlobal('window', globalThis);
+    const engine = new AIEngine({
+        sourceLang: 'ja',
+        targetLang: 'en',
+        translationCache: new Map(),
+        cleanTranslatedText: (text) => text,
+        wrapText: (text) => text,
+    });
+    engine.selectedModel = 'test-model';
+    engine.askAiIfTextTranslated = false;
+    vi.spyOn(engine.tagManager, 'buildNameHints').mockReturnValue('');
+    vi.spyOn(engine, 'requestChatCompletion').mockImplementation(async (payload) => {
+        const content = payload.messages.findLast((message) => message.role === 'user').content;
+        const keys = Object.keys(JSON.parse(content.slice(content.indexOf('{'))));
+        return { text: JSON.stringify({ [keys[0]]: 'The end' }) };
+    });
+    const result = await engine.batchTranslate([
+        { type: 'message', id: '0', value: '終わり。', cacheKey: 'message:ja-en-終わり。' },
+    ]);
+    expect(result.successes).toEqual([]);
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0].rejectReason).toBe('Cut off text');
+});
 
 it('counts Japanese and English sentence endings and ignores decimal separators', () => {
     expect(

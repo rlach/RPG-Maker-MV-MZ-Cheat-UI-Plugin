@@ -537,9 +537,19 @@ export default {
                 if (existingProfile && typeof existingProfile === 'object') {
                     Object.assign(mergedProfile, existingProfile);
                 }
-                Object.assign(mergedProfile, patch);
+                for (const [key, val] of Object.entries(patch)) {
+                    if (val === undefined || val === null || val === '') {
+                        delete mergedProfile[key];
+                    } else {
+                        mergedProfile[key] = val;
+                    }
+                }
 
-                runtime.nameProfilesByLangPair[pairKey][originalName] = mergedProfile;
+                if (Object.keys(mergedProfile).length === 0) {
+                    delete runtime.nameProfilesByLangPair[pairKey][originalName];
+                } else {
+                    runtime.nameProfilesByLangPair[pairKey][originalName] = mergedProfile;
+                }
             }
 
             runtime.saveSettings();
@@ -964,12 +974,10 @@ export default {
             entry.translation = value || '';
 
             const runtime = ensureTranslationRuntime();
-            runtime.setCacheValue(entry.cacheKey, entry.translation);
+            runtime.setCacheValue(entry.cacheKey, entry.translation, { allowEmpty: true });
 
-            const normalizedTranslation = entry.translation?.trim();
-            if (normalizedTranslation) {
-                this.saveNameProfile(entry.originalName, { translation: normalizedTranslation });
-            }
+            const normalizedTranslation = entry.translation?.trim() || '';
+            this.saveNameProfile(entry.originalName, { translation: normalizedTranslation });
 
             // Apply only to already spawned in-game actor instances.
             // Never mutate DB actor names ($dataActors[*].name), because original name is immutable key.

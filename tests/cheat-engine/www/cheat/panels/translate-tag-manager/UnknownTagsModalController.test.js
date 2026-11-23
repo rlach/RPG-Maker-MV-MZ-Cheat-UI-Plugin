@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import AIEngine from '../../../../../../cheat-engine/www/cheat/translate-engines/ai-engine/AIEngine.js';
 import UnknownTagsModal, {
     findTagExamples,
     filterUnknownTagsListByStyle,
@@ -100,4 +101,56 @@ it('closes the list before opening examples and restores it after closing', () =
     expect(context.exampleOpen).toBe(false);
     ticks.shift()();
     expect(events.at(-1)).toEqual(['update:visible', true]);
+});
+
+it('scans unknown tags asynchronously in chunks with progress and cancellation', async () => {
+    const engine = new AIEngine({ sourceLang: 'ja', targetLang: 'en' });
+    const cache = new Map();
+    for (let i = 0; i < 12; i++) {
+        cache.set(`message:ja-en-Line ${i} \\ZZ[${i}]`, '');
+    }
+
+    const progressUpdates = [];
+    const asyncResults = await engine.scanForUnknownTagsAsync(cache, {
+        chunkBudgetMs: 0,
+        minChunkItems: 3,
+        onProgress: (info) => progressUpdates.push(info),
+    });
+
+    expect(asyncResults).toEqual(engine.scanForUnknownTags(cache));
+    expect(progressUpdates.length).toBeGreaterThan(1);
+    expect(progressUpdates.at(-1)).toEqual({ processed: 12, total: 12 });
+
+    const cancelled = await engine.scanForUnknownTagsAsync(cache, {
+        chunkBudgetMs: 0,
+        minChunkItems: 2,
+        isCancelled: () => true,
+    });
+    expect(cancelled).toBeNull();
+});
+
+it('sets isScanning spinner state while UnknownTagsModal.scanCache runs asynchronously', async () => {
+    let resolveScan;
+    const scanPromise = new Promise((resolve) => {
+        resolveScan = resolve;
+    });
+    const scanForUnknownTagsAsync = vi.fn(() => scanPromise);
+    const context = {
+        ...UnknownTagsModal.data(),
+        runtime: {
+            translationCache: new Map([['message:ja-en-Test \\ZZ[1]', '']]),
+            engine: { scanForUnknownTagsAsync },
+        },
+    };
+
+    const run = UnknownTagsModal.methods.scanCache.call(context);
+    expect(context.isScanning).toBe(true);
+    expect(context.scanTotalCount).toBe(1);
+
+    resolveScan([{ pattern: String.raw`\ZZ[N]`, count: 1, exampleKeys: ['message:ja-en-Test \\ZZ[1]'] }]);
+    await run;
+
+    expect(scanForUnknownTagsAsync).toHaveBeenCalledOnce();
+    expect(context.isScanning).toBe(false);
+    expect(context.unknownTagsList).toHaveLength(1);
 });

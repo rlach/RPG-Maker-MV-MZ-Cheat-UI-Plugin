@@ -1,5 +1,5 @@
 import { getTagConsistencyMode } from './constants.js';
-import { detectTranslationSuspicions } from './TranslationSuspicions.js';
+import { detectTranslationSuspicions, isCutOffTranslation } from './TranslationSuspicions.js';
 import { TagSyntax } from './TagSyntax.js';
 import { LlmConnectionError, LLM_CONNECTION_ERROR } from './LlmConnectionError.js';
 import { buildOfficialNameMap } from '../../js/NamePatternCacheRepair.js';
@@ -570,7 +570,7 @@ class AIEngine extends BaseTranslationEngine {
      * @param {Map|Iterable} cacheKeys
      * @returns {{ pattern: string, count: number }[]}
      */
-    scanForUnknownTags(cacheKeys) {
+    _createUnknownTagScanner() {
         // Regex to detect remaining tag-like sequences after preprocessing:
         // 1. XML-style:    <Symbol>, <Symbol:N>, <Symbol:value>
         // 2. Escape-style: \Symbol, \Symbol[N], \Symbol[val], \Symbol<val>, \Symbol(val), \Symbol{val}
@@ -632,9 +632,8 @@ class AIEngine extends BaseTranslationEngine {
             record(pattern);
         };
 
-        const keys = cacheKeys instanceof Map ? cacheKeys.keys() : cacheKeys;
-        for (const key of keys) {
-            if (typeof key !== 'string') continue;
+        const processKey = (key) => {
+            if (typeof key !== 'string') return;
             currentKey = key;
 
             let text = key;
@@ -654,21 +653,82 @@ class AIEngine extends BaseTranslationEngine {
             while ((m = ESC_TAG_RE.exec(text)) !== null) {
                 recordEsc(m[1], m[2], m[3], m[4], m[5], m[6]);
             }
+        };
+
+        const finalize = () => {
+            // Filter out patterns already covered by registered tags
+            const registeredPatterns = this.tagManager.getRegisteredDetectionPatterns();
+            for (const pattern of registeredPatterns) {
+                counts.delete(normalizeEscapePattern(pattern));
+            }
+
+            return Array.from(counts.entries())
+                .map(([pattern, count]) => ({
+                    pattern,
+                    count,
+                    exampleKeys: exampleKeysByPattern.get(pattern),
+                }))
+                .sort((a, b) => b.count - a.count);
+        };
+
+        return { processKey, finalize };
+    }
+
+    scanForUnknownTags(cacheKeys) {
+        const scanner = this._createUnknownTagScanner();
+        const keys = cacheKeys instanceof Map ? cacheKeys.keys() : cacheKeys;
+        for (const key of keys) {
+            scanner.processKey(key);
+        }
+        return scanner.finalize();
+    }
+
+    async scanForUnknownTagsAsync(cacheKeys, options = {}) {
+        const {
+            chunkBudgetMs = 12,
+            minChunkItems = 100,
+            onProgress = null,
+            isCancelled = null,
+        } = options || {};
+        const scanner = this._createUnknownTagScanner();
+        const keys = cacheKeys instanceof Map ? cacheKeys.keys() : cacheKeys || [];
+        const total =
+            cacheKeys instanceof Map
+                ? cacheKeys.size
+                : Array.isArray(cacheKeys)
+                  ? cacheKeys.length
+                  : null;
+        let processed = 0;
+        let sliceProcessed = 0;
+        let sliceStart = Date.now();
+
+        for (const key of keys) {
+            if (typeof isCancelled === 'function' && isCancelled()) {
+                return null;
+            }
+
+            scanner.processKey(key);
+            processed += 1;
+            sliceProcessed += 1;
+
+            if (sliceProcessed >= minChunkItems && Date.now() - sliceStart >= chunkBudgetMs) {
+                if (typeof onProgress === 'function') {
+                    onProgress({ processed, total });
+                }
+                await new Promise((resolve) => setTimeout(resolve, 0));
+                if (typeof isCancelled === 'function' && isCancelled()) {
+                    return null;
+                }
+                sliceProcessed = 0;
+                sliceStart = Date.now();
+            }
         }
 
-        // Filter out patterns already covered by registered tags
-        const registeredPatterns = this.tagManager.getRegisteredDetectionPatterns();
-        for (const pattern of registeredPatterns) {
-            counts.delete(normalizeEscapePattern(pattern));
+        if (typeof onProgress === 'function') {
+            onProgress({ processed, total: total ?? processed });
         }
 
-        return Array.from(counts.entries())
-            .map(([pattern, count]) => ({
-                pattern,
-                count,
-                exampleKeys: exampleKeysByPattern.get(pattern),
-            }))
-            .sort((a, b) => b.count - a.count);
+        return scanner.finalize();
     }
 
     getId() {
@@ -1411,6 +1471,17 @@ class AIEngine extends BaseTranslationEngine {
                     postprocessResult.text
                 );
 
+                if (isCutOffTranslation(itemD.value, finalTranslated, this.tagManager)) {
+                    failures.push({
+                        ...itemD,
+                        translatedValue: rawSlice,
+                        postprocessedValue: finalTranslated,
+                        rejectReason: 'Cut off text',
+                        cancelReason: shouldPreserveCancelReason ? cancelReason : null,
+                    });
+                    continue;
+                }
+
                 successes.push({
                     type: itemD.type,
                     id: itemD.id,
@@ -1418,6 +1489,7 @@ class AIEngine extends BaseTranslationEngine {
                     translated: finalTranslated,
                     suspicions: [
                         ...(postprocessResult.suspicions || []),
+                        ...(newlineValidation.suspicions || []),
                         ...detectTranslationSuspicions(
                             itemD.value,
                             finalTranslated,
@@ -1844,8 +1916,14 @@ class AIEngine extends BaseTranslationEngine {
             const maxRows = this.getDescriptionBoxMaxRows();
             if (actualNewlineCount >= maxRows) {
                 return {
-                    valid: false,
-                    errorReason: 'Newlines outside box',
+                    valid: true,
+                    suspicions: [
+                        {
+                            id: 'newlines-outside-box',
+                            label: 'Newlines outside box',
+                            message: `The description has ${actualNewlineCount + 1} lines (${actualNewlineCount} newlines), which exceeds the box height limit of ${maxRows} lines.`,
+                        },
+                    ],
                 };
             }
             return { valid: true };

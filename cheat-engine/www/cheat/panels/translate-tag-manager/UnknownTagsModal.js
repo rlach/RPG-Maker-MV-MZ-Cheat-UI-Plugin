@@ -167,6 +167,8 @@ export default {
             unknownTagStyleFilter: 'both',
             unknownTagsCacheStringCount: 0,
             isScanning: false,
+            scanProcessedCount: 0,
+            scanTotalCount: 0,
             exampleOpen: false,
             examplePattern: '',
             examples: [],
@@ -213,6 +215,8 @@ export default {
     watch: {
         visible(value) {
             if (!value) {
+                this._activeScanToken = (this._activeScanToken || 0) + 1;
+                this.isScanning = false;
                 return;
             }
 
@@ -231,34 +235,79 @@ export default {
         },
     },
 
+    beforeUnmount() {
+        this._activeScanToken = (this._activeScanToken || 0) + 1;
+        this.isScanning = false;
+    },
+
     methods: {
         close() {
+            this._activeScanToken = (this._activeScanToken || 0) + 1;
+            this.isScanning = false;
             this.$emit('update:visible', false);
             this.$emit('closed');
         },
 
-        scanCache() {
-            const engine = this.runtime?.engine;
-            if (!engine || typeof engine.scanForUnknownTags !== 'function') {
+        async scanCache() {
+            if (this.isScanning) {
                 return;
             }
 
+            const engine = this.runtime?.engine;
+            if (
+                !engine ||
+                (typeof engine.scanForUnknownTagsAsync !== 'function' &&
+                    typeof engine.scanForUnknownTags !== 'function')
+            ) {
+                return;
+            }
+
+            const scanToken = (this._activeScanToken || 0) + 1;
+            this._activeScanToken = scanToken;
+            const isCancelled = () => this._activeScanToken !== scanToken;
+
             this.isScanning = true;
             this.unknownTagsList = [];
+            this.scanProcessedCount = 0;
 
-            setTimeout(() => {
-                try {
-                    const cache = this.runtime.translationCache || new Map();
-                    this.unknownTagsCacheStringCount = getUnknownTagsCacheStringCount(cache);
-                    const results = engine.scanForUnknownTags(cache);
-                    this.unknownTagsList = results;
-                    unknownTagsMemory = cloneUnknownTagsList(results);
-                } catch (err) {
-                    console.warn('[TagManager] scanForUnknownTags failed:', err);
-                } finally {
+            const cache = this.runtime.translationCache || new Map();
+            this.unknownTagsCacheStringCount = getUnknownTagsCacheStringCount(cache);
+            this.scanTotalCount = this.unknownTagsCacheStringCount;
+
+            // Yield once so Vue renders the spinner before scanning begins.
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            if (isCancelled()) {
+                return;
+            }
+
+            try {
+                const results =
+                    typeof engine.scanForUnknownTagsAsync === 'function'
+                        ? await engine.scanForUnknownTagsAsync(cache, {
+                              isCancelled,
+                              onProgress: ({ processed, total }) => {
+                                  if (isCancelled()) return;
+                                  this.scanProcessedCount = processed;
+                                  if (Number.isFinite(total)) {
+                                      this.scanTotalCount = total;
+                                  }
+                              },
+                          })
+                        : engine.scanForUnknownTags(cache);
+
+                if (isCancelled() || results === null) {
+                    return;
+                }
+
+                this.unknownTagsList = results;
+                unknownTagsMemory = cloneUnknownTagsList(results);
+            } catch (err) {
+                console.warn('[TagManager] scanForUnknownTags failed:', err);
+            } finally {
+                if (!isCancelled()) {
                     this.isScanning = false;
                 }
-            }, 0);
+            }
         },
 
         showExamples(item) {
@@ -310,6 +359,7 @@ export default {
             <v-btn size="small" variant="outlined"
                 color="primary"
                 :loading="isScanning"
+                :disabled="isScanning"
                 @click="scanCache">
                 <v-icon size="small" left>mdi-refresh</v-icon>
                 Scan cache
@@ -325,6 +375,22 @@ export default {
                 <v-btn size="small" value="xml">XML style ({{ xmlStyleCount }})</v-btn>
                 <v-btn size="small" value="both">Both ({{ totalUnknownTagsCount }})</v-btn>
             </v-btn-toggle>
+
+            <div v-if="isScanning" class="d-flex align-center py-4 text-caption text-grey-lighten-1">
+                <v-progress-circular
+                    indeterminate
+                    size="20"
+                    width="2"
+                    color="primary"
+                    class="mr-3">
+                </v-progress-circular>
+                <span>
+                    Scanning cache for unknown tags...
+                    <template v-if="scanTotalCount > 0">
+                        ({{ scanProcessedCount }} / {{ scanTotalCount }})
+                    </template>
+                </span>
+            </div>
 
             <div v-if="filteredUnknownTagsList.length === 0 && !isScanning" class="text-caption text-grey-lighten-1">
                 {{ emptyMessage }}

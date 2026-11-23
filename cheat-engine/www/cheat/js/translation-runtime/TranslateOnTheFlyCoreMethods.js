@@ -443,8 +443,9 @@ export const translateOnTheFlyCoreMethods = {
         const hasExistingTranslatedValue = this.isTranslatedCacheValue(currentValue);
         const incomingIsPlaceholder = normalizedValue === '';
 
-        // Never downgrade an existing translated command value with a harvested placeholder.
-        if (!(incomingIsPlaceholder && hasExistingTranslatedValue)) {
+        // Never downgrade an existing translated command value with a harvested placeholder
+        // unless the caller explicitly allows clearing the entry (e.g. user edit in UI).
+        if (options.allowEmpty || !(incomingIsPlaceholder && hasExistingTranslatedValue)) {
             this.translationCache.set(resolvedKey, normalizedValue);
             changedKeys.add(resolvedKey);
         }
@@ -475,7 +476,9 @@ export const translateOnTheFlyCoreMethods = {
             }
         }
 
-        this.notifyCacheRuntime('cache-set', resolvedKey);
+        if (options.notify !== false) {
+            this.notifyCacheRuntime('cache-set', resolvedKey);
+        }
     },
 
     getCacheFileSystem() {

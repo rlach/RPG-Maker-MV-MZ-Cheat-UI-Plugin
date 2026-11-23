@@ -91,6 +91,10 @@ export default class BaseTranslationEngine {
         return [];
     }
 
+    async scanForUnknownTagsAsync(cacheKeys, _options = {}) {
+        return this.scanForUnknownTags(cacheKeys);
+    }
+
     // Helper methods available to all engines
     getCacheKey(text, type) {
         return this.runtime.getCacheKey(text, type);

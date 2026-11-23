@@ -263,6 +263,7 @@ export class TranslationBatchManager {
 
     applyBatchTranslationResults(successes, failures, options = {}) {
         const persist = options.persist === undefined ? true : !!options.persist;
+        const notify = options.notify === undefined ? true : !!options.notify;
         const changedKeys = [];
 
         for (const success of successes || []) {
@@ -273,6 +274,7 @@ export class TranslationBatchManager {
             this.runtime.setCacheValue(success.cacheKey, success.translated, {
                 suspicions: success.suspicions || [],
                 persist: false,
+                notify,
             });
             changedKeys.push(success.cacheKey);
         }
@@ -295,7 +297,11 @@ export class TranslationBatchManager {
                 typeof failure.value === 'string' &&
                 this.runtime.translationCache.get(failure.cacheKey) === failure.value;
             if (!hasUsable || harvestedIdentity) {
-                this.runtime.setCacheValue(failure.cacheKey, '', { persist: false });
+                this.runtime.setCacheValue(failure.cacheKey, '', {
+                    persist: false,
+                    notify,
+                    allowEmpty: harvestedIdentity,
+                });
                 changedKeys.push(failure.cacheKey);
             }
         }
@@ -419,6 +425,16 @@ export class TranslationBatchManager {
         const startedAt = Date.now();
         const aggregatedSuccesses = [];
         const aggregatedFailures = [];
+        const dryRunChangedKeys = new Set();
+        const YIELD_BUDGET_MS = 16;
+        let lastYieldAt = Date.now();
+        const yieldToEventLoop = () => new Promise((resolve) => setTimeout(resolve, 0));
+        const maybeYieldToEventLoop = async () => {
+            if (Date.now() - lastYieldAt >= YIELD_BUDGET_MS) {
+                await yieldToEventLoop();
+                lastYieldAt = Date.now();
+            }
+        };
         const aggregatedErrorStats = BatchSummaryReporter.createErrorStatsAccumulator();
         const mergeStats = (stats) => {
             BatchSummaryReporter.mergeErrorStats(aggregatedErrorStats, stats);
@@ -445,7 +461,7 @@ export class TranslationBatchManager {
             estimate.setItems(entry, items);
             syncEstimate();
         };
-        const countQueueRequestedChars = (entries) => {
+        const countQueueRequestedChars = async (entries) => {
             for (const entry of entries || []) {
                 if (!entry) {
                     continue;
@@ -469,6 +485,7 @@ export class TranslationBatchManager {
                         ? strategy.toTranslationBatchItems(pendingItems || [])
                         : pendingItems || [];
                 estimate.setItems(entry, batchItems);
+                await maybeYieldToEventLoop();
             }
 
             syncEstimate();
@@ -676,9 +693,14 @@ export class TranslationBatchManager {
 
                 const changedKeys = this.applyBatchTranslationResults(successes, failures, {
                     persist: false,
+                    notify: !dryRun,
                 });
 
-                if (!dryRun && changedKeys.length > 0) {
+                if (dryRun) {
+                    for (const key of changedKeys) {
+                        dryRunChangedKeys.add(key);
+                    }
+                } else if (changedKeys.length > 0) {
                     this.runtime.persistCache(changedKeys);
                 }
 
@@ -770,6 +792,10 @@ export class TranslationBatchManager {
                 this.progressTracker.updateStep(translationPhaseLabel, processed, safeItems.length);
                 this.progressTracker.updateCurrentStepErrors(phaseFailures, processed);
                 this.progressTracker.addTotalErrors(failures.length);
+
+                if (dryRun) {
+                    await maybeYieldToEventLoop();
+                }
             }
 
             const summary = BatchSummaryReporter.buildSummary({
@@ -827,7 +853,7 @@ export class TranslationBatchManager {
         if (this.runtime) {
             this.runtime.startQueueCompletionScope(
                 Array.from(queueScopeCacheTypes),
-                countQueueRequestedChars(queueEntries),
+                await countQueueRequestedChars(queueEntries),
                 this.progressChannel
             );
             scopeStarted = true;
@@ -867,6 +893,23 @@ export class TranslationBatchManager {
                         runtime: this.runtime,
                         executionOptions: entry.executionOptions || {},
                     });
+                    if (
+                        dryRun &&
+                        ((translated?.successes && translated.successes.length > 0) ||
+                            (translated?.failures && translated.failures.length > 0))
+                    ) {
+                        const changedKeys = this.applyBatchTranslationResults(
+                            translated.successes || [],
+                            translated.failures || [],
+                            {
+                                persist: false,
+                                notify: false,
+                            }
+                        );
+                        for (const key of changedKeys) {
+                            dryRunChangedKeys.add(key);
+                        }
+                    }
                 } else {
                     const strategy =
                         typeof entry.createStrategy === 'function'
@@ -936,6 +979,10 @@ export class TranslationBatchManager {
                 estimate.removeEntry(entry);
                 syncEstimate();
                 safeQueueEntries.shift();
+
+                if (dryRun) {
+                    await maybeYieldToEventLoop();
+                }
             }
         } finally {
             this.progressTracker.endQueue();
@@ -944,17 +991,10 @@ export class TranslationBatchManager {
             }
         }
 
-        if (dryRun && (aggregatedSuccesses.length > 0 || aggregatedFailures.length > 0)) {
-            const changedKeys = this.applyBatchTranslationResults(
-                aggregatedSuccesses,
-                aggregatedFailures,
-                {
-                    persist: false,
-                }
-            );
-            if (changedKeys.length > 0) {
-                this.runtime.persistCache(changedKeys);
-            }
+        if (dryRun && dryRunChangedKeys.size > 0) {
+            await yieldToEventLoop();
+            this.runtime.persistCache(Array.from(dryRunChangedKeys));
+            this.runtime.notifyCacheRuntime?.('cache-set');
         }
 
         // Earlier failed attempts may have succeeded in a later cleanup phase.
@@ -994,15 +1034,6 @@ export class TranslationBatchManager {
             currentPhaseErrors: 0,
             totalCumulativeErrors: aggregatedFailures.length,
         });
-
-        if (dryRun && aggregatedFailures.length > 0) {
-            const changedKeys = this.applyBatchTranslationResults([], aggregatedFailures, {
-                persist: false,
-            });
-            if (changedKeys.length > 0) {
-                this.runtime.persistCache(changedKeys);
-            }
-        }
 
         const showSummary = options.showSummary !== false;
         if (showSummary && !connectionFailed) {

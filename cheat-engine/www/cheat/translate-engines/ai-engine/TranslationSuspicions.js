@@ -1,14 +1,27 @@
+function stripTranslationTags(value, tagManager) {
+    let text = String(value || '');
+    for (const entry of tagManager?.tagEntries || []) {
+        text = text.replace(new RegExp(entry.prePattern.source, 'gi'), '');
+    }
+    return text.replace(/\\[{}]/g, '').replace(/<br\s*\/?\s*>/gi, '');
+}
+
+const withoutClosingQuotes = (text) => text.trim().replace(/[\s"'”’」』）)\]】»]+$/g, '');
+
+export function isCutOffTranslation(original, translated, tagManager) {
+    const source = stripTranslationTags(original, tagManager);
+    const output = stripTranslationTags(translated, tagManager);
+    const ending = /[.!?。！？…⋯]$/u;
+    return (
+        ending.test(withoutClosingQuotes(source)) &&
+        /[\p{L}\p{N}]$/u.test(withoutClosingQuotes(output))
+    );
+}
+
 /** Advisory checks never change or reject the translated text. */
 export function detectTranslationSuspicions(original, translated, tagManager) {
-    const stripTags = (value) => {
-        let text = String(value || '');
-        for (const entry of tagManager.tagEntries || []) {
-            text = text.replace(new RegExp(entry.prePattern.source, 'gi'), '');
-        }
-        return text.replace(/\\[{}]/g, '').replace(/<br\s*\/?\s*>/gi, '');
-    };
-    const source = stripTags(original);
-    const output = stripTags(translated);
+    const source = stripTranslationTags(original, tagManager);
+    const output = stripTranslationTags(translated, tagManager);
     const reasons = [];
     const hasExtraJsonParts = ['{', '}', '[', ']'].some(
         (part) => output.split(part).length > source.split(part).length
@@ -19,18 +32,6 @@ export function detectTranslationSuspicions(original, translated, tagManager) {
             label: 'JSON parts',
             message:
                 'The translation contains more occurrences of a brace or square bracket than the original.',
-        });
-    }
-    const withoutClosingQuotes = (text) => text.trim().replace(/[\s"'”’」』）)\]】»]+$/g, '');
-    const ending = /[.!?。！？…⋯]$/u;
-    if (
-        ending.test(withoutClosingQuotes(source)) &&
-        /[\p{L}\p{N}]$/u.test(withoutClosingQuotes(output))
-    ) {
-        reasons.push({
-            id: 'cut-off-text',
-            label: 'Cut off text',
-            message: 'The original ends with punctuation, but the translation ends with a word.',
         });
     }
     const contentLength = (text) => Array.from(text.replace(/[\p{P}\s⋯]/gu, '')).length;

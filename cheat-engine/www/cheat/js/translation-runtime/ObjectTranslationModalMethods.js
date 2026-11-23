@@ -173,13 +173,17 @@ function loadMapDataViaDataManager(dataManager, mapId) {
             setTimeout(checkLoaded, pollMs);
         };
 
-        try {
-            dataManager.loadDataFile(tempName, filename);
-            checkLoaded();
-        } catch (error) {
-            cleanup();
-            reject(error);
-        }
+        // Defer to a macrotask so synchronous/custom DataManager.loadDataFile fallbacks
+        // (e.g. encrypted archives) cannot starve UI rendering across consecutive map loads.
+        setTimeout(() => {
+            try {
+                dataManager.loadDataFile(tempName, filename);
+                checkLoaded();
+            } catch (error) {
+                cleanup();
+                reject(error);
+            }
+        }, 0);
     });
 }
 
