@@ -313,3 +313,53 @@ it('translates raw report templates and expanded business strings only inside di
         parent.mockRestore();
     }
 });
+
+it('preserves untranslated YEP name boxes and actor references when translations are enabled', () => {
+    const translator = instance(EventUiTextTranslator);
+    const sources = [
+        String.raw`\n<\n[16]>ふぅ……早く説明がしたい……`,
+        String.raw`\nc<\n[01]>(ふふっ、かわいいわね)`,
+    ];
+    class Base {
+        convertEscapeCharacters(text) {
+            return text
+                .replace(/\\/g, '\x1b')
+                .replace(/\x1bN\[(\d+)\]/gi, (_, id) =>
+                    Number(id) === 16 ? '商人' : 'フィラーナ'
+                );
+        }
+    }
+    class Message extends Base {
+        convertEscapeCharacters(text) {
+            return super
+                .convertEscapeCharacters(text)
+                .replace(/\x1bN(?:C)?<([^>]*)>/gi, (_, name) => {
+                    this.nameBox = name;
+                    return '';
+                });
+        }
+    }
+    vi.stubGlobal('Window_Base', Base);
+    vi.stubGlobal('Window_Message', Message);
+    const parent = vi
+        .spyOn(Object.getPrototypeOf(EventUiTextTranslator.prototype), 'enablePluginTranslation')
+        .mockReturnValue(true);
+    try {
+        translator.enablePluginTranslation();
+        for (const source of sources) {
+            const win = new Message();
+            runtime.enabled = false;
+            const original = win.convertEscapeCharacters(source);
+            const originalName = win.nameBox;
+            runtime.enabled = true;
+            expect(win.convertEscapeCharacters(source)).toBe(original);
+            expect(win.nameBox).toBe(originalName);
+            translator.entries.set(source, { text: source });
+            cache(translator, source, source.replace(/>.*$/, '>Translated dialogue'));
+            expect(win.convertEscapeCharacters(source)).toBe('Translated dialogue');
+            expect(win.nameBox).toBe(originalName);
+        }
+    } finally {
+        parent.mockRestore();
+    }
+});

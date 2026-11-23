@@ -1,3 +1,4 @@
+import { resolveDisplayI18nSource } from './NativeI18nSource.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { wrapTextByVisibleWidth } from './TextWrap.js';
 import { recordDisplayedMessage } from '../DisplayedMessageText.js';
@@ -275,7 +276,7 @@ export const translateOnTheFlyMessageMethods = {
 
     async translateChoiceText(text) {
         try {
-            const cleanText = (text || '').trim();
+            const cleanText = resolveDisplayI18nSource(text || '', this).trim();
             if (!cleanText) {
                 return text;
             }
@@ -361,7 +362,7 @@ export const translateOnTheFlyMessageMethods = {
 
     async translateSpeakerName(speakerName) {
         try {
-            const cleanName = (speakerName || '').trim();
+            const cleanName = resolveDisplayI18nSource(speakerName || '', this).trim();
             if (!cleanName) {
                 return speakerName;
             }
@@ -388,7 +389,10 @@ export const translateOnTheFlyMessageMethods = {
     async translateWithSelectedEngine(text, options = {}) {
         const sourceLang = this.sourceLang || 'auto';
         const targetLang = this.targetLang || 'en';
-        const payload = text === null || text === undefined ? '' : String(text);
+        const payload = resolveDisplayI18nSource(
+            text === null || text === undefined ? '' : String(text),
+            this
+        );
 
         if (!payload.trim()) {
             return text;

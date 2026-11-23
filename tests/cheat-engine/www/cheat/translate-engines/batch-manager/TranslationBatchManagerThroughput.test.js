@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { resolveDisplayI18nSource } from '../../../../../../cheat-engine/www/cheat/js/translation-runtime/NativeI18nSource.js';
+import { CurrentEvent } from '../../../../../../cheat-engine/www/cheat/translate-engines/translation-phases/CurrentEvent.js';
+import { describe, expect, it, vi } from 'vitest';
 
 import { TranslationBatchManager } from '../../../../../../cheat-engine/www/cheat/translate-engines/batch-manager/TranslationBatchManager.js';
 import { translateOnTheFlyFlowMethods } from '../../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslateOnTheFlyFlowMethods.js';
@@ -606,4 +608,69 @@ it('materializes rediscovered identity entries during dry run so empty-string MT
     });
     expect(runtime.translationCache.get(key)).toBe('Takuma bothers Haruka');
     expect(new CacheEmptyStrings().collectUntranslated({ runtime })).toHaveLength(0);
+});
+
+it('releases CurrentEvent pending locks and restores queued text after a connection failure', async () => {
+    const runtime = createRuntimeStub();
+    const source = '元の台詞';
+    const cacheKey = 'message:ja-en-' + source;
+    runtime.pendingTranslations = new Map();
+    runtime.failedTranslations = new Map();
+    runtime.replaceMessageText = vi.fn();
+    runtime.getPreferredMessageCacheEntry = () => null;
+    runtime.markBatchFailuresAsUntranslated = (items) => {
+        for (const item of items) runtime.failedTranslations.set(item.cacheKey, Date.now());
+    };
+    runtime.engine.batchTranslate = async (batch) => ({
+        successes: [],
+        failures: batch.map((item) => ({
+            ...item,
+            cancelReason: 'llm_connection_error',
+            rejectReason: 'Connection refused',
+        })),
+    });
+    const phase = new CurrentEvent({ currentText: source });
+    const item = { type: 'message', value: source, cacheKey };
+    phase.collectUntranslated = () => {
+        runtime.pendingTranslations.set(cacheKey, true);
+        phase._state.items = [item];
+        phase._state.pendingKeys = new Set([cacheKey]);
+        return [item];
+    };
+    const manager = new TranslationBatchManager(runtime);
+    manager.register({
+        getKind: () => 'disconnectProbe',
+        createEntries: async () => [{ strategy: phase }],
+    });
+    vi.stubGlobal('$gameMessage', { isChoice: () => false });
+    vi.stubGlobal('window', { $gameMessage: globalThis.$gameMessage });
+    try {
+        const result = await manager.runBatchedTranslation(
+            [{ kind: 'disconnectProbe', backgroundJob: false }],
+            { showSummary: false }
+        );
+        expect(result.cancelReason).toBe('llm_connection_error');
+        expect(runtime.pendingTranslations.size).toBe(0);
+        expect(runtime.failedTranslations.has(cacheKey)).toBe(true);
+        expect(runtime.replaceMessageText).toHaveBeenCalledWith(source);
+        expect(runtime._translationApplied).toBe(true);
+    } finally {
+        vi.unstubAllGlobals();
+    }
+});
+
+it('sends resolved I18N values to the LLM and harvests dry-run values rather than reference keys',async()=>{
+    vi.stubGlobal('window',{$plugins:[{name:'DisplayI18NTexts',status:true}],$dataI18nTexts:[{ja_JP:'台詞'},{ja_JP:'アイテム'}]});
+    try {
+        const runtime=createRuntimeStub();runtime.saveSettings=()=>{};
+        runtime.getCacheKey=(text,type)=>`${type}:ja-en-${resolveDisplayI18nSource(text,runtime)}`;
+        const manager=new TranslationBatchManager(runtime);
+        manager.register({getKind:()=> 'i18nProbe',createEntries:async()=>[{items:[{type:'message',value:'\\I18N[0]',cacheKey:'message:ja-en-\\I18N[0]'},{type:'command',value:'\\I18N[1]',cacheKey:'command:ja-en-\\I18N[1]'}]}]});
+        await manager.runBatchedTranslation([{kind:'i18nProbe'}],{dryRun:true,showSummary:false});
+        expect([...runtime.translationCache.keys()]).toEqual(['message:ja-en-台詞','command:ja-en-アイテム']);
+        const batches=[];runtime.engine.batchTranslate=async batch=>{batches.push(batch);return {successes:batch.map(item=>({...item,translated:'Translated'})),failures:[]};};
+        await manager.runBatchedTranslation([{kind:'i18nProbe',backgroundJob:false}],{showSummary:false});
+        expect(batches.flat().map(item=>item.value)).toEqual(['台詞','アイテム']);
+        expect([...runtime.translationCache.keys()].some(key=>key.includes('I18N['))).toBe(false);
+    }finally{vi.unstubAllGlobals();}
 });

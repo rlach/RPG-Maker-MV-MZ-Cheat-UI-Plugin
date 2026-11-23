@@ -1,3 +1,4 @@
+import { resolveDisplayI18nSource } from '../../js/translation-runtime/NativeI18nSource.js';
 import { BatchChunker } from './BatchChunker.js';
 import { ErrorRecoveryStrategy } from './ErrorRecoveryStrategy.js';
 import { BatchProgressTracker } from './BatchProgressTracker.js';
@@ -491,7 +492,7 @@ export class TranslationBatchManager {
                     }) || [];
             }
 
-            const safeItems = hasStrategy
+            let safeItems = hasStrategy
                 ? strategy.toTranslationBatchItems
                     ? strategy.toTranslationBatchItems(pendingItems)
                     : (pendingItems || []).map((item) => ({
@@ -503,6 +504,12 @@ export class TranslationBatchManager {
                 : Array.isArray(entryItems)
                   ? entryItems
                   : [];
+            safeItems = safeItems.map((item) => {
+                const value = resolveDisplayI18nSource(item.value, this.runtime);
+                return value === item.value
+                    ? item
+                    : { ...item, value, cacheKey: this.runtime.getCacheKey(value, item.type) };
+            });
             const translationPhaseLabel = hasStrategy
                 ? strategy.getTranslationPhaseLabel({
                       runtime: this.runtime,
@@ -776,7 +783,7 @@ export class TranslationBatchManager {
             });
             const stats = this.errorRecovery.getStats();
 
-            if (!connectionFailed && !interruptedForCurrentMap && hasStrategy) {
+            if (!interruptedForCurrentMap && hasStrategy) {
                 strategy.finalizePhase?.({
                     runtime: this.runtime,
                     pendingItems,

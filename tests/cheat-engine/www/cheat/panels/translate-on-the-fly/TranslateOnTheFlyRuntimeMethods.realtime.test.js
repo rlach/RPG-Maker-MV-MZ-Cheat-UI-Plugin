@@ -631,3 +631,17 @@ it('uses cached dialogue while cheat skip is held without starting LLM work', ()
     expect(globalThis.$gameMessage._texts.join('\n')).toBe('EN line 1');
     expect(runtime.requestForegroundDialogBatch).not.toHaveBeenCalled();
 });
+
+it('starts and accepts next-message input on the original dialogue after a failed foreground request releases pending keys',()=>{
+    installRpgMakerGlobals({messageLines:['JP line 1'],speaker:''});
+    const runtime=createRuntime();
+    runtime.requestForegroundDialogBatch=vi.fn(payload=>{runtime.pendingTranslations.set(payload.cacheKey,true);return Promise.resolve(null);});
+    translateOnTheFlyRuntimeMethods.setupTranslationHook.call(runtime);
+    const messageWindow=new globalThis.Window_Message();
+    expect(messageWindow.canStart()).toBe(false);
+    const key=runtime.getMessageCacheKey('JP line 1',{hasPortrait:false});
+    runtime.pendingTranslations.delete(key);runtime.failedTranslations.set(key,Date.now());
+    expect(messageWindow.canStart()).toBe(true);
+    expect(messageWindow.startInput()).toBe(true);
+    expect(globalThis.$gameMessage._texts.join('\n')).toBe('JP line 1');
+});

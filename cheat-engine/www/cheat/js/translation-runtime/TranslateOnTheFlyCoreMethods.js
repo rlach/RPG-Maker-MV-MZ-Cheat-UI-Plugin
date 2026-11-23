@@ -1,3 +1,4 @@
+import { resolveDisplayI18nSource } from './NativeI18nSource.js';
 import { TranslationSuspicionStore } from '../TranslationSuspicionStore.js';
 import { TranslateOnTheFlyState } from '../TranslateOnTheFlyState.js';
 import { ensureTranslateCacheRuntime } from '../TranslateCacheRuntime.js';
@@ -174,6 +175,7 @@ export const translateOnTheFlyCoreMethods = {
             throw new Error('[TranslateOnTheFly] getCacheKey requires an explicit cache type');
         }
 
+        text = resolveDisplayI18nSource(text, this);
         const cacheType = type === 'speaker' ? 'actor_name' : type;
         const normalizedText = typeof text === 'string' ? text.replace(/\n+$/, '') : text;
         return `${cacheType}:${this.sourceLang}-${this.targetLang}-${normalizedText}`;

@@ -2,6 +2,9 @@ import { SourceTextCatalogTranslator } from '../SourceTextCatalogTranslator.js';
 import { DTextPictureTranslator } from './DTextPictureTranslator.js';
 import { collectScriptVariableAssignments } from '../ScriptVariableAssignments.js';
 
+// A literal newline is distinct from actor references and YEP name-box tags.
+const normalizeDisplayNewlines = (text) => text.replace(/\\n(?!\[|<|[A-Za-z0-9_])/g, '\n');
+
 /**
  * Event-authored UI for TMSimpleWindow v1.2.0, DTextPicture, and
  * ResidentWindow games with variable-driven messages and choices (MV).
@@ -81,7 +84,7 @@ export class EventUiTextTranslator extends SourceTextCatalogTranslator {
             if (!super.isUsableText(text)) continue;
             this.collectVariableReferences(text);
             if (!this.isUsableText(text)) continue;
-            const normalized = text.replace(/\\n/g, '\n');
+            const normalized = normalizeDisplayNewlines(text);
             this.entries.set(normalized, { text: normalized });
         }
     }
@@ -108,9 +111,9 @@ export class EventUiTextTranslator extends SourceTextCatalogTranslator {
                 this.collectVariableReferences(value);
                 const catalog = this.extractCatalog(value);
                 for (const entry of catalog.entries) {
-                    entry.text = entry.text.replace(/\\n/g, '\n');
+                    entry.text = normalizeDisplayNewlines(entry.text);
                     if (entry.parts)
-                        entry.parts = entry.parts.map((part) => part.replace(/\\n/g, '\n'));
+                        entry.parts = entry.parts.map((part) => normalizeDisplayNewlines(part));
                     this.entries.set(entry.text, entry);
                     this.collectVariableReferences(entry.text);
                     if (!entry.parts)
@@ -166,11 +169,11 @@ export class EventUiTextTranslator extends SourceTextCatalogTranslator {
                 return original.apply(this, arguments);
             // Resolve string-valued display variables before escape expansion.
             // Never change their game-state values or the global value() method.
-            const template = translator.resolveText(text.replace(/\\n/g, '\n'), runtime);
+            const template = translator.resolveText(normalizeDisplayNewlines(text), runtime);
             const prepared = template.replace(/\\V\[(\d+)\]/gi, (token, id) => {
                 const value = window.$gameVariables.value(Number(id));
                 if (typeof value !== 'string') return token;
-                const translated = translator.resolveText(value.replace(/\\n/g, '\n'), runtime);
+                const translated = translator.resolveText(normalizeDisplayNewlines(value), runtime);
                 return translated === value ? token : translated;
             });
             const converted = original.call(this, prepared);

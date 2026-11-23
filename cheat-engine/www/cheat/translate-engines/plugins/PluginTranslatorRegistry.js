@@ -104,6 +104,7 @@ import { MotMnkrEquipUiTranslator } from './translators/MotMnkrEquipUiTranslator
 import { CharacterSelectionTranslator } from './translators/CharacterSelectionTranslator.js';
 import { ItemBookTranslator } from './translators/ItemBookTranslator.js';
 import { MitsugaseUiTranslator } from './translators/MitsugaseUiTranslator.js';
+import { DisplayI18nTextsTranslator } from './translators/DisplayI18nTextsTranslator.js';
 import { HbCaseUiTranslator } from './translators/HbCaseUiTranslator.js';
 import { VisuCoreInterfaceTranslator } from './translators/VisuCoreInterfaceTranslator.js';
 import { PurefullBattleMenuTranslator } from './translators/PurefullBattleMenuTranslator.js';
@@ -348,6 +349,7 @@ class PluginTranslatorRegistry {
             PurefullBattleMenuTranslator,
             VisuCoreInterfaceTranslator,
             HbCaseUiTranslator,
+            DisplayI18nTextsTranslator,
             NoEquipmentTextTranslator,
             BattleSystemSelectableTranslator,
             NuunSceneFormationTranslator,

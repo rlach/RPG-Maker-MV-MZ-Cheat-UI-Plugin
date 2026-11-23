@@ -242,6 +242,20 @@ export default {
             this.overlayHeight = size.height;
         }
 
+        if (!window.__CHEAT_EXTERNAL_WINDOW__) {
+            // Leave room for the host padding and a one-percent viewport margin.
+            const maxWidth = Math.max(
+                1,
+                Math.floor(window.innerWidth - 2 * Math.max(8, window.innerWidth * 0.01))
+            );
+            const maxHeight = Math.max(
+                1,
+                Math.floor(window.innerHeight - 2 * Math.max(8, window.innerHeight * 0.01))
+            );
+            this.overlayWidth = Math.min(this.overlayWidth, maxWidth);
+            this.overlayHeight = Math.min(this.overlayHeight, maxHeight);
+        }
+
         this.initResizeObserver();
 
         let navItem = this.componentNameToNavItem[this.currentComponentName];

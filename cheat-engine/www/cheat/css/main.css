@@ -184,8 +184,14 @@ which can inherit hidden cursors. */ .v-overlay-container,
 .resizable-overlay {
     resize: both;
     overflow: hidden;
-    min-width: 620px;
-    min-height: 340px;
+    min-width: min(620px, 98vw, calc(100vw - 16px));
+    min-height: min(340px, 98vh, calc(100vh - 16px));
+}
+
+/* Fit the in-game viewport even after a window resize. */
+#cheat-modal.resizable-overlay {
+    max-width: min(98vw, calc(100vw - 16px));
+    max-height: min(98vh, calc(100vh - 16px));
 }
 
 /* Keep table pagination/footer fixed while rows area scrolls */
