@@ -287,6 +287,7 @@ export const translateOnTheFlySettingsMethods = {
     onChangeTextWrapping() {
         // Don't clear cache - wrapping doesn't affect cache validity
         this.saveSettings();
+        this.notifyCacheRuntime('settings-text-wrapping');
     },
 
     onChangeMaxWidth() {

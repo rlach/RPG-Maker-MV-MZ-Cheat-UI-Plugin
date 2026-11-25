@@ -280,6 +280,10 @@ it('counts and collects ADV speakers and messages through the actual mass transl
         'message:Label dialogue',
     ]);
     vi.stubGlobal('window', { ...window, $dataCommonEvents: [null, { list }] });
+    vi.stubGlobal('fetch', async () => ({
+        ok: true,
+        text: async () => JSON.stringify([null, { list }]),
+    }));
     const commons = new CommonEvents();
     expect(commons.countAmountSync({ runtime }).leftStrings).toBe(4);
     const [{ strategy }] = await commons.createEntries();

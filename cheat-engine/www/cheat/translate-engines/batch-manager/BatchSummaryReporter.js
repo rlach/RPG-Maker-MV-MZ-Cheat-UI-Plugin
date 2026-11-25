@@ -200,13 +200,19 @@ export class BatchSummaryReporter {
         };
     }
 
-    static showAlert(summary) {
+    static showAlert(summary, suspiciousCount = 0) {
         if (!summary) {
             return;
         }
 
         const fullMessage = `${summary.title}\n${summary.message}`;
-        if (summary.hasErrors) Alert.error(fullMessage, null, -1);
+        if (suspiciousCount > 0) {
+            Alert.warn(
+                `${fullMessage}\n${suspiciousCount} suspicious translations`,
+                null,
+                summary.hasErrors ? -1 : 5000
+            );
+        } else if (summary.hasErrors) Alert.error(fullMessage, null, -1);
         else Alert.success(fullMessage, null, 5000);
     }
 

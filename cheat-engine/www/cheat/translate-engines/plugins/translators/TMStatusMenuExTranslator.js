@@ -1,5 +1,8 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 
+// TMStatusMenuEx / Av_TMStatusMenuEx (MV, unversioned builds).
+// Detect only enabled manifest entries: unrelated SaveMaxNum builds can
+// incorrectly advertise Imported.TMStatusMenuEx without implementing its UI.
 const PLUGIN_NAME = 'TMStatusMenuEx';
 const PARAM_FIELDS = ['xparamText', 'sparamText'];
 
@@ -25,45 +28,6 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
 
     getCacheType() {
         return 'plugin_tm_status_menu_ex';
-    }
-
-    detectPlugin() {
-        const pluginNames = this.getPluginAliases().map((name) => name.toLowerCase());
-
-        if (Array.isArray(window.$plugins)) {
-            const matched = window.$plugins.some((plugin) => {
-                if (!plugin || typeof plugin.name !== 'string' || plugin.status === false) {
-                    return false;
-                }
-
-                return pluginNames.includes(plugin.name.trim().toLowerCase());
-            });
-
-            if (matched) {
-                return true;
-            }
-        }
-
-        const pluginManager = window['PluginManager'];
-        if (pluginManager && typeof pluginManager.parameters === 'function') {
-            const parameters = pluginManager.parameters(
-                this.getPluginAliases()
-                    .map((name) => this.findPluginEntry(name))
-                    .find((entry) => entry?.status !== false && entry)?.name || PLUGIN_NAME
-            );
-            const hasAnyParam = PARAM_FIELDS.some((field) => {
-                const value =
-                    parameters && typeof parameters[field] === 'string' ? parameters[field] : '';
-                return !!value.trim();
-            });
-
-            if (hasAnyParam) {
-                return true;
-            }
-        }
-
-        const imported = window['Imported'];
-        return !!imported?.[PLUGIN_NAME];
     }
 
     /**
@@ -135,10 +99,6 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
     }
 
     async precomputeCounts() {
-        if (!this.ensureDetection()) {
-            return;
-        }
-
         if (this._scanPrepared) {
             return;
         }
@@ -224,20 +184,11 @@ export class TMStatusMenuExTranslator extends BasePluginTranslator {
     _withTranslatedDrawText(windowInstance, runtime, callback) {
         const cacheType = this.getCacheType();
         const origDrawText = windowInstance.drawText;
+        const translator = this;
 
         windowInstance.drawText = function (text, x, y, w, align) {
-            let displayText = text;
-            if (typeof text === 'string' && text.trim()) {
-                const cacheKey = runtime.getCacheKey(text, cacheType);
-                runtime.trackCacheKeyUsage(cacheKey);
-                if (runtime.hasUsableCacheValue(cacheKey)) {
-                    const cached = runtime.translationCache.get(cacheKey);
-                    if (typeof cached === 'string' && cached.trim()) {
-                        displayText = cached;
-                    }
-                }
-            }
-            origDrawText.call(this, displayText, x, y, w, align);
+            const displayText = translator.resolveRuntimeTranslation(text, runtime, cacheType);
+            return origDrawText.call(this, displayText, x, y, w, align);
         };
 
         try {

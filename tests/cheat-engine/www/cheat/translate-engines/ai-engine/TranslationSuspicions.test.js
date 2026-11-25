@@ -358,3 +358,70 @@ it('compares bracket types separately after excluding actual game tags', () => {
         )
     ).toContain('json-parts');
 });
+
+it('flags translations identical to the original text as Identical translation', () => {
+    expect(detectTranslationSuspicions('HP', 'HP', manager())).toEqual([
+        expect.objectContaining({
+            id: 'identical-translation',
+            label: 'Identical translation',
+        }),
+    ]);
+    expect(detectTranslationSuspicions('原文です。', '  原文です。 ', manager()).map((r) => r.id)).toContain(
+        'identical-translation'
+    );
+    expect(detectTranslationSuspicions('原文です。', 'Original text.', manager())).toEqual([]);
+    expect(detectTranslationSuspicions('', '', manager())).toEqual([]);
+});
+
+it('flags foreign CJK characters when translating from Japanese/Korean/Chinese to a different script', () => {
+    expect(
+        detectTranslationSuspicions('これは私の猫です。', 'This is my の cat.', manager(), {
+            sourceLang: 'ja',
+            targetLang: 'en',
+        })
+    ).toEqual([
+        expect.objectContaining({
+            id: 'foreign-characters',
+            label: 'Foreign characters',
+            message: expect.stringContaining('の'),
+        }),
+    ]);
+
+    expect(
+        detectTranslationSuspicions('이것은 고양이입니다.', 'This is a 고양이.', manager(), {
+            sourceLang: 'ko',
+            targetLang: 'pl',
+        }).map((r) => r.id)
+    ).toContain('foreign-characters');
+
+    expect(
+        detectTranslationSuspicions('这是我的猫。', 'This is my 猫.', manager(), {
+            sourceLang: 'zh-CN',
+            targetLang: 'en',
+        }).map((r) => r.id)
+    ).toContain('foreign-characters');
+
+    // Clean translation has no foreign-characters suspicion.
+    expect(
+        detectTranslationSuspicions('これは私の猫です。', 'This is my cat.', manager(), {
+            sourceLang: 'ja',
+            targetLang: 'en',
+        })
+    ).toEqual([]);
+
+    // Non-CJK source languages do not trigger this check.
+    expect(
+        detectTranslationSuspicions('This is a cat.', 'To jest の kot.', manager(), {
+            sourceLang: 'en',
+            targetLang: 'pl',
+        }).map((r) => r.id)
+    ).not.toContain('foreign-characters');
+
+    // Same-script CJK pair (e.g. Simplified -> Traditional Chinese) does not trigger on Han characters.
+    expect(
+        detectTranslationSuspicions('这是我的猫。', '這是我的貓。', manager(), {
+            sourceLang: 'zh-CN',
+            targetLang: 'zh-TW',
+        }).map((r) => r.id)
+    ).not.toContain('foreign-characters');
+});

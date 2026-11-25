@@ -1,4 +1,5 @@
 import { MapEvents } from './MapEvents.js';
+import { parseJsonSafely } from '../plugins/translators/TranslatorHelpers.js';
 
 export class CommonEvents extends MapEvents {
     getKind() {
@@ -6,10 +7,24 @@ export class CommonEvents extends MapEvents {
     }
 
     async createEntries() {
+        // Display plugins may expand actor references in the live event lists.
+        // Batch keys must still match the authored command text used at runtime.
+        this.sourcePromise ??= (async () => {
+            const response = await fetch('data/CommonEvents.json');
+            if (!response.ok) throw new Error('Cannot read original common events');
+            const events = parseJsonSafely(await response.text());
+            if (!Array.isArray(events)) throw new Error('Invalid original common events');
+            this.sourceCommonEvents = events;
+            return events;
+        })().catch((error) => {
+            this.sourcePromise = null;
+            throw error;
+        });
+        const commonEvents = await this.sourcePromise;
         return [
             {
                 strategy: this.configure(
-                    { events: [{ pages: window.$dataCommonEvents }] },
+                    { events: [{ pages: commonEvents }] },
                     -1,
                     null,
                     'translating common events'
@@ -37,6 +52,9 @@ export class CommonEvents extends MapEvents {
     }
 
     countAmountSync({ runtime }) {
-        return this.constructor.countCommonEventsAmount(runtime, window.$dataCommonEvents);
+        return this.constructor.countCommonEventsAmount(
+            runtime,
+            this.sourceCommonEvents || window.$dataCommonEvents
+        );
     }
 }

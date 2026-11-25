@@ -1,3 +1,6 @@
+import { guessConfigFromPattern } from '../../translate-engines/ai-engine/UnknownTagConfig.js';
+export { guessConfigFromPattern };
+
 let unknownTagsMemory = [];
 
 function cloneUnknownTagsList(list) {
@@ -36,79 +39,6 @@ export function getUnknownTagsCacheStringCount(cache) {
         }
     }
     return count;
-}
-
-export function guessConfigFromPattern(pattern) {
-    const xmlMatch = /^<([A-Za-z][A-Za-z0-9]*)(?::(.+))?>$/.exec(pattern);
-    if (xmlMatch) {
-        const sym = xmlMatch[1];
-        const val = xmlMatch[2];
-        let type = 'withoutParameter';
-        if (val === 'N') type = 'withNumericParameter';
-        else if (val === '…') type = 'withCustomParameter';
-        return {
-            description: sym.toLowerCase(),
-            tagSymbol: sym,
-            style: 'xml',
-            type,
-            bracket: 'none',
-            maskValue: false,
-            requiredConsistency: false,
-            reservedWidth: 0,
-            extraPromptForLlm: '',
-            alwaysTranslate: false,
-            alwaysAddToKnowledgeBase: false,
-        };
-    }
-
-    const escMatch = /^\\([A-Za-z${}|.!><^][A-Za-z0-9]*)(.*)$/.exec(pattern);
-    if (escMatch) {
-        const sym = escMatch[1];
-        const rest = escMatch[2] || '';
-        let type = 'withoutParameter';
-        let bracket = '<';
-        if (rest === '[N]') {
-            type = 'withNumericParameter';
-        } else if (rest === '[…]') {
-            type = 'withCustomParameter';
-            bracket = '[';
-        } else if (rest === '<…>') {
-            type = 'withCustomParameter';
-        } else if (rest === '(…)') {
-            type = 'withCustomParameter';
-            bracket = '(';
-        } else if (rest === '{…}') {
-            type = 'withCustomParameter';
-            bracket = '{';
-        }
-        return {
-            description: sym.toLowerCase(),
-            tagSymbol: sym,
-            style: 'escape',
-            type,
-            bracket,
-            maskValue: false,
-            requiredConsistency: false,
-            reservedWidth: 0,
-            extraPromptForLlm: '',
-            alwaysTranslate: false,
-            alwaysAddToKnowledgeBase: false,
-        };
-    }
-
-    return {
-        description: '',
-        tagSymbol: '',
-        style: 'escape',
-        type: 'withNumericParameter',
-        bracket: '<',
-        maskValue: false,
-        requiredConsistency: false,
-        reservedWidth: 0,
-        extraPromptForLlm: '',
-        alwaysTranslate: false,
-        alwaysAddToKnowledgeBase: false,
-    };
 }
 
 export function findTagExamples(cache, pattern, exampleKeys = null) {

@@ -48,6 +48,7 @@ function setMapDataLoadMethod(method) {
 }
 
 const DEFAULT_OBJECT_TRANSLATION_TYPE_DEFS = Object.freeze([
+    { id: 'names', label: 'Names', noDragDrop: true, first: true },
     { id: 'systemCommands', label: 'system commands' },
     { id: 'items', label: 'items' },
     { id: 'skills', label: 'skills' },
@@ -224,7 +225,7 @@ export const objectTranslationRuntimeMethods = {
             ? this.objectTranslationTypeOrder
             : [];
 
-        const ordered = [];
+        const ordered = defaults.filter((entry) => entry.first).map((entry) => entry.id);
         const seen = new Set();
 
         for (const rawId of requestedIds) {
@@ -244,7 +245,7 @@ export const objectTranslationRuntimeMethods = {
 
         // noDragDrop items always appended after draggable ones
         for (const id of noDragDropIds) {
-            ordered.push(id);
+            if (!ordered.includes(id)) ordered.push(id);
         }
 
         this.objectTranslationTypeOrder = ordered.filter((id) => !noDragDropIds.includes(id));

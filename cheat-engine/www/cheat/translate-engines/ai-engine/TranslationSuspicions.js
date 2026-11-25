@@ -18,11 +18,67 @@ export function isCutOffTranslation(original, translated, tagManager) {
     );
 }
 
+const CJK_LANGUAGES = new Set(['ja', 'ko', 'zh']);
+
+function normalizeBaseLanguage(lang) {
+    return String(lang || '')
+        .trim()
+        .toLowerCase()
+        .split(/[-_]/)[0];
+}
+
+function getForeignScriptPattern(sourceLang, targetLang) {
+    const sourceBase = normalizeBaseLanguage(sourceLang);
+    const targetBase = normalizeBaseLanguage(targetLang);
+    if (!sourceBase || !targetBase || sourceBase === targetBase || !CJK_LANGUAGES.has(sourceBase)) {
+        return null;
+    }
+
+    if (!CJK_LANGUAGES.has(targetBase)) {
+        return /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Han}]/gu;
+    }
+
+    if (sourceBase === 'ja' && (targetBase === 'ko' || targetBase === 'zh')) {
+        return /[\p{Script=Hiragana}\p{Script=Katakana}]/gu;
+    }
+
+    if (sourceBase === 'ko' && (targetBase === 'ja' || targetBase === 'zh')) {
+        return /[\p{Script=Hangul}]/gu;
+    }
+
+    return null;
+}
+
 /** Advisory checks never change or reject the translated text. */
-export function detectTranslationSuspicions(original, translated, tagManager) {
+export function detectTranslationSuspicions(original, translated, tagManager, options = {}) {
     const source = stripTranslationTags(original, tagManager);
     const output = stripTranslationTags(translated, tagManager);
     const reasons = [];
+    const normalizedOriginal = String(original ?? '').trim();
+    const normalizedTranslated = String(translated ?? '').trim();
+    if (normalizedOriginal.length > 0 && normalizedOriginal === normalizedTranslated) {
+        reasons.push({
+            id: 'identical-translation',
+            label: 'Identical translation',
+            message: 'The translation is identical to the original text.',
+        });
+    }
+    const foreignScriptPattern = getForeignScriptPattern(
+        options?.sourceLang ?? tagManager?.runtime?.sourceLang,
+        options?.targetLang ?? tagManager?.runtime?.targetLang
+    );
+    if (foreignScriptPattern) {
+        const foreignMatches = Array.from(new Set(output.match(foreignScriptPattern) || []));
+        if (foreignMatches.length > 0) {
+            reasons.push({
+                id: 'foreign-characters',
+                label: 'Foreign characters',
+                message: `The translation contains unexpected source-script characters: ${foreignMatches
+                    .slice(0, 8)
+                    .join('')}`,
+            });
+        }
+    }
     const hasExtraJsonParts = ['{', '}', '[', ']'].some(
         (part) => output.split(part).length > source.split(part).length
     );

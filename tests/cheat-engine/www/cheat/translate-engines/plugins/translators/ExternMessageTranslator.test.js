@@ -54,6 +54,9 @@ it('supports the 1.3 global compiler, defers display variables, and keeps techni
     expect(window.convertMessageCommand({ parameters: [':event[\\V[1]]'] })[0].parameters[0]).toBe(
         ':event[42]'
     );
+    expect(window.convertMessageCommand({ parameters: ['\\M[\\V[1]]'] })[0].parameters[0]).toBe(
+        '\\M[42]'
+    );
     runtime.isTranslationEnabled = () => false;
     expect(window.convertMessageCommand({ parameters: ['Floor \\V[1]'] })[0].parameters[0]).toBe(
         'Floor 42'

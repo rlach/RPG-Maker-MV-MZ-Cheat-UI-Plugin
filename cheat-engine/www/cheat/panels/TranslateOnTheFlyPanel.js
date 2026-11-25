@@ -1,3 +1,10 @@
+import { onTranslateCacheRuntimeChanged } from '../js/TranslateCacheRuntime.js';
+import TranslationConnection from '../components/TranslationConnection.js';
+import { subscribeRootWindowEvent } from '../js/RootWindowState.js';
+import {
+    getQuickTranslationState,
+    QUICK_TRANSLATION_EVENT,
+} from '../js/translation-runtime/QuickTranslation.js';
 import { TranslateOnTheFlyState } from '../js/TranslateOnTheFlyState.js';
 import { AIEngine } from '../translate-engines/index.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
@@ -21,6 +28,7 @@ const runtimeStateProxyComputed = TRANSLATION_RUNTIME_STATE_KEYS.reduce((acc, ke
 
 export default {
     name: 'TranslateOnTheFlyPanel',
+    components: { TranslationConnection },
 
     template: String.raw`
 <v-card flat class="ma-0 pa-0">
@@ -122,6 +130,7 @@ export default {
         <v-select
             v-model="translationEngine"
             :items="translationEngineOptions"
+             :disabled="quickTranslationActive"
             label="Translation Engine" variant="outlined" density="compact"
             hide-details
             @update:model-value="onChangeTranslationEngine"
@@ -131,6 +140,7 @@ export default {
         <v-select
             v-model="sourceLang"
             :items="languageOptions"
+            :disabled="quickTranslationActive"
             label="Source Language" variant="outlined" density="compact"
             hide-details
             @update:model-value="onChangeSourceLang"
@@ -140,6 +150,7 @@ export default {
         <v-select
             v-model="targetLang"
             :items="languageOptions"
+            :disabled="quickTranslationActive"
             label="Target Language" variant="outlined" density="compact"
             hide-details
             @update:model-value="onChangeTargetLang" item-title="text">
@@ -167,6 +178,9 @@ export default {
         </div>
 
         <!-- AI Engine (OpenAPI compatible / Open WebUI) config -->
+        <translation-connection
+            v-if="translationEngine === 'openApi' || translationEngine === 'gpt4all'"
+            always-configure class="mt-3" />
         ${AIEngine.getConfigTemplate()}
 
     </v-card-text>
@@ -176,11 +190,19 @@ export default {
     <v-card-text class="py-0">
         <v-switch
             v-model="enableTextWrapping"
-            label="Keep translated strings under max width (in characters)" density="compact"
+            label="Wrap translated text to fit" density="compact"
             hide-details
             @click.self.stop
             @update:model-value="onChangeTextWrapping">
         </v-switch>
+        <v-checkbox
+            v-model="manuallySetTextWidths"
+            label="Manually set text widths"
+            density="compact"
+            hide-details
+            :disabled="!enableTextWrapping"
+            @update:model-value="onChangeTextWrapping">
+        </v-checkbox>
     </v-card-text>
 
     <v-card-text class="py-0">
@@ -192,7 +214,7 @@ export default {
                 min="20"
                 max="200"
                 hide-details
-                :disabled="!enableTextWrapping"
+                :disabled="!enableTextWrapping || !manuallySetTextWidths"
                 @keydown.stop
                 @update:model-value="onChangeMaxWidth"
                 @focus="$event.target.select()"
@@ -238,7 +260,7 @@ export default {
                 min="20"
                 max="200"
                 hide-details
-                :disabled="!enableTextWrapping"
+                :disabled="!enableTextWrapping || !manuallySetTextWidths"
                 @keydown.stop
                 @update:model-value="onChangeMaxWidthWithPortrait"
                 @focus="$event.target.select()"
@@ -272,7 +294,7 @@ export default {
                         v-bind="activatorProps"
 
                         :color="linkDescriptionMaxWidthToDialogue ? 'primary' : 'grey-lighten-1'"
-                        :disabled="!enableTextWrapping"
+                        :disabled="!enableTextWrapping || !manuallySetTextWidths"
                         @click="toggleDescriptionWidthLink">
                         <v-icon size="small">
                             {{
@@ -299,7 +321,7 @@ export default {
                 min="20"
                 max="200"
                 hide-details
-                :disabled="!enableTextWrapping || linkDescriptionMaxWidthToDialogue"
+                :disabled="!enableTextWrapping || !manuallySetTextWidths || linkDescriptionMaxWidthToDialogue"
                 @keydown.stop
                 @update:model-value="onChangeDescriptionMaxWidth"
                 @focus="$event.target.select()"
@@ -312,7 +334,7 @@ export default {
                 min="1"
                 max="20"
                 hide-details
-                :disabled="!enableTextWrapping"
+                :disabled="!enableTextWrapping || !manuallySetTextWidths"
                 @keydown.stop
                 @update:model-value="onChangeDescriptionMaxRows"
                 @focus="$event.target.select()"
@@ -354,7 +376,7 @@ export default {
             min="0.01"
             step="0.01"
             hide-details
-            :disabled="!enableTextWrapping"
+            :disabled="!enableTextWrapping || !manuallySetTextWidths"
             @keydown.stop
             @update:model-value="onChangeTextWrapFontScaleMultiplier"
             @focus="$event.target.select()">
@@ -424,6 +446,13 @@ export default {
     created() {
         this._runtime = ensureTranslationRuntime();
         this.syncRuntimeRefs();
+        this.quickTranslationUnsubscribe = subscribeRootWindowEvent(
+            QUICK_TRANSLATION_EVENT,
+            () => this.stateVersion++
+        );
+        this.languageUnsubscribe = onTranslateCacheRuntimeChanged(({ reason }) => {
+            if (reason === 'settings-language') this.stateVersion++;
+        });
 
         this.stateUnsubscribe = TranslateOnTheFlyState.subscribe((enabled) => {
             if (this._runtime) {
@@ -434,6 +463,8 @@ export default {
     },
 
     beforeUnmount() {
+        this.quickTranslationUnsubscribe();
+        this.languageUnsubscribe();
         if (this.stateUnsubscribe) {
             this.stateUnsubscribe();
             this.stateUnsubscribe = null;
@@ -452,6 +483,11 @@ export default {
 
     computed: {
         ...runtimeStateProxyComputed,
+
+        quickTranslationActive() {
+            void this.stateVersion;
+            return getQuickTranslationState().active;
+        },
 
         cachedCount() {
             void this.stateVersion;
@@ -601,26 +637,6 @@ export default {
 
         onChangeTargetLang() {
             return this.callRuntime('onChangeTargetLang');
-        },
-
-        fetchAiModels() {
-            return this.callRuntime('fetchAiModels');
-        },
-
-        onChangeAiProvider(v) {
-            return this.callRuntime('onChangeAiProvider', v);
-        },
-
-        onChangeAiHost(v) {
-            return this.callRuntime('onChangeAiHost', v);
-        },
-
-        onChangeAiApiKey(v) {
-            return this.callRuntime('onChangeAiApiKey', v);
-        },
-
-        onChangeAiModel(v) {
-            return this.callRuntime('onChangeAiModel', v);
         },
 
         onChangeAiAskIfTextTranslated(v) {

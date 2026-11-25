@@ -6,6 +6,7 @@ import {
 
 /**
  * Baizan ExternMessage 1.1.0 (MV/MZ) and 1.3.12 (MZ, RJ352933).
+ * Includes the usuki98 1.3.12 tuple-returning image-preload fork (RJ01499436).
  * Version 1.3 exposes a global compiler returning a list instead of a static
  * interpreter compiler writing into a supplied list.
  * CSV values in $externMessage.map are strings compiled into 101/401 commands.
@@ -49,11 +50,14 @@ export class ExternMessageTranslator extends ExternBaseTranslator {
                 // 1.3 expands variables before the normal message runtime sees
                 // them. Keep display variables symbolic until Window_Base draws
                 // them, but preserve authored expansion in technical commands.
+                // A variable inside \\M[...] selects the CSV entry itself; it
+                // must expand now or the compiler emits the identifier as text.
                 if (
                     compiling &&
                     key === '\\V' &&
                     translator.isRuntimeTranslationActive(translator.getRuntime()) &&
-                    !/:(?:name|face|event|script|bg|layout)\b/.test(text)
+                    !/:(?:name|face|event|script|bg|layout)\b/.test(text) &&
+                    !/\\M\[/i.test(text)
                 )
                     return text;
                 return parse.call(this, text, key, ...args);
@@ -102,6 +106,7 @@ export class ExternMessageTranslator extends ExternBaseTranslator {
         const extern = window.$externMessage;
         if (
             !extern?.map &&
+            !extern?._map &&
             typeof extern?.setup === 'function' &&
             typeof window.$externMessageCSV === 'string'
         )
@@ -116,7 +121,8 @@ export class ExternMessageTranslator extends ExternBaseTranslator {
             return null;
         const entries = [];
         for (const [messageId, value] of Object.entries(dictionary)) {
-            const values = Array.isArray(value) ? value : [value];
+            const selectedColumn = Math.max(0, Number(extern.ValueReferenceColumnIndex || 1) - 1);
+            const values = Array.isArray(value) ? [value[selectedColumn] || value[0]] : [value];
             for (const [column, text] of values.entries()) {
                 if (!this.isUsableText(text)) continue;
                 const commands = [];
@@ -139,12 +145,12 @@ export class ExternMessageTranslator extends ExternBaseTranslator {
                         window.parseCmd = function (text, key, ...args) {
                             return key === '\\V' ? text : parse.call(this, text, key, ...args);
                         };
-                        commands.push(
-                            ...window.convertMessageCommand({
-                                ...command,
-                                parameters: [`\\M[${messageId}]`],
-                            })
-                        );
+                        const compiled = window.convertMessageCommand({
+                            ...command,
+                            parameters: [`\\M[${messageId}]`],
+                        });
+                        // The image-preload fork returns [commands, imageCommands].
+                        commands.push(...(Array.isArray(compiled[0]) ? compiled[0] : compiled));
                     } finally {
                         window.convertScript = script;
                         window.parseCmd = parse;

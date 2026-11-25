@@ -659,18 +659,108 @@ it('releases CurrentEvent pending locks and restores queued text after a connect
     }
 });
 
-it('sends resolved I18N values to the LLM and harvests dry-run values rather than reference keys',async()=>{
-    vi.stubGlobal('window',{$plugins:[{name:'DisplayI18NTexts',status:true}],$dataI18nTexts:[{ja_JP:'台詞'},{ja_JP:'アイテム'}]});
+it('sends resolved I18N values to the LLM and harvests dry-run values rather than reference keys', async () => {
+    vi.stubGlobal('window', {
+        $plugins: [{ name: 'DisplayI18NTexts', status: true }],
+        $dataI18nTexts: [{ ja_JP: '台詞' }, { ja_JP: 'アイテム' }],
+    });
     try {
-        const runtime=createRuntimeStub();runtime.saveSettings=()=>{};
-        runtime.getCacheKey=(text,type)=>`${type}:ja-en-${resolveDisplayI18nSource(text,runtime)}`;
-        const manager=new TranslationBatchManager(runtime);
-        manager.register({getKind:()=> 'i18nProbe',createEntries:async()=>[{items:[{type:'message',value:'\\I18N[0]',cacheKey:'message:ja-en-\\I18N[0]'},{type:'command',value:'\\I18N[1]',cacheKey:'command:ja-en-\\I18N[1]'}]}]});
-        await manager.runBatchedTranslation([{kind:'i18nProbe'}],{dryRun:true,showSummary:false});
-        expect([...runtime.translationCache.keys()]).toEqual(['message:ja-en-台詞','command:ja-en-アイテム']);
-        const batches=[];runtime.engine.batchTranslate=async batch=>{batches.push(batch);return {successes:batch.map(item=>({...item,translated:'Translated'})),failures:[]};};
-        await manager.runBatchedTranslation([{kind:'i18nProbe',backgroundJob:false}],{showSummary:false});
-        expect(batches.flat().map(item=>item.value)).toEqual(['台詞','アイテム']);
-        expect([...runtime.translationCache.keys()].some(key=>key.includes('I18N['))).toBe(false);
-    }finally{vi.unstubAllGlobals();}
+        const runtime = createRuntimeStub();
+        runtime.saveSettings = () => {};
+        runtime.getCacheKey = (text, type) =>
+            `${type}:ja-en-${resolveDisplayI18nSource(text, runtime)}`;
+        const manager = new TranslationBatchManager(runtime);
+        manager.register({
+            getKind: () => 'i18nProbe',
+            createEntries: async () => [
+                {
+                    items: [
+                        {
+                            type: 'message',
+                            value: '\\I18N[0]',
+                            cacheKey: 'message:ja-en-\\I18N[0]',
+                        },
+                        {
+                            type: 'command',
+                            value: '\\I18N[1]',
+                            cacheKey: 'command:ja-en-\\I18N[1]',
+                        },
+                    ],
+                },
+            ],
+        });
+        await manager.runBatchedTranslation([{ kind: 'i18nProbe' }], {
+            dryRun: true,
+            showSummary: false,
+        });
+        expect([...runtime.translationCache.keys()]).toEqual([
+            'message:ja-en-台詞',
+            'command:ja-en-アイテム',
+        ]);
+        const batches = [];
+        runtime.engine.batchTranslate = async (batch) => {
+            batches.push(batch);
+            return {
+                successes: batch.map((item) => ({ ...item, translated: 'Translated' })),
+                failures: [],
+            };
+        };
+        await manager.runBatchedTranslation([{ kind: 'i18nProbe', backgroundJob: false }], {
+            showSummary: false,
+        });
+        expect(batches.flat().map((item) => item.value)).toEqual(['台詞', 'アイテム']);
+        expect([...runtime.translationCache.keys()].some((key) => key.includes('I18N['))).toBe(
+            false
+        );
+    } finally {
+        vi.unstubAllGlobals();
+    }
+});
+import { UniqueDataLoaderTranslator } from '../../../../../../cheat-engine/www/cheat/translate-engines/plugins/translators/UniqueDataLoaderTranslator.js';
+it('runs UniqueDataLoader through the actual mass phase and stores only standard typed keys', async () => {
+    vi.stubGlobal('window', globalThis);
+    const runtime = createRuntimeStub();
+    runtime.enabled = true;
+    runtime.isTranslationEnabled = () => true;
+    runtime.getCacheKey = (text, type) =>
+        `${type === 'speaker' ? 'actor_name' : type}:ja-en-${text}`;
+    runtime.isPluginTranslatorEnabled = () => true;
+    const translator = new UniqueDataLoaderTranslator();
+    translator._pluginDetected = true;
+    translator._detectionChecked = true;
+    translator.collectRows([
+        {
+            text: '初見の台詞\r\n二行目',
+            textName: '案内人',
+            choicesText: 'イージー',
+            helpText: '敗北後も続行',
+        },
+        { faceName: 'Actor1', text: '顔付き台詞' },
+    ]);
+    const initial = translator.countAmountSync({ runtime });
+    expect(initial.leftStrings).toBe(5);
+    const manager = new TranslationBatchManager(runtime);
+    manager.register(translator);
+    runtime.engine.batchTranslate = async (items) => ({
+        successes: items.map((item) => ({ ...item, translated: 'Translated ' + item.type })),
+        failures: [],
+    });
+    await manager.runBatchedTranslation(
+        [{ kind: translator.getKind(), itemLimit: 10, charLimit: 5000 }],
+        { showSummary: false }
+    );
+    expect([...runtime.translationCache.keys()].sort()).toEqual(
+        [
+            'actor_name:ja-en-案内人',
+            'choice:ja-en-イージー',
+            'message:ja-en-初見の台詞\n二行目',
+            'message:ja-en-敗北後も続行',
+            'message_portrait:ja-en-顔付き台詞',
+        ].sort()
+    );
+    expect(translator.countAmountSync({ runtime }).leftStrings).toBe(0);
+    expect(await translator.createEntries({ runtime })).toEqual([]);
+    runtime.translationCache.delete('message:ja-en-初見の台詞\n二行目');
+    expect((await translator.createEntries({ runtime })).length).toBe(1);
+    vi.unstubAllGlobals();
 });

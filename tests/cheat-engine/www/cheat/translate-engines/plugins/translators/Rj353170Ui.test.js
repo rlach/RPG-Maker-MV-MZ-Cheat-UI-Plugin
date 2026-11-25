@@ -94,6 +94,10 @@ it('finds legacy MZ config parameters and translates help before rendering lines
         ],
     });
     const t = new ManoInputConfigTranslator();
+    vi.stubGlobal('fetch', async () => ({
+        ok: true,
+        text: async () => 'var $plugins=' + JSON.stringify(window.$plugins) + ';',
+    }));
     vi.spyOn(t, '_scheduleEnablePluginTranslation').mockImplementation(() => {});
     await t.precomputeCounts();
     expect(t._scanEntries.map((e) => e.text)).toContain(text);
@@ -146,6 +150,8 @@ it('hooks gamepad help through the older exported-window branch even on MZ', () 
         Mano_InputConfig: { Window_GamepadConfig: class {}, Scene_GamepadConfig: GamepadScene },
     });
     const translator = new ManoInputConfigTranslator();
+    translator._sourceAliases = new Map([[text, text]]);
+    vi.spyOn(translator, 'precomputeCounts').mockResolvedValue();
     runtimeFor(translator, [[text, 'No gamepad connected.\nPress a button to retry.']]);
     vi.spyOn(translator, '_hookOptionsCommandName').mockReturnValue(true);
     vi.spyOn(translator, '_hookMV').mockReturnValue(true);

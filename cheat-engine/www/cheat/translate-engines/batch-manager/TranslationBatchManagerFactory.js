@@ -1,4 +1,5 @@
 import { TranslationBatchManager } from './TranslationBatchManager.js';
+import { Names } from '../translation-phases/Names.js';
 import { Actor } from '../translation-phases/Actor.js';
 import { CommonEvents } from '../translation-phases/CommonEvents.js';
 import { DataContainer } from '../translation-phases/DataContainer.js';
@@ -33,6 +34,7 @@ function registerDefaultStrategies(manager) {
     }
 
     manager.register(new Actor());
+    manager.register(new Names());
 
     manager.register(DataObjects.getInstance());
     manager.register(new DirectItems());
@@ -60,7 +62,7 @@ export function createTranslationBatchManager(runtime, options = {}) {
             : runtime;
     const manager = new TranslationBatchManager(runtime, {
         ...options,
-        progressUi,
+        progressUi: options.progressUi || progressUi,
     });
     registerDefaultStrategies(manager);
     return manager;

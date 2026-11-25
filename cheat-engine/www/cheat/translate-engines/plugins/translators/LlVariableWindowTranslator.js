@@ -15,6 +15,9 @@ export class LlVariableWindowTranslator extends SourceTextCatalogTranslator {
     shouldScanEventData() {
         return false;
     }
+    getCatalogCacheTypes() {
+        return [this.getCacheType(), 'variable'];
+    }
     hookVariableWindows(scene) {
         this.prototypes ??= new WeakSet();
         for (let id = 1; id <= 4; id++) {

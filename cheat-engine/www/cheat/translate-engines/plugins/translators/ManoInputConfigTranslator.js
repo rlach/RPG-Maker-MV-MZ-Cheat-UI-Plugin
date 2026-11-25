@@ -1,5 +1,11 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
+import { parseJsonSafely, walkNestedJsonLike } from './TranslatorHelpers.js';
+import { readJavaScriptLiteralData } from './JavaScriptTextCatalog.js';
 
+/** Mano_InputConfig: legacy MV and MZ multilingual parameter layouts.
+ * Immutable parameter labels and authored language variants define source identity;
+ * arbitrary key caps, indexes and translated drawing output are never harvested.
+ */
 const RUNTIME_HOOK_GUARD = '__CHEAT_MANO_INPUT_CONFIG_TRANSLATOR_HOOKED__';
 
 const CACHE_TYPE = 'plugin_mano_input_config';
@@ -20,31 +26,13 @@ function noteOrString(text) {
 
     if (text[0] === '"' && text[text.length - 1] === '"') {
         try {
-            return JSON.parse(text);
+            return parseJsonSafely(text, text);
         } catch (_) {
             // fall through – return raw
         }
     }
 
     return text;
-}
-
-/**
- * Safe JSON.parse – returns null on failure.
- *
- * @param {string} raw
- * @returns {object|null}
- */
-function safeJsonParse(raw) {
-    if (typeof raw !== 'string' || !raw.trim()) {
-        return null;
-    }
-
-    try {
-        return JSON.parse(raw);
-    } catch (_) {
-        return null;
-    }
 }
 
 /**
@@ -55,7 +43,7 @@ function safeJsonParse(raw) {
  * @returns {string}
  */
 function extractMultiLangString(raw) {
-    const obj = safeJsonParse(raw);
+    const obj = parseJsonSafely(raw, null);
     if (!obj) {
         return '';
     }
@@ -71,7 +59,7 @@ function extractMultiLangString(raw) {
  * @returns {string}
  */
 function extractMultiLangNote(raw) {
-    const obj = safeJsonParse(raw);
+    const obj = parseJsonSafely(raw, null);
     if (!obj) {
         return '';
     }
@@ -87,7 +75,7 @@ function extractMultiLangNote(raw) {
  * @returns {{ name: string, keyText: string, helpText: string }}
  */
 function extractBasicSymbol(raw) {
-    const obj = safeJsonParse(raw);
+    const obj = parseJsonSafely(raw, null);
     if (!obj) {
         return { name: '', keyText: '', helpText: '' };
     }
@@ -107,7 +95,7 @@ function extractBasicSymbol(raw) {
  * @returns {string}
  */
 function extractKeyconfigCommand(raw) {
-    const obj = safeJsonParse(raw);
+    const obj = parseJsonSafely(raw, null);
     if (!obj) {
         return '';
     }
@@ -144,23 +132,13 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
      * @returns {string}
      */
     resolveFromCache(text, runtime) {
-        if (!this.isUsableText(text)) {
-            return text;
-        }
-
-        if (!runtime) {
-            return text;
-        }
-
-        const cacheKey = runtime.getCacheKey(text, CACHE_TYPE);
-        runtime.trackCacheKeyUsage(cacheKey);
-
-        if (!runtime.hasUsableCacheValue(cacheKey)) {
-            return text;
-        }
-
-        const cached = runtime.translationCache.get(cacheKey);
-        return this.isUsableText(cached) ? cached : text;
+        if (!this.isRuntimeTranslationActive(runtime)) return text;
+        const source = this._sourceAliases?.get(text);
+        if (!source) return text;
+        const translated = this.resolveRuntimeTranslation(source, runtime, CACHE_TYPE, {
+            missValue: text,
+        });
+        return translated === source ? text : translated;
     }
 
     // ─── Runtime hooks ────────────────────────────────────────────────────────
@@ -194,6 +172,7 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
     }
 
     enablePluginTranslation() {
+        void this.precomputeCounts();
         if (window[RUNTIME_HOOK_GUARD]) {
             return true;
         }
@@ -1033,10 +1012,10 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
         // ── extendsMapper (array of struct<InputDefine>) ─────────────────────
         const extendersRaw = params['extendsMapper'];
         if (typeof extendersRaw === 'string' && extendersRaw.trim()) {
-            const extenders = safeJsonParse(extendersRaw);
+            const extenders = parseJsonSafely(extendersRaw);
             if (Array.isArray(extenders)) {
                 for (let i = 0; i < extenders.length; i++) {
-                    const item = safeJsonParse(extenders[i]);
+                    const item = parseJsonSafely(extenders[i]);
                     if (!item) {
                         continue;
                     }
@@ -1070,32 +1049,26 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
         }
     }
 
-    buildScanEntries() {
+    async buildScanEntries() {
         const entries = [];
-
-        // Collect from $plugins entry (persisted parameters in plugins.js)
-        const pluginEntry = this.findPluginEntry(this.getPluginName());
-        if (pluginEntry?.parameters) {
-            this.appendEntriesFromParameters(
-                pluginEntry.parameters,
-                'pluginEntryParameter',
-                entries
-            );
-        }
-
-        // Collect from PluginManager.parameters() (runtime-merged parameters)
-        const pluginManager = window['PluginManager'];
-        if (pluginManager && typeof pluginManager.parameters === 'function') {
-            const runtimeParams = pluginManager.parameters(this.getPluginName());
-            if (runtimeParams && typeof runtimeParams === 'object') {
-                this.appendEntriesFromParameters(
-                    runtimeParams,
-                    'runtimePluginManagerParameter',
-                    entries
-                );
+        const response = await fetch('js/plugins.js');
+        if (!response.ok) throw new Error('Cannot read Mano InputConfig source manifest');
+        const { bindings } = readJavaScriptLiteralData(await response.text(), ['$plugins']);
+        const plugin = (bindings.$plugins || []).find(
+            (entry) => entry.status && entry.name.split('/').pop() === this.getPluginName()
+        );
+        const parameters = plugin?.parameters || {};
+        this.appendEntriesFromParameters(parameters, 'originalPluginParameters', entries);
+        this._sourceAliases = new Map(entries.map(({ text }) => [text, text]));
+        walkNestedJsonLike(parameters, (value) => {
+            if (!value || typeof value !== 'object' || typeof value.jp !== 'string') return;
+            const source = noteOrString(value.jp);
+            if (!this._sourceAliases.has(source)) return;
+            for (const variant of [value.jp, value.en]) {
+                if (typeof variant === 'string' && variant)
+                    this._sourceAliases.set(noteOrString(variant), source);
             }
-        }
-
+        });
         // Mano_InputConfig also defines some translatable labels in code literals
         // rather than plugin parameters (e.g. createButtonLayoutChangeCommand).
         for (const text of STATIC_PLUGIN_TEXTS) {
@@ -1109,14 +1082,11 @@ export class ManoInputConfigTranslator extends BasePluginTranslator {
             }
         }
 
+        for (const { text } of entries) this._sourceAliases.set(text, text);
         return entries;
     }
 
     async precomputeCounts() {
-        if (!this.ensureDetection()) {
-            return;
-        }
-
         if (this._scanPrepared) {
             return;
         }

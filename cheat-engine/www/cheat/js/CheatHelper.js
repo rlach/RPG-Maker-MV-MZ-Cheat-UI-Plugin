@@ -771,6 +771,7 @@ export class MessageCheat {
             const result = clear.apply(this, args);
             this.__cheatMessageLogId = null;
             this.__cheatDisplayedLogBody = null;
+            this.__cheatDisplayedLogSource = null;
             return result;
         };
 

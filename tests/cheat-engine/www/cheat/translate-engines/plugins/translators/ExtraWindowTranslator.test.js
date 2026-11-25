@@ -78,3 +78,51 @@ it('retries until the plugin window is available and restores templates on failu
     expect(() => display.drawAllText()).toThrow('draw failed');
     expect(display._data.Text).toBe('original');
 });
+
+it('reuses original actor-name cache entries in partially translated HUDs without changing source data', () => {
+    const source = String.raw`\ac\FS[24] セイラ Lv\V[68]`;
+    const partial = String.raw`\AC\FS[24] セイラ Level\V[68]`;
+    class ExtraWindow {
+        constructor() {
+            this._data = { Text: source };
+        }
+        drawAllText() {
+            return this._data.Text.replace('\\V[68]', '1');
+        }
+    }
+    const actors = [
+        null,
+        { name: 'Seila', _translateOriginal: { name: 'セイラ' } },
+        { name: 'Font', _translateOriginal: { name: 'FS' } },
+    ];
+    vi.stubGlobal('window', { Window_SceneExtra: ExtraWindow, $dataActors: actors });
+    vi.stubGlobal('Window_SceneExtra', ExtraWindow);
+    let enabled = true;
+    const runtime = {
+        isTranslationEnabled: () => enabled,
+        getCacheKey: (text, type) => `${type}:${text}`,
+        translationCache: new Map([
+            ['plugin_extra_window:' + source, partial],
+            ['actor_name:セイラ', 'Seila'],
+            ['actor_name:FS', 'Font'],
+        ]),
+        hasUsableCacheValue(key) {
+            return this.translationCache.has(key);
+        },
+        trackCacheKeyUsage: vi.fn(),
+    };
+    const translator = new ExtraWindowTranslator();
+    vi.spyOn(translator, 'getRuntime').mockReturnValue(runtime);
+    expect(translator.enablePluginTranslation()).toBe(true);
+    const hud = new ExtraWindow();
+    for (let i = 0; i < 3; i++) expect(hud.drawAllText()).toBe(String.raw`\AC\FS[24] Seila Level1`);
+    expect(hud._data.Text).toBe(source);
+    expect(actors[1]).toEqual({ name: 'Seila', _translateOriginal: { name: 'セイラ' } });
+    expect(
+        runtime.trackCacheKeyUsage.mock.calls.every(
+            ([key]) => key === 'plugin_extra_window:' + source || key === 'actor_name:セイラ'
+        )
+    ).toBe(true);
+    enabled = false;
+    expect(hud.drawAllText()).toBe(source.replace('\\V[68]', '1'));
+});

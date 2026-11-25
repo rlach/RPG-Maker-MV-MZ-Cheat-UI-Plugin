@@ -1,8 +1,12 @@
 import { SourceTextCatalogTranslator } from '../SourceTextCatalogTranslator.js';
 
+/** TMGoldLevelUp (MV) and TMGoldLevelUpMZ: command, funding and skill labels. */
 export class TmGoldLevelUpTranslator extends SourceTextCatalogTranslator {
     getPluginName() {
         return 'TMGoldLevelUp';
+    }
+    getPluginAliases() {
+        return ['TMGoldLevelUp', 'TMGoldLevelUpMZ'];
     }
     getCacheType() {
         return 'plugin_tm_gold_level_up';
@@ -11,7 +15,13 @@ export class TmGoldLevelUpTranslator extends SourceTextCatalogTranslator {
         return false;
     }
     collectParameterTexts(parameters) {
-        for (const field of ['levelUpCommand', 'currentGold', 'learnSkill']) {
+        for (const field of [
+            'levelUpCommand',
+            'currentGold',
+            'learnSkill',
+            'execLevelUpText',
+            'cancelLevelUpText',
+        ]) {
             const text = parameters[field];
             if (this.isUsableText(text)) this.entries.set(text, { text });
         }

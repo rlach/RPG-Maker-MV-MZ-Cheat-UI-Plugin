@@ -6,6 +6,7 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { parseStructArraySafely } from './TranslatorHelpers.js';
 import { withVariableDisplayContext } from '../../../js/translation-runtime/VariableDisplayContext.js';
+import { escapeCatalogPattern } from './JavaScriptTextCatalog.js';
 
 export class ExtraWindowTranslator extends BasePluginTranslator {
     constructor() {
@@ -64,7 +65,30 @@ export class ExtraWindowTranslator extends BasePluginTranslator {
             }
 
             const sourceText = this._data.Text;
-            const translated = translator.resolveRuntimeTranslation(sourceText, runtime);
+            let translated = translator.resolveRuntimeTranslation(sourceText, runtime);
+            // Literal actor captions can remain in an otherwise translated HUD.
+            // Reuse proven database sources, never harvest the displayed template.
+            const actorNames = (window.$dataActors || [])
+                .filter(Boolean)
+                .map((actor) => actor._translateOriginal?.name || actor.name)
+                .filter((name) => typeof name === 'string' && name && sourceText.includes(name));
+            const names = [...new Set(actorNames)].sort((a, b) => b.length - a.length);
+            if (names.length) {
+                const pattern = new RegExp(
+                    '(^|[\\s\\]])(' +
+                        names.map(escapeCatalogPattern).join('|') +
+                        ')(?=$|[\\s\\\\:：])',
+                    'g'
+                );
+                translated = translated.replace(
+                    pattern,
+                    (_, prefix, name) =>
+                        prefix +
+                        translator.resolveRuntimeTranslation(name, runtime, 'actor_name', {
+                            harvestMissing: false,
+                        })
+                );
+            }
             if (translated === sourceText)
                 return withVariableDisplayContext(() => original.apply(this, arguments));
 

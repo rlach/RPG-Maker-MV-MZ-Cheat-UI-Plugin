@@ -1,3 +1,4 @@
+import { withOriginalTextResource } from '../TextResourceTranslationContext.js';
 /**
  * MNKR_TMLogWindowMZ translator
  *
@@ -11,7 +12,6 @@
  */
 
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
-import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
 import { parseJsonSafely } from './TranslatorHelpers.js';
 import { isKnownDisplayTranslation } from '../NotificationTranslationContext.js';
 
@@ -22,6 +22,8 @@ const CANDIDATE_TEXT_ARG_KEYS = ['text', 'message', 'log', 'value', 'line'];
 
 function isSupportedPluginName(value) {
     const pluginName = String(value || '')
+        .split('/')
+        .pop()
         .trim()
         .toLowerCase();
 
@@ -157,10 +159,35 @@ export class MNKRTMLogWindowMZTranslator extends BasePluginTranslator {
         };
         const addLog = system.addLog;
         system.addLog = function (text, ...args) {
-            const result = addLog.call(this, text, ...args);
+            // Native addLog snapshots variables into the saved original log.
+            const result = withOriginalTextResource(() => addLog.call(this, text, ...args));
             const stored = this._actionLog?.[this._actionLog.length - 1];
             if (typeof stored === 'string') {
-                origins.set(stored, mirror ? { ...mirror, mirrored: true } : { source: text });
+                let displayText = null;
+                const runtime = translator.getRuntime();
+                if (!mirror && translator.isRuntimeTranslationActive(runtime)) {
+                    const knownTemplate = runtime.hasUsableCacheValue(
+                        runtime.getCacheKey(text, translator.getCacheType())
+                    );
+                    const translated = knownTemplate
+                        ? translator.resolveRuntimeTranslation(
+                              text,
+                              runtime,
+                              translator.getCacheType(),
+                              { harvestMissing: false }
+                          )
+                        : text;
+                    const dummy = window.$gameTemp?.dummyWindow?.();
+                    const rendered =
+                        typeof dummy?.convertEscapeCharacters === 'function'
+                            ? dummy.convertEscapeCharacters(translated)
+                            : translated;
+                    if (rendered !== text && rendered !== stored) displayText = rendered;
+                }
+                origins.set(
+                    stored,
+                    mirror ? { ...mirror, mirrored: true } : { source: text, displayText }
+                );
                 if (origins.size > 4096) origins.delete(origins.keys().next().value);
             }
             return result;
@@ -175,9 +202,27 @@ export class MNKRTMLogWindowMZTranslator extends BasePluginTranslator {
                 isKnownDisplayTranslation(runtime, text)
             )
                 return draw.call(this, text, ...args);
-            // eslint-disable-next-line no-control-regex -- Restore RPG Maker ESC controls for cache lookup.
-            const origin = origins.get(text) || { source: String(text).replace(/\x1b/g, '\\') };
-            const source = origin.group ? origin.group.lines.join('\n') : origin.source;
+            // Both native log windows prepend font size after addLog has stored
+            // the expanded line. Match its identity before considering cache keys.
+            let origin = origins.get(text);
+            // eslint-disable-next-line no-control-regex -- Native stored logs use RPG Maker ESC controls.
+            const prefix = origin ? '' : String(text).match(/^(?:\\|\x1b)FS\[\d+\]/i)?.[0] || '';
+            origin ??= origins.get(String(text).slice(prefix.length));
+            if (!origin) {
+                // Loaded saves have no in-memory origin map. Recover only exact
+                // authored commands, allowing native ESC conversion of controls.
+                const stored = String(text).slice(prefix.length).replaceAll('\x1b', '\\');
+                const entry = translator._scanEntries.find((entry) => entry.text === stored);
+                if (entry) origin = { source: entry.text };
+            }
+            // Saved/foreign rendered lines have no proven source identity. Never
+            // harvest them: they may contain translated names or variable values.
+            if (!origin) return draw.call(this, text, ...args);
+            const render = (value) => draw.call(this, prefix + value, ...args);
+            if (typeof origin.displayText === 'string') return render(origin.displayText);
+            const source = origin.group
+                ? origin.group.lines.join('\n').replace(/\r\n/g, '\n')
+                : origin.source;
             const preferred = runtime.getPreferredMessageCacheEntry(source, {
                 hasPortrait: origin.portrait,
             });
@@ -190,24 +235,34 @@ export class MNKRTMLogWindowMZTranslator extends BasePluginTranslator {
                         : origin.index === origin.group.lines.length - 1
                           ? lines.join(' ')
                           : '';
-                return draw.call(this, translated, ...args);
+                return render(translated);
             }
             if (!translator.isUsableText(translated)) {
                 // A mirrored cache miss belongs to the regular message pipeline.
-                translated = origin.mirrored
-                    ? text
-                    : translator.resolveRuntimeTranslation(origin.source, runtime);
+                const knownSource =
+                    translator._scanEntries.some((entry) => entry.text === origin.source) ||
+                    runtime.hasUsableCacheValue(
+                        runtime.getCacheKey(origin.source, translator.getCacheType())
+                    );
+                translated =
+                    origin.mirrored || !knownSource
+                        ? text
+                        : translator.resolveRuntimeTranslation(
+                              origin.source,
+                              runtime,
+                              translator.getCacheType(),
+                              {
+                                  missValue: text,
+                                  harvestMissing: false,
+                              }
+                          );
             }
-            return draw.call(this, translated, ...args);
+            return translated === text ? draw.call(this, text, ...args) : render(translated);
         };
         return true;
     }
 
     async precomputeCounts() {
-        if (!this.ensureDetection()) {
-            return;
-        }
-
         if (this._scanPrepared) {
             return;
         }
@@ -405,6 +460,8 @@ export class MNKRTMLogWindowMZTranslator extends BasePluginTranslator {
     }
 
     async collectMapEntries(output) {
+        const { loadMapDataById } =
+            await import('../../../js/translation-runtime/ObjectTranslationModalMethods.js');
         const mapInfos = Array.isArray(window.$dataMapInfos) ? window.$dataMapInfos : [];
         for (const mapInfo of mapInfos) {
             const mapId = Number(mapInfo?.id);

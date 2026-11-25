@@ -53,7 +53,7 @@ function excluded(ancestors) {
         if (node.type === 'AssignmentExpression' && node.left.type === 'MemberExpression')
             return ASSET_FIELD.test(keyName(node.left.property));
         if (node.type === 'VariableDeclarator')
-            return /(?:IMAGE|PICTURE|PORTRAIT|ASSET|SOUND|FONT|PATH|FILE)/i.test(
+            return /(?:IMAGE|PICTURE|PORTRAIT|ASSET|SOUND|FONT|PATH|(?:^|_)FILE)/i.test(
                 node.id.name || ''
             );
         if (node.type !== 'CallExpression') return false;

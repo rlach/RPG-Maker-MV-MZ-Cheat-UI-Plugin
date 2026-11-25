@@ -3,7 +3,7 @@
 export function displayedMessageText(text, messageWindow, alreadyConverted = false) {
     let value = String(text ?? '');
     if (!value) return value;
-    if (!alreadyConverted) {
+    if (!alreadyConverted || /(?:\\|\x1b)(?:V|N|P)\[\d+\]/i.test(value)) {
         // Message-specific conversion can clear/reopen a plugin's name box.
         // Use the base escape converter for read-only log snapshots instead.
         const convert =
@@ -34,8 +34,10 @@ export function displayedSpeakerName(message, messageWindow) {
 
 export function recordDisplayedMessage(message, messageWindow, choiceWindow, store, meta = {}) {
     const displayed = messageWindow?._textState?.text;
-    if (typeof displayed === 'string')
+    if (typeof displayed === 'string' && displayed !== message.__cheatDisplayedLogSource) {
         message.__cheatDisplayedLogBody = displayedMessageText(displayed, messageWindow, true);
+        message.__cheatDisplayedLogSource = displayed;
+    }
     const body =
         message.__cheatDisplayedLogBody ?? displayedMessageText(message.allText(), messageWindow);
     const choices = choiceWindow

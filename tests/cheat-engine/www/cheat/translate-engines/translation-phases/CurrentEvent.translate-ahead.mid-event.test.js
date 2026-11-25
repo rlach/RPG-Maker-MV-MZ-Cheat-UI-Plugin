@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock(
-    '../../../../../../../cheat-engine/www/cheat/translate-engines/plugins/PluginTranslatorRegistry.js',
+    '../../../../../../cheat-engine/www/cheat/translate-engines/plugins/PluginTranslatorRegistry.js',
     () => ({
         PLUGIN_TRANSLATOR_REGISTRY: {
             buildEventCommandTraversalOptions: vi.fn(() => ({})),
@@ -12,8 +12,8 @@ vi.mock(
     })
 );
 
-import { CurrentEvent } from '../../../../../../../cheat-engine/www/cheat/translate-engines/translation-phases/CurrentEvent.js';
-import { translateOnTheFlyFlowMethods } from '../../../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslateOnTheFlyFlowMethods.js';
+import { CurrentEvent } from '../../../../../../cheat-engine/www/cheat/translate-engines/translation-phases/CurrentEvent.js';
+import { translateOnTheFlyFlowMethods } from '../../../../../../cheat-engine/www/cheat/js/translation-runtime/TranslateOnTheFlyFlowMethods.js';
 
 function buildShowTextEvent(messageTexts) {
     const list = [];

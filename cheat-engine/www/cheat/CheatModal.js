@@ -1,3 +1,4 @@
+import { observeOverlaySize } from './js/OverlayResize.js';
 import GeneralPanel from './panels/GeneralPanel.js';
 import HealthSettingPanel from './panels/HealthSettingPanel.js';
 import StatsSettingPanel from './panels/StatsSettingPanel.js';
@@ -10,6 +11,7 @@ import SaveRecallPanel from './panels/SaveRecallPanel.js';
 import TeleportPanel from './panels/TeleportPanel.js';
 import TextLogPanel from './panels/TextLogPanel.js';
 import ShortcutPanel from './panels/ShortcutPanel.js';
+import QuickTranslationPanel from './panels/QuickTranslationPanel.js';
 import TranslateOnTheFlyPanel from './panels/TranslateOnTheFlyPanel.js';
 import TranslateNamesPanel from './panels/TranslateNamesPanel.js';
 import TranslateCacheManagerPanel from './panels/TranslateCacheManagerPanel.js';
@@ -36,6 +38,7 @@ export default {
         TeleportPanel,
         TextLogPanel,
         ShortcutPanel,
+        QuickTranslationPanel,
         TranslateOnTheFlyPanel,
         TranslateNamesPanel,
         TranslateCacheManagerPanel,
@@ -171,6 +174,11 @@ export default {
                     icon: 'mdi-cog',
                     children: [
                         {
+                            name: 'Quick Start',
+                            icon: 'mdi-lightning-bolt',
+                            component: 'quick-translation-panel',
+                        },
+                        {
                             name: 'Settings',
                             icon: 'mdi-translate',
                             component: 'translate-on-the-fly-panel',
@@ -221,7 +229,7 @@ export default {
             ],
             overlayWidth: 700,
             overlayHeight: 400,
-            resizeObserver: null,
+            stopResizeObserver: null,
         };
     },
 
@@ -269,30 +277,11 @@ export default {
 
     methods: {
         initResizeObserver() {
-            if (!window.ResizeObserver) {
-                return;
-            }
-
-            this.resizeObserver = new ResizeObserver((entries) => {
-                if (!entries || !entries.length) return;
-                const rect = entries[0].contentRect;
-                if (!rect) return;
-                const newWidth = Math.round(rect.width);
-                const newHeight = Math.round(rect.height);
-
-                const changed = newWidth !== this.overlayWidth || newHeight !== this.overlayHeight;
-                this.overlayWidth = newWidth;
-                this.overlayHeight = newHeight;
-
-                if (changed) {
-                    CHEAT_WINDOW_MANAGER.setOverlaySize(newWidth, newHeight);
-                }
-            });
-
             this.$nextTick(() => {
-                if (this.$el && this.resizeObserver) {
-                    this.resizeObserver.observe(this.$el);
-                }
+                if (!this.$el) return;
+                this.stopResizeObserver = observeOverlaySize(this.$el, (width, height) => {
+                    CHEAT_WINDOW_MANAGER.setOverlaySize(width, height);
+                });
             });
         },
 
@@ -316,16 +305,7 @@ export default {
     },
 
     beforeUnmount() {
-        if (this.resizeObserver && this.$el) {
-            try {
-                this.resizeObserver.unobserve(this.$el);
-            } catch (_e) {
-                /* observer cleanup */
-            }
-        }
-        if (this.resizeObserver) {
-            this.resizeObserver.disconnect();
-            this.resizeObserver = null;
-        }
+        this.stopResizeObserver?.();
+        this.stopResizeObserver = null;
     },
 };

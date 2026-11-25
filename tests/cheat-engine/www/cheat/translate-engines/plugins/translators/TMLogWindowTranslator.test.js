@@ -30,74 +30,94 @@ it('scans MV addLog and script entries without duplicating regular messages', ()
     ]);
 });
 
-it.each([TMLogWindowTranslator, MNKRTMLogWindowMZTranslator])('renders mirrored messages through their standard whole-message cache and keeps stored logs original (%s)', (Translator) => {
-    vi.stubGlobal('window', globalThis);
-    class System {
-        constructor() {
-            this._actionLog = [];
+it.each([TMLogWindowTranslator, MNKRTMLogWindowMZTranslator])(
+    'renders mirrored messages through their standard whole-message cache and keeps stored logs original (%s)',
+    (Translator) => {
+        vi.stubGlobal('window', globalThis);
+        class System {
+            constructor() {
+                this._actionLog = [];
+            }
+            addLog(text) {
+                this._actionLog.push(text);
+            }
         }
-        addLog(text) {
-            this._actionLog.push(text);
+        const system = new System();
+        class Message {
+            constructor() {
+                this._texts = [];
+            }
+            faceName() {
+                return '';
+            }
+            add(text) {
+                this._texts.push(text);
+                system.addLog(text);
+            }
         }
+        class Base {
+            drawTextEx(text) {
+                return text;
+            }
+        }
+        class Window_MapLog extends Base {}
+        vi.stubGlobal('Game_System', System);
+        vi.stubGlobal('Game_Message', Message);
+        vi.stubGlobal('Window_Base', Base);
+        const cache = new Map([
+            ['会話', 'Dialogue'],
+            ['アイテム\\I[322]', 'Item\\I[322]'],
+            ['一行\n二行', 'First\nSecond'],
+        ]);
+        const runtime = {
+            enabled: true,
+            isTranslationEnabled() {
+                return this.enabled;
+            },
+            getPreferredMessageCacheEntry: (text) => ({ value: cache.get(text) }),
+            translationCache: new Map([
+                [`${new Translator().getCacheType()}:追加情報`, 'Extra information'],
+            ]),
+            getCacheKey: (text, type) => `${type}:${text}`,
+            hasUsableCacheValue(key) {
+                return !!this.translationCache.get(key);
+            },
+            trackCacheKeyUsage: vi.fn(),
+        };
+        const translator = new Translator();
+        vi.spyOn(translator, 'getRuntime').mockReturnValue(runtime);
+        expect(translator.enablePluginTranslation()).toBe(true);
+        const log = new Window_MapLog();
+        new Message().add('会話');
+        expect(log.drawTextEx('会話')).toBe('Dialogue');
+        expect(log.drawTextEx('\\FS[24]会話')).toBe('\\FS[24]Dialogue');
+        expect(runtime.trackCacheKeyUsage).not.toHaveBeenCalled();
+        new Message().add('アイテム\\I[322]');
+        expect(log.drawTextEx('アイテム\\I[322]')).toBe('Item\\I[322]');
+        const message = new Message();
+        message.add('一行');
+        message.add('二行');
+        expect(log.drawTextEx('一行')).toBe('First');
+        expect(log.drawTextEx('二行')).toBe('Second');
+        expect(log.drawTextEx('\\FS[24]一行')).toBe('\\FS[24]First');
+        expect(log.drawTextEx('\x1bFS[24]二行')).toBe('\x1bFS[24]Second');
+        system.addLog('追加情報');
+        expect(log.drawTextEx('追加情報')).toBe('Extra information');
+        expect(system._actionLog).toEqual(['会話', 'アイテム\\I[322]', '一行', '二行', '追加情報']);
+        expect(new Base().drawTextEx('追加情報')).toBe('追加情報');
+        if (Translator === MNKRTMLogWindowMZTranslator) {
+            const notice = String.raw`\C[1]メインクエスト\C[0]が更新されました`;
+            translator._scanEntries = [{ text: notice }];
+            runtime.translationCache.set(
+                `${translator.getCacheType()}:${notice}`,
+                'Main quest updated'
+            );
+            expect(log.drawTextEx('\\FS[24]' + notice.replaceAll('\\', '\x1b'))).toBe(
+                '\\FS[24]Main quest updated'
+            );
+            expect(log.drawTextEx('unknown saved output')).toBe('unknown saved output');
+        }
+        runtime.enabled = false;
+        expect(log.drawTextEx('会話')).toBe('会話');
     }
-    const system = new System();
-    class Message {
-        constructor() {
-            this._texts = [];
-        }
-        faceName() {
-            return '';
-        }
-        add(text) {
-            this._texts.push(text);
-            system.addLog(text);
-        }
-    }
-    class Base {
-        drawTextEx(text) {
-            return text;
-        }
-    }
-    class Window_MapLog extends Base {}
-    vi.stubGlobal('Game_System', System);
-    vi.stubGlobal('Game_Message', Message);
-    vi.stubGlobal('Window_Base', Base);
-    const cache = new Map([
-        ['会話', 'Dialogue'],
-        ['アイテム\\I[322]', 'Item\\I[322]'],
-        ['一行\n二行', 'First\nSecond'],
-    ]);
-    const runtime = {
-        enabled: true,
-        isTranslationEnabled() {
-            return this.enabled;
-        },
-        getPreferredMessageCacheEntry: (text) => ({ value: cache.get(text) }),
-        translationCache: new Map([[`${new Translator().getCacheType()}:追加情報`, 'Extra information']]),
-        getCacheKey: (text, type) => `${type}:${text}`,
-        hasUsableCacheValue(key) {
-            return !!this.translationCache.get(key);
-        },
-        trackCacheKeyUsage: vi.fn(),
-    };
-    const translator = new Translator();
-    vi.spyOn(translator, 'getRuntime').mockReturnValue(runtime);
-    expect(translator.enablePluginTranslation()).toBe(true);
-    const log = new Window_MapLog();
-    new Message().add('会話');
-    expect(log.drawTextEx('会話')).toBe('Dialogue');
-    expect(runtime.trackCacheKeyUsage).not.toHaveBeenCalled();
-    new Message().add('アイテム\\I[322]');
-    expect(log.drawTextEx('アイテム\\I[322]')).toBe('Item\\I[322]');
-    const message = new Message();
-    message.add('一行');
-    message.add('二行');
-    expect(log.drawTextEx('一行')).toBe('First');
-    expect(log.drawTextEx('二行')).toBe('Second');
-    system.addLog('追加情報');
-    expect(log.drawTextEx('追加情報')).toBe('Extra information');
-    expect(system._actionLog).toEqual(['会話', 'アイテム\\I[322]', '一行', '二行', '追加情報']);
-    expect(new Base().drawTextEx('追加情報')).toBe('追加情報');
-    runtime.enabled = false;
-    expect(log.drawTextEx('会話')).toBe('会話');
-});
+);

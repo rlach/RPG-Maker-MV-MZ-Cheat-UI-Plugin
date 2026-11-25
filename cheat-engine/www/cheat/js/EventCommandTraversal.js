@@ -5,8 +5,12 @@ const SHOW_SCROLL_TEXT_CODE = 105;
 const SHOW_SCROLL_TEXT_LINE_CODE = 405;
 const CHANGE_NAME_CODE = 320;
 const CONTROL_VARIABLES_CODE = 122;
+const SCRIPT_CODE = 355;
+const SCRIPT_LINE_CODE = 655;
 const VARIABLE_OPERAND_CONSTANT = 0;
 const VARIABLE_OPERAND_SCRIPT = 4;
+const SCRIPT_SET_VARIABLE_PATTERN =
+    /(?:window\.)?\$gameVariables\.setValue\(\s*(\d+)\s*,\s*('(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*")\s*\)/g;
 
 function isNonEmptyString(value) {
     return typeof value === 'string' && value !== '';
@@ -194,6 +198,46 @@ export function extractScrollTextEntryAt(list, scrollCmdIndex) {
     };
 }
 
+function collectScriptVariableAssignmentEntries(
+    scriptText,
+    cmdIndex,
+    command,
+    allowedIds,
+    entries
+) {
+    if (!isNonEmptyString(scriptText)) {
+        return;
+    }
+
+    SCRIPT_SET_VARIABLE_PATTERN.lastIndex = 0;
+    let match = SCRIPT_SET_VARIABLE_PATTERN.exec(scriptText);
+    while (match) {
+        const variableId = Number(match[1]) || 0;
+        const rawOperandValue = match[2];
+        const value = decodeSimpleJsStringLiteral(rawOperandValue);
+
+        if (
+            variableId > 0 &&
+            isNonEmptyString(value) &&
+            (!allowedIds || allowedIds.has(variableId))
+        ) {
+            entries.push({
+                type: 'variable_value',
+                value,
+                operandType: VARIABLE_OPERAND_SCRIPT,
+                rawOperandValue,
+                variableIds: [variableId],
+                variableIdStart: variableId,
+                variableIdEnd: variableId,
+                cmdIndex,
+                command,
+            });
+        }
+
+        match = SCRIPT_SET_VARIABLE_PATTERN.exec(scriptText);
+    }
+}
+
 export function collectVariableAssignmentEntries(list, options = {}) {
     if (!Array.isArray(list)) {
         return [];
@@ -218,7 +262,28 @@ export function collectVariableAssignmentEntries(list, options = {}) {
 
     for (let i = 0; i < list.length; i++) {
         const cmd = list[i];
-        if (!cmd || cmd.code !== CONTROL_VARIABLES_CODE) {
+        if (!cmd) {
+            continue;
+        }
+
+        if (cmd.code === SCRIPT_CODE || cmd.code === SCRIPT_LINE_CODE) {
+            const lines = [String(cmd.parameters?.[0] || '')];
+            let nextIndex = i + 1;
+            while (
+                cmd.code === SCRIPT_CODE &&
+                nextIndex < list.length &&
+                list[nextIndex]?.code === SCRIPT_LINE_CODE
+            ) {
+                lines.push(String(list[nextIndex].parameters?.[0] || ''));
+                nextIndex += 1;
+            }
+
+            collectScriptVariableAssignmentEntries(lines.join('\n'), i, cmd, allowedIds, entries);
+            i = nextIndex - 1;
+            continue;
+        }
+
+        if (cmd.code !== CONTROL_VARIABLES_CODE) {
             continue;
         }
 

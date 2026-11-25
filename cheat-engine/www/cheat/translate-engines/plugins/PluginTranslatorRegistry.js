@@ -1,3 +1,16 @@
+import { Project3UiTranslator } from './translators/Project3UiTranslator.js';
+import { SakuraEventIndicatorTranslator } from './translators/SakuraEventIndicatorTranslator.js';
+import { MuuiLocalizationTranslator } from './translators/MuuiLocalizationTranslator.js';
+import { WdmzPartyChangeTranslator } from './translators/WdmzPartyChangeTranslator.js';
+import { MessageWindowOffsetTranslator } from './translators/MessageWindowOffsetTranslator.js';
+import { ShopSceneExtensionTranslator } from './translators/ShopSceneExtensionTranslator.js';
+import { ChangeSelectItemWindowMZTranslator } from './translators/ChangeSelectItemWindowMZTranslator.js';
+import { TDogUiTranslator } from './translators/TDogUiTranslator.js';
+import { AdvSystemTranslator } from './translators/AdvSystemTranslator.js';
+import { UskMiraUiTranslator } from './translators/UskMiraUiTranslator.js';
+import { AddPluginUiSuiteTranslator } from './translators/AddPluginUiSuiteTranslator.js';
+import { DarkPlasmaIndividualItemCommandTranslator } from './translators/DarkPlasmaIndividualItemCommandTranslator.js';
+import { UniqueDataLoaderTranslator } from './translators/UniqueDataLoaderTranslator.js';
 import { TmGoldLevelUpTranslator } from './translators/TmGoldLevelUpTranslator.js';
 import { EncLive2dSaveTranslator } from './translators/EncLive2dSaveTranslator.js';
 import { VisuOptionsCoreTranslator } from './translators/VisuOptionsCoreTranslator.js';
@@ -308,11 +321,18 @@ import { ResidentWindowTranslator } from './translators/ResidentWindowTranslator
 import { SaveNameInputTranslator } from './translators/SaveNameInputTranslator.js';
 import { MiniInformationWindowTranslator } from './translators/MiniInformationWindowTranslator.js';
 import { SRDHUDMakerTranslator } from './translators/SRDHUDMakerTranslator.js';
+import { HsCustomUiTranslator } from './translators/HsCustomUiTranslator.js';
+import { BattleEroTranslator } from './translators/BattleEroTranslator.js';
+import { RecollectionRoomTranslator } from './translators/RecollectionRoomTranslator.js';
+import { CallEnemyTranslator } from './translators/CallEnemyTranslator.js';
+import { FtkrOriginalSceneWindowTranslator } from './translators/FtkrOriginalSceneWindowTranslator.js';
+import { MenuWindowTranslator } from './translators/MenuWindowTranslator.js';
 import { isRpgMakerMv } from '../../js/RpgMakerRuntime.js';
 
 class PluginTranslatorRegistry {
     constructor() {
         this.translatorClasses = [
+            AdvSystemTranslator,
             ABEnemyBookTranslator,
             AKUNOUOptionMessageSpeedTranslator,
             AlchemySystemTranslator,
@@ -322,6 +342,18 @@ class PluginTranslatorRegistry {
             CategorySynthesisTranslator,
             ChronusTranslator,
             ChangeSlotTranslator,
+            UskMiraUiTranslator,
+            TDogUiTranslator,
+            ChangeSelectItemWindowMZTranslator,
+            ShopSceneExtensionTranslator,
+            MessageWindowOffsetTranslator,
+            WdmzPartyChangeTranslator,
+            MuuiLocalizationTranslator,
+            Project3UiTranslator,
+            SakuraEventIndicatorTranslator,
+            UniqueDataLoaderTranslator,
+            AddPluginUiSuiteTranslator,
+            DarkPlasmaIndividualItemCommandTranslator,
             CbrEroStatusTranslator,
             CommonPopupCoreTranslator,
             CustomizeConfigItemTranslator,
@@ -331,6 +363,8 @@ class PluginTranslatorRegistry {
             LicoUiTranslator,
             FCustomUiTranslator,
             InfoWindowTranslator,
+            MenuWindowTranslator,
+            FtkrOriginalSceneWindowTranslator,
             NYAInfoMenuWindowTranslator,
             VitsunoDifficultyTranslator,
             AnimationMapNameTranslator,
@@ -618,6 +652,10 @@ class PluginTranslatorRegistry {
             YepQuestJournalTranslator,
             YepSaveCoreTranslator,
             SaveFilePlusTranslator,
+            HsCustomUiTranslator,
+            BattleEroTranslator,
+            RecollectionRoomTranslator,
+            CallEnemyTranslator,
         ];
         this.translatorInstances = new Map();
         this.detectedPluginNames = new Set();

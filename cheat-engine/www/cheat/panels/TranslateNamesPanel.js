@@ -1,9 +1,14 @@
+import { onTranslateCacheRuntimeChanged } from '../js/TranslateCacheRuntime.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
 import { createTranslationBatchManager } from '../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { getRowsPerPage, setRowsPerPage } from '../js/TableSettings.js';
 import { ConfirmDialog } from '../js/DialogHelper.js';
-import { ensureTranslateCacheRuntime, isMapLike } from '../js/TranslateCacheRuntime.js';
-import { nameIsTag } from '../js/EventCommandTraversal.js';
+import { PREDEFINED_NAME_PATTERNS } from '../js/translation-runtime/NamePatterns.js';
+import {
+    addNamesToCache,
+    findNamesInCache,
+    getTranslationNames,
+} from '../js/translation-runtime/TranslationNames.js';
 import { Alert } from '../js/AlertHelper.js';
 import {
     previewNamePatternRepair,
@@ -277,6 +282,15 @@ export default {
                     </template>
                     <span>Remove cache-only name</span>
                 </cheat-tooltip>
+                <cheat-tooltip location="bottom">
+                    <template v-slot:activator="{ props: activatorProps }">
+                        <v-btn variant="text" icon size="x-small" color="error"
+                            v-bind="activatorProps" @click="onTranslationChange(item, '')">
+                            <v-icon size="small">mdi-close</v-icon>
+                        </v-btn>
+                    </template>
+                    <span>Clear translation</span>
+                </cheat-tooltip>
             </div>
         </template>
 
@@ -321,41 +335,7 @@ export default {
                     value: 'fill_before_llm',
                 },
             ],
-            predefinedNamePatterns: [
-                {
-                    pattern: String.raw`\\n\<([^<>]+)\>`,
-                    example: '\\N<Char Name>\nThe text being spoken.',
-                },
-                {
-                    pattern: String.raw`^([^\[「]+)\n「`,
-                    example: 'Char Name\n「The text being spoken.',
-                },
-                {
-                    pattern: String.raw`\\nw\[([^\[\]]+)\]`,
-                    example: '\\nw[Char Name]\nThe text being spoken.',
-                },
-                {
-                    pattern: '^([^：]+)：\n',
-                    example: 'Char Name：\nThe text being spoken.',
-                },
-                {
-                    pattern: '^「([^」]+)」\n',
-                    example: '「Char Name」\nThe text being spoken.',
-                },
-                {
-                    pattern: '^【([^【】]+)】\n',
-                    example: '【Char Name】\nThe text being spoken.',
-                },
-                {
-                    pattern: String.raw`\\c\[\d+\]([^\[]+)\\c\[\d+\]\n`,
-                    example: '\\c[23]Char Name\\c[0]\nThe text being spoken.',
-                },
-                {
-                    pattern: String.raw`^([^\n。、.,…？?！!\\\[\]「」]+)\n`,
-                    example:
-                        'Char Name\nThe text being spoken. This will probably also capture some non-name text, so clean-up manually afterwards.',
-                },
-            ],
+            predefinedNamePatterns: PREDEFINED_NAME_PATTERNS,
             tableHeaders: [
                 {
                     text: 'Lp.',
@@ -398,6 +378,14 @@ export default {
     created() {
         this.refresh();
         const runtime = ensureTranslationRuntime();
+        this.unsubscribeNames = onTranslateCacheRuntimeChanged(({ reason }) => {
+            if (reason === 'quick-translation-name-pattern') {
+                this.namePattern = runtime.namePatternForEnforcing;
+            }
+            if (reason === 'quick-translation-found-names' || reason === 'settings-language') {
+                this.refresh();
+            }
+        });
         if (runtime) {
             if (runtime.namePatternForEnforcing) {
                 this.namePattern = runtime.namePatternForEnforcing;
@@ -413,7 +401,12 @@ export default {
     },
 
     activated() {
+        this.namePattern = ensureTranslationRuntime().namePatternForEnforcing;
         this.refresh();
+    },
+
+    beforeUnmount() {
+        this.unsubscribeNames();
     },
 
     watch: {
@@ -435,7 +428,7 @@ export default {
         },
         namePattern(newVal) {
             const runtime = ensureTranslationRuntime();
-            if (runtime) {
+            if (runtime && runtime.namePatternForEnforcing !== newVal) {
                 runtime.namePatternForEnforcing = newVal;
                 runtime.saveSettings();
             }
@@ -573,73 +566,30 @@ export default {
             return `actor_name:${sourceLang}-${targetLang}-${originalName}`;
         },
 
-        extractSearchableCacheContent(cacheKey) {
-            if (typeof cacheKey !== 'string') {
-                return '';
-            }
-
-            const firstColon = cacheKey.indexOf(':');
-            let payload = firstColon >= 0 ? cacheKey.slice(firstColon + 1) : cacheKey;
-
-            // Hide implementation detail like "ja-en-" from user regex matching.
-            payload = payload.replace(/^[a-z]{2}(?:-[A-Za-z]{2})?-[a-z]{2}(?:-[A-Za-z]{2})?-/, '');
-            return payload;
-        },
-
         refresh() {
             this.loading = true;
             try {
                 const { sourceLang, targetLang } = this.getLanguagePair();
-                const { cache } = ensureTranslateCacheRuntime();
                 const runtime = ensureTranslationRuntime();
-                const prefix = `actor_name:${sourceLang}-${targetLang}-`;
-
-                // Collect all actor_name cache entries
-                const cacheNameMap = new Map();
-                if (isMapLike(cache)) {
-                    for (const [key, value] of cache.entries()) {
-                        if (key.startsWith(prefix)) {
-                            const name = key.slice(prefix.length);
-                            if (name) cacheNameMap.set(name, value || '');
-                        }
-                    }
-                }
-
+                const { actors, names: cacheNameMap } = getTranslationNames(runtime);
                 const dbOriginalNames = new Set();
                 const entries = [];
 
-                // Load DB actors
-                const dataActors = window.$dataActors;
-                if (Array.isArray(dataActors)) {
-                    for (let i = 1; i < dataActors.length; i++) {
-                        const actor = dataActors[i];
-                        if (!actor?.name) continue;
-                        const storedName = actor._translateOriginal
-                            ? actor._translateOriginal.name
-                            : actor.name;
-                        const originalName =
-                            PLUGIN_TRANSLATOR_REGISTRY.resolveMessageCacheSourceText({
-                                runtime,
-                                text: storedName,
-                                mode: 'collection',
-                            });
-                        if (!originalName) continue;
+                for (const { actorId, originalName } of actors) {
+                    dbOriginalNames.add(originalName);
+                    const cacheKey = this.buildCacheKey(originalName, sourceLang, targetLang);
+                    const inCache = cacheNameMap.has(originalName);
 
-                        dbOriginalNames.add(originalName);
-                        const cacheKey = this.buildCacheKey(originalName, sourceLang, targetLang);
-                        const inCache = cacheNameMap.has(originalName);
-
-                        entries.push({
-                            lp: i,
-                            source: inCache ? 'both' : 'db',
-                            originalName,
-                            translation: inCache ? cacheNameMap.get(originalName) : '',
-                            gender: this.resolveGender(originalName),
-                            cacheKey,
-                            rowKey: `db:${i}:${originalName}`,
-                            actorId: i,
-                        });
-                    }
+                    entries.push({
+                        lp: actorId,
+                        source: inCache ? 'both' : 'db',
+                        originalName,
+                        translation: inCache ? cacheNameMap.get(originalName) : '',
+                        gender: this.resolveGender(originalName),
+                        cacheKey,
+                        rowKey: `db:${actorId}:${originalName}`,
+                        actorId,
+                    });
                 }
 
                 // Add cache-only entries (not found in DB)
@@ -677,69 +627,19 @@ export default {
                 return;
             }
 
-            let regex;
+            const runtime = ensureTranslationRuntime();
+            let names;
             try {
-                regex = new RegExp(this.namePattern, 'gi');
-            } catch (err) {
-                console.warn('[TranslateNamesPanel] Invalid regex:', this.namePattern, err);
-                if (window.Alert)
-                    window.Alert.error(
-                        'Invalid regex pattern: ' + (err?.message ? err.message : err)
-                    );
+                names = findNamesInCache(runtime.translationCache, this.namePattern);
+            } catch (error) {
+                Alert.error('Invalid regex pattern: ' + error.message);
                 return;
             }
-
-            const { sourceLang, targetLang } = this.getLanguagePair();
-            const { cache } = ensureTranslateCacheRuntime();
-            if (!isMapLike(cache)) {
-                this.refresh();
+            if (!names.size) {
+                Alert.info('No names found in cache with this pattern.');
                 return;
             }
-
-            const foundNames = new Set();
-            for (const key of cache.keys()) {
-                const searchableContent = this.extractSearchableCacheContent(key);
-                if (!searchableContent) {
-                    continue;
-                }
-
-                regex.lastIndex = 0;
-                let match;
-                while ((match = regex.exec(searchableContent)) !== null) {
-                    const trimmedName = match[1]?.trim();
-                    if (trimmedName) foundNames.add(trimmedName);
-
-                    // Guard against zero-length regex matches causing infinite loops.
-                    if (match[0] === '') {
-                        regex.lastIndex += 1;
-                    }
-                }
-            }
-
-            if (foundNames.size === 0) {
-                if (window.Alert) window.Alert.info('No names found in cache with this pattern.');
-                return;
-            }
-
-            const changedKeys = [];
-            for (const name of foundNames) {
-                const nameWithoutColor = name.replace(/\\c\[\d+\]/g, '').trim();
-                if (nameIsTag(nameWithoutColor)) {
-                    continue;
-                }
-                const cacheKey = this.buildCacheKey(nameWithoutColor, sourceLang, targetLang);
-                if (!cache.has(cacheKey)) {
-                    cache.set(cacheKey, '');
-                    changedKeys.push(cacheKey);
-                }
-            }
-
-            if (changedKeys.length > 0) {
-                const runtime = ensureTranslationRuntime();
-                runtime.persistCache(changedKeys);
-                runtime.notifyCacheRuntime('names-panel-found-names');
-            }
-
+            addNamesToCache(runtime, names, 'names-panel-found-names');
             this.refresh();
         },
 
@@ -807,20 +707,10 @@ export default {
             if (this.translating) return;
 
             const runtime = ensureTranslationRuntime();
-            const items = [];
-            let idCounter = 0;
-
-            for (const entry of this.entries) {
-                if (entry.translation?.trim()) continue;
-                items.push({
-                    type: 'actor_name',
-                    id: `actor_name_${idCounter++}`,
-                    value: entry.originalName,
-                    cacheKey: entry.cacheKey,
-                });
+            if (!runtime.batchManager) {
+                runtime.batchManager = createTranslationBatchManager(runtime);
             }
-
-            if (!items.length) {
+            if (!runtime.batchManager.countAmountSync([{ kind: 'names' }])[0].left) {
                 if (window.Alert) window.Alert.info('All names are already translated.');
                 return;
             }
@@ -830,21 +720,15 @@ export default {
             }
 
             this.translating = true;
-            let processStarted = true;
 
             try {
-                if (!runtime.batchManager) {
-                    runtime.batchManager = createTranslationBatchManager(runtime);
-                }
-
                 const maxItems =
                     Number(runtime.batchItemsLimit) > 0 ? Number(runtime.batchItemsLimit) : 20;
                 const maxChars = Number(runtime.charLimit) > 0 ? Number(runtime.charLimit) : 1000;
 
                 await runtime.batchManager.runBatchedTranslation([
                     {
-                        kind: 'directItems',
-                        items,
+                        kind: 'names',
                         backgroundJob: false,
                         translationPhaseLabel: 'names',
                         showSummary: true,
@@ -860,7 +744,7 @@ export default {
                     );
             } finally {
                 this.translating = false;
-                if (processStarted) runtime.endNonOtfTranslationProcess();
+                runtime.endNonOtfTranslationProcess();
                 this.refresh();
             }
         },

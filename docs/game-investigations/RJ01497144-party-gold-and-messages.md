@@ -1,0 +1,8 @@
+# RJ01497144 party formation, gold levels and common events (2.1.70)
+
+- WDmzPartyChange and enabled optional layouts provide dynamic party/member list titles, sorting captions and dismissal commands. A dedicated source-catalog translator scans their original script literals and translates drawing without changing party or sort state.
+- The game enables TMGoldLevelUpMZ; the existing translator only detected TMGoldLevelUp. Both aliases are now supported, along with execLevelUpText and cancelLevelUpText parameters, funding and learned-skill labels.
+- The reported unfilled message is authored in CommonEvents.json event 104 with literal actor references. The cache also contains a translated variant whose first actor reference has been expanded to a literal Japanese name, while the authored key remains empty. Source scanning against the original file finds the exact runtime key. CommonEvents batch scanning now uses the immutable original JSON instead of potentially expanded/translated live event lists. Existing alternate keys are not migrated or deleted.
+- Names Manager now provides the red close action on each row. It uses the existing manual-edit handler with an empty value, preserving the source row and original name while clearing the translation and updating any spawned actor display.
+
+Original-game source probes confirmed the two party captions, all four reported level-up command/label texts and the literal actor-reference message are collected. Permanent regressions cover immutable common-event source keys, repeated drawing, no translated-key feedback and disabled translation. These checks are distinct from live game validation. No deployment, game-source edit or cache repair was performed.

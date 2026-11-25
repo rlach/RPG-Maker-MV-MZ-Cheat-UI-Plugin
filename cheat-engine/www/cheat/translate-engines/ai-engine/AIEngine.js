@@ -1,3 +1,4 @@
+import { TagFormatRecovery } from './TagFormatRecovery.js';
 import { getTagConsistencyMode } from './constants.js';
 import { detectTranslationSuspicions, isCutOffTranslation } from './TranslationSuspicions.js';
 import { TagSyntax } from './TagSyntax.js';
@@ -92,6 +93,7 @@ class AIEngine extends BaseTranslationEngine {
 
         // Initialize services
         this.tagManager = new TagManager(runtime);
+        this.tagFormatRecovery = new TagFormatRecovery();
         this.validationService = new ValidationService(this);
         this.retryHandler = new RetryHandler(this);
         this.apiClient = new ApiClient({
@@ -975,6 +977,44 @@ class AIEngine extends BaseTranslationEngine {
             return { successes: [], failures: [] };
         }
 
+        const configuredFormat = this.tagManager.syntax.format;
+        const recoveryBaseFormat = options.recoveryBaseFormat || configuredFormat;
+        if (!options.transportFormat) {
+            const groups = new Map();
+            for (const item of items) {
+                const format = this.tagFormatRecovery.next(item, this.runtime, recoveryBaseFormat);
+                if (!groups.has(format)) groups.set(format, []);
+                groups.get(format).push(item);
+            }
+            if (groups.size > 1 || !groups.has(configuredFormat)) {
+                const merged = { successes: [], failures: [] };
+                for (const [transportFormat, group] of groups) {
+                    if (merged.cancelReason) {
+                        merged.failures.push(
+                            ...group.map((item) => ({
+                                ...item,
+                                cancelReason: merged.cancelReason,
+                                rejectReason: 'Request cancelled',
+                            }))
+                        );
+                        continue;
+                    }
+                    const result = await this.batchTranslate(group, {
+                        ...options,
+                        transportFormat,
+                        recoveryBaseFormat,
+                    });
+                    merged.successes.push(...result.successes);
+                    merged.failures.push(...result.failures);
+                    if (result.cancelReason) merged.cancelReason = result.cancelReason;
+                }
+                return merged;
+            }
+        }
+        // A request-local parser prevents one item's recovery from changing global settings.
+        const requestTagManager = Object.create(this.tagManager);
+        requestTagManager.setTagFormat(options.transportFormat || configuredFormat);
+
         const isBackgroundJob = !!(options && options.backgroundJob);
         const retryState = options && options.retryState ? options.retryState : null;
 
@@ -997,7 +1037,7 @@ class AIEngine extends BaseTranslationEngine {
                         ? this.applyOfficialNamesBeforeSending(originalValue)
                         : originalValue;
                 const { preprocessedText, tagCounts, caseMap } =
-                    this.tagManager.preprocessTags(llmInputValue);
+                    requestTagManager.preprocessTags(llmInputValue);
                 return {
                     ...item,
                     index: i,
@@ -1015,7 +1055,7 @@ class AIEngine extends BaseTranslationEngine {
                 jsonMap[item.jsonKey] = item.preprocessed;
             });
 
-            const nameHints = this.tagManager.buildNameHints();
+            const nameHints = requestTagManager.buildNameHints();
             const sourceName = this.getLanguageName(this.runtime.sourceLang);
             const targetName = this.getLanguageName(this.runtime.targetLang);
             const content = JSON.stringify(jsonMap);
@@ -1071,21 +1111,21 @@ class AIEngine extends BaseTranslationEngine {
             }
 
             const alwaysTranslateTagIds =
-                this.tagManager.getAlwaysTranslateTagIds(preprocessedTexts);
+                requestTagManager.getAlwaysTranslateTagIds(preprocessedTexts);
             const alwaysTranslatePart =
                 alwaysTranslateTagIds.length > 0
                     ? ` Make sure to ALWAYS translate to target language contents of following tags: ${alwaysTranslateTagIds.join(', ')}.`
                     : '';
 
             const alwaysKbaseTagIds =
-                this.tagManager.getAlwaysAddToKnowledgeBaseTagIds(preprocessedTexts);
+                requestTagManager.getAlwaysAddToKnowledgeBaseTagIds(preprocessedTexts);
             const alwaysKbasePart =
                 alwaysKbaseTagIds.length > 0
                     ? ` When translating following tags always put all translations into knowledge base: ${alwaysKbaseTagIds.join(', ')}.`
                     : '';
 
             const additionalTagInfos =
-                this.tagManager.getAdditionalTagPromptInfos(preprocessedTexts);
+                requestTagManager.getAdditionalTagPromptInfos(preprocessedTexts);
             const additionalTagInfoPart =
                 additionalTagInfos.length > 0
                     ? ` Additional tag info: ${additionalTagInfos.join('; ')}.`
@@ -1109,8 +1149,11 @@ class AIEngine extends BaseTranslationEngine {
                                       );
                                       if (hasDescriptionKey) {
                                           const widthInChars =
-                                              this.runtime.descriptionMaxLineWidth || 59;
-                                          const maxRows = this.runtime.descriptionMaxRows || 2;
+                                              this.runtime.getAutomaticTextLayout?.('description')
+                                                  ?.maxChars ||
+                                              this.runtime.descriptionMaxLineWidth ||
+                                              59;
+                                          const maxRows = this.getDescriptionBoxMaxRows();
                                           // Build tag exceptions list
                                           const tagExceptions = TAG_CONFIGS.filter(
                                               (t) =>
@@ -1438,12 +1481,14 @@ class AIEngine extends BaseTranslationEngine {
                 }
 
                 // Postprocess tags
-                const postprocessResult = this.tagManager.postprocessTags(
+                const postprocessResult = requestTagManager.postprocessTags(
                     rawSlice,
                     itemD.tagCounts,
                     itemD.caseMap
                 );
                 if (!postprocessResult.valid) {
+                    if (postprocessResult.errorReason === 'Unresolved encoded tags left in output')
+                        this.tagFormatRecovery.failed(itemD, this.runtime, recoveryBaseFormat);
                     failures.push({
                         ...itemD,
                         translatedValue: rawSlice,
@@ -1455,7 +1500,11 @@ class AIEngine extends BaseTranslationEngine {
                     continue;
                 }
 
-                const newlineValidation = this.validateNewlineCounts(itemD, postprocessResult);
+                const newlineValidation = this.validateNewlineCounts(
+                    itemD,
+                    postprocessResult,
+                    options
+                );
                 if (!newlineValidation.valid) {
                     failures.push({
                         ...itemD,
@@ -1468,7 +1517,8 @@ class AIEngine extends BaseTranslationEngine {
 
                 const finalTranslated = this.postprocessTranslatedItem(
                     itemD,
-                    postprocessResult.text
+                    postprocessResult.text,
+                    options
                 );
 
                 if (isCutOffTranslation(itemD.value, finalTranslated, this.tagManager)) {
@@ -1482,6 +1532,7 @@ class AIEngine extends BaseTranslationEngine {
                     continue;
                 }
 
+                this.tagFormatRecovery.succeeded(itemD, this.runtime, recoveryBaseFormat);
                 successes.push({
                     type: itemD.type,
                     id: itemD.id,
@@ -1493,7 +1544,11 @@ class AIEngine extends BaseTranslationEngine {
                         ...detectTranslationSuspicions(
                             itemD.value,
                             finalTranslated,
-                            this.tagManager
+                            this.tagManager,
+                            {
+                                sourceLang: this.runtime?.sourceLang,
+                                targetLang: this.runtime?.targetLang,
+                            }
                         ),
                     ],
                     cacheKey: itemD.cacheKey,
@@ -1835,9 +1890,9 @@ class AIEngine extends BaseTranslationEngine {
         return rawBodyText;
     }
 
-    postprocessTranslatedItem(item, translated) {
+    postprocessTranslatedItem(item, translated, options) {
         // Call parent postprocessing first
-        const baseProcessed = super.postprocessTranslatedItem(item, translated);
+        const baseProcessed = super.postprocessTranslatedItem(item, translated, options);
 
         // Enforce official names after tag restoration when regex matches exactly once
         if (
@@ -1893,15 +1948,16 @@ class AIEngine extends BaseTranslationEngine {
         return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
     }
 
-    getDescriptionBoxMaxRows() {
-        const parsed = Number(this.runtime?.descriptionMaxRows);
+    getDescriptionBoxMaxRows({ boxingMode } = {}) {
+        const layout = boxingMode ? null : this.runtime?.getAutomaticTextLayout?.('description');
+        const parsed = Number(layout?.maxRows ?? this.runtime?.descriptionMaxRows);
         if (!Number.isFinite(parsed) || parsed <= 0) {
             return 2;
         }
         return Math.max(1, Math.floor(parsed));
     }
 
-    validateNewlineCounts(item, postprocessResult) {
+    validateNewlineCounts(item, postprocessResult, options) {
         const newlineTagConfig = this.getSimpleNewlineTagConfig();
         const mode = getTagConsistencyMode(newlineTagConfig);
         const shouldValidateConsistency = mode === 'full' || mode === 'missing';
@@ -1913,7 +1969,7 @@ class AIEngine extends BaseTranslationEngine {
         const hasDescriptionBoxPrompt = !!this.runtime?.addBoxWidthInfoToLlmPrompt;
 
         if (isDescription && hasDescriptionBoxPrompt) {
-            const maxRows = this.getDescriptionBoxMaxRows();
+            const maxRows = this.getDescriptionBoxMaxRows(options);
             if (actualNewlineCount >= maxRows) {
                 return {
                     valid: true,

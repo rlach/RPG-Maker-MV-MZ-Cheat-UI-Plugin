@@ -175,6 +175,7 @@ class BoxingService {
 
     _buildTypeStats(runtime, showAllTypes = false) {
         const statsMap = {};
+        const seenSources = new Set();
 
         if (!showAllTypes) {
             for (const type of DESCRIPTION_TYPES) {
@@ -192,6 +193,9 @@ class BoxingService {
                 continue;
             }
 
+            const identity = JSON.stringify([parsed.type, parsed.original]);
+            if (seenSources.has(identity)) continue;
+            seenSources.add(identity);
             tallyCacheEntry(statsMap, parsed, value);
         }
 

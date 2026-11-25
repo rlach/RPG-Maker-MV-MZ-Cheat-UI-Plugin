@@ -39,6 +39,20 @@ function snackbar() {
         context[name] = method.bind(context);
     return context;
 }
+it('shows the original translation summary as a warning when cache suspicions exist', () => {
+    const warning = vi.spyOn(Alert, 'warn').mockImplementation(() => {});
+    try {
+        const summary = BatchSummaryReporter.buildSummary({ totalItems: 2, successes: 2 });
+        BatchSummaryReporter.showAlert(summary, 3);
+        expect(warning).toHaveBeenCalledWith(
+            '[BatchSummary]\nsuccess: 2/2 (100%)\n3 suspicious translations',
+            null,
+            5000
+        );
+    } finally {
+        warning.mockRestore();
+    }
+});
 it('holds translation errors and queued alerts until the user dismisses the error', async () => {
     vi.useFakeTimers();
     const component = snackbar();

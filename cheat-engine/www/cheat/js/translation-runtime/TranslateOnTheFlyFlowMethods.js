@@ -645,6 +645,7 @@ export const translateOnTheFlyFlowMethods = {
             .filter((stat) => stat.left > 0)
             .map((stat) => ({
                 kind: stat.id,
+                ...(stat.id === 'names' && { translationPhaseLabel: 'names' }),
                 ...(stat.id === 'cacheEmptyStrings' && {
                     repeatUntilSuccess: !!this.cacheEmptyStringsRepeatUntilSuccess,
                 }),
@@ -695,7 +696,10 @@ export const translateOnTheFlyFlowMethods = {
                       currentPhaseErrors: 0,
                       totalCumulativeErrors: this.objectTranslationJob.runErrors,
                   });
-            BatchSummaryReporter.showAlert(summary);
+            const suspiciousCount = dryRun
+                ? 0
+                : this.getTranslationSuspicionStore().summarize(this.translationCache).total;
+            BatchSummaryReporter.showAlert(summary, suspiciousCount);
             BatchSummaryReporter.logSummary(summary);
 
             return {

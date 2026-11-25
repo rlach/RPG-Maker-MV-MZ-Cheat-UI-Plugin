@@ -1,0 +1,27 @@
+{
+  "translation": {
+    "manuallySetTextWidths": false,
+    "enableTextWrapping": true,
+    "maxLineWidth": 60,
+    "maxLineWidthWithPortrait": 47,
+    "descriptionMaxLineWidth": 59,
+    "linkDescriptionMaxWidthToDialogue": true,
+    "descriptionMaxRows": 2,
+    "addBoxWidthInfoToLlmPrompt": false,
+    "removeNewlinesBeforeWrappingMaxCount": 0,
+    "textWrapFontScaleMultiplier": 0.69,
+    "enableImageReplacement": true,
+    "autoSwitchNameInputLanguage": true,
+    "enabledPluginTranslators": {},
+    "pluginTranslatorSettings": {},
+    "nameProfilesByLangPair": {},
+    "namePatternForEnforcing": "\\\\n\\<([^<>]+)\\>",
+    "officialNameEnforcementMode": "none",
+    "officialNameEnforcementIncludeAllText": false
+  },
+  "tags": {
+    "tagFormat": "tags",
+    "customTags": [],
+    "tagOverrides": {}
+  }
+}

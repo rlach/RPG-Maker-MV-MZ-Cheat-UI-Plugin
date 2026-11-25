@@ -3,6 +3,7 @@ import { Alert } from './AlertHelper.js';
 import { cloneObject, isNwjsEnvironment, isUtilsReady } from './Tools.js';
 import { SpeedCheat, SceneCheat, GeneralCheat, BattleCheat, MessageCheat } from './CheatHelper.js';
 import { ShortcutMap } from './ShortcutHelper.js';
+import { getRootWindow, setRootWindowStateValue } from './RootWindowState.js';
 
 const INIT_RETRY_TIMEOUT_MS = 100;
 
@@ -893,3 +894,6 @@ class GlobalShortcut {
 }
 
 export const GLOBAL_SHORTCUT = new GlobalShortcut();
+if (getRootWindow() === window && !window.opener) {
+    setRootWindowStateValue('GLOBAL_SHORTCUT', GLOBAL_SHORTCUT);
+}

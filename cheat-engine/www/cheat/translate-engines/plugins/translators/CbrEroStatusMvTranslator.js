@@ -1,4 +1,5 @@
 import { isRpgMakerMv } from '../../../js/RpgMakerRuntime.js';
+import { withVariableDisplayContext } from '../../../js/translation-runtime/VariableDisplayContext.js';
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_CBR_ERO_STATUS_MV_TRANSLATOR_HOOKED__';
@@ -82,13 +83,23 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
         return result;
     }
 
+    isTranslatableSubjectTemplate(text) {
+        if (!this.isUsableText(text)) {
+            return false;
+        }
+        const stripped = String(text)
+            .replace(/\\(?:[VNPCI]\[\d+\]|[{}\\G])/gi, '')
+            .trim();
+        return stripped !== '';
+    }
+
     appendScanEntriesFromParameters(parameters, pageNo, output, scope) {
         if (!parameters || typeof parameters !== 'object' || !Array.isArray(output)) {
             return;
         }
 
         const pushEntry = (text, rowNo, sourceKey) => {
-            if (!this.isUsableText(text)) {
+            if (!this.isTranslatableSubjectTemplate(text)) {
                 return;
             }
 
@@ -141,7 +152,7 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
             for (let rowIdx = 0; rowIdx < page.t.length; rowIdx++) {
                 const row = page.t[rowIdx];
                 const text = row && typeof row.subject === 'string' ? row.subject : '';
-                if (!this.isUsableText(text)) {
+                if (!this.isTranslatableSubjectTemplate(text)) {
                     continue;
                 }
 
@@ -187,8 +198,8 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
 
         if (
             !window.Window_EroStatus ||
-            !Window_EroStatus.prototype ||
-            typeof Window_EroStatus.prototype.update !== 'function'
+            !window.Window_EroStatus.prototype ||
+            typeof window.Window_EroStatus.prototype.update !== 'function'
         ) {
             return;
         }
@@ -219,12 +230,48 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
         return Array.from(byCacheKey.values());
     }
 
+    resolveDynamicDrawSegment(text) {
+        if (!this.isUsableText(text)) {
+            return text;
+        }
+
+        const trimmed = String(text).trim();
+        if (/^[+-]?\d+(?:\.\d+)?$/.test(trimmed)) {
+            return text;
+        }
+
+        const runtime = this.getRuntime();
+        if (!this.isRuntimeTranslationActive(runtime)) {
+            return text;
+        }
+
+        return this.resolveRuntimeTranslation(
+            text,
+            runtime,
+            [this.getCacheType(), 'variable_value', 'enemy_name', 'actor_name'],
+            {
+                requireRuntimeTranslationActive: true,
+                missValue: text,
+                harvestMissing: false,
+            }
+        );
+    }
+
     translateSubjectValue(subject, runtime) {
         if (!this.isUsableText(subject)) {
             return subject;
         }
 
-        if (!runtime) {
+        if (!runtime || !this.isRuntimeTranslationActive(runtime)) {
+            return subject;
+        }
+
+        // Pure escape templates like "\V[126]" or "\V[41]" have no static text to translate;
+        // their expanded values are translated via VariableDisplayContext / resolveDynamicDrawSegment.
+        const strippedTemplate = String(subject)
+            .replace(/\\(?:[VNPCI]\[\d+\]|[{}\\G])/gi, '')
+            .trim();
+        if (!strippedTemplate) {
             return subject;
         }
 
@@ -281,16 +328,16 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
 
         if (
             !window.Window_EroStatus ||
-            !Window_EroStatus.prototype ||
-            typeof Window_EroStatus.prototype.update !== 'function'
+            !window.Window_EroStatus.prototype ||
+            typeof window.Window_EroStatus.prototype.update !== 'function'
         ) {
             return false;
         }
 
-        const original = Window_EroStatus.prototype.update;
+        const original = window.Window_EroStatus.prototype.update;
         const translator = this;
 
-        Window_EroStatus.prototype.update = function () {
+        window.Window_EroStatus.prototype.update = function () {
             try {
                 translator.applyRuntimeSubjectTranslations();
             } catch (error) {
@@ -300,7 +347,41 @@ export class CbrEroStatusMvTranslator extends BasePluginTranslator {
                 );
             }
 
-            return original.apply(this, arguments);
+            if (this.CBR_complete?.()) {
+                return original.apply(this, arguments);
+            }
+
+            const contents = this.contents;
+            const ctx = contents?.context;
+            let savedMeasureText = null;
+            let savedDrawText = null;
+
+            if (ctx && typeof ctx.measureText === 'function') {
+                savedMeasureText = ctx.measureText;
+                ctx.measureText = function (text) {
+                    const resolved = translator.resolveDynamicDrawSegment(text);
+                    return savedMeasureText.call(this, resolved);
+                };
+            }
+
+            if (contents && typeof contents.drawText === 'function') {
+                savedDrawText = contents.drawText;
+                contents.drawText = function (text, x, y, maxWidth, lineHeight, align) {
+                    const resolved = translator.resolveDynamicDrawSegment(text);
+                    return savedDrawText.call(this, resolved, x, y, maxWidth, lineHeight, align);
+                };
+            }
+
+            try {
+                return withVariableDisplayContext(() => original.apply(this, arguments));
+            } finally {
+                if (ctx && savedMeasureText) {
+                    ctx.measureText = savedMeasureText;
+                }
+                if (contents && savedDrawText) {
+                    contents.drawText = savedDrawText;
+                }
+            }
         };
 
         window[RUNTIME_HOOK_GUARD] = true;

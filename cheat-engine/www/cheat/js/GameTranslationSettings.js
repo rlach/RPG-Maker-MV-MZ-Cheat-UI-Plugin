@@ -3,6 +3,7 @@ import { KeyValueStorage } from './KeyValueStorage.js';
 // Portable game configuration travels with the split translation cache. Engine
 // credentials, prompts and generation preferences stay in the local settings.
 export const GAME_TRANSLATION_SETTINGS_KEYS = Object.freeze([
+    'manuallySetTextWidths',
     'enableTextWrapping',
     'maxLineWidth',
     'maxLineWidthWithPortrait',

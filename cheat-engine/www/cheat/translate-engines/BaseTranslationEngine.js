@@ -126,7 +126,7 @@ export default class BaseTranslationEngine {
         return type === 'message' || type === 'message_portrait' || type === 'scroll_text';
     }
 
-    getWrapConfigForType(type) {
+    getWrapConfigForType(type, { boxingMode } = {}) {
         const isDescription = this.isDescriptionType(type);
         const isPortraitMessage = type === 'message_portrait';
         let maxWidth = this.runtime.maxLineWidth;
@@ -135,15 +135,26 @@ export default class BaseTranslationEngine {
         } else if (isPortraitMessage) {
             maxWidth = this.runtime.maxLineWidthWithPortrait || this.runtime.maxLineWidth;
         }
-        const wrapOptions = isDescription ? { flattenExistingNewlines: true } : undefined;
+        const geometryType = isDescription ? 'description' : type;
+        const layout =
+            !boxingMode &&
+            (isDescription || type === 'message' || isPortraitMessage) &&
+            this.runtime.getAutomaticTextLayout?.(geometryType);
+        if (layout) maxWidth = layout.width;
+        const wrapOptions =
+            isDescription || layout
+                ? { flattenExistingNewlines: isDescription, font: layout?.font }
+                : undefined;
         return { isDescription, maxWidth, wrapOptions, isMessage: this.isMessageType(type) };
     }
 
-    postprocessTranslatedItem(item, translated) {
+    postprocessTranslatedItem(item, translated, options) {
         const itemType = item?.type;
         let value = typeof translated === 'string' ? translated : '';
-        const { isDescription, isMessage, maxWidth, wrapOptions } =
-            this.getWrapConfigForType(itemType);
+        const { isDescription, isMessage, maxWidth, wrapOptions } = this.getWrapConfigForType(
+            itemType,
+            options
+        );
 
         if (isMessage && !isDescription) {
             const maxCount = Number(this.runtime?.removeNewlinesBeforeWrappingMaxCount);

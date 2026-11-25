@@ -867,7 +867,7 @@ export class TranslationBatchManager {
                 }
 
                 const currentMapId = this.runtime.getCurrentMapIdForPhasePriority();
-                if (currentMapId > 0) {
+                if (currentMapId > 0 && safeQueueEntries[0].kind !== 'names') {
                     const currentMapEntryIndex = this.getCurrentMapEntryIndex(
                         safeQueueEntries,
                         currentMapId
@@ -884,7 +884,9 @@ export class TranslationBatchManager {
                 }
 
                 const allowCurrentMapMidPhaseSwitch = !!(
-                    this.runtime && this.runtime.changeToCurrentMapInMassTranslationMidPhase
+                    entry.kind !== 'names' &&
+                    this.runtime &&
+                    this.runtime.changeToCurrentMapInMassTranslationMidPhase
                 );
 
                 let translated;

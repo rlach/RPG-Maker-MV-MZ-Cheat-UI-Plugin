@@ -1,3 +1,4 @@
+import { preserveNativeBitmapText } from './BitmapTextCompatibility.js';
 import { BasePluginTranslator } from './BasePluginTranslator.js';
 import { parseJsonSafely, walkNestedJsonLike } from './translators/TranslatorHelpers.js';
 import { TAG_TYPE, TAG_STYLE, TAG_BRACKET } from '../ai-engine/constants.js';
@@ -161,24 +162,45 @@ export class SourceTextCatalogTranslator extends BasePluginTranslator {
         }
     }
 
-    buildPendingItems(runtime) {
-        return [...this.entries.keys()].map((value, index) => ({
-            type: this.getCacheType(),
-            id: `cage_${index}`,
+    getPendingSourceEntries() {
+        return [...this.entries].map(([value, entry]) => ({
+            type: entry.cacheType || this.getCacheType(),
             value,
-            cacheKey: runtime.getCacheKey(value, this.getCacheType()),
         }));
+    }
+
+    buildPendingItems(runtime) {
+        return this.getPendingSourceEntries().map((entry, index) => ({
+            ...entry,
+            id: `cage_${index}`,
+            cacheKey: runtime.getCacheKey(entry.value, entry.type),
+        }));
+    }
+
+    getPendingItemCacheTypes(item) {
+        return this.getTextCacheTypes(item.value);
     }
 
     getCatalogCacheTypes() {
         return [this.getCacheType()];
+    }
+    getTextCacheTypes(text) {
+        const type = this.entries.get(text)?.cacheType;
+        return type ? [type] : this.getCatalogCacheTypes();
+    }
+
+    resolveEscapeConvertedText(converted, runtime) {
+        const escape = String.fromCharCode(27);
+        const source = converted.split(escape).join('\\');
+        const translated = this.resolveText(source, runtime);
+        return translated === source ? converted : translated.split('\\').join(escape);
     }
 
     collectUntranslated({ runtime }) {
         this.prepareDynamicValueTag(runtime);
         return this.buildPendingItems(runtime).filter(
             (item) =>
-                !this.getCatalogCacheTypes().some((type) =>
+                !this.getPendingItemCacheTypes(item).some((type) =>
                     runtime.hasUsableCacheValue(runtime.getCacheKey(item.value, type))
                 )
         );
@@ -194,7 +216,7 @@ export class SourceTextCatalogTranslator extends BasePluginTranslator {
         if (!this.isUsableText(text) || !this.isRuntimeTranslationActive(runtime)) return text;
         this.prepareDynamicValueTag(runtime);
         if (this.entries.has(text))
-            return this.resolveRuntimeTranslation(text, runtime, this.getCatalogCacheTypes());
+            return this.resolveRuntimeTranslation(text, runtime, this.getTextCacheTypes(text));
         if (depth < 2)
             for (const entry of this.templates) {
                 const match = entry.pattern.exec(text);
@@ -202,7 +224,7 @@ export class SourceTextCatalogTranslator extends BasePluginTranslator {
                 const translated = this.resolveRuntimeTranslation(
                     entry.text,
                     runtime,
-                    this.getCatalogCacheTypes()
+                    this.getTextCacheTypes(entry.text)
                 );
                 if (translated === entry.text) continue;
                 return translated.replace(/\\COT\[(\d+)\]/g, (_, index) =>
@@ -211,12 +233,19 @@ export class SourceTextCatalogTranslator extends BasePluginTranslator {
             }
         if (allowFragments && this.fragmentPattern)
             return text.replace(this.fragmentPattern, (source) =>
-                this.resolveRuntimeTranslation(source, runtime, this.getCatalogCacheTypes())
+                this.resolveRuntimeTranslation(source, runtime, this.getTextCacheTypes(source))
             );
         return text;
     }
 
     hookDrawing(prototype, name) {
+        if (
+            prototype === window.Bitmap?.prototype &&
+            name === 'drawText' &&
+            preserveNativeBitmapText(window.$plugins)
+        )
+            return;
+
         const original = prototype[name];
         const translator = this;
         prototype[name] = function (text, ...args) {

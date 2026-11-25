@@ -73,6 +73,8 @@ declare const Window_Base: any;
 declare const Window_Selectable: any;
 declare const Window_SavefileList: any;
 declare const Window_Message: any;
+declare const Window_NameBox: any;
+declare const Sprite_Character: any;
 declare const Window_Command: any;
 declare const Window_EroStatus: any;
 declare const Scene_InnDiary: any;
@@ -147,6 +149,7 @@ declare interface Window {
     nw?: any;
     Vue?: any;
     __CHEAT_EXTERNAL_WINDOW__?: boolean;
+    GLOBAL_SHORTCUT?: typeof import('../cheat-engine/www/cheat/js/GlobalShortcut.js').GLOBAL_SHORTCUT;
     $externMessage?: any;
     $externMessageCSV?: string;
     $gameMessage?: any;
@@ -183,8 +186,15 @@ declare interface Window {
     SpeedCheat?: any;
     SceneCheat?: any;
     Scene_Base?: any;
+    Scene_Options?: any;
     Scene_Menu?: any;
     Scene_Shop?: any;
+    Scene_Battle?: any;
+    Scene_Equip?: any;
+    Scene_Item?: any;
+    Scene_Skill?: any;
+    Rectangle?: new (x: number, y: number, width: number, height: number) => any;
+    Utils?: typeof Utils;
     Scene_EroStatus?: any;
     Window_DefeatText?: any;
     Window_MessageEx?: any;
@@ -210,10 +220,15 @@ declare interface Window {
     Scene_Map?: any;
     Window_MenuEx?: any;
     Window_Base?: any;
+    Window_Selectable?: any;
     Window_Command?: any;
+    TextManager?: any;
     Window_EroStatus?: any;
     Scene_InnDiary?: any;
     Window_Message?: any;
+    Window_NameBox?: any;
+    Sprite_Character?: any;
+    MUUI_Localization?: any;
     Window_SavefileList?: any;
     Window_Options?: any;
     Window_MenuCommand?: any;
@@ -230,6 +245,7 @@ declare interface Window {
     Window_InfoMenu?: any;
     Window_Help?: any;
     Window_CustomMenuCommand?: any;
+    Window_CustomMenu?: any;
     Window_CustomMenuDataList?: any;
     Window_ChoiceList?: any;
     Window_GalgeChoiceList?: any;
@@ -270,3 +286,16 @@ declare const RTK: any;
 
 declare function getTaneoyaName(id: number): string;
 declare function getBabyName(id: number): string;
+
+declare const CsvImportor: { parseFromCSV(text: string): string[][] };
+
+declare const ADV_System: any;
+
+/** Project3 author suite presentation API (MZ). */
+interface Window {
+    Project3DialogueWindow?: Readonly<{
+        draw(bitmap: unknown, options?: Record<string, unknown>): unknown;
+        [key: string]: unknown;
+    }>;
+    PIXI?: { Text?: { prototype: object } };
+}

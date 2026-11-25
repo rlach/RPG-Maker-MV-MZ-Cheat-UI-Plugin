@@ -1,4 +1,5 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
+import { parseJsonSafely } from './TranslatorHelpers.js';
 
 /**
  * YEP_BattleEngineCore translator
@@ -8,27 +9,44 @@ import { BasePluginTranslator } from '../BasePluginTranslator.js';
  * - YEP_BattleEngineCore.js v1.51 (MV)
  *
  * Translation notes:
- * - Source strings are collected from plugin parameters in the enabled plugin
- *   entry and PluginManager runtime parameters.
- * - Runtime hooks patch battle command list creation points to translate
- *   command labels without touching command symbols.
+ * - Source strings are collected from YEP_BattleEngineCore's Selection Help
+ *   parameters (User Help Text, Ally Help Text, Allies Help Text, Enemy Help Text,
+ *   Enemies Help Text, All Help Text, Random Help Text) and <Display Text: x> /
+ *   <Display Name: x> skill/item notetags.
+ * - Does not hook Window_PartyCommand / Window_ActorCommand makeCommandList to
+ *   harvest into plugin_yep_battle_engine_core, because standard party/actor
+ *   commands come from TextManager / $dataSystem.terms.commands and are already
+ *   translated by CommandTranslationManager (hooking them after
+ *   CommandTranslationManager previously harvested already-translated English
+ *   command names like "Attack", "Defend", and "Item" as new source keys).
+ * - Hooks Window_Help.prototype.drawSpecialSelectionText and
+ *   Window_BattleLog.prototype.displayText at runtime.
  */
 
 const PLUGIN_NAME = 'YEP_BattleEngineCore';
 const CACHE_TYPE = 'plugin_yep_battle_engine_core';
 
-const PARTY_COMMAND_SYMBOLS = new Set(['fight', 'escape']);
-const ACTOR_COMMAND_SYMBOLS = new Set(['attack', 'guard', 'item']);
+const HELP_PARAM_TO_YANFLY_KEY = [
+    ['User Help Text', 'BECHelpUserTx'],
+    ['Ally Help Text', 'BECHelpAllyTx'],
+    ['Allies Help Text', 'BECHelpAlliesTx'],
+    ['Enemy Help Text', 'BECHelpEnemyTx'],
+    ['Enemies Help Text', 'BECHelpEnemiesTx'],
+    ['All Help Text', 'BECHelpAllTx'],
+    ['Random Help Text', 'BECHelpRandTx'],
+];
 
-const HOOK_FLAG_PARTY = '__CHEAT_YEP_BATTLE_ENGINE_CORE_PARTY_COMMAND_HOOKED__';
-const HOOK_FLAG_ACTOR = '__CHEAT_YEP_BATTLE_ENGINE_CORE_ACTOR_COMMAND_HOOKED__';
+const TRANSLATABLE_PARAM_KEYS = new Set(HELP_PARAM_TO_YANFLY_KEY.map(([key]) => key));
 
-const PARAM_EXCLUDE_KEYS = new Set([
-    'ActionSpeed',
-    'DefaultActionSpeed',
-    'ReflectAnimation',
-    'MotionSpeed',
-]);
+const DISPLAY_TEXT_NOTE_RE = /<(?:DISPLAY NAME|DISPLAY TEXT):\s*(.*)>/gi;
+
+const HOOK_FLAG_HELP = '__CHEAT_YEP_BATTLE_ENGINE_CORE_HELP_HOOKED__';
+const HOOK_FLAG_DISPLAY_TEXT = '__CHEAT_YEP_BATTLE_ENGINE_CORE_DISPLAY_TEXT_HOOKED__';
+
+const DATABASE_NOTE_SOURCES = [
+    ['Skills', '$dataSkills', 'skill_name'],
+    ['Items', '$dataItems', 'item_name'],
+];
 
 export class YepBattleEngineCoreTranslator extends BasePluginTranslator {
     constructor() {
@@ -36,6 +54,7 @@ export class YepBattleEngineCoreTranslator extends BasePluginTranslator {
         this._scanPrepared = false;
         this._scanEntries = [];
         this._scanPromise = null;
+        this._originalYanflyHelpParams = null;
     }
 
     getPluginName() {
@@ -51,10 +70,6 @@ export class YepBattleEngineCoreTranslator extends BasePluginTranslator {
     }
 
     async precomputeCounts() {
-        if (!this.ensureDetection()) {
-            return;
-        }
-
         if (this._scanPrepared) {
             return;
         }
@@ -63,7 +78,7 @@ export class YepBattleEngineCoreTranslator extends BasePluginTranslator {
             return this._scanPromise;
         }
 
-        this._scanPromise = Promise.resolve(this.buildScanEntries())
+        this._scanPromise = this.buildScanEntries()
             .then((entries) => {
                 this._scanEntries = Array.isArray(entries) ? entries : [];
                 this._scanPrepared = true;
@@ -78,9 +93,32 @@ export class YepBattleEngineCoreTranslator extends BasePluginTranslator {
         return this._scanPromise;
     }
 
-    buildScanEntries() {
+    async buildScanEntries() {
         const entries = [];
+        this._collectSyncEntries(entries);
 
+        for (const [fileName, globalKey] of DATABASE_NOTE_SOURCES) {
+            if (Array.isArray(window[globalKey]) || typeof fetch !== 'function') {
+                continue;
+            }
+
+            try {
+                const response = await fetch(`data/${fileName}.json`);
+                if (response?.ok) {
+                    const parsed = parseJsonSafely(await response.text(), null);
+                    if (Array.isArray(parsed)) {
+                        this._appendNotetagEntries(entries, parsed, fileName);
+                    }
+                }
+            } catch {
+                // Ignore missing database files in partial test environments
+            }
+        }
+
+        return entries;
+    }
+
+    _collectSyncEntries(entries) {
         const pluginEntry = this.findPluginEntry(this.getPluginName());
         this._appendParameterEntries(entries, pluginEntry?.parameters, 'pluginEntry');
 
@@ -92,7 +130,47 @@ export class YepBattleEngineCoreTranslator extends BasePluginTranslator {
             );
         }
 
-        return entries;
+        for (const [fileName, globalKey] of DATABASE_NOTE_SOURCES) {
+            if (Array.isArray(window[globalKey])) {
+                this._appendNotetagEntries(entries, window[globalKey], fileName);
+            }
+        }
+    }
+
+    _appendNotetagEntries(output, list, scope) {
+        if (!Array.isArray(list)) {
+            return;
+        }
+
+        for (const item of list) {
+            if (!item || typeof item !== 'object') {
+                continue;
+            }
+
+            const noteText =
+                typeof item._translateOriginal?.note === 'string'
+                    ? item._translateOriginal.note
+                    : item.note;
+            if (!this.isUsableText(noteText)) {
+                continue;
+            }
+
+            DISPLAY_TEXT_NOTE_RE.lastIndex = 0;
+            let match;
+            while ((match = DISPLAY_TEXT_NOTE_RE.exec(noteText)) !== null) {
+                const displayText = String(match[1] || '').trim();
+                if (this.isUsableText(displayText)) {
+                    output.push({
+                        text: displayText,
+                        source: {
+                            scope,
+                            field: 'battleDisplayText',
+                            id: item.id,
+                        },
+                    });
+                }
+            }
+        }
     }
 
     collectUntranslated({ runtime }) {
@@ -100,8 +178,12 @@ export class YepBattleEngineCoreTranslator extends BasePluginTranslator {
             return [];
         }
 
+        if (!this._scanPrepared && this._scanEntries.length === 0) {
+            this._collectSyncEntries(this._scanEntries);
+        }
+
         const items = this._buildUniquePendingItems(runtime);
-        return items.filter((item) => !runtime.hasUsableCacheValue(item.cacheKey));
+        return items.filter((item) => !this._isEntryTranslated(item.value, runtime));
     }
 
     getCachedCountsSync({ runtime }) {
@@ -109,15 +191,14 @@ export class YepBattleEngineCoreTranslator extends BasePluginTranslator {
             return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
         }
 
-        if (!this._scanPrepared) {
-            this._scanEntries = this.buildScanEntries();
-            this._scanPrepared = true;
+        if (!this._scanPrepared && this._scanEntries.length === 0) {
+            this._collectSyncEntries(this._scanEntries);
         }
 
         const items = this._buildUniquePendingItems(runtime);
         const totalStrings = items.length;
         const leftStrings = items.filter(
-            (item) => !runtime.hasUsableCacheValue(item.cacheKey)
+            (item) => !this._isEntryTranslated(item.value, runtime)
         ).length;
 
         return {
@@ -128,34 +209,85 @@ export class YepBattleEngineCoreTranslator extends BasePluginTranslator {
         };
     }
 
-    enablePluginTranslation() {
-        const partyProto = window.Window_PartyCommand?.prototype;
-        const actorProto = window.Window_ActorCommand?.prototype;
+    _isEntryTranslated(text, runtime) {
+        return [CACHE_TYPE, 'actor_name', 'skill_name', 'item_name'].some((cacheType) =>
+            runtime.hasUsableCacheValue(runtime.getCacheKey(text, cacheType))
+        );
+    }
 
-        if (
-            !partyProto ||
-            typeof partyProto.makeCommandList !== 'function' ||
-            !actorProto ||
-            typeof actorProto.makeCommandList !== 'function'
-        ) {
+    resolveYepText(text, runtime, fallbackCacheTypes = [CACHE_TYPE, 'actor_name']) {
+        if (!this.isUsableText(text) || !this.isRuntimeTranslationActive(runtime)) {
+            return text;
+        }
+
+        const translated = this.resolveRuntimeTranslation(text, runtime, fallbackCacheTypes, {
+            requireRuntimeTranslationActive: true,
+            missValue: null,
+            harvestMissing: false,
+        });
+        if (this.isUsableText(translated)) {
+            return translated;
+        }
+
+        const primaryKey = runtime.getCacheKey(text, CACHE_TYPE);
+        runtime.trackCacheKeyUsage(primaryKey, { harvestMissing: true });
+        return text;
+    }
+
+    enablePluginTranslation() {
+        const helpProto = window.Window_Help?.prototype;
+        const battleLogProto = window.Window_BattleLog?.prototype;
+
+        const canHookHelp = helpProto && typeof helpProto.drawSpecialSelectionText === 'function';
+        const canHookDisplayText =
+            battleLogProto && typeof battleLogProto.displayText === 'function';
+
+        if (!canHookHelp && !canHookDisplayText) {
             return false;
         }
 
-        const applyRuntimeTranslationToCommand = this._applyRuntimeTranslationToCommand.bind(this);
+        const translator = this;
 
-        if (!partyProto[HOOK_FLAG_PARTY]) {
-            const originalMakeCommandList = partyProto.makeCommandList;
-            partyProto.makeCommandList = function () {
-                const result = originalMakeCommandList.apply(this, arguments);
-                if (Array.isArray(this._list)) {
-                    for (const command of this._list) {
-                        applyRuntimeTranslationToCommand(command, PARTY_COMMAND_SYMBOLS);
+        if (canHookHelp && !helpProto[HOOK_FLAG_HELP]) {
+            const originalDrawSpecialSelectionText = helpProto.drawSpecialSelectionText;
+            helpProto.drawSpecialSelectionText = function () {
+                const runtime = translator.getRuntime();
+                const yanflyParam = window.Yanfly?.Param;
+                if (!yanflyParam || !translator.isRuntimeTranslationActive(runtime)) {
+                    return originalDrawSpecialSelectionText.apply(this, arguments);
+                }
+
+                if (!translator._originalYanflyHelpParams) {
+                    translator._originalYanflyHelpParams = {};
+                    for (const [, prop] of HELP_PARAM_TO_YANFLY_KEY) {
+                        if (typeof yanflyParam[prop] === 'string') {
+                            translator._originalYanflyHelpParams[prop] = yanflyParam[prop];
+                        }
                     }
                 }
-                return result;
+
+                const saved = {};
+                try {
+                    for (const [prop, sourceVal] of Object.entries(
+                        translator._originalYanflyHelpParams
+                    )) {
+                        saved[prop] = yanflyParam[prop];
+                        if (translator.isUsableText(sourceVal)) {
+                            yanflyParam[prop] = translator.resolveYepText(sourceVal, runtime, [
+                                CACHE_TYPE,
+                                'actor_name',
+                            ]);
+                        }
+                    }
+                    return originalDrawSpecialSelectionText.apply(this, arguments);
+                } finally {
+                    for (const [prop, prevVal] of Object.entries(saved)) {
+                        yanflyParam[prop] = prevVal;
+                    }
+                }
             };
 
-            Object.defineProperty(partyProto, HOOK_FLAG_PARTY, {
+            Object.defineProperty(helpProto, HOOK_FLAG_HELP, {
                 value: true,
                 configurable: true,
                 enumerable: false,
@@ -163,19 +295,55 @@ export class YepBattleEngineCoreTranslator extends BasePluginTranslator {
             });
         }
 
-        if (!actorProto[HOOK_FLAG_ACTOR]) {
-            const originalMakeCommandList = actorProto.makeCommandList;
-            actorProto.makeCommandList = function () {
-                const result = originalMakeCommandList.apply(this, arguments);
-                if (Array.isArray(this._list)) {
-                    for (const command of this._list) {
-                        applyRuntimeTranslationToCommand(command, ACTOR_COMMAND_SYMBOLS);
+        if (canHookDisplayText && !battleLogProto[HOOK_FLAG_DISPLAY_TEXT]) {
+            const originalDisplayText = battleLogProto.displayText;
+            battleLogProto.displayText = function (item) {
+                if (
+                    item &&
+                    typeof item === 'object' &&
+                    typeof item.battleDisplayText === 'string'
+                ) {
+                    if (typeof item._yepOriginalBattleDisplayText !== 'string') {
+                        const origName = item._translateOriginal?.name;
+                        const currentDisplay = item.battleDisplayText;
+                        // If battleDisplayText defaulted to item.name before DataObjects translated item.name in-place,
+                        // keep original Japanese name as canonical source.
+                        item._yepOriginalBattleDisplayText =
+                            typeof origName === 'string' && currentDisplay === origName
+                                ? origName
+                                : currentDisplay;
                     }
                 }
-                return result;
+
+                const rawText = originalDisplayText.apply(this, arguments);
+                const runtime = translator.getRuntime();
+                if (!translator.isRuntimeTranslationActive(runtime) || !item) {
+                    return item?._yepOriginalBattleDisplayText || rawText;
+                }
+
+                const sourceText = item._yepOriginalBattleDisplayText || rawText;
+                if (!translator.isUsableText(sourceText)) {
+                    return rawText;
+                }
+
+                // If the skill/item has no custom <Display Text: x> override, prefer its already-translated item.name
+                const origItemName = item._translateOriginal?.name ?? item.name;
+                if (
+                    sourceText === origItemName &&
+                    translator.isUsableText(item.name) &&
+                    item.name !== sourceText
+                ) {
+                    return item.name;
+                }
+
+                return translator.resolveYepText(sourceText, runtime, [
+                    CACHE_TYPE,
+                    'skill_name',
+                    'item_name',
+                ]);
             };
 
-            Object.defineProperty(actorProto, HOOK_FLAG_ACTOR, {
+            Object.defineProperty(battleLogProto, HOOK_FLAG_DISPLAY_TEXT, {
                 value: true,
                 configurable: true,
                 enumerable: false,
@@ -192,7 +360,7 @@ export class YepBattleEngineCoreTranslator extends BasePluginTranslator {
         }
 
         for (const [field, rawValue] of Object.entries(parameters)) {
-            if (PARAM_EXCLUDE_KEYS.has(String(field))) {
+            if (!TRANSLATABLE_PARAM_KEYS.has(String(field))) {
                 continue;
             }
 
@@ -233,38 +401,6 @@ export class YepBattleEngineCoreTranslator extends BasePluginTranslator {
         }
 
         return true;
-    }
-
-    _applyRuntimeTranslationToCommand(command, allowedSymbols) {
-        if (!command || typeof command !== 'object') {
-            return;
-        }
-
-        const symbol = String(command.symbol || '');
-        if (!allowedSymbols.has(symbol)) {
-            return;
-        }
-
-        const sourceText = String(command.name || '');
-        if (!this.isUsableText(sourceText)) {
-            return;
-        }
-
-        const runtime = this.getRuntime();
-        if (!runtime) {
-            return;
-        }
-
-        if (!this.isRuntimeTranslationActive(runtime)) {
-            const cacheKey = runtime.getCacheKey(sourceText, this.getCacheType());
-            runtime.trackCacheKeyUsage(cacheKey);
-            return;
-        }
-
-        command.name = this.resolveRuntimeTranslation(sourceText, runtime, this.getCacheType(), {
-            requireRuntimeTranslationActive: true,
-            missValue: sourceText,
-        });
     }
 
     _buildUniquePendingItems(runtime) {

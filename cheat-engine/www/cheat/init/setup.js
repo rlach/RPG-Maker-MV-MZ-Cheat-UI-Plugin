@@ -1,3 +1,4 @@
+import { installImagePathCompatibility } from '../js/ImagePathCompatibility.js';
 // RPG MV API : https://kinoar.github.io/rmmv-doc-web/index.html
 
 import { loadWindowUiLibraries, createWindowUiApp } from '../js/WindowUiLibraries.js';
@@ -128,6 +129,7 @@ function ensureTranslateOnTheFlyRuntimeWithRetry(options = {}) {
 
 async function bootstrapCheatUi() {
     await ensureEveryDependencyReadyWithRetry({ delayMs: 250, logEvery: 8 });
+    installImagePathCompatibility();
 
     // initialize vue
     await loadWindowUiLibraries(window);

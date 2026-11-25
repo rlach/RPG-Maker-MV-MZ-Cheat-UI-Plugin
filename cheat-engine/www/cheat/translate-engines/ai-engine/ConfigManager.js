@@ -70,55 +70,6 @@ export class ConfigManager {
     static getTemplate() {
         return `
        <div v-if="translationEngine === 'openApi' || translationEngine === 'gpt4all'" class="mt-3">
-             <v-select
-               v-model="aiProvider"
-               :items="aiProviderOptions"
-               label="Provider" variant="outlined" density="compact"
-               hide-details
-               @update:model-value="onChangeAiProvider"
-               @update:model-value="onChangeAiProvider"
-               class="mb-2"
-              item-title="text"></v-select>
-             <v-text-field
-               v-model="aiHost"
-               :label="aiProvider === 'openwebui' ? 'Open WebUI Host' : 'OpenAPI compatible Host'" variant="outlined" density="compact"
-               hide-details
-               @keydown.stop
-               @update:model-value="onChangeAiHost"
-               class="mb-2"
-             ></v-text-field>
-             <v-text-field
-                             v-if="aiProvider === 'openwebui' || aiProvider === 'openApi'"
-               v-model="aiApiKey"
-                             :label="aiProvider === 'openwebui' ? 'Open WebUI API Key' : 'OpenAPI compatible API Key'" variant="outlined" density="compact"
-               hide-details
-               type="password"
-               @keydown.stop
-               @update:model-value="onChangeAiApiKey"
-               class="mb-2"
-             ></v-text-field>
-             <div class="d-flex gap-2 mb-2 align-center">
-               <v-btn size="small" variant="outlined"
-                 color="primary"
-                 :disabled="aiLoadingModels"
-                 @click="fetchAiModels"
-                 :loading="aiLoadingModels"
-               >
-                 <v-icon size="small" left>mdi-refresh</v-icon>
-                 Fetch Models
-               </v-btn>
-               <div v-if="aiModelsError" class="text-caption error--text">{{ aiModelsError }}</div>
-             </div>
-             <v-select
-               v-model="aiSelectedModel"
-               :items="aiModels"
-               label="Select Model" variant="outlined" density="compact"
-               hide-details
-               :disabled="aiModels.length === 0"
-               @update:model-value="onChangeAiModel"
-               class="mb-2"
-              item-title="text"></v-select>
-
              <v-checkbox
                v-model="aiAskIfTextTranslated"
                label="ask AI if text is translated"
@@ -316,6 +267,13 @@ export class ConfigManager {
     getMethods() {
         return {
             fetchAiModels: () => this._fetchAiModels(),
+            checkAiConnection: async () => {
+                const models = await this._requestModels();
+                if (!this.aiEngine.selectedModel) throw new Error('Select a translation model.');
+                if (!models.includes(this.aiEngine.selectedModel)) {
+                    throw new Error('The selected model is unavailable.');
+                }
+            },
             onChangeAiProvider: this._createPersistedHandler((v) => this._onChangeAiProvider(v)),
             onChangeAiHost: this._createPersistedHandler((v) => {
                 this.aiEngine.host = v;
@@ -407,16 +365,7 @@ export class ConfigManager {
         this._syncPanelEngineConfig();
 
         try {
-            const endpoint = this._getModelsUrl();
-            const headers = this._getAuthHeaders();
-            const response = await fetch(endpoint, { headers });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-
-            const data = await response.json();
-            const models = this._normalizeModelsResponse(data);
+            const models = await this._requestModels();
 
             this.aiEngine.models = models;
             if (this.aiEngine.selectedModel && !models.includes(this.aiEngine.selectedModel)) {
@@ -441,6 +390,24 @@ export class ConfigManager {
      * Handle provider change
      * @private
      */
+    async _requestModels() {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        try {
+            const response = await fetch(this._getModelsUrl(), {
+                headers: this._getAuthHeaders(),
+                signal: controller.signal,
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return this._normalizeModelsResponse(await response.json());
+        } catch (error) {
+            if (controller.signal.aborted) throw new Error('Connection check timed out.');
+            throw error;
+        } finally {
+            clearTimeout(timeout);
+        }
+    }
+
     async _onChangeAiProvider(provider) {
         this.aiEngine.provider = provider === 'gpt4all' ? 'openApi' : provider;
 
@@ -466,7 +433,7 @@ export class ConfigManager {
      * @private
      */
     _getModelsUrl() {
-        const host = this.aiEngine.host || 'http://localhost:4891';
+        const host = (this.aiEngine.host || 'http://localhost:4891').trim().replace(/\/+$/, '');
         if (this.aiEngine.provider === 'openwebui') {
             return `${host}/api/models`;
         }

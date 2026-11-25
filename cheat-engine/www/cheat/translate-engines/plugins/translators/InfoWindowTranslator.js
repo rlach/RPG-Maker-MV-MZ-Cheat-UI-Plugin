@@ -1,10 +1,12 @@
 import { SourceTextCatalogTranslator } from '../SourceTextCatalogTranslator.js';
+import { withVariableDisplayContext } from '../../../js/translation-runtime/VariableDisplayContext.js';
 
 /**
- * InfoWindow.js (MV, unversioned menu variant in RJ203736 and map HUD variant in RJ01583227).
+ * InfoWindow.js (MV, unversioned menu variant in RJ203736 / RJ194421 and map HUD variant in RJ01583227).
  * Reads literal display strings from the plugin source for Mass Translation.
  * Window_Info is private to an IIFE: hook the created menu window instance,
- * preserving gauge calculations, variable IDs, numbers and commented-out text.
+ * wrapping refresh in VariableDisplayContext for direct $gameVariables.value()
+ * lines while preserving gauge calculations, variable IDs, numbers and comments.
  */
 export class InfoWindowTranslator extends SourceTextCatalogTranslator {
     getPluginName() {
@@ -27,6 +29,20 @@ export class InfoWindowTranslator extends SourceTextCatalogTranslator {
         return false;
     }
 
+    hookInfoWindow(win) {
+        if (!win) return;
+        this._hookedWindows ??= new WeakSet();
+        if (this._hookedWindows.has(win)) return;
+        this._hookedWindows.add(win);
+        this.hookDrawing(win, 'drawText');
+        if (typeof win.refresh === 'function') {
+            const originalRefresh = win.refresh;
+            win.refresh = function (...args) {
+                return withVariableDisplayContext(() => originalRefresh.apply(this, args));
+            };
+        }
+    }
+
     enablePluginTranslation() {
         const menuPrototype = window.Scene_Menu?.prototype;
         const prototype =
@@ -39,11 +55,10 @@ export class InfoWindowTranslator extends SourceTextCatalogTranslator {
         const create = prototype[method];
         prototype[method] = function (...args) {
             const result = create.apply(this, args);
-            if (this._InfoWindow) translator.hookDrawing(this._InfoWindow, 'drawText');
+            translator.hookInfoWindow(this._InfoWindow);
             return result;
         };
-        const existing = window.SceneManager?._scene?._InfoWindow;
-        if (existing) this.hookDrawing(existing, 'drawText');
+        this.hookInfoWindow(window.SceneManager?._scene?._InfoWindow);
         this.precomputeCounts().catch((error) =>
             console.error('[InfoWindowTranslator] Catalog scan failed', error)
         );

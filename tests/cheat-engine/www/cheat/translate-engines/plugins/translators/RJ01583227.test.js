@@ -107,3 +107,46 @@ it('translates map popup text before glyph splitting using existing map-name key
     expect(new Interpreter().refreshMapName(params).join('')).toBe('Dungeon');
     expect(params).toEqual({ size: 30 });
 });
+
+it('supports Yana 1.01 map transfers before escape expansion and glyph splitting without modifying map data', () => {
+    vi.stubGlobal('window', globalThis);
+    const convert = vi.fn(text => text.replace('\\V[1]', '2'));
+    const popup = Object.create({ convertEscapeCharacters: convert });
+    vi.stubGlobal('CommonPopupManager', { window: () => popup });
+    class Interpreter {
+        animationMapName() {
+            const name = popup.convertEscapeCharacters($gameMap.displayName());
+            popup.convertEscapeCharacters('\\FS[28]');
+            return name.split('');
+        }
+    }
+    vi.stubGlobal('Game_Interpreter', Interpreter);
+    const interpreter = new Interpreter();
+    const displayName = () => '地下\\V[1]階';
+    vi.stubGlobal('$gameMap', { displayName, showMapName: () => interpreter.animationMapName() });
+    const translator = new AnimationMapNameTranslator();
+    const runtime = runtimeFor(translator);
+    runtime.translationCache.set('map_name:地下\\V[1]階', 'Basement \\V[1]');
+    expect(translator.enablePluginTranslation()).toBe(true);
+    for (let i = 0; i < 3; i++) expect($gameMap.showMapName().join('')).toBe('Basement 2');
+    expect($gameMap.displayName).toBe(displayName);
+    expect(Object.hasOwn(popup, 'convertEscapeCharacters')).toBe(false);
+    expect(runtime.trackCacheKeyUsage.mock.calls.map(call => call[0])).toEqual(Array(3).fill('map_name:地下\\V[1]階'));
+    runtime.isTranslationEnabled = () => false;
+    expect($gameMap.showMapName().join('')).toBe('地下2階');
+    expect(runtime.trackCacheKeyUsage).toHaveBeenCalledTimes(3);
+});
+it('restores an owned popup converter even when the legacy animation throws', () => {
+    vi.stubGlobal('window', globalThis);
+    const popup = { convertEscapeCharacters: text => text };
+    const descriptor = Object.getOwnPropertyDescriptor(popup, 'convertEscapeCharacters');
+    vi.stubGlobal('CommonPopupManager', { window: () => popup });
+    class Interpreter { animationMapName() { throw new Error('native failure'); } }
+    vi.stubGlobal('Game_Interpreter', Interpreter);
+    vi.stubGlobal('$gameMap', { displayName: () => '町' });
+    const translator = new AnimationMapNameTranslator();
+    runtimeFor(translator);
+    expect(translator.enablePluginTranslation()).toBe(true);
+    expect(() => new Interpreter().animationMapName()).toThrow('native failure');
+    expect(Object.getOwnPropertyDescriptor(popup, 'convertEscapeCharacters')).toEqual(descriptor);
+});

@@ -1,12 +1,24 @@
 /* eslint-disable no-control-regex -- RPG Maker supports ESC-prefixed localization references. */
 /** Resolve DisplayI18NTexts references before keys and translation requests. */
+import { ensureRootWindowStateValue, getRootWindow } from '../RootWindowState.js';
+const NATIVE_SOURCE_RESOLVERS = '__CHEAT_NATIVE_SOURCE_RESOLVERS__';
+export function setNativeTextSourceResolver(pluginName, resolver) {
+    ensureRootWindowStateValue(NATIVE_SOURCE_RESOLVERS, () => new Map()).set(pluginName, resolver);
+}
 let snapshot;
 export function setDisplayI18nSourceDictionary(dictionary) {
     snapshot = dictionary;
 }
 export function resolveDisplayI18nSource(text, runtime) {
-    if (typeof text !== 'string' || !/(?:\\|\x1b)I18N\[\d+\]/i.test(text)) return text;
-    const scope = typeof window !== 'undefined' ? window : globalThis;
+    if (typeof text !== 'string') return text;
+    const scope = typeof window !== 'undefined' ? getRootWindow() : globalThis;
+    for (const [name, resolve] of scope[NATIVE_SOURCE_RESOLVERS] || []) {
+        if (
+            scope.$plugins?.some((plugin) => plugin.status && plugin.name.split('/').pop() === name)
+        )
+            text = resolve(text, runtime);
+    }
+    if (!/(?:\\|\x1b)I18N\[\d+\]/i.test(text)) return text;
     if (!scope.$plugins?.some((plugin) => plugin.status && plugin.name === 'DisplayI18NTexts'))
         return text;
     const dictionary = scope.$dataI18nTexts || snapshot;

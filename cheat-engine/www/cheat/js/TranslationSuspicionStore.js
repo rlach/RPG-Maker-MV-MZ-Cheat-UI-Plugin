@@ -40,6 +40,29 @@ export class TranslationSuspicionStore {
         return record.reasons;
     }
 
+    summarize(cache) {
+        let total = 0;
+        const issues = new Map();
+        for (const [key, record] of Object.entries(this.entries)) {
+            if (!cache.has(key) || cache.get(key) !== record.translation || !record.reasons.length)
+                continue;
+            total++;
+            const counted = new Set();
+            for (const { id, label } of record.reasons) {
+                if (counted.has(id)) continue;
+                counted.add(id);
+                if (!issues.has(id)) issues.set(id, { id, label, count: 0 });
+                issues.get(id).count++;
+            }
+        }
+        return {
+            total,
+            issues: [...issues.values()].sort(
+                (a, b) => b.count - a.count || a.label.localeCompare(b.label)
+            ),
+        };
+    }
+
     set(key, reasons, translation = '') {
         const next =
             Array.isArray(reasons) && reasons.length ? { translation, reasons } : undefined;

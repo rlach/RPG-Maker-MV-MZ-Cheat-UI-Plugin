@@ -1,11 +1,9 @@
-// Goal: register MPP_MessageEX escape-command tags so command tokens and syntax
-// remain stable during translation. This translator intentionally does not scan
-// plugin-owned data because MPP_MessageEX tags are used inside regular message
-// text that the core translators already collect.
-
-import { BasePluginTranslator } from '../BasePluginTranslator.js';
-
-const RUNTIME_HOOK_GUARD = '__CHEAT_MPP_MESSAGE_EX_TRANSLATOR_HOOKED__';
+/** MPP_MessageEX (MV/MZ): preserve escape commands and translate Text Set
+ * display resources without rewriting the native parameter table or SET IDs.
+ */
+import { SourceTextCatalogTranslator } from '../SourceTextCatalogTranslator.js';
+import { parseJsonSafely } from './TranslatorHelpers.js';
+import { readJavaScriptLiteralData } from './JavaScriptTextCatalog.js';
 const CACHE_TYPE = 'plugin_mpp_message_ex';
 
 const MPP_MESSAGE_EX_PLUGIN_TAGS = [
@@ -277,7 +275,7 @@ const MPP_MESSAGE_EX_PLUGIN_TAGS = [
     },
 ];
 
-export class MppMessageExTranslator extends BasePluginTranslator {
+export class MppMessageExTranslator extends SourceTextCatalogTranslator {
     getPluginName() {
         return 'MPP_MessageEX';
     }
@@ -290,29 +288,49 @@ export class MppMessageExTranslator extends BasePluginTranslator {
         return CACHE_TYPE;
     }
 
-    enablePluginTranslation() {
-        if (window[RUNTIME_HOOK_GUARD]) {
-            return true;
+    getSourcePluginNames() {
+        return [];
+    }
+    shouldScanEventData() {
+        return false;
+    }
+    async collectAdditionalTexts() {
+        const response = await fetch('js/plugins.js');
+        if (!response.ok) throw new Error('Cannot read MPP_MessageEX source parameters');
+        const { bindings } = readJavaScriptLiteralData(await response.text(), ['$plugins']);
+        const plugin = bindings.$plugins?.find(
+            (row) =>
+                row.status &&
+                row.name.split('/').pop().toLowerCase() === this.getPluginName().toLowerCase()
+        );
+        for (const value of parseJsonSafely(plugin?.parameters['Text Set'], [])) {
+            if (typeof value !== 'string') continue;
+            const text = value.replace(/\\\\/g, '\\');
+            if (!text.replace(/\\+[A-Za-z]+\[[^\]]*\]/g, '').trim()) continue;
+            this.entries.set(text, { text });
         }
-
+    }
+    enablePluginTranslation() {
+        const base = window.Window_Base?.prototype;
+        if (typeof base?.convertEscapeCharacters !== 'function') return false;
+        if (!super.enablePluginTranslation()) return false;
         this.registerPluginCustomTags(MPP_MESSAGE_EX_PLUGIN_TAGS);
-        window[RUNTIME_HOOK_GUARD] = true;
+        const translator = this;
+        for (const prototype of [base, window.Window_Message?.prototype]) {
+            if (
+                !prototype ||
+                (prototype !== base &&
+                    !Object.prototype.hasOwnProperty.call(prototype, 'convertEscapeCharacters'))
+            )
+                continue;
+            const convert = prototype.convertEscapeCharacters;
+            prototype.convertEscapeCharacters = function (text, ...args) {
+                const converted = convert.call(this, text, ...args);
+                const runtime = translator.getRuntime();
+                if (!translator.isRuntimeTranslationActive(runtime)) return converted;
+                return translator.resolveEscapeConvertedText(converted, runtime);
+            };
+        }
         return true;
-    }
-
-    async precomputeCounts() {
-        return;
-    }
-
-    async buildScanEntries() {
-        return [];
-    }
-
-    collectUntranslated() {
-        return [];
-    }
-
-    getCachedCountsSync() {
-        return { total: 0, left: 0, totalStrings: 0, leftStrings: 0 };
     }
 }

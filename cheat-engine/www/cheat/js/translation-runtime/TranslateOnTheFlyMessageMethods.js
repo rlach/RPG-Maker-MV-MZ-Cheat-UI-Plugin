@@ -2,6 +2,7 @@ import { resolveDisplayI18nSource } from './NativeI18nSource.js';
 import { createTranslationBatchManager } from '../../translate-engines/batch-manager/TranslationBatchManagerFactory.js';
 import { wrapTextByVisibleWidth } from './TextWrap.js';
 import { recordDisplayedMessage } from '../DisplayedMessageText.js';
+import { resolveTextLayout } from './TextLayoutGeometry.js';
 
 export const translateOnTheFlyMessageMethods = {
     replaceMessageText(translatedText) {
@@ -190,6 +191,10 @@ export const translateOnTheFlyMessageMethods = {
         return cleaned;
     },
 
+    getAutomaticTextLayout(type, { preview = false } = {}) {
+        return resolveTextLayout(this, type, undefined, preview);
+    },
+
     wrapText(text, maxWidth, options = {}) {
         if (!this.enableTextWrapping || !maxWidth || maxWidth <= 0) {
             return text;
@@ -199,6 +204,7 @@ export const translateOnTheFlyMessageMethods = {
             flattenExistingNewlines: !!(options && options.flattenExistingNewlines),
             tagEntries: this.engine?.tagManager?.tagEntries,
             fontScaleWidthMultiplier: this.textWrapFontScaleMultiplier,
+            font: options?.font,
         });
     },
 

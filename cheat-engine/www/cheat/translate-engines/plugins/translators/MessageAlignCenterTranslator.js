@@ -41,7 +41,11 @@ export class MessageAlignCenterTranslator extends BasePluginTranslator {
     enablePluginTranslation() {
         this.registerPluginCustomTags(PLUGIN_TAGS);
         const prototype = window.Window_Base?.prototype;
-        if (typeof prototype?.convertEscapeCharacters === 'function') {
+        if (
+            typeof prototype?.convertEscapeCharacters === 'function' &&
+            typeof prototype?.processEscapeCharacter === 'function'
+        ) {
+            const translator = this;
             const original = prototype.convertEscapeCharacters;
             const parameters = window.PluginManager?.parameters?.(this.getPluginName()) || {};
             const symbols = [
@@ -56,11 +60,27 @@ export class MessageAlignCenterTranslator extends BasePluginTranslator {
                 'gi'
             );
             prototype.convertEscapeCharacters = function (text, ...args) {
+                if (!translator.isRuntimeTranslationActive(translator.getRuntime()))
+                    return original.call(this, text, ...args);
                 return original.call(
                     this,
                     typeof text === 'string' ? text.replace(bareAlignment, '$1[0]') : text,
                     ...args
                 );
+            };
+            const process = prototype.processEscapeCharacter;
+            const alignmentCodes = new Set(symbols.map((symbol) => symbol.toUpperCase()));
+            prototype.processEscapeCharacter = function (code, textState, ...args) {
+                // Zero is only a lexer boundary. The native parameterless MZ
+                // plugin must not measure or render it as three literal glyphs.
+                // Parameter-aware variants also treat the absent shift as zero.
+                if (
+                    translator.isRuntimeTranslationActive(translator.getRuntime()) &&
+                    alignmentCodes.has(code.toUpperCase()) &&
+                    textState.text.slice(textState.index, textState.index + 3) === '[0]'
+                )
+                    textState.index += 3;
+                return process.call(this, code, textState, ...args);
             };
         }
         return true;
