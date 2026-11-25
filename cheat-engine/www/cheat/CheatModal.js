@@ -97,6 +97,7 @@ export default {
     },
 
     data() {
+        const { width, height } = CHEAT_WINDOW_MANAGER.getOverlaySize();
         return {
             navWidth: 200,
 
@@ -227,9 +228,9 @@ export default {
                     component: 'hacks-panel',
                 },
             ],
-            overlayWidth: 700,
-            overlayHeight: 400,
-            stopResizeObserver: null,
+            overlayWidth: width,
+            overlayHeight: height,
+            stopObservingOverlaySize: null,
         };
     },
 
@@ -244,27 +245,13 @@ export default {
     },
 
     mounted() {
-        const size = CHEAT_WINDOW_MANAGER.getOverlaySize();
-        if (size && Number.isFinite(size.width) && Number.isFinite(size.height)) {
-            this.overlayWidth = size.width;
-            this.overlayHeight = size.height;
-        }
-
         if (!window.__CHEAT_EXTERNAL_WINDOW__) {
-            // Leave room for the host padding and a one-percent viewport margin.
-            const maxWidth = Math.max(
-                1,
-                Math.floor(window.innerWidth - 2 * Math.max(8, window.innerWidth * 0.01))
-            );
-            const maxHeight = Math.max(
-                1,
-                Math.floor(window.innerHeight - 2 * Math.max(8, window.innerHeight * 0.01))
-            );
-            this.overlayWidth = Math.min(this.overlayWidth, maxWidth);
-            this.overlayHeight = Math.min(this.overlayHeight, maxHeight);
+            this.stopObservingOverlaySize = observeOverlaySize(this.$el, (width, height) => {
+                this.overlayWidth = width;
+                this.overlayHeight = height;
+                CHEAT_WINDOW_MANAGER.setOverlaySize(width, height);
+            });
         }
-
-        this.initResizeObserver();
 
         let navItem = this.componentNameToNavItem[this.currentComponentName];
 
@@ -276,15 +263,6 @@ export default {
     },
 
     methods: {
-        initResizeObserver() {
-            this.$nextTick(() => {
-                if (!this.$el) return;
-                this.stopResizeObserver = observeOverlaySize(this.$el, (width, height) => {
-                    CHEAT_WINDOW_MANAGER.setOverlaySize(width, height);
-                });
-            });
-        },
-
         onNavTreeUpdate(data) {
             if (data && data.length === 1) {
                 this.$emit('update:currentComponentName', data[0].component);
@@ -305,7 +283,7 @@ export default {
     },
 
     beforeUnmount() {
-        this.stopResizeObserver?.();
-        this.stopResizeObserver = null;
+        this.stopObservingOverlaySize?.();
+        this.stopObservingOverlaySize = null;
     },
 };

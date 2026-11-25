@@ -1,3 +1,4 @@
+import { YepVictoryAftermathTranslator } from './translators/YepVictoryAftermathTranslator.js';
 import { Project3UiTranslator } from './translators/Project3UiTranslator.js';
 import { SakuraEventIndicatorTranslator } from './translators/SakuraEventIndicatorTranslator.js';
 import { MuuiLocalizationTranslator } from './translators/MuuiLocalizationTranslator.js';
@@ -367,6 +368,7 @@ class PluginTranslatorRegistry {
             FtkrOriginalSceneWindowTranslator,
             NYAInfoMenuWindowTranslator,
             VitsunoDifficultyTranslator,
+            YepVictoryAftermathTranslator,
             AnimationMapNameTranslator,
 
             DKToolsLocalizationTranslator,

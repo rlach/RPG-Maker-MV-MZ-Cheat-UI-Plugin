@@ -1,3 +1,4 @@
+import { textFitsVisibleBox } from '../../js/translation-runtime/TextWrap.js';
 import { parseCacheKeyForLangPair } from '../../js/TranslateCacheRuntime.js';
 import { BasePhase } from './BasePhase.js';
 
@@ -57,6 +58,19 @@ export class DescriptionsCleanup extends BasePhase {
                 // Skip untranslated entries
                 continue;
             }
+
+            if (
+                textFitsVisibleBox(
+                    currentValue,
+                    Number(runtime.descriptionMaxLineWidth) || 59,
+                    Number(runtime.descriptionMaxRows) || 2,
+                    {
+                        tagEntries: runtime.engine?.tagManager?.tagEntries,
+                        fontScaleWidthMultiplier: runtime.textWrapFontScaleMultiplier,
+                    }
+                )
+            )
+                continue;
 
             // Use the existing translation as the value to send to LLM for reformatting
             items.push({

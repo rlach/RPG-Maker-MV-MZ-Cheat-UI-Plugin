@@ -493,3 +493,22 @@ export function wrapTextByVisibleWidth(text, maxWidth, options = {}) {
 
     return wrappedLines.join('\n');
 }
+
+/** Measure an existing translation with the same tag/font rules as wrapping. */
+export function textFitsVisibleBox(text, maxWidth, maxRows, options = {}) {
+    const lines = normalizeSourceText(text, false).split('\n');
+    if (lines.length > maxRows) return false;
+    const tags = buildKnownEscapeTagRegex(options.tagEntries);
+    let fontLevel = 1;
+    for (const line of lines) {
+        const metrics = measureTextWidthAndFontLevel(
+            line,
+            fontLevel,
+            options.fontScaleWidthMultiplier,
+            tags
+        );
+        if (metrics.weightedWidth > maxWidth) return false;
+        fontLevel = metrics.fontLevel;
+    }
+    return true;
+}
