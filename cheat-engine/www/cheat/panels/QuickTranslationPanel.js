@@ -1,3 +1,8 @@
+import {
+    getTextLayoutCapacities,
+    getManualTextLayoutCapacities,
+    TEXT_LAYOUT_CHANGED_EVENT,
+} from '../js/translation-runtime/TextLayoutProviders.js';
 import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationRuntime.js';
 import { onTranslateCacheRuntimeChanged } from '../js/TranslateCacheRuntime.js';
 import { getRootWindow, subscribeRootWindowEvent } from '../js/RootWindowState.js';
@@ -46,22 +51,31 @@ export default {
                 />
                 <v-table density="compact" class="mb-3">
                     <caption class="text-left">
-                        Detected text widths
-                        <span v-if="manualTextWidths"> · Manual widths in use</span>
+                        Detected digits per line
+                        <span v-if="manualTextWidths"> · Manual widths in use
+                            <v-btn variant="text" size="x-small" @click="showDetectedValues = !showDetectedValues">
+                                {{ showDetectedValues ? 'Hide detected values' : 'Show detected values' }}
+                            </v-btn>
+                        </span>
                     </caption>
                     <thead>
                         <tr>
                             <th scope="col">Text</th>
-                            <th scope="col" class="text-end">Pixels</th>
-                            <th scope="col" class="text-end">Digits at base size</th>
+                            <th scope="col" class="text-end">−1</th>
+                            <th scope="col" class="text-end font-weight-bold">Base</th>
+                            <th scope="col" class="text-end">+1</th>
+                            <th scope="col" class="text-end">+2</th>
                             <th scope="col" class="text-end">Rows</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-for="row in textLayouts" :key="row.label">
                             <th scope="row" class="font-weight-regular">{{ row.label }}</th>
-                            <td class="text-end">{{ row.width ?? '—' }}</td>
-                            <td class="text-end">{{ row.maxChars ?? '—' }}</td>
+                            <td v-for="size in ['minus1', 'base', 'plus1', 'plus2']" :key="size"
+                                class="text-end" :class="{ 'font-weight-bold': size === 'base' }">
+                                {{ row[size] ?? '—' }}
+                                <small v-if="manualTextWidths && showDetectedValues" class="text-medium-emphasis font-weight-regular">({{ row.detected[size] ?? '—' }})</small>
+                            </td>
                             <td class="text-end">{{ row.maxRows ?? '—' }}</td>
                         </tr>
                     </tbody>
@@ -102,6 +116,7 @@ export default {
             widthPreviewShortcut: '',
             textLayouts: [],
             manualTextWidths: false,
+            showDetectedValues: false,
         };
     },
 
@@ -115,6 +130,10 @@ export default {
             if (reason === 'settings-language' || reason === 'settings-text-wrapping')
                 this.refresh();
         });
+        this._unsubscribeTextLayouts = subscribeRootWindowEvent(
+            TEXT_LAYOUT_CHANGED_EVENT,
+            this.refresh
+        );
         this.refresh();
     },
 
@@ -125,6 +144,7 @@ export default {
     beforeUnmount() {
         this._unsubscribeQuickTranslation();
         this._unsubscribeLanguages();
+        this._unsubscribeTextLayouts();
     },
 
     methods: {
@@ -136,10 +156,20 @@ export default {
             this.manualTextWidths = this._runtime.manuallySetTextWidths;
             this.textLayouts = TEXT_LAYOUT_FIELDS.map(([type, label]) => {
                 const layout = this._runtime.getAutomaticTextLayout(type, { preview: true });
+                const detected = getTextLayoutCapacities(layout);
+                const runtime = this._runtime;
+                const width =
+                    type === 'message_portrait'
+                        ? runtime.maxLineWidthWithPortrait
+                        : type === 'description' && !runtime.linkDescriptionMaxWidthToDialogue
+                          ? runtime.descriptionMaxLineWidth
+                          : runtime.maxLineWidth;
                 return {
                     label,
-                    width: layout ? Math.floor(layout.width) : null,
-                    maxChars: layout?.maxChars,
+                    ...(this.manualTextWidths
+                        ? getManualTextLayoutCapacities(width, runtime.textWrapFontScaleMultiplier)
+                        : detected),
+                    detected,
                     maxRows: layout?.maxRows,
                 };
             });

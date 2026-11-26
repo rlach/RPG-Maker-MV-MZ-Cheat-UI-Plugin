@@ -1,9 +1,35 @@
+import { TAG_TYPE } from './constants.js';
+
 function stripTranslationTags(value, tagManager) {
     let text = String(value || '');
     for (const entry of tagManager?.tagEntries || []) {
         text = text.replace(new RegExp(entry.prePattern.source, 'gi'), '');
     }
     return text.replace(/\\[{}]/g, '').replace(/<br\s*\/?\s*>/gi, '');
+}
+
+/**
+ * Strip tags whose values are not meant to be translated (no-parameter, numeric,
+ * and masked custom-parameter tags), while keeping the inner value of unmasked
+ * custom-parameter tags so untranslated tag payloads still count as text.
+ */
+function stripNonTranslatableTags(value, tagManager) {
+    let text = String(value || '');
+    for (const entry of tagManager?.tagEntries || []) {
+        const pattern = new RegExp(entry.prePattern.source, 'gi');
+        if (entry.type === TAG_TYPE.WITH_CUSTOM_PARAMETER && !entry.maskValue) {
+            text = text.replace(pattern, (_match, inner) =>
+                typeof inner === 'string' ? inner : ''
+            );
+        } else {
+            text = text.replace(pattern, '');
+        }
+    }
+    return text.replace(/\\[{}]/g, '').replace(/<br\s*\/?\s*>/gi, '');
+}
+
+function hasTranslatableContentForIdenticalCheck(value, tagManager) {
+    return /\p{L}/u.test(stripNonTranslatableTags(value, tagManager));
 }
 
 const withoutClosingQuotes = (text) => text.trim().replace(/[\s"'”’」』）)\]】»]+$/g, '');
@@ -56,7 +82,11 @@ export function detectTranslationSuspicions(original, translated, tagManager, op
     const reasons = [];
     const normalizedOriginal = String(original ?? '').trim();
     const normalizedTranslated = String(translated ?? '').trim();
-    if (normalizedOriginal.length > 0 && normalizedOriginal === normalizedTranslated) {
+    if (
+        normalizedOriginal.length > 0 &&
+        normalizedOriginal === normalizedTranslated &&
+        hasTranslatableContentForIdenticalCheck(normalizedOriginal, tagManager)
+    ) {
         reasons.push({
             id: 'identical-translation',
             label: 'Identical translation',

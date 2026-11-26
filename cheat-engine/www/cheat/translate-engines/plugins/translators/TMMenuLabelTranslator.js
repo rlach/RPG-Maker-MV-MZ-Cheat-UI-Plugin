@@ -1,4 +1,5 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
+import { withVariableDisplayContext } from '../../../js/translation-runtime/VariableDisplayContext.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_TM_MENU_LABEL_TRANSLATOR_HOOKED__';
 
@@ -13,6 +14,9 @@ const PARAM_FIELDS = [
     'labelDFooter',
 ];
 
+/** TMMenuLabel 1.1.1 (MV and MZ port, RJ01516332): captions, units and
+ * safe variable values are localized only during menu presentation.
+ */
 export class TMMenuLabelTranslator extends BasePluginTranslator {
     constructor() {
         super();
@@ -116,6 +120,13 @@ export class TMMenuLabelTranslator extends BasePluginTranslator {
                     );
                 }
 
+                // Resolve the selected variable only at its display boundary.
+                // The raw value remains available to game logic and saves.
+                const variableId = Number(label?.id);
+                if (variableId > 0)
+                    arguments[3] = withVariableDisplayContext(() =>
+                        window.$gameVariables.value(variableId)
+                    );
                 return originalDrawMenuLabel.apply(this, arguments);
             };
 

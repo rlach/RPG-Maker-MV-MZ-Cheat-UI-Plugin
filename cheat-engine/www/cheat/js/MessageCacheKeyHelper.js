@@ -35,19 +35,29 @@ export function getMessageSourceTextVariants(text) {
     return Array.from(new Set(variants));
 }
 
-export function buildMessageCacheLookupKeys(getCacheKey, text, hasPortrait = false) {
+export function buildMessageCacheLookupKeys(
+    getCacheKey,
+    text,
+    hasPortrait = false,
+    preferTroop = false
+) {
     if (typeof getCacheKey !== 'function') {
         return [];
     }
 
     const messageTypes = hasPortrait
-        ? ['message_portrait', 'message']
+        ? ['message_portrait', 'message', 'troop']
         : [
               'message',
               // Fallback across message variants when portrait state differs between
               // harvesting and runtime rendering contexts.
               'message_portrait',
+              'troop',
           ];
+    if (preferTroop) {
+        messageTypes.splice(messageTypes.indexOf('troop'), 1);
+        messageTypes.unshift('troop');
+    }
 
     const messageTextVariants = getMessageSourceTextVariants(text);
     const keys = [];

@@ -1,3 +1,11 @@
+import { MyGameSuiteTranslator } from './translators/MyGameSuiteTranslator.js';
+import { WindowsetMenuTranslator } from './translators/WindowsetMenuTranslator.js';
+import { DarkPlasmaAutoLineBreakTranslator } from './translators/DarkPlasmaAutoLineBreakTranslator.js';
+import { MessagePlusTranslator } from './translators/MessagePlusTranslator.js';
+import { MoviePictureTranslator } from './translators/MoviePictureTranslator.js';
+import { NlmCardItemSelectTranslator } from './translators/NlmCardItemSelectTranslator.js';
+import { OnlyOneBattleStatusTranslator } from './translators/OnlyOneBattleStatusTranslator.js';
+import { TomomiUiTranslator } from './translators/TomomiUiTranslator.js';
 import { YepVictoryAftermathTranslator } from './translators/YepVictoryAftermathTranslator.js';
 import { Project3UiTranslator } from './translators/Project3UiTranslator.js';
 import { SakuraEventIndicatorTranslator } from './translators/SakuraEventIndicatorTranslator.js';
@@ -327,6 +335,7 @@ import { BattleEroTranslator } from './translators/BattleEroTranslator.js';
 import { RecollectionRoomTranslator } from './translators/RecollectionRoomTranslator.js';
 import { CallEnemyTranslator } from './translators/CallEnemyTranslator.js';
 import { FtkrOriginalSceneWindowTranslator } from './translators/FtkrOriginalSceneWindowTranslator.js';
+import { InputFormMzTranslator } from './translators/InputFormMzTranslator.js';
 import { MenuWindowTranslator } from './translators/MenuWindowTranslator.js';
 import { isRpgMakerMv } from '../../js/RpgMakerRuntime.js';
 
@@ -366,8 +375,17 @@ class PluginTranslatorRegistry {
             InfoWindowTranslator,
             MenuWindowTranslator,
             FtkrOriginalSceneWindowTranslator,
+            InputFormMzTranslator,
             NYAInfoMenuWindowTranslator,
             VitsunoDifficultyTranslator,
+            DarkPlasmaAutoLineBreakTranslator,
+            MessagePlusTranslator,
+            MyGameSuiteTranslator,
+            WindowsetMenuTranslator,
+            MoviePictureTranslator,
+            NlmCardItemSelectTranslator,
+            OnlyOneBattleStatusTranslator,
+            TomomiUiTranslator,
             YepVictoryAftermathTranslator,
             AnimationMapNameTranslator,
 

@@ -1,6 +1,7 @@
 import { BasePluginTranslator } from '../BasePluginTranslator.js';
 import { parseJsonSafely } from './TranslatorHelpers.js';
 import { withVariableDisplayContext } from '../../../js/translation-runtime/VariableDisplayContext.js';
+import { extractJavaScriptTextCatalog } from './JavaScriptTextCatalog.js';
 
 const CACHE_TYPE = 'plugin_ll_menu_screen';
 const DEBUG_TAG = '[LLMenuScreenTranslator]';
@@ -101,6 +102,22 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
     }
 
     _appendEntriesFromParameters(parameters, output) {
+        // Block values are JavaScript expressions evaluated by LL at draw time.
+        // Parse their authored literals without executing or changing the expression.
+        for (const label of LABEL_PARAM_FIELDS) {
+            const field = label.replace(/Label$/, 'Value');
+            const expression = parameters?.[field];
+            if (typeof expression !== 'string' || !expression.trim()) continue;
+            try {
+                // Keep trailing // comments (e.g. LL's built-in @option comments)
+                // from commenting out the closing wrapper parentheses.
+                for (const entry of extractJavaScriptTextCatalog(`({text: (\n${expression}\n)})`)
+                    .entries)
+                    output.push({ text: entry.text, source: { field } });
+            } catch (error) {
+                console.warn(`${DEBUG_TAG} Failed to parse ${field} expression`, error);
+            }
+        }
         // Older/index-based LL layouts use individual helpTextItem/Skill/etc.
         for (const [field, text] of Object.entries(parameters || {})) {
             if (/^helpText[A-Z]/.test(field) && typeof text === 'string' && text.trim())
@@ -455,13 +472,7 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
                             const runtime = getRuntime();
                             if (runtime && isRuntimeTranslationActive(runtime)) {
                                 // Resolve from plugin-specific cache only; keep misses unchanged.
-                                resolved = resolveRuntimeTranslation(text, runtime, CACHE_TYPE, {
-                                    missValue: text,
-                                    harvestMissing: false,
-                                });
-                                if (resolved === text) {
-                                    resolved = resolveFromCache(text, runtime, false);
-                                }
+                                resolved = resolveFromCache(text, runtime, false);
                             }
                         }
                     } catch (error) {
@@ -473,6 +484,12 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
 
                     return protoDrawText.call(this, resolved, x, y, maxWidth, align);
                 };
+
+                // Window_MenuHelp.initialize() runs refresh() before this hook is attached.
+                // Re-render once so static block labels are translated even without help text.
+                if (typeof win.refresh === 'function') {
+                    win.refresh();
+                }
             } catch (error) {
                 console.warn(
                     '[LLMenuScreenCustomTranslator] Failed to patch Window_MenuHelp instance',
@@ -497,13 +514,7 @@ export class LLMenuScreenCustomTranslator extends BasePluginTranslator {
                     if (ctorName === 'Window_MenuHelp' && typeof text === 'string' && text.trim()) {
                         const runtime = getRuntime();
                         if (runtime && isRuntimeTranslationActive(runtime)) {
-                            resolved = resolveRuntimeTranslation(text, runtime, CACHE_TYPE, {
-                                missValue: text,
-                                harvestMissing: false,
-                            });
-                            if (resolved === text) {
-                                resolved = resolveFromCache(text, runtime, false);
-                            }
+                            resolved = resolveFromCache(text, runtime, false);
                         }
                     }
                 } catch (error) {

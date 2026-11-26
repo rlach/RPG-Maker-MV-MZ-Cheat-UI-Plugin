@@ -26,6 +26,29 @@ export class YepVictoryAftermathTranslator extends SourceTextCatalogTranslator {
     shouldScanEventData() {
         return false;
     }
+    enablePluginTranslation() {
+        const prototype = window.Window_VictoryExp?.prototype;
+        if (
+            typeof prototype?.refresh !== 'function' ||
+            typeof prototype?.drawAllGauges !== 'function'
+        )
+            return false;
+        if (!super.enablePluginTranslation()) return false;
+        const translator = this;
+        const refresh = prototype.refresh;
+        prototype.refresh = function (...args) {
+            const result = refresh.apply(this, args);
+            // Native refresh clears the contents and redraws portraits only.
+            // Once ticks finish, updateTicks never paints gauges again.
+            if (
+                Number.isFinite(this._tick) &&
+                translator.isRuntimeTranslationActive(translator.getRuntime())
+            )
+                this.drawAllGauges();
+            return result;
+        };
+        return true;
+    }
     async collectAdditionalTexts() {
         const response = await fetch('js/plugins.js');
         if (!response.ok) throw new Error('Cannot read original victory parameters');

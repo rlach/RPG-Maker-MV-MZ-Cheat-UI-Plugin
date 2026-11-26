@@ -105,7 +105,7 @@ describe('Quick translation', () => {
         [true, '\\{\\}', false],
         [false, '\\FS[40]', true],
     ])(
-        'checks names (%s) and font size tags (%s) in manual mode (%s) before starting the real queue',
+        'checks names (%s) and proceeds regardless of font size tags (%s) in manual mode (%s)',
         async (hasNames, sizeTag, manual, needsRepair) => {
             vi.stubGlobal('window', {});
             const scanForUnknownTagsAsync = vi.fn(async () => [{ pattern: '\\FOOBAR[N]' }]);
@@ -195,25 +195,24 @@ describe('Quick translation', () => {
 
             await quickTranslate(runtime);
 
-            const needsPreview = Boolean(manual && sizeTag);
-            expect(runBatchedTranslation).toHaveBeenCalledTimes(hasNames && !needsPreview ? 2 : 1);
-            expect(hud.updateProgressBox).toHaveBeenCalledTimes(hasNames && !needsPreview ? 1 : 0);
-            if (hasNames && !needsPreview) {
+            expect(runBatchedTranslation).toHaveBeenCalledTimes(hasNames ? 2 : 1);
+            expect(hud.updateProgressBox).toHaveBeenCalledTimes(hasNames ? 1 : 0);
+            if (hasNames) {
                 expect(hud.updateProgressBox).toHaveBeenCalledWith('Phase', 'Progress', 'Total');
                 expect(hud.hideProgressBox).toHaveBeenCalledTimes(1);
             }
             const status = getQuickTranslationState();
             expect(status.suspicions).toEqual(
-                hasNames && !needsPreview
+                hasNames
                     ? {
                           total: 1,
                           issues: [{ id: 'fewer-sentences', label: 'Fewer sentences', count: 1 }],
                       }
                     : null
             );
-            expect(status.showWidthPreview).toBe(needsPreview);
+            expect(status.showWidthPreview).toBe(false);
             expect(status.message.includes('No reliable name pattern')).toBe(!hasNames);
-            expect(status.message.includes('Font-size tags detected')).toBe(needsPreview);
+            expect(status.message.includes('Font-size tags detected')).toBe(false);
             expect(scanForUnknownTagsAsync).toHaveBeenCalledTimes(1);
             expect(persistCache).toHaveBeenCalledTimes(Number(hasNames) + Number(!!needsRepair));
             if (needsRepair) {

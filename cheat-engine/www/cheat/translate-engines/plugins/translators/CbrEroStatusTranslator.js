@@ -3,6 +3,7 @@ import { extractJavaScriptTextCatalog } from './JavaScriptTextCatalog.js';
 import { parseJsonSafely } from './TranslatorHelpers.js';
 import { loadMapDataById } from '../../../js/translation-runtime/ObjectTranslationModalMethods.js';
 import { isRpgMakerMv } from '../../../js/RpgMakerRuntime.js';
+import { prepareCbrVariableText, restoreCbrVariableText } from './CbrVariableText.js';
 
 const RUNTIME_HOOK_GUARD = '__CHEAT_CBR_ERO_STATUS_TRANSLATOR_HOOKED__';
 const PLUGIN_SCRIPT_HEADER = 'CBR-エロステータス';
@@ -28,6 +29,8 @@ function extractTextPayloadFromDataLine(line) {
 }
 
 /** CBR_EroStatus MZ, including script-generated impressions in RJ01683605.
+ * RJ01516332's 2023-12-08 revision expands text variables privately; protect
+ * their display output through measurement without localizing image/scripts.
  * RJ01284200 v1.0.0 (MZ) adds hardcoded multipage labels and CBR_hSceneList.json.
  * Scan JavaScript display text without executing events. Translate evaluated
  * segments before measuring/drawing; keep script expressions and state intact.
@@ -88,6 +91,13 @@ export class CbrEroStatusTranslator extends SourceTextCatalogTranslator {
         return 'plugin_cbr_ero_status';
     }
 
+    resolveText(text, runtime, ...args) {
+        return restoreCbrVariableText(
+            super.resolveText(text, runtime, ...args),
+            this.variableTokens
+        );
+    }
+
     enablePluginTranslation() {
         if (window[RUNTIME_HOOK_GUARD]) {
             return true;
@@ -119,6 +129,16 @@ export class CbrEroStatusTranslator extends SourceTextCatalogTranslator {
                 });
             }
             const bitmap = this.contents;
+            const page = window.CBR.eroStatus?.data?.[window.CBR.eroStatus.pageNow];
+            const records = page?.['テキスト'];
+            const previousTokens = translator.variableTokens;
+            if (Array.isArray(records)) {
+                const display = prepareCbrVariableText(records, (id) =>
+                    window.$gameVariables.value(id)
+                );
+                page['テキスト'] = display.text;
+                translator.variableTokens = display.tokens;
+            }
             const measure = bitmap.measureTextWidth;
             const ownMeasure = Object.prototype.hasOwnProperty.call(bitmap, 'measureTextWidth');
             bitmap.measureTextWidth = function (text) {
@@ -127,6 +147,8 @@ export class CbrEroStatusTranslator extends SourceTextCatalogTranslator {
             try {
                 return refresh.apply(this, args);
             } finally {
+                if (Array.isArray(records)) page['テキスト'] = records;
+                translator.variableTokens = previousTokens;
                 if (ownMeasure) bitmap.measureTextWidth = measure;
                 else delete bitmap.measureTextWidth;
             }

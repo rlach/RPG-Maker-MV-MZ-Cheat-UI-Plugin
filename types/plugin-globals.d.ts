@@ -41,3 +41,11 @@ declare interface Window {
         };
     };
 }
+
+interface Window {
+    Window_VictoryExp?: { prototype: any };
+}
+
+interface Window {
+    CanvasRenderingContext2D?: { prototype: any };
+}

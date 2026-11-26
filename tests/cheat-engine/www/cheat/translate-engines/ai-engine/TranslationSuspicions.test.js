@@ -373,6 +373,57 @@ it('flags translations identical to the original text as Identical translation',
     expect(detectTranslationSuspicions('', '', manager())).toEqual([]);
 });
 
+it('excludes numbers, special characters, and masked/non-translatable tags from Identical translation', () => {
+    const tm = manager();
+    tm.setCustomTagConfigs([
+        {
+            description: 'Masked SE tag',
+            tagSymbol: 'SE',
+            type: 'withCustomParameter',
+            style: 'escape',
+            bracket: '[',
+            maskValue: true,
+            requiredConsistency: true,
+        },
+        {
+            description: 'Unmasked speaker tag',
+            tagSymbol: 'NAME',
+            type: 'withCustomParameter',
+            style: 'escape',
+            bracket: '<',
+            maskValue: false,
+            requiredConsistency: true,
+        },
+    ]);
+
+    const excludedCases = [
+        '123',
+        '0 / 100',
+        '100%',
+        '！？……',
+        '---',
+        '\\I[57]\\C[6]\\V[331]',
+        '\\V[1] / \\V[2]',
+        '\\SE[bgm_battle_01]',
+        '\\C[2]\\SE[bgm_battle_01] 100%!',
+        '\\NAME<123>',
+    ];
+    for (const sample of excludedCases) {
+        expect(
+            detectTranslationSuspicions(sample, sample, tm).map((r) => r.id),
+            sample
+        ).not.toContain('identical-translation');
+    }
+
+    // Real text and unmasked custom tag values with letters must still be flagged.
+    for (const flaggedSample of ['\\SE[bgm_01] こんにちは', '\\NAME<しえる>', '\\C[6]HP\\C[0]']) {
+        expect(
+            detectTranslationSuspicions(flaggedSample, flaggedSample, tm).map((r) => r.id),
+            flaggedSample
+        ).toContain('identical-translation');
+    }
+});
+
 it('flags foreign CJK characters when translating from Japanese/Korean/Chinese to a different script', () => {
     expect(
         detectTranslationSuspicions('これは私の猫です。', 'This is my の cat.', manager(), {
@@ -424,4 +475,23 @@ it('flags foreign CJK characters when translating from Japanese/Korean/Chinese t
             targetLang: 'zh-TW',
         }).map((r) => r.id)
     ).not.toContain('foreign-characters');
+});
+
+it('accepts a single filtered suspicion and ignores an empty result', async () => {
+    vi.stubGlobal('window', globalThis);
+    const { default: Panel } = await import('../../../../../../cheat-engine/www/cheat/panels/TranslateCacheManagerPanel.js');
+    const show = vi.spyOn(ConfirmDialog, 'show');
+    const panel = {
+        suspicionFilter: 'partial-tags', searchInput: '', selectedTypeFilter: 'message',
+        getEntriesMatchingFilter: vi.fn(() => [{ key: 'single' }]),
+        acceptSuspicions: vi.fn(),
+    };
+    Panel.methods.confirmAcceptMatchingSuspicions.call(panel);
+    const options = show.mock.calls[0][0];
+    options.actions[1].action();
+    expect(panel.acceptSuspicions).toHaveBeenCalledWith(['single']);
+    show.mockClear();
+    panel.getEntriesMatchingFilter.mockReturnValue([]);
+    Panel.methods.confirmAcceptMatchingSuspicions.call(panel);
+    expect(show).not.toHaveBeenCalled();
 });

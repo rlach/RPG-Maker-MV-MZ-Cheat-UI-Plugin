@@ -7,7 +7,6 @@ import {
     getNameDetectionEvidence,
     getQuickTagConfigs,
 } from './QuickTranslationRules.js';
-import { hasCachedFontSizeTags } from './TextWrap.js';
 import { applyNamePatternRepair, previewNamePatternRepair } from '../NamePatternCacheRepair.js';
 
 export const QUICK_TRANSLATION_EVENT = 'quick-translation';
@@ -150,15 +149,6 @@ export async function quickTranslate(runtime) {
             runtime.saveSettings();
             runtime.notifyCacheRuntime('quick-translation-name-pattern');
             addNamesToCache(runtime, selected.names.keys(), 'quick-translation-found-names');
-        }
-        if (
-            runtime.manuallySetTextWidths &&
-            hasCachedFontSizeTags(cacheKeys, languagePrefix, engine.tagManager.tagEntries)
-        ) {
-            state.showWidthPreview = true;
-            warnings.push(
-                'Font-size tags detected. Check the font size multiplier in Settings, then run Mass Translation manually.'
-            );
         }
         if (warnings.length) {
             update(warnings.join('\n'), true);

@@ -153,6 +153,7 @@ export class LunatlazurActorNameWindowTranslator extends BasePluginTranslator {
         const isUsableText = this.isUsableText.bind(this);
         const isRuntimeTranslationActive = this.isRuntimeTranslationActive.bind(this);
         const resolveRuntimeTranslation = this.resolveRuntimeTranslation.bind(this);
+        const resolveNameSource = this.resolveNameSource.bind(this);
 
         // Hook the plugin's own name-box text setter so only the visible name payload is replaced.
         nameWindow.setText = function (text) {
@@ -161,7 +162,8 @@ export class LunatlazurActorNameWindowTranslator extends BasePluginTranslator {
             try {
                 const runtime = getRuntime();
                 if (runtime && isUsableText(text) && isRuntimeTranslationActive(runtime)) {
-                    nextText = resolveRuntimeTranslation(text, runtime, ACTOR_NAME_CACHE_TYPE, {
+                    const source = resolveNameSource(text, runtime);
+                    nextText = resolveRuntimeTranslation(source, runtime, ACTOR_NAME_CACHE_TYPE, {
                         missValue: text,
                     });
                 }
@@ -176,6 +178,22 @@ export class LunatlazurActorNameWindowTranslator extends BasePluginTranslator {
         };
 
         nameWindow._cheatLunatlazurActorNameHooked = true;
+    }
+
+    resolveNameSource(text, runtime) {
+        // The name tag may come from a translated message. Only the preserved
+        // original message can establish which speaker this display belongs to.
+        const original = window.$gameMessage?._translateOriginalText;
+        if (typeof original !== 'string') return text;
+        const names = [...original.matchAll(/\\N<([^>]+)>/gi)].map((match) => match[1]);
+        if (names.includes(text)) return text;
+        if (new Set(names).size === 1) return names[0];
+        const candidates = names.filter(
+            (name) =>
+                runtime.translationCache.get(runtime.getCacheKey(name, ACTOR_NAME_CACHE_TYPE)) ===
+                text
+        );
+        return new Set(candidates).size === 1 ? candidates[0] : text;
     }
 
     async buildScanEntries() {

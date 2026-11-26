@@ -149,7 +149,9 @@ export class Troops extends BasePhase {
                 .filter((entry) => entry && entry.cacheKey)
                 .map((entry) => [entry.cacheKey, entry])
         );
-        const changedKeys = [];
+        const changedKeys = (successes || [])
+            .filter((entry) => entry?.cacheKey)
+            .map((entry) => entry.cacheKey);
 
         for (const success of successes || []) {
             if (!success || !success.cacheKey) {
@@ -169,6 +171,9 @@ export class Troops extends BasePhase {
             }
 
             for (const originalType of originalTypes) {
+                // Message rendering can read the canonical troop bucket directly.
+                // Choices and speakers still use their own standard namespaces.
+                if (originalType === 'message' || originalType === 'message_portrait') continue;
                 const cacheKey = runtime.getCacheKey(originalValue, originalType);
                 runtime.setCacheValue(cacheKey, success.translated, {
                     persist: false,

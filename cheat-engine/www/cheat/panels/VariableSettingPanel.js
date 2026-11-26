@@ -4,6 +4,8 @@ import { ensureTranslationRuntime } from '../js/translation-runtime/TranslationR
 import { tableSessionMixin } from '../js/TableSessionState.js';
 import { getPinnedVariableIds, setVariablePinned } from '../js/VariablePins.js';
 
+import { getVariableType } from '../js/VariableValueType.js';
+
 export default {
     name: 'VariableSettingPanel',
     mixins: [tableSessionMixin('variables')],
@@ -21,6 +23,9 @@ export default {
                 @keydown.stop
                 @focus="$event.target.select()">
             </v-text-field>
+            <v-select v-model="variableType" :items="variableTypeOptions"
+                label="Value type" density="compact" variant="outlined" hide-details
+                style="flex: 0 0 170px;" class="mx-2" />
             <v-switch
                 v-model="onlySafeForTranslate" density="compact"
                 hide-details
@@ -169,8 +174,18 @@ export default {
     },
 
     computed: {
+        variableTypeOptions() {
+            return [
+                { title: 'All types', value: '' },
+                ...[...new Set(this.tableItems.map((item) => getVariableType(item.value)))]
+                    .sort()
+                    .map((value) => ({ title: value, value })),
+            ];
+        },
         filteredTableItems() {
             return this.tableItems.filter((item) => {
+                if (this.variableType && getVariableType(item.value) !== this.variableType)
+                    return false;
                 if (this.onlyPinned && !item.pinned) return false;
                 const matchesNameless = !this.excludeNameless || !!item.name;
                 const matchesSafeFilter = !this.onlySafeForTranslate || !!item.safeForTranslate;

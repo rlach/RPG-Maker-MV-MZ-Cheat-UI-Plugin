@@ -115,10 +115,12 @@ export function createWindowUiApp(hostWindow, options) {
                 VCheckbox: { density: 'compact' },
                 VDataTable: {
                     density: 'compact',
-                    showFirstLastPage: false,
+                    showFirstLastPage: true,
                     itemsPerPageOptions: [5, 10, 20, 50, 100, -1],
                     itemsPerPageText: 'Rows per page:',
                 },
+                VDataTableServer: { showFirstLastPage: true },
+                VPagination: { showFirstLastPage: true },
                 VTooltip: { openDelay: 400, closeDelay: 0 },
             },
         })

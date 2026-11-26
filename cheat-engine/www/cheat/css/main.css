@@ -709,12 +709,6 @@ including Chromium versions without :has() support. */ .v-overlay-container .v-i
 .v-overlay-container .cheat-navigation .v-list-item-title span {
     white-space: nowrap;
 }
-#app .v-data-table-footer .v-pagination__first,
-#app .v-data-table-footer .v-pagination__last,
-.v-overlay-container .v-data-table-footer .v-pagination__first,
-.v-overlay-container .v-data-table-footer .v-pagination__last {
-    display: none;
-}
 #app .v-table .cheat-health-cell,
 .v-overlay-container .v-table .cheat-health-cell {
     display: flex;

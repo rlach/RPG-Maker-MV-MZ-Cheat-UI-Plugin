@@ -127,3 +127,79 @@ it('translates current location from map_name in private menu windows, preservin
     runtime.enabled = false;
     expect(scene._menuHelpWindow.drawText('ペタルプロ事務所')).toBe('ペタルプロ事務所');
 });
+
+it('scans block labels when block value expressions contain trailing // comments and refreshes initial labels on open', () => {
+    vi.stubGlobal('window', globalThis);
+    vi.stubGlobal('$plugins', [
+        {
+            name: 'LL_MenuScreenCustom',
+            status: true,
+            parameters: {
+                menuHelpTexts: '[]',
+                leftBlockLabel: '現在地：',
+                leftBlockValue: '$gameMap.displayName()',
+                rightBlockLabel: 'プレイ時間：',
+                rightBlockValue: '$gameSystem.playtimeText()',
+                leftBottomBlockLabel: 'ループ回数',
+                leftBottomBlockValue: '$gameVariables.value(198)   // 変数ID:198の値',
+            },
+        },
+    ]);
+
+    const translator = new LLMenuScreenCustomTranslator();
+    expect(translator.buildScanEntries().map((entry) => entry.text)).toEqual(
+        expect.arrayContaining(['現在地：', 'プレイ時間：', 'ループ回数'])
+    );
+
+    const drawn = [];
+    class BaseWindow {
+        drawText(text) {
+            drawn.push(text);
+            return text;
+        }
+    }
+    class Window_MenuHelp extends BaseWindow {
+        constructor() {
+            super();
+            this.refresh();
+        }
+        refresh() {
+            this.drawText('現在地：');
+            this.drawText('プレイ時間：');
+            this.drawText('ループ回数');
+        }
+    }
+    class Menu {
+        update() {}
+        createMenuHelpWindow() {
+            this._menuHelpWindow = new Window_MenuHelp();
+        }
+    }
+    vi.stubGlobal('Window_Base', BaseWindow);
+    vi.stubGlobal('Scene_Menu', Menu);
+
+    const runtime = {
+        enabled: true,
+        isTranslationEnabled() {
+            return this.enabled;
+        },
+        translationCache: new Map([
+            ['plugin_ll_menu_screen:現在地：', 'Location: '],
+            ['plugin_ll_menu_screen:プレイ時間：', 'Playtime: '],
+            ['plugin_ll_menu_screen:ループ回数', 'Loops: '],
+        ]),
+        getCacheKey: (text, type) => `${type}:${text}`,
+        hasUsableCacheValue(key) {
+            return this.translationCache.has(key);
+        },
+        trackCacheKeyUsage: vi.fn(),
+    };
+    vi.spyOn(translator, 'getRuntime').mockReturnValue(runtime);
+
+    expect(translator.enablePluginTranslation()).toBe(true);
+    const scene = new Menu();
+    scene.createMenuHelpWindow();
+
+    // The re-render triggered after hooking drawText must emit translated labels.
+    expect(drawn.slice(-3)).toEqual(['Location: ', 'Playtime: ', 'Loops: ']);
+});

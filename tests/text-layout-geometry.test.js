@@ -53,6 +53,37 @@ describe('automatic text layout', () => {
         expect(scene._messageWindow).toBeUndefined();
     });
 
+    it('runs updatePlacement on synthetic title-screen message window so plugins like NRP_MessageWindow apply configured width', () => {
+        const scene = { calcWindowHeight: () => 220 };
+        const messageWindowRect = vi.fn(() => ({ width: 1600, height: 220 }));
+        const Window_Message = vi.fn(function (rect) {
+            this.width = rect.width;
+            this.height = rect.height;
+            Object.assign(this, makeMessageWindow(), {
+                contentsWidth: () => this.width - 24,
+                resetFontSettings() {
+                    this.contents.fontSize = 42;
+                },
+                updatePlacement() {
+                    this.width = 760;
+                },
+            });
+        });
+        const root = {
+            $gameSystem: {},
+            $gameMessage: { faceName: () => '' },
+            SceneManager: { _scene: scene },
+            Scene_Message: { prototype: { messageWindowRect } },
+            Window_Message,
+            Bitmap,
+        };
+        // 760 - 24 (padding) - 4 (inset) = 732; at fontSize 42 (digit width 21), floor(732 / 21) = 34
+        expect(resolveTextLayout({}, 'message', root)).toMatchObject({
+            width: 732,
+            maxChars: 34,
+        });
+    });
+
     it('uses the MZ text window, independently of screen width, and caches geometry', () => {
         const messageWindow = makeMessageWindow();
         const root = {

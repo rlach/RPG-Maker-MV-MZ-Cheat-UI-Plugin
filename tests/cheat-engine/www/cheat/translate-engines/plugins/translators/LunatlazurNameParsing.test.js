@@ -5,6 +5,37 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
+it('uses the original message speaker when translated tags reach the name window', () => {
+    const { Message, translator, runtime } = setup();
+    runtime.translationCache.set('actor_name:服屋', 'Clothier');
+    runtime.hasUsableCacheValue = (key) => runtime.translationCache.has(key);
+    vi.stubGlobal('$gameMessage', { _translateOriginalText: '\\N<服屋>Hello' });
+    expect(translator.enablePluginTranslation()).toBe(true);
+    const message = new Message();
+    message.createSubWindows();
+    for (let index = 0; index < 3; index++) {
+        message.startMessage('\\N<Clothier>Hello');
+        expect(message._nameWindow.name).toBe('Clothier');
+    }
+    const keys = runtime.trackCacheKeyUsage.mock.calls.map(([key]) => key);
+    expect(keys).toContain('actor_name:服屋');
+    expect(keys).not.toContain('actor_name:Clothier');
+    expect(runtime.translationCache.has('actor_name:Clothier')).toBe(false);
+    expect($gameMessage._translateOriginalText).toBe('\\N<服屋>Hello');
+    runtime.translationCache.clear();
+    runtime.trackCacheKeyUsage.mockClear();
+    message.startMessage('\\N<Clothier>Hello');
+    expect(message._nameWindow.name).toBe('Clothier');
+    expect(runtime.trackCacheKeyUsage.mock.calls.map(([key]) => key)).toEqual(['actor_name:服屋']);
+
+    // An authored English source remains valid even if it equals another translation.
+    $gameMessage._translateOriginalText = '\\N<Clothier>Hello';
+    expect(translator.resolveNameSource('Clothier', runtime)).toBe('Clothier');
+    runtime.enabled = false;
+    message.startMessage('\\N<服屋>Hello');
+    expect(message._nameWindow.name).toBe('服屋');
+});
+
 function setup(parseDuringStart = false) {
     vi.stubGlobal('window', globalThis);
     class Base {

@@ -236,7 +236,9 @@ export const translateOnTheFlyCoreMethods = {
         return buildMessageCacheLookupKeys(
             this.getCacheKey.bind(this),
             text,
-            !!options?.hasPortrait
+            !!options?.hasPortrait,
+            options.preferTroop ??
+                !!(window.$gameParty?.inBattle() && window.$gameTroop?._interpreter?.isRunning())
         );
     },
 

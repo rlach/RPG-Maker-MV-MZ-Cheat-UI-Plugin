@@ -150,7 +150,7 @@ export default {
                                 item-title="text" item-value="value" aria-label="Suspicious"
                                 variant="outlined" single-line density="compact" hide-details style="max-width: 300px;" @keydown.stop />
                             <v-btn variant="text" icon size="small" color="success"
-                                title="Accept all matching suspicions" :disabled="suspicionFilter === 'any' || matchingFilterEntryCount <= 1"
+                                title="Accept all matching suspicions" :disabled="suspicionFilter === 'any' || matchingFilterEntryCount < 1"
                                 @click="confirmAcceptMatchingSuspicions">
                                 <v-icon>mdi-check-all</v-icon>
                             </v-btn>
@@ -585,7 +585,7 @@ export default {
                 this.searchInput,
                 this.selectedTypeFilter
             ).map((entry) => entry.key);
-            if (keys.length <= 1) return;
+            if (keys.length < 1) return;
             ConfirmDialog.show({
                 width: 500,
                 message: `Accept all suspicions for ${keys.length} translations matching all current filters?`,

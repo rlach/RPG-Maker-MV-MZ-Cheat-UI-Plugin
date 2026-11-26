@@ -1,3 +1,12 @@
+export function resolveOverlaySize(saved, host = window) {
+    return saved
+        ? { ...saved }
+        : {
+              width: Math.min(host.innerWidth * 0.98, host.innerWidth - 16),
+              height: Math.min(host.innerHeight * 0.98, host.innerHeight - 16),
+          };
+}
+
 export function observeOverlaySize(element, saveSize, host = window) {
     if (!host.MutationObserver) return () => {};
     let previousWidth = element.style.width;

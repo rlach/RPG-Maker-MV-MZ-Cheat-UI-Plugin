@@ -4,6 +4,7 @@ import {
     setUnifiedSetting,
 } from './UnifiedSettings.js';
 import { isRpgMakerMv } from './RpgMakerRuntime.js';
+import { resolveOverlaySize } from './OverlayResize.js';
 
 class CheatWindowManager {
     constructor() {
@@ -12,7 +13,7 @@ class CheatWindowManager {
         this.externalWindow = null;
         this.mainComponent = null;
         this.lastComponent = null;
-        this.overlaySize = { width: 700, height: 400 };
+        this.overlaySize = null;
         this.__load();
 
         const main = nw.Window.get();
@@ -33,7 +34,7 @@ class CheatWindowManager {
 
             if (data.overlaySize) {
                 const { width, height } = data.overlaySize;
-                if (Number.isFinite(width) && Number.isFinite(height)) {
+                if (Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0) {
                     this.overlaySize = { width, height };
                 }
             }
@@ -86,7 +87,7 @@ class CheatWindowManager {
     }
 
     getOverlaySize() {
-        return { ...this.overlaySize };
+        return resolveOverlaySize(this.overlaySize);
     }
 
     getExternalWindowPath() {

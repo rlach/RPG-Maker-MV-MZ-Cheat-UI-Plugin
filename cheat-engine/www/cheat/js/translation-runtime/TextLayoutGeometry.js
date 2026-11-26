@@ -1,3 +1,4 @@
+import { applyTextLayoutProviders } from './TextLayoutProviders.js';
 import { getRootWindow } from '../RootWindowState.js';
 
 const windowLayouts = new WeakMap();
@@ -68,7 +69,9 @@ function getStandardHelpLayout(root, mv) {
             ? 2
             : new Rectangle(0, 0, Graphics.boxWidth, Window_Help.prototype.fittingHeight(2));
         const help = new Window_Help(rect);
-        standardHelpLayouts.set($gameSystem, describeWindow(help, root, true, mv));
+        const layout = describeWindow(help, root, true, mv);
+        if (layout) layout.window = help;
+        standardHelpLayouts.set($gameSystem, layout);
     }
     return standardHelpLayouts.get($gameSystem);
 }
@@ -77,7 +80,17 @@ function getStandardMessageWindow(root, scene, mv) {
     if (!scene || !root.Window_Message) return null;
     if (!standardMessageWindows.has(scene)) {
         const rect = mv ? undefined : root.Scene_Message.prototype.messageWindowRect.call(scene);
-        standardMessageWindows.set(scene, new root.Window_Message(rect));
+        const win = new root.Window_Message(rect);
+        // Plugins such as NRP_MessageWindow allocate Graphics.width in messageWindowRect()
+        // and apply the actual configured width/height inside updatePlacement().
+        if (typeof win.updatePlacement === 'function') {
+            try {
+                win.updatePlacement();
+            } catch {
+                // Keep initial geometry if a plugin's updatePlacement expects live scene state.
+            }
+        }
+        standardMessageWindows.set(scene, win);
     }
     return standardMessageWindows.get(scene);
 }
@@ -125,13 +138,20 @@ export function resolveTextLayout(runtime, type, root = getRootWindow(), preview
                 : (root.ImageManager?.faceWidth ?? 144) + 20;
             inset = layout.insets.get(portrait) ?? (portrait ? faceInset : mv ? 0 : 4);
         }
-        const width = layout.width - inset;
+        const geometry = applyTextLayoutProviders(
+            { width: layout.width, inset, font: layout.font, maxRows: layout.maxRows },
+            { window: window || layout.window, type, root },
+            root
+        );
+        const width = geometry.width - geometry.inset;
         if (!(width > 0)) return null;
         return {
             width,
-            maxChars: Math.floor(width / layout.font.digitWidth),
-            maxRows: layout.maxRows,
-            font: layout.font,
+            maxChars: Math.floor(
+                width / geometry.font.measureGlyph('0', geometry.font.baseFontSize)
+            ),
+            maxRows: geometry.maxRows,
+            font: geometry.font,
         };
     } catch {
         return null;

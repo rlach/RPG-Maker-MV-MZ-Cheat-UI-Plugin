@@ -9,6 +9,7 @@ export function getTableSessionState(key) {
             onlyOwnedItems: false,
             onlySafeForTranslate: false,
             onlyPinned: false,
+            variableType: '',
             page: 1,
             sortBy: [],
             sortDesc: [],
@@ -27,6 +28,7 @@ export function tableSessionMixin(key) {
         'onlyOwnedItems',
         'onlySafeForTranslate',
         'onlyPinned',
+        'variableType',
         'page',
     ]) {
         computed[field] = {
